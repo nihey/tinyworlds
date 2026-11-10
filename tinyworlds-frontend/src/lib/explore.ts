@@ -1,7 +1,7 @@
 /**
  * The invitation, on a map, to the site's other places. Pure: when it is shown.
  *
- * It is for someone who landed on one map and may not know there are others. Putting it away
+ * It is mostly for someone who landed on one map and may not know there are others. Putting it away
  * is remembered in this browser, for every map at once (they share an origin), along with how
  * many places there were at the time: it comes back only when there are more.
  */
@@ -14,23 +14,13 @@ export function putAwayAt(raw: string | null): number {
   return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
-/** Whether the page the visitor came from is the site's own front page: they have just seen the list. */
-export function cameFromHome(referrer: string, origin: string, homeUrl: string): boolean {
-  try {
-    const from = new URL(referrer);
-    const home = new URL(homeUrl, origin);
-    return from.origin === home.origin && from.pathname === home.pathname;
-  } catch {
-    return false; // no referrer, or not an address
-  }
-}
-
 /**
- * Whether to invite: there are other places, the visitor has not just come from the list of
- * them, and there are more than when they last put the invitation away.
+ * Whether to invite: there are other places, and more of them than when the visitor last put
+ * the invitation away. Everyone else is invited, however they arrived: someone who came by way
+ * of the front page has seen the list, but a way back to it costs them nothing.
  */
-export function invites(others: number, putAway: number, fromHome: boolean): boolean {
-  return others > 0 && !fromHome && others > putAway;
+export function invites(others: number, putAway: number): boolean {
+  return others > 0 && others > putAway;
 }
 
 /** The front page, at its list of places. */

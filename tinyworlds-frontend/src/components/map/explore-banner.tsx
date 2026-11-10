@@ -3,7 +3,7 @@
 import { ArrowRight, X } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import { cameFromHome, EXPLORE_KEY, invites, placesUrl, putAwayAt } from "@/lib/explore";
+import { EXPLORE_KEY, invites, placesUrl, putAwayAt } from "@/lib/explore";
 import { cn } from "@/lib/utils";
 import { HOME_URL, SITE_ID } from "@/site";
 import { WORLDS } from "@/worlds";
@@ -19,11 +19,7 @@ function invited(): boolean {
   } catch {
     // storage blocked: they are invited on every visit, and can still put it away for this one
   }
-  return invites(
-    OTHERS.length,
-    putAway,
-    cameFromHome(document.referrer, window.location.origin, HOME_URL),
-  );
+  return invites(OTHERS.length, putAway);
 }
 
 /** A skyline of four towers, each lit in another world's colour: the other places, in a glyph. */
@@ -77,7 +73,7 @@ export function ExploreBanner({
   };
 
   return (
-    <div className={cn("explore-banner sign z-[5] flex items-center", className)} style={style}>
+    <div className={cn("other-places sign z-[5] flex items-center", className)} style={style}>
       {/* another build of the site, so a plain link */}
       <a
         href={placesUrl(HOME_URL)}

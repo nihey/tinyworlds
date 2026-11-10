@@ -139,8 +139,8 @@ src/
 - **The invitation to the other places** (`components/map/explore-banner.tsx`, rules in
   `lib/explore.ts`): a small sign under the search box, "8 more cities and worlds to explore",
   linking to the front page's list (`/#cities`). Most visitors land on one map and never see
-  that there are others. It arrives last, after the map's own signs; it is not shown to someone
-  who has just come from the front page; it can be put away, which is remembered for every map
+  that there are others. It arrives last, after the map's own signs, for everyone, however they
+  got to the map; it can be put away, which is remembered for every map
   (`localStorage` `tinyworlds.explore` holds how many other places there were) until the site
   has more places than then; and it steps aside while the search box is in use (a `:has()`
   rule in `globals.css`), because the results open over that spot. Its little skyline is lit
