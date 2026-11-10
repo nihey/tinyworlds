@@ -74,4 +74,19 @@ export const CURATED: Curated[] = [
   { n: "Green-Wood Cemetery", t: "park", lon: -73.9903, lat: 40.6584, r: 76, s: 0.5 },
   { n: "Domino Park", t: "park", lon: -73.9676, lat: 40.7146, r: 72, s: 2 },
   { n: "Stuyvesant Town", t: "place", lon: -73.978, lat: 40.7317, r: 70, s: 1 },
+  // Buildings the map dresses as landmarks (tinynyc.landmarks.ts) that the data's places do not
+  // list under the name people type. Positions are their footprints in the building data.
+  { n: "30 Rockefeller Plaza", t: "landmark", lon: -73.9796, lat: 40.7592, r: 82, s: 1.5 },
+  { n: "Hearst Tower", t: "landmark", lon: -73.9836, lat: 40.7666, r: 78, s: 1.5 },
+  { n: "Seagram Building", t: "landmark", lon: -73.972, lat: 40.7584, r: 78, s: 1.5 },
+  { n: "The New York Times Building", t: "landmark", lon: -73.9897, lat: 40.7559, r: 78, s: 1.5 },
+  { n: "Trump Tower", t: "landmark", lon: -73.9739, lat: 40.7623, r: 78, s: 1.5 },
+  { n: "The Dakota", t: "landmark", lon: -73.9761, lat: 40.7768, r: 78, s: 2 },
+  { n: "Citigroup Center", t: "landmark", lon: -73.9699, lat: 40.7583, r: 76, s: 1.5 },
+  { n: "4 World Trade Center", t: "landmark", lon: -74.012, lat: 40.7103, r: 76, s: 1.5 },
+  { n: "56 Leonard Street", t: "landmark", lon: -74.0063, lat: 40.7176, r: 76, s: 1.5 },
+  { n: "8 Spruce Street", t: "landmark", lon: -74.0056, lat: 40.7109, r: 74, s: 1.5 },
+  { n: "Lever House", t: "landmark", lon: -73.9729, lat: 40.7596, r: 74, s: 2 },
+  { n: "New York Life Building", t: "landmark", lon: -73.9856, lat: 40.7427, r: 74, s: 1.5 },
+  { n: "General Electric Building", t: "landmark", lon: -73.9724, lat: 40.7571, r: 72, s: 1.5 },
 ];
