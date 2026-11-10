@@ -1,5 +1,5 @@
 import type { Locale } from "@/i18n/locale";
-import { HOME, IS_HOME, WORLD, WORLDS } from "@/worlds";
+import { DEFAULT_WORLD, HOME, IS_HOME, WORLD, WORLDS } from "@/worlds";
 
 /**
  * What this build is, whichever it is: one world's map, or the front page that lists the worlds.
@@ -57,3 +57,25 @@ export const worldUrl = (id: string, base = WORLDS_BASE): string => `${base}/${i
 /** A world's share card, which doubles as its picture on the front page: it is served from the world's own folder. */
 export const worldCardUrl = (id: string, base = WORLDS_BASE, cards = CARDS_BASE): string =>
   cards ? `${cards}/${id}.jpg` : `${base}/${id}/og/${id}.jpg`;
+
+/** The sub-path this build is served under: empty for the front page at the site's root. */
+const BASE_PATH = trimmed(process.env.NEXT_PUBLIC_BASE_PATH);
+
+/**
+ * The front page's moving pictures (public/loops/, made by tinyworlds-videos). Unlike the share
+ * cards they are the front page's own files: only its build needs deploying for them to show.
+ */
+export const LOOPS_BASE = `${BASE_PATH}/loops`;
+
+/** A world's card loop: its share card's picture, drifting. Silent, a few hundred kB. */
+export const worldLoopUrl = (id: string, base = LOOPS_BASE): string => `${base}/${id}.mp4`;
+
+/** The front page's own share card (public/og/tinyworlds.jpg, made by the pipeline's `home-card`). */
+export const HOME_CARD_PATH = `${BASE_PATH}/og/tinyworlds.jpg`;
+
+/** The picture at the top of the front page: a slow lap over one world, and that lap's first frame. */
+export const HERO = {
+  world: DEFAULT_WORLD,
+  loop: `${LOOPS_BASE}/hero.mp4`,
+  still: `${LOOPS_BASE}/hero.jpg`,
+} as const;

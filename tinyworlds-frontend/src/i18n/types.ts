@@ -62,8 +62,12 @@ export interface Strings {
   home: {
     title: string;
     description: string;
+    /** what the front page's share card shows, for those who cannot see it */
+    cardAlt: string;
     tagline: string;
     pitch: string;
+    /** the hero's button, into the map its picture shows: "{city}" is that world's city */
+    explore: string;
     cities: string;
     /** the heading of the worlds that are not real places */
     imagined: string;

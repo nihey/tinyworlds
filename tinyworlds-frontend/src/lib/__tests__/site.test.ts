@@ -4,10 +4,13 @@ import {
   CONTACT_EMAIL,
   CONTACT_URL,
   GITHUB_URL,
+  HERO,
+  HOME_CARD_PATH,
   HOME_URL,
   SITE_ID,
   SITE_NAME,
   worldCardUrl,
+  worldLoopUrl,
   worldUrl,
 } from "@/site";
 
@@ -27,6 +30,13 @@ describe("site", () => {
     expect(worldCardUrl("tinyrao")).toBe("/tinyrao/og/tinyrao.jpg");
     expect(worldUrl("tinynyc", "/worlds")).toBe("/worlds/tinynyc/");
     expect(worldCardUrl("tinynyc", "/worlds")).toBe("/worlds/tinynyc/og/tinynyc.jpg");
+  });
+
+  it("keeps the moving pictures in the front page's own folder", () => {
+    expect(worldLoopUrl("tinyrao")).toBe("/loops/tinyrao.mp4");
+    expect(worldLoopUrl("tinyrao", "/sub/loops")).toBe("/sub/loops/tinyrao.mp4");
+    expect(HERO).toEqual({ world: "tinynyc", loop: "/loops/hero.mp4", still: "/loops/hero.jpg" });
+    expect(HOME_CARD_PATH).toBe("/og/tinyworlds.jpg");
   });
 
   it("says where to write about the project", () => {

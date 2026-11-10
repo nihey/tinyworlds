@@ -6,8 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DICTIONARIES } from "@/i18n";
 import { ogLocale } from "@/i18n/locale";
 import { PREFS_KEY } from "@/lib/prefs";
-import { SITE_ACCENT, SITE_HOME_LOCALE, SITE_ID, SITE_NAME, worldCardUrl } from "@/site";
-import { DEFAULT_WORLD, IS_HOME, WORLD, WORLDS } from "@/worlds";
+import { HOME_CARD_PATH, SITE_ACCENT, SITE_HOME_LOCALE, SITE_ID, SITE_NAME } from "@/site";
+import { IS_HOME, WORLD } from "@/worlds";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -32,15 +32,14 @@ const trimmed = (value: string | undefined) => (value ?? "").trim().replace(/\/+
 const siteUrl = trimmed(process.env.NEXT_PUBLIC_SITE_URL);
 const basePath = trimmed(process.env.NEXT_PUBLIC_BASE_PATH);
 
-// A world's page is about that world; the front page is about all of them, and borrows the
-// first world's share card.
-const lead = WORLDS[DEFAULT_WORLD];
+// A world's page is about that world; the front page is about all of them, and has a share
+// card of its own: several cities side by side under the site's name.
 const page = IS_HOME
   ? {
       title: DICTIONARIES[SITE_HOME_LOCALE].home.title,
       description: DICTIONARIES[SITE_HOME_LOCALE].home.description,
-      cardPath: worldCardUrl(lead.id, undefined, ""),
-      cardAlt: lead.copy[SITE_HOME_LOCALE].cardAlt,
+      cardPath: HOME_CARD_PATH,
+      cardAlt: DICTIONARIES[SITE_HOME_LOCALE].home.cardAlt,
     }
   : {
       title: WORLD.copy[SITE_HOME_LOCALE].title,

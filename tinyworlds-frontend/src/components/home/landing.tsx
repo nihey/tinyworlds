@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowUpRight, BadgeCheck, Code, Heart } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { DonateDialog } from "@/components/donate/donate-dialog";
 import { MilestoneBar } from "@/components/donate/milestone-bar";
+import { MovingPicture } from "@/components/home/moving-picture";
 import { Wordmark } from "@/components/map/wordmark";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMilestones } from "@/hooks/use-milestones";
@@ -14,7 +15,16 @@ import type { Locale, Strings } from "@/i18n";
 import { RANKING_LIMIT, rankCities } from "@/lib/city-picker";
 import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { cn } from "@/lib/utils";
-import { CONTACT_EMAIL, CONTACT_URL, GITHUB_URL, SITE_ID, worldCardUrl, worldUrl } from "@/site";
+import {
+  CONTACT_EMAIL,
+  CONTACT_URL,
+  GITHUB_URL,
+  HERO,
+  SITE_ID,
+  worldCardUrl,
+  worldLoopUrl,
+  worldUrl,
+} from "@/site";
 import { WORLDS, type World } from "@/worlds";
 
 const HEADING =
@@ -29,37 +39,21 @@ const ACTION =
 const QUIET =
   "rounded-sm text-xs font-semibold text-paper-dim underline decoration-paper-dim/50 underline-offset-2 outline-none hover:text-paper focus-visible:text-taxi";
 
-/** A world's share card as its picture; until there is one, its name on a plain plate. */
+/**
+ * A world's picture on its card: its share card, which starts to drift once the card is on
+ * screen (the loop opens on the card's own framing, wordmark and all). Until a world has a
+ * share card where the front page looks for it, its name on a plain plate.
+ */
 function CardPicture({ world, alt }: { world: World; alt: string }) {
-  const [missing, setMissing] = useState(false);
-  const picture = useRef<HTMLImageElement>(null);
-  // a picture that failed before the page came alive never tells: ask it
-  useEffect(() => {
-    const img = picture.current;
-    if (img && img.complete && img.naturalWidth === 0) setMissing(true);
-  }, []);
-  if (missing)
-    return (
-      <div
-        role="img"
-        aria-label={alt}
-        className="flex aspect-[1200/630] w-full items-center justify-center bg-sign-raised"
-      >
-        <Wordmark suffix={world.wordmark} accent={world.accent.color} className="text-4xl" />
-      </div>
-    );
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- a plain file from another build's folder
-    <img
-      ref={picture}
-      src={worldCardUrl(world.id)}
+    <MovingPicture
+      still={worldCardUrl(world.id)}
+      loop={worldLoopUrl(world.id)}
       alt={alt}
-      width={1200}
-      height={630}
-      loading="lazy"
-      decoding="async"
-      onError={() => setMissing(true)}
-      className="block aspect-[1200/630] h-auto w-full bg-sign-raised object-cover"
+      className="aspect-[1200/630] w-full"
+      fallback={
+        <Wordmark suffix={world.wordmark} accent={world.accent.color} className="text-4xl" />
+      }
     />
   );
 }
@@ -101,23 +95,16 @@ function WorldGrid({
                 className="group sign block h-full overflow-hidden transition-transform outline-none hover:-translate-y-0.5 focus-visible:shadow-[0_0_0_3px_var(--taxi)]"
               >
                 <CardPicture world={world} alt={copy.cardAlt} />
-                <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-4 py-3.5">
-                  <div className="min-w-[9rem] flex-1">
+                <div className="flex items-start gap-3 px-4 py-3.5">
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-lg leading-tight font-semibold text-paper">{copy.city}</h3>
                     <p className="pt-1 text-sm leading-snug text-paper-dim">{copy.card}</p>
                   </div>
-                  <span className="flex shrink-0 items-center gap-1 pt-0.5">
-                    <Wordmark
-                      suffix={world.wordmark}
-                      accent={world.accent.color}
-                      className="text-xl"
-                    />
-                    <ArrowUpRight
-                      aria-hidden
-                      className="size-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                      strokeWidth={2.25}
-                    />
-                  </span>
+                  <ArrowUpRight
+                    aria-hidden
+                    className="mt-0.5 size-5 shrink-0 text-paper-dim transition-[color,transform] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-taxi"
+                    strokeWidth={2.25}
+                  />
                 </div>
               </a>
             </li>
@@ -198,20 +185,38 @@ export function Landing() {
   const imagined = Object.values(WORLDS).filter((world) => world.fictional);
   const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
+  // the world the hero's picture shows, and its button leads into
+  const lead = WORLDS[HERO.world];
   const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-12 sm:px-6 sm:pt-8">
-      <header className="sign overflow-hidden">
-        <div aria-hidden className="h-[3px] bg-taxi" />
-        <div className="px-5 py-8 sm:px-10 sm:py-12">
-          <h1>
-            <Wordmark className="text-[clamp(3rem,13vw,5.5rem)]" />
-          </h1>
-          <p className="pt-3 text-xl font-semibold text-paper sm:text-2xl">{t.home.tagline}</p>
-          <p className="max-w-2xl pt-2 text-[15px] leading-relaxed text-paper-dim sm:text-base">
-            {t.home.pitch}
-          </p>
+      {/* The hero is a share card grown to the page's width: a city, alive, signed in its lower
+          left corner. On a narrow screen the sign hangs from the picture's edge instead of
+          covering it. */}
+      <header className="relative">
+        <MovingPicture
+          still={HERO.still}
+          loop={HERO.loop}
+          alt=""
+          eager
+          className="aspect-[16/11] w-full rounded-[10px] shadow-[0_0_0_1px_rgb(0_0_0/0.6),0_16px_34px_-14px_rgb(0_0_0/0.65)] sm:aspect-[16/9] lg:aspect-[2/1]"
+        />
+        <div className="sign relative mx-3 -mt-14 overflow-hidden sm:mx-5 sm:-mt-24 sm:max-w-md lg:absolute lg:bottom-5 lg:left-5 lg:m-0">
+          <div aria-hidden className="h-[3px] bg-taxi" />
+          <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6">
+            <h1>
+              <Wordmark className="text-[clamp(2.75rem,12vw,3.75rem)]" />
+            </h1>
+            <p className="pt-2.5 text-xl leading-tight font-semibold text-paper">
+              {t.home.tagline}
+            </p>
+            <p className="pt-1.5 text-[15px] leading-relaxed text-paper-dim">{t.home.pitch}</p>
+            <a href={worldUrl(lead.id)} className={`${ACTION} mt-4`}>
+              {t.home.explore.replace("{city}", lead.copy[locale].city)}
+              <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.5} />
+            </a>
+          </div>
         </div>
       </header>
 

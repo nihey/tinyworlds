@@ -60,7 +60,9 @@ Every data URL goes through `dataUrl()` in `src/map/data.ts`, which prefixes the
 appends `?v=<manifest.build>`. `public/data/` is generated and gitignored: move it out of the way
 before `next build` (the export would copy every tile into `out/`); without it the page shows the
 "map didn't load" dialog. `public/og/<world>.jpg` (1200×630 share cards, made by the pipeline) is
-committed and must stay.
+committed and must stay; so are `public/og/tinyworlds.jpg` (the front page's own share card, the
+pipeline's `home-card`) and `public/loops/` (the front page's moving pictures, made by
+`tinyworlds-videos`: `<world>.mp4`, `hero.mp4`, `hero.jpg`).
 
 ## Layout
 
@@ -85,7 +87,8 @@ src/
 │                        # column, minimap, settings, about, …
 ├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
 │                        # and the city progress bar the front page's ranking uses
-├── components/home/     # the front page
+├── components/home/     # the front page: landing.tsx, and moving-picture.tsx (a still that
+│                        # comes alive: the hero and the cards)
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
@@ -109,6 +112,20 @@ src/
 - The front page's cards are plain `<a href="/<id>/">` (another build) with the world's share
   card as picture, served from the world's own folder: `/<id>/og/<id>.jpg`. A world whose card
   is not there yet shows its wordmark on a plain plate instead.
+- **The front page's pictures move** (`components/home/moving-picture.tsx`). Each card plays
+  its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
+  the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
+  to it, so the still hands over to the film unseen and the film loops unseen. The hero is the
+  same idea at the page's width: `/loops/hero.jpg` and `hero.mp4`, a lap over the tip of
+  Manhattan, with the page's sign (wordmark, tagline, pitch, "Explore New York") over its lower
+  left; below `lg` the sign hangs from the picture's bottom edge instead of covering it.
+  A loop is fetched only when its picture is on screen (`preload="none"`, an
+  `IntersectionObserver`), plays while it stays there, and is never fetched under
+  `prefers-reduced-motion` or `Save-Data`; if it is missing or cannot play, the still stays.
+  The loops are the front page's own files (`LOOPS_BASE` in `site.ts`), unlike the share cards:
+  `deploy/deploy.sh home` is all they need, and a world's folder does not carry them.
+- **The front page's share card** is its own picture, `public/og/tinyworlds.jpg`
+  (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
   link back to the front page (`NEXT_PUBLIC_HOME_URL`).
 - **Contact.** `CONTACT_EMAIL` in `site.ts` is the one place the project's address lives: the

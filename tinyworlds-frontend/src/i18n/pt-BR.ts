@@ -52,9 +52,11 @@ export const ptBR: Strings = {
     title: "tinyworlds · cidades inteiras, em miniatura",
     description:
       "Cidades inteiras em miniatura, em pixel art isométrica, geradas por código a partir de dados abertos. É grátis: arraste, dê zoom e procure qualquer rua.",
+    cardAlt: "Seis cidades desenhadas em pixel art isométrica, lado a lado, sob a marca tinyworlds",
     tagline: "Cidades inteiras, em miniatura",
     pitch:
       "Cada cidade aqui é uma miniatura isométrica em pixel art, gerada por código a partir de dados abertos e gratuita para explorar.",
+    explore: "Explorar {city}",
     cities: "Cidades",
     imagined: "Lugares imaginários",
     ranking: "Ranking das cidades",
