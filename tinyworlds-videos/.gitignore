@@ -11,8 +11,8 @@ out/
 **/renders/
 **/.hyperframes/
 
-# sound: the music is composed per run, the effects are copied from a library
-*/assets/music/
+# sound: the effects are copied from a library. (The music is committed: a film is timed to
+# the very bed it was made with, and composing it again gives another.)
 */assets/sfx/
 **/.waveform-cache/
 **/.thumbnails/

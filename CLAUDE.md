@@ -229,8 +229,9 @@ its payment link. Details in `tinyworlds-api/CLAUDE.md`.
 - npm, Node 22, TypeScript strict, ESLint + Prettier in every sub-project.
 - Raw downloads and generated tiles are never committed (`tinyworlds-pipeline/data/`,
   `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/` and
-  the front page's loops in `tinyworlds-frontend/public/loops/` are; the videos' plates, takes,
-  sound and renders are not.
+  the front page's loops in `tinyworlds-frontend/public/loops/` are, and so is each film's music
+  bed (`tinyworlds-videos/*/assets/music/`: a film is timed to it); the videos' plates, takes,
+  sound effects and renders are not.
 - Every picture of a map, still or moving, is cut from the real tiles or filmed from the real
   viewer (`tinyworlds-videos`): nothing is redrawn for a card, a loop or a film.
 - Attribution is part of the product: the About panel credits each world's data sources

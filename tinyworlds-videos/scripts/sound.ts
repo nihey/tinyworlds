@@ -5,7 +5,9 @@ import { ROOT } from "./lib/world.js";
 /**
  * A film's music bed, composed by ElevenLabs Music from a description of its feel (never of its
  * subject, and never "in the manner of" anyone's music). Needs ELEVENLABS_API_KEY in the
- * environment; the track is written to <film>/assets/music/bed.mp3, which is not committed.
+ * environment; the track is written to <film>/assets/music/bed.mp3. That file is committed, and
+ * the film is timed to it: running this replaces it with a different piece, so the film's
+ * moments have to be measured and set again.
  *   ELEVENLABS_API_KEY=… npm run sound [-- --for film | westeros] [--seconds 38]
  */
 const BEDS: Record<string, { prompt: string; seconds: number }> = {

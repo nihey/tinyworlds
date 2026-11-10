@@ -138,4 +138,5 @@ The idea of a city redrawn tile by tile as isometric pixel art comes from
 ## Licence
 
 Code: [MIT](LICENSE). The rendered tiles are produced from open data and carry its attribution
-requirements (see Credits).
+requirements (see Credits). The films' music (`tinyworlds-videos/*/assets/music/`) was composed
+with ElevenLabs Music for these films and is not part of the MIT-licensed code.

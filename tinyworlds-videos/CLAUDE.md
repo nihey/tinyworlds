@@ -17,7 +17,7 @@ npm run loops                   # render every card loop → ../tinyworlds-front
 npm run flyovers [-- hero|cities]   # the hero → …/public/loops/hero.{mp4,jpg} (committed); city flyovers → out/flyovers/
 npm run takes -- main [--until 8.4]   # film the New York map for the film (VIEWER_URL, a dev server of the viewer)
 npm run takes -- page           # capture the front page for the film (HOME_URL, a dev server of the front page)
-ELEVENLABS_API_KEY=… npm run sound [-- --for film|westeros]   # compose a film's music bed → <film>/assets/music/bed.mp3
+ELEVENLABS_API_KEY=… npm run sound [-- --for film|westeros]   # compose a NEW music bed → <film>/assets/music/bed.mp3 (replaces the committed one)
 npm run film [-- draft|looks|delivery]   # render the film → out/film/tinyworlds.mp4 (+ a smaller copy to share)
 npm run westeros -- stills 0 2.9 12.7    # the Westeros tour: look at its picture at those seconds (VIEWER_URL)
 npm run westeros -- take                 # film it from the viewer (NEXT_PUBLIC_WORLD=tinywesteros)
@@ -33,8 +33,10 @@ Everything reads the worlds' data where the pipeline writes it
 (`../tinyworlds-frontend/public/data/<world>/`), so a world needs its tiles before it can have a
 loop. `ffmpeg` and Chrome must be installed (`CHROME_PATH`, default `/usr/bin/google-chrome`).
 
-What is committed: the scripts, the compositions, `*/assets/fonts/`. What is not (all
-reproducible): plates and batch rows, takes, the music and the effects, `out/`, renders.
+What is committed: the scripts, the compositions, `*/assets/fonts/`, and each film's music bed
+(`*/assets/music/bed.mp3`): a film is timed to the very bed it was made with, and composing it
+again gives a different one. What is not (all reproducible): plates and batch rows, takes, the
+sound effects, `out/`, renders.
 
 ## Layout
 
@@ -109,7 +111,8 @@ same code as the share card's.
   120 BPM, the first beat at 0.04 s. A new bed means new moments, a new take.
 - **Sound.** The bed is composed by ElevenLabs Music (`sound.ts`); the effects are eight files
   of the HyperFrames media library (`click`, `click-soft`, `typing`, `whoosh`, `whoosh-short`,
-  `riser`, `impact-bass-1`, `pop`) copied into `film/assets/sfx/`. Neither is committed.
+  `riser`, `impact-bass-1`, `pop`) copied into `film/assets/sfx/`. The bed is committed (the
+  moments above are its beats); the effects are not.
 - **The address** on the end card is the `address` variable, given by `npm run film` from
   `SITE_URL` or `deploy/.env`. The source says `example.com`.
 
@@ -131,7 +134,7 @@ made for fan communities: people who know the places.
 - **The music follows no grid.** The bed is asked for at 80 BPM and does not keep it, so two
   moments are set by measuring it instead: the film starts where the music's first drum is
   (`data-media-start`), and the region lines wait for the band's entrance (`regions` on the
-  stop). A new bed means measuring again.
+  stop). The bed is committed for that reason; a new one means measuring again.
 - **Fan-made, and it says so.** The rule that fan-made places stay out of what promotes the
   project still holds for the flyovers and the showcase film. This one is the other way round:
   a picture of the fan-made map for the fans of its world, with "A fan-made map. Not affiliated
