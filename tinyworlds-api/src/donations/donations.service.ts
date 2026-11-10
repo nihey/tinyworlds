@@ -37,16 +37,42 @@ const isUniqueViolation = (error: unknown): boolean =>
 export class DonationsService {
   private readonly logger = new Logger(DonationsService.name);
 
+  /**
+   * The Stripe product behind each language's price, asked for once and kept: a donation of a
+   * set amount is a one-off price on that product, so the checkout page still names it in the
+   * donor's language.
+   */
+  private readonly products = new Map<Locale, Promise<string>>();
+
   constructor(
     @Inject(STRIPE) private readonly stripe: StripeClient,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
+  private productOf(locale: Locale): Promise<string> {
+    let known = this.products.get(locale);
+    if (!known) {
+      const priceId = this.config.get(LOCALE_FACTS[locale].price, {
+        infer: true,
+      });
+      known = this.stripe.prices.retrieve(priceId).then(({ product }) => {
+        const id = typeof product === 'string' ? product : product?.id;
+        if (!id) throw new Error(`Price ${priceId} has no product`);
+        return id;
+      });
+      this.products.set(locale, known);
+      // a failed lookup is not remembered: the next donation asks again
+      known.catch(() => this.products.delete(locale));
+    }
+    return known;
+  }
+
   /**
-   * Opens a Stripe Checkout for a donation and answers its URL. The donor picks the amount on
-   * Stripe's page (the price is pay-what-you-want); the city, if any, travels in the metadata
-   * and comes back through the webhook.
+   * Opens a Stripe Checkout for a donation and answers its URL. The amount is the one the donor
+   * chose on the site; without one it is chosen on Stripe's page (the price is
+   * pay-what-you-want). The city, if any, travels in the metadata and comes back through the
+   * webhook.
    */
   async createCheckout(input: CreateDonationCheckoutInput): Promise<string> {
     const returnUrl = acceptReturnUrl(
@@ -61,20 +87,34 @@ export class DonationsService {
     const typed = cleanCityName(input.city);
     // a name with no letter or digit in it names no city
     const city = citySlug(typed) ? typed : '';
+    const amountCents = input.amountCents ?? null;
     const metadata: Record<string, string> = {
       app: APP_TAG,
       world: input.world,
       locale,
       ...(city ? { city } : {}),
+      ...(amountCents !== null ? { amount_cents: String(amountCents) } : {}),
     };
 
     let url: string | null;
     try {
+      const lineItem: Stripe.Checkout.SessionCreateParams.LineItem =
+        amountCents !== null
+          ? {
+              quantity: 1,
+              price_data: {
+                currency: COUNTED_CURRENCY,
+                unit_amount: amountCents,
+                product: await this.productOf(locale),
+              },
+            }
+          : {
+              price: this.config.get(facts.price, { infer: true }),
+              quantity: 1,
+            };
       const session = await this.stripe.checkout.sessions.create({
         mode: 'payment',
-        line_items: [
-          { price: this.config.get(facts.price, { infer: true }), quantity: 1 },
-        ],
+        line_items: [lineItem],
         submit_type: 'donate',
         locale: facts.stripe,
         success_url: `${returnUrl}?donated=1`,

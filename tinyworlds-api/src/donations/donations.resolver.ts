@@ -12,7 +12,7 @@ export class DonationsResolver {
   @UseGuards(GqlThrottlerGuard)
   @Mutation(() => DonationCheckout, {
     description:
-      'Starts a donation at Stripe (the amount is chosen there, from US$1) and answers the page to send the donor to',
+      "Starts a donation at Stripe and answers the page to send the donor to. The amount is the one given, from US$1; without one it is chosen on Stripe's page.",
   })
   async createDonationCheckout(
     @Args('input') input: CreateDonationCheckoutInput,

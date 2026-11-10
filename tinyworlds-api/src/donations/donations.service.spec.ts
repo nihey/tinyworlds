@@ -105,6 +105,92 @@ describe('DonationsService.createCheckout', () => {
     },
   );
 
+  it.each([
+    ['en-US', 'en', 'price_en', 'prod_en'],
+    ['pt-BR', 'pt-BR', 'price_pt', 'prod_pt'],
+    ['es-ES', 'es', 'price_es', 'prod_es'],
+  ])(
+    'charges the amount chosen on the site, on the product of %s',
+    async (locale, stripeLocale, price, product) => {
+      const { service, stripe } = setup();
+      const url = await service.createCheckout({
+        ...input,
+        locale,
+        amountCents: 2500,
+      });
+      expect(url).toBe('https://checkout.stripe.test/c/pay/cs_test_1');
+      expect(stripe.priceLookups).toEqual([price]);
+      const metadata = {
+        app: 'tinyworlds',
+        world: 'tinynyc',
+        locale,
+        city: 'São Paulo',
+        amount_cents: '2500',
+      };
+      expect(stripe.calls[0]).toMatchObject({
+        mode: 'payment',
+        submit_type: 'donate',
+        locale: stripeLocale,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: { currency: 'usd', unit_amount: 2500, product },
+          },
+        ],
+        success_url: 'https://example.com/tinynyc/?donated=1',
+        cancel_url: 'https://example.com/tinynyc/?donated=0',
+        metadata,
+        payment_intent_data: {
+          description: 'Tiny Worlds donation — São Paulo',
+          metadata,
+        },
+      });
+      // a set amount, so not the pay-what-you-want price as well
+      expect(stripe.calls[0].line_items?.[0]).not.toHaveProperty('price');
+    },
+  );
+
+  it('without an amount neither looks a product up nor mentions one', async () => {
+    const { service, stripe } = setup();
+    await service.createCheckout(input);
+    await service.createCheckout({ ...input, amountCents: null });
+    expect(stripe.priceLookups).toEqual([]);
+    for (const call of stripe.calls) {
+      expect(call.line_items).toEqual([{ price: 'price_en', quantity: 1 }]);
+      expect(call.metadata).not.toHaveProperty('amount_cents');
+    }
+  });
+
+  it("asks Stripe for each language's product once, however many donate", async () => {
+    const { service, stripe } = setup();
+    const give = (locale: string, amountCents: number) =>
+      service.createCheckout({ ...input, locale, amountCents });
+    // the first two at the same moment: still one lookup
+    await Promise.all([give('en-US', 100), give('en-US', 500)]);
+    await give('en-US', 1_000_000);
+    await give('pt-BR', 700);
+    await give('pt-BR', 900);
+    await give('es-ES', 300);
+    expect(stripe.priceLookups).toEqual(['price_en', 'price_pt', 'price_es']);
+    expect(
+      stripe.calls.map((call) => call.line_items?.[0].price_data?.unit_amount),
+    ).toEqual([100, 500, 1_000_000, 700, 900, 300]);
+  });
+
+  it('answers 503 when the product cannot be looked up, and asks again next time', async () => {
+    const { service, stripe } = setup();
+    stripe.failWith = new Error('Stripe is down');
+    await expect(
+      service.createCheckout({ ...input, amountCents: 500 }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(stripe.calls).toHaveLength(0);
+
+    stripe.failWith = null;
+    await service.createCheckout({ ...input, amountCents: 500 });
+    expect(stripe.priceLookups).toEqual(['price_en']);
+    expect(stripe.calls).toHaveLength(1);
+  });
+
   it('leaves the city out when none is given, or the text names nothing', async () => {
     const { service, stripe } = setup();
     await service.createCheckout({ ...input, city: undefined });

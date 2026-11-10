@@ -57,6 +57,7 @@ describe('the API over HTTP', () => {
   beforeEach(async () => {
     await prisma.$executeRawUnsafe('TRUNCATE donations, cities');
     stripe.calls = [];
+    stripe.priceLookups = [];
   });
 
   afterAll(async () => {
@@ -177,6 +178,67 @@ describe('the API over HTTP', () => {
         locale: 'es-ES',
       },
     });
+  });
+
+  it('charges the amount chosen on the site, looking the product up once', async () => {
+    const input = {
+      city: 'Lisbon',
+      world: 'tinynyc',
+      locale: 'pt-BR',
+      returnUrl: 'https://example.com/tinynyc/',
+    };
+    for (const amountCents of [100, 2500, 1_000_000]) {
+      // its own address: the checkout limit is counted per visitor
+      const res = await graphql(CHECKOUT, { input: { ...input, amountCents } })
+        .set('x-forwarded-for', '203.0.113.21')
+        .expect(200);
+      expect(answer(res).errors).toBeUndefined();
+    }
+    expect(stripe.priceLookups).toEqual(['price_pt']);
+    expect(stripe.calls.map((call) => call.line_items?.[0].price_data)).toEqual(
+      [100, 2500, 1_000_000].map((unit_amount) => ({
+        currency: 'usd',
+        unit_amount,
+        product: 'prod_pt',
+      })),
+    );
+    expect(stripe.calls[1].metadata).toEqual({
+      app: 'tinyworlds',
+      city: 'Lisbon',
+      world: 'tinynyc',
+      locale: 'pt-BR',
+      amount_cents: '2500',
+    });
+  });
+
+  it('refuses an amount under US$1, over US$10,000 or not in whole cents', async () => {
+    const good = {
+      world: 'tinynyc',
+      locale: 'en-US',
+      returnUrl: 'http://localhost:3000/',
+    };
+    for (const [amountCents, reason] of [
+      [99, 'amountCents must be at least 100 (US$1)'],
+      [0, 'amountCents must be at least 100 (US$1)'],
+      [-500, 'amountCents must be at least 100 (US$1)'],
+      [1_000_001, 'amountCents must be at most 1000000 (US$10,000)'],
+    ] as const) {
+      const res = await graphql(CHECKOUT, { input: { ...good, amountCents } })
+        .set('x-forwarded-for', '203.0.113.22')
+        .expect(200);
+      const error = answer(res).errors?.[0];
+      expect(error?.extensions.code).toBe('BAD_REQUEST');
+      expect(JSON.stringify(error)).toContain(reason);
+    }
+    // not a whole number: GraphQL's Int refuses it before the resolver is reached (HTTP 400)
+    const fraction = await graphql(CHECKOUT, {
+      input: { ...good, amountCents: 500.5 },
+    })
+      .set('x-forwarded-for', '203.0.113.22')
+      .expect(400);
+    expect(answer(fraction).errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
+    expect(stripe.calls).toHaveLength(0);
+    expect(stripe.priceLookups).toHaveLength(0);
   });
 
   it('validates the input before anything reaches Stripe', async () => {

@@ -37,6 +37,11 @@ enum CityStatus {
 
 input CreateDonationCheckoutInput {
   """
+  What to give, in US cents: a whole number from 100 to 1000000. Leave out to choose the amount on Stripe's page.
+  """
+  amountCents: Int
+
+  """
   The city the donation is for: one from the list or a new one. Leave out for none in particular.
   """
   city: String
@@ -62,7 +67,7 @@ type DonationCheckout {
 
 type Mutation {
   """
-  Starts a donation at Stripe (the amount is chosen there, from US$1) and answers the page to send the donor to
+  Starts a donation at Stripe and answers the page to send the donor to. The amount is the one given, from US$1; without one it is chosen on Stripe's page.
   """
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
 }

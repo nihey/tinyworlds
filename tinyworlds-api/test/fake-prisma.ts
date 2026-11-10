@@ -65,10 +65,21 @@ export class FakePrisma {
   city = {
     upsert: (args: {
       where: { slug: string };
-      create: { slug: string; name: string; goalCents: number };
+      create: {
+        slug: string;
+        name: string;
+        goalCents: number;
+        status?: CityRow['status'];
+        worldId?: string;
+      };
+      update?: { status?: CityRow['status']; worldId?: string };
     }): Promise<CityRow> => {
       const found = this.cities.find((c) => c.slug === args.where.slug);
-      return Promise.resolve(found ?? this.seedCity(args.create));
+      if (!found) return Promise.resolve(this.seedCity(args.create));
+      if (args.update?.status) found.status = args.update.status;
+      if (args.update?.worldId !== undefined)
+        found.worldId = args.update.worldId;
+      return Promise.resolve(found);
     },
     update: (args: {
       where: { id: string };

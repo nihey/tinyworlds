@@ -39,10 +39,10 @@ src/
     ├── donation-facts.ts           # a Checkout session → what it says about a donation
     ├── return-url.ts               # where a checkout may send the donor back to
     ├── locales.ts                  # en-US / pt-BR / es-ES → Stripe locale, price, wording
-    ├── stripe.provider.ts          # the Stripe client (tests replace it)
+    ├── stripe.provider.ts          # the Stripe client: 4.5 s timeout, no retry (tests replace it)
     ├── donations.resolver.ts dto/ models/
     └── stripe-webhook.controller.ts
-prisma/     schema.prisma, migrations/, seed.ts, seed-data.ts
+prisma/     schema.prisma, migrations/, seed.ts (the script), seed-cities.ts (what it does), seed-data.ts
 test/       fake-prisma.ts, fake-stripe.ts, app.e2e-spec.ts, global-setup.ts
 scripts/    send-webhook.mjs
 ```
@@ -57,7 +57,7 @@ allows: Stripe needs the raw body). `schema.gql` is the generated record of the 
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String }
 type Query { health: String!  cityMilestones: [CityMilestone!]! }
-input CreateDonationCheckoutInput { city: String  world: String!  locale: String!  returnUrl: String! }
+input CreateDonationCheckoutInput { amountCents: Int  city: String  world: String!  locale: String!  returnUrl: String! }
 type DonationCheckout { url: String! }
 type Mutation { createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout! }
 ```
@@ -67,11 +67,20 @@ type Mutation { createDonationCheckout(input: CreateDonationCheckoutInput!): Don
 - `createDonationCheckout`: `city` is free text up to 60 characters (an existing name or a new
   one; omit for none), `world` matches `/^[a-z0-9]{3,20}$/`, `locale` is `en-US | pt-BR | es-ES`,
   `returnUrl` is a page on one of `ALLOWED_ORIGINS` with no query or hash. It opens a Stripe
-  Checkout (`mode: payment`, `submit_type: donate`) on the pay-what-you-want price of that
-  language, so **the amount is chosen on Stripe's page**, and answers its URL. Stripe sends the
-  donor back to `returnUrl?donated=1`, or `?donated=0` on cancel. Limited to 10 a minute per
-  address. A Stripe failure is a 503 (`SERVICE_UNAVAILABLE`), which the site answers by falling
-  back to its static payment link.
+  Checkout (`mode: payment`, `submit_type: donate`) and answers its URL. Stripe sends the donor
+  back to `returnUrl?donated=1`, or `?donated=0` on cancel. Limited to 10 a minute per address.
+  A Stripe failure is a 503 (`SERVICE_UNAVAILABLE`), which the site answers by falling back to
+  its static payment link.
+- **The amount.** `amountCents` is optional: US cents, a whole number from 100 to 1000000
+  (US$1 to US$10,000; outside that is `BAD_REQUEST` with the reason, and a fraction is refused
+  by GraphQL's `Int` as `BAD_USER_INPUT`, HTTP 400). With it, the donor chose the amount on the
+  site: the line item is a one-off `price_data` of that amount in `usd` on the **product** of
+  that language's price, so the checkout page still names the donation in the donor's language,
+  and `amount_cents` goes into the metadata. The product id is asked from Stripe once per
+  language (`prices.retrieve`) and kept in memory; a failed lookup is a 503 and is asked again
+  next time. Without `amountCents` the line item is the pay-what-you-want price itself and the
+  amount is chosen on Stripe's page (what older builds of the site send). Either way the
+  webhook records what Stripe says was paid (`amount_total`), never what was asked for.
 - Webhook: the signature is verified against `STRIPE_WEBHOOK_SECRET` (400 otherwise). Only
   `checkout.session.completed` and `checkout.session.async_payment_succeeded` with
   `payment_status = paid` **and** `metadata.app = "tinyworlds"` are acted on; everything else is
@@ -115,9 +124,13 @@ A donor names a city by paying for it, so a new name appears on the site as soon
 donation is paid; `hidden` is the way to take one down. Merging two cities means moving the
 donations (`UPDATE donations SET city_id = …`) and adding up the two counters by hand.
 
-`prisma/seed.ts` (`npm run seed`) upserts the starting cities by slug: the two built ones
-(re-asserted as `BUILT` with their `world_id`) and six suggestions at zero. It never touches what
-a city has raised, and never changes a suggestion that is already there.
+`prisma/seed.ts` (`npm run seed`) upserts the starting cities by slug (`seed-cities.ts`): the
+built ones (New York, Ribeirão Preto, Orlando; re-asserted as `BUILT` with their `world_id`) and
+six suggestions at zero. It never touches a city's name, goal or what it has raised, and never
+changes a suggestion that is already there. A built city that donors had already put on the list
+as a proposal is therefore promoted in place: it becomes `BUILT` with its world and keeps every
+cent and donation. So **adding a world** on this side is one line in `seed-data.ts` and a run of
+the seed.
 
 ## Environment
 
@@ -148,12 +161,15 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
 ## Testing
 
 - Unit tests (`src/**/*.spec.ts`) build the service by hand over `test/fake-prisma.ts` (two
-  arrays with unique columns and rollback) and `test/fake-stripe.ts`. Webhook deliveries are
+  arrays with unique columns and rollback) and `test/fake-stripe.ts` (records the sessions asked
+  for and the prices looked up; `price_en` belongs to `prod_en`). Webhook deliveries are
   signed for real with `stripe.webhooks.generateTestHeaderString` and a placeholder secret, so
   the signature check is the real one. No test talks to Stripe.
 - `npm run test:e2e` boots the whole app with the fake Stripe on its own database
   (`tinyworlds_test`, created on the compose Postgres if missing), and goes through HTTP: the
-  global prefix, validation, the raw-body webhook, throttling by forwarded address, CORS.
+  global prefix, validation, the raw-body webhook, throttling by forwarded address, CORS. The
+  checkout limit is per address and the tests share a minute: a test that starts several
+  checkouts sets its own `x-forwarded-for`.
 - By hand, without Stripe: `npm run webhook:send` posts a signed `checkout.session.completed` to
   the local API using `STRIPE_WEBHOOK_SECRET` from `.env`. `--id` fixes the session id (send it
   twice to see a replay change nothing), `--link` shapes it like a payment link's session,

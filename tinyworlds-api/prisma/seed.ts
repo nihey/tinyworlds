@@ -1,7 +1,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { config } from 'dotenv';
 import { PrismaClient } from '../src/generated/prisma/client.js';
-import { BUILT, PROPOSED } from './seed-data.js';
+import { seedCities } from './seed-cities.js';
 
 /**
  * Puts the starting cities in place. Safe to run again at any time: a city that is already
@@ -23,29 +23,10 @@ const prisma = new PrismaClient({
 });
 
 try {
-  for (const city of BUILT) {
-    await prisma.city.upsert({
-      where: { slug: city.slug },
-      create: {
-        slug: city.slug,
-        name: city.name,
-        status: 'BUILT',
-        worldId: city.worldId,
-        goalCents,
-      },
-      update: { status: 'BUILT', worldId: city.worldId },
-    });
-  }
-  for (const city of PROPOSED) {
-    await prisma.city.upsert({
-      where: { slug: city.slug },
-      create: { slug: city.slug, name: city.name, goalCents },
-      update: {},
-    });
-  }
+  const { built, proposed } = await seedCities(prisma, goalCents);
   const total = await prisma.city.count();
   console.log(
-    `Seeded ${BUILT.length} built and ${PROPOSED.length} proposed cities; ${total} in the table.`,
+    `Seeded ${built} built and ${proposed} proposed cities; ${total} in the table.`,
   );
 } finally {
   await prisma.$disconnect();

@@ -8,8 +8,19 @@ export const TEST_WEBHOOK_SECRET = 'whsec_example';
 /** Records what the API asked Stripe for, and answers with a made-up checkout page. */
 export class FakeStripe implements StripeClient {
   calls: Stripe.Checkout.SessionCreateParams[] = [];
+  /** The price ids whose product was asked for, in order. */
+  priceLookups: string[] = [];
   /** Set to make the next call fail the way a Stripe outage does. */
   failWith: Error | null = null;
+
+  /** "price_en" belongs to "prod_en": enough to tell the languages apart. */
+  prices = {
+    retrieve: (id: string): Promise<{ product: string }> => {
+      if (this.failWith) return Promise.reject(this.failWith);
+      this.priceLookups.push(id);
+      return Promise.resolve({ product: id.replace(/^price_/, 'prod_') });
+    },
+  };
 
   checkout = {
     sessions: {
