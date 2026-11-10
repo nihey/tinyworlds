@@ -10,6 +10,7 @@ import { binRect } from "./render/bin.js";
 import { renderCard } from "./render/card.js";
 import { ChunkRenderer } from "./render/chunk.js";
 import { toRgba, writePng } from "./render/encode.js";
+import { renderHomeCard } from "./render/home-card.js";
 import { renderAll } from "./render/run.js";
 import { loadScene } from "./render/scene.js";
 import { buildScene } from "./scene/build.js";
@@ -109,6 +110,17 @@ program
   .option("--out <file>", "where to write it (default: ../tinyworlds-frontend/public/og/<city>.jpg)")
   .action(async (opts: { out?: string }) => {
     await renderCard({ out: opts.out });
+  });
+
+program
+  .command("home-card")
+  .description(
+    "Render the front page's share card, from the tiles of the cities on it (whatever --city says)",
+  )
+  .option("--out <file>", "where to write it (default: ../tinyworlds-frontend/public/og/tinyworlds.jpg)")
+  .option("--data <dir>", "where the worlds' data folders are (default: the frontend's public/data)")
+  .action(async (opts: { out?: string; data?: string }) => {
+    await renderHomeCard(opts);
   });
 
 program

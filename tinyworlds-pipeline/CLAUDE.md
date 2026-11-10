@@ -28,6 +28,7 @@ npm run cli -- render --around -73.9857,40.7484,1500   # only redraw near a poin
 npm run cli -- render --pyramid-only                    # rebuild the coarse levels from level 0
 npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
+npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
 npm run cli -- --city tinyrao preview --at -47.8093,-21.1752 --size 1500,900 --shrink 4 --out /tmp/p.png
 npm test          # vitest
@@ -78,6 +79,9 @@ src/
 │   ├── ground.ts      # ground kind → textured colour; shorelines; cane fields
 │   ├── sprites.ts     # procedural trees (temperate, tropical, subtropical or boreal colours)
 │   ├── card.ts        # the 1200 × 630 share card with the pixel wordmark
+│   ├── sign.ts        # the wordmark's pixel face and plate: cards, the front page's card, the videos
+│   ├── plate.ts       # a picture cut from a world's finished tiles (any world, no scene needed)
+│   ├── home-card.ts   # the front page's share card: six cities in leaning slices, from their tiles
 │   ├── bin.ts run.ts worker.ts pyramid.ts encode.ts scene.ts
 └── index/build.ts     # search index, area outlines, ferry routes and flights (from data)
 ```
