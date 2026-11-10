@@ -12,6 +12,7 @@ chosen with `--city` (default `tinynyc`).
 | `tinyorl`          | ≈ 4 min             | 1.1 GB, 29,000 files |
 | `tinyfte`          | seconds             | a few MB             |
 | `tinyvlc`          | ≈ 1 min             | 0.2 GB               |
+| `tinylas`          | ≈ 1 min             | 0.2 GB               |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 
@@ -48,6 +49,7 @@ src/
 │   ├── tinyorl.ts (+ .places.ts)
 │   ├── tinyfte.ts (+ .places.ts)   # El Calafate (the id is its airport code)
 │   ├── tinyvlc.ts (+ .places.ts)   # Valencia
+│   ├── tinylas.ts (+ .places.ts)   # Las Vegas
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
 │   └── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 ├── config.ts          # which city this process draws (CITY) and its directories (DIRS)
@@ -91,7 +93,7 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
    - `heights.raster`: `true` where buildings have no mapped heights (add `openBuildings` to
      `sources`, after `overture`);
    - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`,
-     `MEDITERRANEAN`, `PATAGONIA`, or a new one);
+     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, or a new one);
    - `ground`: how the data's land classes read locally (cane fields, dry steppe, market gardens);
    - `heightFixes` / `heightCaps`: the few places where the mapped heights are plainly wrong
      (look at the tallest buildings in a preview before trusting them);
