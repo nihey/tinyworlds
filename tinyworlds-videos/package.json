@@ -16,6 +16,7 @@
     "takes": "tsx scripts/takes.ts",
     "sound": "tsx scripts/sound.ts",
     "film": "tsx scripts/film.ts",
+    "westeros": "tsx scripts/westeros.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix && prettier --write ."

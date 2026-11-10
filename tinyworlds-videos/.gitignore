@@ -4,7 +4,7 @@ node_modules/
 # cut from the tiles or filmed from the viewer: reproducible with the scripts
 */assets/plates/
 */batch/
-film/assets/takes/
+*/assets/takes/
 
 # renders and HyperFrames' own working state
 out/
@@ -12,7 +12,7 @@ out/
 **/.hyperframes/
 
 # sound: the music is composed per run, the effects are copied from a library
-film/assets/music/
-film/assets/sfx/
+*/assets/music/
+*/assets/sfx/
 **/.waveform-cache/
 **/.thumbnails/

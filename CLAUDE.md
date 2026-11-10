@@ -32,7 +32,7 @@ tinyworlds/
 ├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
 ├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world) and the front page
 ├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins)
-├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film
+├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film, a tour of tinywesteros
 ├── deploy/                # nginx config, deploy script, .env.example
 ├── dev.sh                 # tmux launcher
 └── CLAUDE.md / README.md

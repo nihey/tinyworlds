@@ -1,0 +1,196 @@
+<!doctype html>
+<!--
+  "The known world": a tour of tinywesteros, 1920 × 1080, 35 s, for people who know the places.
+  One continuous take of the real map (filmed by `npm run westeros -- take`): from Castle Black
+  out along the Wall, to Winterfell and King's Landing, the Seven Kingdoms outlined and named by
+  the viewer's own region lines, then Braavos, Valyria, Meereen and Asshai, and out to the whole
+  map. What is added on top is a name for each place, in the site's manner, an end card, and
+  music. See SPEC.md.
+
+  The map is fan-made and the end card says so. The site's address is never written here (the
+  repository is public): it is the `address` variable, given at render time by
+  `npm run westeros -- render`.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"address","type":"string","label":"Where the map lives, on the end card","default":"example.com/tinywesteros"},
+    {"id":"tagline","type":"string","label":"The line beside the wordmark","default":"The known world, pocket-sized"},
+    {"id":"note","type":"string","label":"The small print","default":"A fan-made map. Not affiliated with George R. R. Martin or HBO."}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      :root {
+        --fog: #e9e6df;
+        --sign: #15171a;
+        --paper: #f4f2ec;
+        --paper-dim: #b4b1a8;
+        /* the world's own colour: old gold, as on a painted map */
+        --gold: #d9b45a;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--fog);
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: "Archivo", sans-serif;
+      }
+      /* the end card: one sign in the band under the map, the site's own black enamel */
+      #end {
+        position: absolute;
+        left: 0;
+        top: 760px;
+        width: 1920px;
+        display: flex;
+        justify-content: center;
+        z-index: 5;
+      }
+      #end-sign {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 48px;
+        overflow: hidden;
+        background: var(--sign);
+        color: var(--paper);
+        border-radius: 20px;
+        padding: 30px 52px 28px;
+        box-shadow:
+          inset 0 2px 0 rgb(255 255 255 / 0.08),
+          0 0 0 2px rgb(0 0 0 / 0.6),
+          0 30px 64px -26px rgb(0 0 0 / 0.65),
+          0 4px 12px -2px rgb(0 0 0 / 0.3);
+        white-space: nowrap;
+      }
+      #end-strip {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 6px;
+        background: var(--gold);
+      }
+      /* the wordmark is pixels: shown at its own size, never smoothed */
+      #end-wordmark {
+        display: block;
+        width: 448px;
+        height: 56px;
+        image-rendering: pixelated;
+      }
+      #end-line {
+        font-size: 46px;
+        line-height: 1.12;
+        font-weight: 600;
+        letter-spacing: -0.012em;
+      }
+      #end-address {
+        padding-top: 6px;
+        font-size: 36px;
+        line-height: 1.2;
+        font-weight: 500;
+        color: var(--gold);
+      }
+      #end-note {
+        padding-top: 8px;
+        font-size: 28px;
+        line-height: 1.25;
+        font-weight: 400;
+        color: var(--paper-dim);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="35"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- the tour: the take, and a name for each place -->
+      <div
+        id="tour"
+        data-composition-id="tour"
+        data-composition-src="compositions/tour.html"
+        data-start="0"
+        data-duration="35"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <!-- the end card lands once the whole map is in view and its regions are named -->
+      <div id="end" class="clip" data-start="30" data-duration="5" data-track-index="3">
+        <div id="end-sign">
+          <div id="end-strip"></div>
+          <img id="end-wordmark" src="assets/plates/wordmark.png" alt="tinywesteros" />
+          <div id="end-words">
+            <div id="end-line" data-var-text="tagline">The known world, pocket-sized</div>
+            <div id="end-address" data-var-text="address">example.com/tinywesteros</div>
+            <div id="end-note" data-var-text="note">
+              A fan-made map. Not affiliated with George R. R. Martin or HBO.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- the bed (npm run sound -- --for westeros). It opens on a drum half a second in: the
+           film starts there, so the first picture and the first stroke arrive together, and the
+           band's entrance, 13.1 s into the music, is when the kingdoms are outlined (12.6 s).
+           The bed measures -12 LUFS; at 0.7 the film comes out near -15. -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/bed.mp3"
+        data-start="0"
+        data-duration="35"
+        data-media-start="0.5"
+        data-track-index="10"
+        data-volume="0.7"
+        data-fade-out="1.2"
+      ></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      // the end card is stamped on, the way pixels arrive: in steps
+      tl.fromTo(
+        "#end-sign",
+        { y: 46, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" },
+        30,
+      );
+      tl.fromTo(
+        "#end-strip",
+        { scaleX: 0, transformOrigin: "0% 50%" },
+        { scaleX: 1, duration: 0.45, ease: "power2.out" },
+        30.08,
+      );
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

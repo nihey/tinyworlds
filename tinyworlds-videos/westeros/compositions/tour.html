@@ -1,0 +1,141 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+      font-family: "Archivo", sans-serif;
+    }
+    #tour-take {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      object-fit: contain;
+    }
+    /* a place's name, on a sign in the site's manner: black enamel, paper lettering, and the
+       world's own gold along its top edge, as the viewer's search sign carries its colour */
+    .tour-sign {
+      position: absolute;
+      left: 96px;
+      bottom: 96px;
+      overflow: hidden;
+      background: #15171a;
+      color: #f4f2ec;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+      white-space: nowrap;
+    }
+    .tour-strip {
+      height: 6px;
+      background: #d9b45a;
+    }
+    .tour-name {
+      padding: 22px 46px 28px;
+      font-size: 76px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    /* the whole of Westeros fills the left of that picture, down to Dorne: this one name stands
+       over the open sea at the top right instead */
+    #tour-s4-sign {
+      left: auto;
+      bottom: auto;
+      right: 96px;
+      top: 96px;
+    }
+  </style>
+  <div id="root" data-composition-id="tour" data-width="1920" data-height="1080">
+    <!-- one continuous take of the real viewer, 1050 frames -->
+    <video
+      id="tour-take"
+      class="clip"
+      data-start="0"
+      data-duration="35"
+      data-track-index="0"
+      src="assets/takes/tour.mp4"
+      muted
+      playsinline
+    ></video>
+
+    <!-- each name arrives as the view lands on its place, and leaves just before the view does.
+         The times are the take's (scripts/westeros.ts: a place a bar, 3 s; the way there 1.4 s) -->
+    <div id="tour-s1" class="clip" data-start="0.5" data-duration="2.45" data-track-index="1">
+      <div id="tour-s1-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">The Wall</div>
+      </div>
+    </div>
+    <div id="tour-s2" class="clip" data-start="4.3" data-duration="1.65" data-track-index="2">
+      <div id="tour-s2-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Winterfell</div>
+      </div>
+    </div>
+    <div id="tour-s3" class="clip" data-start="7.3" data-duration="1.65" data-track-index="3">
+      <div id="tour-s3-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">King's Landing</div>
+      </div>
+    </div>
+    <div id="tour-s4" class="clip" data-start="12.6" data-duration="2.35" data-track-index="4">
+      <div id="tour-s4-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">The Seven Kingdoms</div>
+      </div>
+    </div>
+    <div id="tour-s5" class="clip" data-start="16.3" data-duration="1.65" data-track-index="1">
+      <div id="tour-s5-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Braavos</div>
+      </div>
+    </div>
+    <div id="tour-s6" class="clip" data-start="19.3" data-duration="1.65" data-track-index="2">
+      <div id="tour-s6-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Valyria</div>
+      </div>
+    </div>
+    <div id="tour-s7" class="clip" data-start="22.3" data-duration="1.65" data-track-index="3">
+      <div id="tour-s7-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Meereen</div>
+      </div>
+    </div>
+    <div id="tour-s8" class="clip" data-start="25.3" data-duration="1.65" data-track-index="4">
+      <div id="tour-s8-sign" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Asshai</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // signs arrive and leave the way pixels do: in steps, never eased
+    const sign = (id, arrives, leaves) => {
+      tl.fromTo(id, { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, arrives);
+      tl.fromTo(
+        id,
+        { y: 0, opacity: 1 },
+        { y: -28, opacity: 0, duration: 0.17, ease: "steps(3)", immediateRender: false },
+        leaves,
+      );
+    };
+    sign("#tour-s1-sign", 0.5, 2.75);
+    sign("#tour-s2-sign", 4.3, 5.75);
+    sign("#tour-s3-sign", 7.3, 8.75);
+    sign("#tour-s4-sign", 12.6, 14.75);
+    sign("#tour-s5-sign", 16.3, 17.75);
+    sign("#tour-s6-sign", 19.3, 20.75);
+    sign("#tour-s7-sign", 22.3, 23.75);
+    sign("#tour-s8-sign", 25.3, 26.75);
+    window.__timelines["tour"] = tl;
+  </script>
+</template>

@@ -49,7 +49,7 @@ the Wall to Asshai as one toy-scale diorama (unofficial; places from *A Song of 
 | `tinyworlds-pipeline/` | TypeScript CLI: downloads the data, builds the scene, renders the tiles and indexes |
 | `tinyworlds-frontend/` | Next.js 16 static site: the map viewer (one build per city) and the front page |
 | `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, and the donation funnel for admins |
-| `tinyworlds-videos/` | HyperFrames: the front page's loops, city flyovers and the showcase film, all from the real tiles and viewer |
+| `tinyworlds-videos/` | HyperFrames: the front page's loops, city flyovers, the showcase film and a tour of tinywesteros, all from the real tiles and viewer |
 | `deploy/` | nginx config and the deploy script |
 
 ## Setup

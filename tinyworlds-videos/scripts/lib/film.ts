@@ -174,6 +174,30 @@ export const easeInOut = (u: number): number => (u < 0.5 ? 4 * u * u * u : 1 - (
 export const clamp01 = (u: number): number => Math.min(1, Math.max(0, u));
 
 /**
+ * A flight from one view to another, `u` from 0 to 1: up and out until the whole way fits in
+ * about a screen and a bit, across, and down again. The ground is covered fastest where the
+ * view is widest, so the picture itself moves at an even pace, and both ends are eased. Two
+ * views close together (or one far inside the other) need no climb: that is a plain zoom.
+ */
+export function flight(from: Cam, to: Cam, span = VIEW.width * 1.2): (u: number) => Cam {
+  const way = Math.hypot(to.x - from.x, to.y - from.y);
+  const climb = way > 0 ? Math.max(0, Math.log((Math.sqrt(from.scale * to.scale) * way) / span)) : 0;
+  const a = Math.log(from.scale);
+  const b = Math.log(to.scale);
+  const scaleAt = (q: number): number => Math.exp(a + (b - a) * q - climb * Math.sin(Math.PI * q));
+  const STEPS = 256;
+  const covered = [0];
+  for (let i = 1; i <= STEPS; i++) covered.push(covered[i - 1] + 1 / scaleAt((i - 0.5) / STEPS));
+  return (u) => {
+    const q = easeInOut(clamp01(u));
+    const at = q * STEPS;
+    const i = Math.min(STEPS - 1, Math.floor(at));
+    const w = (covered[i] + (covered[i + 1] - covered[i]) * (at - i)) / covered[STEPS];
+    return { x: from.x + (to.x - from.x) * w, y: from.y + (to.y - from.y) * w, scale: scaleAt(q) };
+  };
+}
+
+/**
  * A smooth curve through (time, value) keys that never overshoots them (monotone cubic,
  * Fritsch-Carlson): a camera move written as "by this second, this far", with no bumps between.
  */
