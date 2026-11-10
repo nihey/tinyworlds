@@ -1,21 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  AMOUNT_DEFAULT,
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  AMOUNT_PRESETS,
   checkoutInput,
   chosenCity,
-  CITY_LIMIT,
   CITY_MAX,
+  clampAmount,
+  donationsLabel,
   donateMode,
   donateUrl,
   formatUsd,
   isCheckoutUrl,
-  listCities,
+  parseAmount,
   parseMilestones,
   paymentLinkFor,
   progress,
   readDonated,
   returnUrlOf,
+  usdSymbol,
   withTimeout,
-  type CityMilestone,
 } from "../donate";
 
 const LINK = "https://donate.stripe.com/test_example";
@@ -80,18 +85,6 @@ describe("paymentLinkFor", () => {
     expect(paymentLinkFor("en-US", "tinynyc", { ...NO_LINKS, "pt-BR": LINK })).toBeNull();
     expect(paymentLinkFor("pt-BR", "tinynyc", { ...NO_LINKS, "pt-BR": LINK })).not.toBeNull();
   });
-});
-
-const city = (over: Partial<CityMilestone>): CityMilestone => ({
-  id: over.name ?? "x",
-  slug: "x",
-  name: "X",
-  raisedCents: 0,
-  goalCents: 10000,
-  donations: 0,
-  status: "PROPOSED",
-  worldId: null,
-  ...over,
 });
 
 describe("progress", () => {
@@ -175,33 +168,6 @@ describe("parseMilestones", () => {
   });
 });
 
-describe("listCities", () => {
-  const open = Array.from({ length: 8 }, (_, i) =>
-    city({ name: `City ${i}`, raisedCents: 8000 - i * 1000 }),
-  );
-  const built = city({ name: "New York", status: "BUILT", worldId: "tinynyc", raisedCents: 10000 });
-
-  it("shows the first few cities that can still be funded", () => {
-    const { rows, more } = listCities([built, ...open], false);
-    expect(rows).toHaveLength(CITY_LIMIT);
-    expect(rows.map((c) => c.name)).toEqual(open.slice(0, CITY_LIMIT).map((c) => c.name));
-    expect(more).toBe(true);
-  });
-
-  it("shows them all when expanded, the built ones last", () => {
-    const { rows } = listCities([built, ...open], true);
-    expect(rows).toHaveLength(9);
-    expect(rows[8].name).toBe("New York");
-  });
-
-  it("offers nothing more when everything already shows", () => {
-    expect(listCities(open.slice(0, 3), false)).toEqual({ rows: open.slice(0, 3), more: false });
-    expect(listCities([], false)).toEqual({ rows: [], more: false });
-    // a built city is something more to see
-    expect(listCities([built], false)).toEqual({ rows: [], more: true });
-  });
-});
-
 describe("the donor's choice", () => {
   it("names a city from the list as it is", () => {
     expect(chosenCity({ kind: "city", name: "São Paulo" })).toBe("São Paulo");
@@ -214,28 +180,40 @@ describe("the donor's choice", () => {
     expect(long!.length).toBeLessThanOrEqual(CITY_MAX);
   });
 
-  it("is no city for nothing typed, or none chosen", () => {
+  it("is no city for nothing typed, punctuation alone, or none chosen", () => {
     expect(chosenCity({ kind: "other", text: "   " })).toBeNull();
+    expect(chosenCity({ kind: "other", text: " ?! " })).toBeNull();
     expect(chosenCity({ kind: "none" })).toBeNull();
   });
 
-  it("becomes the checkout's input", () => {
+  it("becomes the checkout's input, with the amount in cents", () => {
     expect(
       checkoutInput(
         { kind: "city", name: "Lisboa" },
+        25,
         "tinyrao",
         "pt-BR",
         "https://example.com/tinyrao/",
       ),
     ).toEqual({
       city: "Lisboa",
+      amountCents: 2500,
       world: "tinyrao",
       locale: "pt-BR",
       returnUrl: "https://example.com/tinyrao/",
     });
-    expect(
-      checkoutInput({ kind: "none" }, "home", "en-US", "https://example.com/").city,
-    ).toBeNull();
+    const none = checkoutInput({ kind: "none" }, 1, "home", "en-US", "https://example.com/");
+    expect(none.city).toBeNull();
+    expect(none.amountCents).toBe(100);
+  });
+
+  it("keeps the amount it sends within the limits, and can leave it to the checkout", () => {
+    const at = (dollars: number | null) =>
+      checkoutInput({ kind: "none" }, dollars, "home", "en-US", "https://example.com/").amountCents;
+    expect(at(0)).toBe(AMOUNT_MIN * 100);
+    expect(at(999999)).toBe(AMOUNT_MAX * 100);
+    expect(at(12.6)).toBe(1300);
+    expect(at(null)).toBeNull();
   });
 
   it("returns to the page without its query or hash", () => {
@@ -308,5 +286,59 @@ describe("readDonated", () => {
   it("says nothing when the page was not arrived at from a checkout", () => {
     expect(readDonated("")).toEqual({ donated: null, search: "" });
     expect(readDonated("?a=1")).toEqual({ donated: null, search: "?a=1" });
+  });
+});
+
+describe("amounts", () => {
+  it("offers round sums, ten dollars to begin with", () => {
+    expect([...AMOUNT_PRESETS]).toEqual([5, 10, 25, 50, 100]);
+    expect(AMOUNT_PRESETS).toContain(AMOUNT_DEFAULT);
+    expect(AMOUNT_DEFAULT).toBe(10);
+  });
+
+  it("reads what is typed as whole dollars", () => {
+    expect(parseAmount("25")).toBe(25);
+    expect(parseAmount(" 7 ")).toBe(7);
+    expect(parseAmount("$40")).toBe(40);
+    expect(parseAmount("25.90")).toBe(25);
+    expect(parseAmount("25,50")).toBe(25);
+  });
+
+  it("is no amount when there is no number", () => {
+    for (const text of ["", "   ", "abc", "$", "-"]) expect(parseAmount(text), text).toBeNull();
+  });
+
+  it("keeps amounts between one and ten thousand dollars", () => {
+    expect(parseAmount("0")).toBe(AMOUNT_MIN);
+    expect(parseAmount("000")).toBe(AMOUNT_MIN);
+    expect(parseAmount("10000")).toBe(10000);
+    expect(parseAmount("99999")).toBe(AMOUNT_MAX);
+    expect(clampAmount(-3)).toBe(AMOUNT_MIN);
+    expect(clampAmount(2.4)).toBe(2);
+    expect(clampAmount(Number.NaN)).toBe(AMOUNT_MIN);
+  });
+
+  it("writes the dollar sign the way each language does", () => {
+    expect(usdSymbol("en-US")).toBe("$");
+    expect(usdSymbol("pt-BR")).toBe("US$");
+    expect(formatUsd(1000, "en-US")).toBe("$10");
+  });
+});
+
+describe("donationsLabel", () => {
+  const en = { none: "No donations yet", one: "{n} donation", other: "{n} donations" };
+  const pt = { none: "Ainda sem doações", one: "{n} doação", other: "{n} doações" };
+
+  it("counts donations in the singular and the plural", () => {
+    expect(donationsLabel(0, "en-US", en)).toBe("No donations yet");
+    expect(donationsLabel(1, "en-US", en)).toBe("1 donation");
+    expect(donationsLabel(2, "en-US", en)).toBe("2 donations");
+    expect(donationsLabel(1, "pt-BR", pt)).toBe("1 doação");
+    expect(donationsLabel(12, "pt-BR", pt)).toBe("12 doações");
+  });
+
+  it("groups thousands the way the language does", () => {
+    expect(donationsLabel(1234, "en-US", en)).toBe("1,234 donations");
+    expect(donationsLabel(1234, "pt-BR", pt)).toBe("1.234 doações");
   });
 });

@@ -1,11 +1,13 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { ArrowLeft, Search, X } from "lucide-react";
 import { useId, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 import type { Place } from "@/map/manifest";
 import type { SearchIndex } from "@/map/search";
+import { HOME_URL } from "@/site";
 import { PlaceBullet, placeLabel } from "./place-types";
 import { Wordmark } from "./wordmark";
 
@@ -24,7 +26,10 @@ interface SearchSignProps {
   style?: React.CSSProperties;
 }
 
-/** The sign in the corner: the wordmark, and a search box that opens downwards into results. */
+/**
+ * The sign in the corner: the way back to the front page, the wordmark, and a search box that
+ * opens downwards into results.
+ */
 export function SearchSign({
   index,
   unavailable,
@@ -91,7 +96,22 @@ export function SearchSign({
       {/* the yellow edge every sign on this map hangs from */}
       <div aria-hidden className="h-[3px] bg-taxi" />
       <div className="flex h-12 items-center">
-        <Wordmark className="pr-3 pl-3.5 text-[26px]" />
+        {/* another build of the site, so a plain link */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href={HOME_URL}
+              aria-label={t.about.allCities}
+              className="bullet ml-1 size-9 text-paper-dim hover:text-paper"
+            >
+              <ArrowLeft className="size-[18px]" strokeWidth={2.25} />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>
+            {t.about.allCities}
+          </TooltipContent>
+        </Tooltip>
+        <Wordmark className="pr-3 pl-1 text-[26px]" />
         <span aria-hidden className="h-6 w-px bg-sign-line" />
         <label className="flex h-full min-w-0 flex-1 items-center gap-2 pr-2 pl-3">
           <Search aria-hidden className="size-4 shrink-0 text-paper-dim" strokeWidth={2.25} />

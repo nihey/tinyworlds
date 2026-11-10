@@ -245,6 +245,27 @@
     0 2px 6px -1px rgb(0 0 0 / 0.3);
 }
 
+/* the part of a funding bar a donation is about to add: the accent in stripes, drifting */
+.funding-added {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--taxi) 78%, transparent) 0 5px,
+    color-mix(in srgb, var(--taxi) 38%, transparent) 5px 10px
+  );
+  background-size: 14.142px 100%;
+  animation: funding-drift 900ms linear infinite;
+}
+@keyframes funding-drift {
+  to {
+    background-position-x: 14.142px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .funding-added {
+    animation: none;
+  }
+}
+
 /* round buttons, lit yellow when on */
 @utility bullet {
   display: inline-flex;

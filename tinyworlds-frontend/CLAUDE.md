@@ -2,7 +2,7 @@
 
 The map viewer: a Next.js 16 static export that draws the tiles and indexes written by
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
-One build is one **target**: a **world** (city) — `tinynyc`, `tinyrao` — or `home`, the front
+One build is one **target**: a **world** (city) — `tinynyc`, `tinyrao`, `tinyorl` — or `home`, the front
 page that lists the worlds. The interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
 `tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
@@ -79,13 +79,18 @@ src/
 │   ├── engine.ts        # MapEngine
 │   ├── life.ts          # ferries and flights
 │   └── __tests__/
-├── components/map/      # the signs: search, tool column, minimap, settings, about, …
-├── components/donate/   # the donate sign and the city progress bar
+├── components/map/      # the signs: search (with the way back to the front page), tool
+│                        # column, minimap, settings, about, …
+├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
+│                        # and the city progress bar the front page's ranking uses
 ├── components/home/     # the front page
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
-                         # donation logic), donate-api.ts (Apollo Client; imported lazily)
+                         # donation logic: links, amounts, the checkout input), city-picker.ts
+                         # (pure: what the picker offers, the bar preview, the ranking),
+                         # city-catalogue.ts (well-known cities to pick from), donate-api.ts
+                         # (Apollo Client; imported lazily)
 ```
 
 ## Targets: worlds and the front page
@@ -100,7 +105,10 @@ src/
   language, analytics, donations): `SITE_ID` is the world id or `"home"`. On the front page
   `WORLD` is only a stand-in (the default world) that nothing shows: use `site.ts` there.
 - The front page's cards are plain `<a href="/<id>/">` (another build) with the world's share
-  card as picture, served from the world's own folder: `/<id>/og/<id>.jpg`.
+  card as picture, served from the world's own folder: `/<id>/og/<id>.jpg`. A world whose card
+  is not there yet shows its wordmark on a plain plate instead.
+- Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
+  link back to the front page (`NEXT_PUBLIC_HOME_URL`).
 
 ## Words: languages and worlds
 
@@ -110,7 +118,7 @@ src/
 - **`useI18n()`** (`hooks/use-i18n.ts`) gives components `{ locale, t, copy }`: `t` is the
   dictionary, `copy` the world's own words in that language. It is a `useSyncExternalStore` whose
   server snapshot is the site's **home language** (`WORLD.homeLocale`: en-US for tinynyc, pt-BR
-  for tinyrao), so the static HTML hydrates cleanly and then switches. Code outside React
+  for tinyrao, en-US for tinyorl), so the static HTML hydrates cleanly and then switches. Code outside React
   (errors thrown while loading) uses `activeStrings()`.
 - **No hard-coded UI strings in components**: every visible string and aria-label comes from `t`
   (language) or `copy` (city). `Strings` in `types.ts` is the contract, so a key missing from one
@@ -131,7 +139,7 @@ src/
   "15", "quinze", "XV"). An alternate written `=word` only matches a whole word. Names and
   queries are always compared unaccented.
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
-  tinynyc and the front page, `#ff7a3d` for tinyrao); the engine and the minimap read the world's
+  tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl); the engine and the minimap read the world's
   value for canvas drawing. Don't write the yellow as a literal. `worlds.test.ts` checks the
   contrast of each pair.
 - A world may ship an empty `hoods.json`: the settings row, the `B` key and the help line then
@@ -147,16 +155,37 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   `locale=en|pt-BR|es`. Opens in a new tab.
 - **The API** (`NEXT_PUBLIC_API_URL`, `tinyworlds-api`): `cityMilestones` lists the cities being
   funded (each is built when its bar is full) and `createDonationCheckout` opens a checkout for
-  the donor's choice: a listed city, one they type (≤ 60 chars), or none. The checkout returns to
-  `returnUrl?donated=1|0`; `useDonationReturn` thanks the donor and removes the marker.
+  `{ city, amountCents, world, locale, returnUrl }`: the city is one being funded, any other
+  (≤ 60 chars) or none; `amountCents` is what was chosen here (US$1 to US$10,000, whole
+  dollars). The checkout returns to `returnUrl?donated=1|0`; `useDonationReturn` thanks the donor
+  and removes the marker.
+- **The donate sign** (`components/donate/donate-dialog.tsx`), with the API:
+  - `city-picker.tsx`: a searchable combobox (Popover + cmdk `Command`, filtering done by
+    `pickerOptions`, not by cmdk). It offers "no city in particular" (the default), the cities
+    being funded with their sums, and the rest of `lib/city-catalogue.ts` with the country in
+    the visitor's language. A city is offered once; a built one (by the API's word, or because
+    it is one of `WORLDS`) never. A search that finds nothing offers what was typed as a new
+    city; "Other city…" turns the control into a text field. The catalogue's `alt` spellings
+    ("Londres", "Lisboa") only help the search: what is sent is the English `name`, so one city
+    does not collect under two names.
+  - `amount-picker.tsx`: chips for US$5/10/25/50/100 and a field for any other whole amount.
+  - `funding-preview.tsx`: the chosen city's bar with the donation about to be made added to
+    it in stripes (`previewBar`), and what that means: it fills the bar, or lands above the
+    goal. With no city chosen there is no bar, only a line.
+  - It says, in every language: cities with the most funding are built first, and what is given
+    beyond a city's goal pays for the servers and keeps the project improving.
+- **The front page's ranking** (`rankCities`): the cities that reached their goal ("Funded":
+  `FUNDED` and `BUILDING`) apart, then the ones still collecting, numbered, most funded first,
+  ten before "show all". A row opens the donate sign with that city chosen
+  (`<DonateDialog city>`).
 - **The API must never block a donation.** List or checkout failing, or taking over 5 s, drops
-  the sign back to the payment link (`donateMode` in `lib/donate.ts` is the whole rule).
+  the sign back to the payment link (`donateMode` in `lib/donate.ts` is the whole rule), where
+  the amount and the city are set on the checkout page instead.
 - `lib/donate-api.ts` (Apollo Client 4, core API, no provider) is only ever imported dynamically
   (`useMilestones`, the checkout button), so Apollo is not in the bundle the map starts with.
-- The heart in the tool column, the link in About and the front page's "Next cities" section all
-  open `components/donate/donate-dialog.tsx`. Analytics hooks are declarative:
-  `data-rybbit-event="donate_open" | "donate_checkout"` with `data-rybbit-prop-world` (and
-  `-city`).
+- The heart in the tool column, the link in About and the front page's ranking all open the
+  same sign. Analytics hooks are declarative: `data-rybbit-event="donate_open" |
+"donate_checkout"` with `data-rybbit-prop-world` (and `-city`, `-amount`).
 - Never put a real payment link, key or API host in the repository: they come from the
   environment at build time.
 

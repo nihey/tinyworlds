@@ -46,6 +46,18 @@ describe("dictionaries", () => {
     for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
       expect(placeholders(dictionary.donate.body), locale).toEqual(["{wordmark}"]);
       expect(placeholders(dictionary.donate.progress), locale).toEqual(["{goal}", "{raised}"]);
+      expect(placeholders(dictionary.donate.preview), locale).toEqual([
+        "{added}",
+        "{goal}",
+        "{raised}",
+      ]);
+      expect(placeholders(dictionary.donate.actionAmount), locale).toEqual(["{amount}"]);
+      expect(placeholders(dictionary.donate.useTyped), locale).toEqual(["{name}"]);
+      expect(placeholders(dictionary.donate.alreadyBuilt), locale).toEqual(["{name}"]);
+      expect(placeholders(dictionary.home.donateTo), locale).toEqual(["{city}"]);
+      expect(placeholders(dictionary.donate.donations.none), locale).toEqual([]);
+      expect(placeholders(dictionary.donate.donations.one), locale).toEqual(["{n}"]);
+      expect(placeholders(dictionary.donate.donations.other), locale).toEqual(["{n}"]);
     }
   });
 });

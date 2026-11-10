@@ -11,25 +11,29 @@ import {
 } from "@/components/ui/dialog";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMilestones } from "@/hooks/use-milestones";
+import { defaultGoal, findMilestone, previewBar } from "@/lib/city-picker";
 import {
+  AMOUNT_DEFAULT,
   API_URL,
   checkoutInput,
   chosenCity,
-  CITY_MAX,
   donateMode,
-  listCities,
+  formatUsd,
+  parseAmount,
   paymentLinkFor,
   returnUrlOf,
-  selectable,
   type Choice,
 } from "@/lib/donate";
-import { cn } from "@/lib/utils";
-import { SITE_ID, SITE_NAME } from "@/site";
-import { MilestoneBar } from "./milestone-bar";
+import { BUILT_CITIES, SITE_ID, SITE_NAME } from "@/site";
+import { AmountPicker } from "./amount-picker";
+import { CityPicker } from "./city-picker";
+import { FundingPreview } from "./funding-preview";
 
 interface DonateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** a city already chosen when the sign opens (a row of the front page's ranking) */
+  city?: string | null;
 }
 
 /** A dictionary line with "{wordmark}" replaced by the site's name, set a little stronger. */
@@ -45,52 +49,48 @@ function Named({ text }: { text: string }) {
   );
 }
 
-const ROW =
-  "flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 transition-colors hover:bg-sign-raised has-checked:bg-sign-raised has-focus-visible:shadow-[0_0_0_2px_var(--taxi)]";
-
-/** The round mark of a radio row; the real input sits invisibly on top of the row's label. */
-function Dot({ on }: { on: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-full border-2",
-        on ? "border-taxi" : "border-paper-dim/70",
-      )}
-    >
-      {on && <span className="size-2 rounded-full bg-taxi" />}
-    </span>
-  );
-}
-
 const ACTION =
-  "mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-taxi px-5 text-[15px] font-semibold text-taxi-ink transition-[filter,transform] outline-none hover:brightness-110 focus-visible:shadow-[0_0_0_2px_var(--sign),0_0_0_4px_var(--taxi)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-80";
+  "mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-taxi px-5 text-base font-semibold text-taxi-ink transition-[filter,transform] outline-none hover:brightness-110 focus-visible:shadow-[0_0_0_2px_var(--sign),0_0_0_4px_var(--taxi)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-80";
+
+const LABEL = "block pb-1.5 text-[11px] font-semibold tracking-[0.14em] text-paper-dim uppercase";
 
 /**
  * What the sign says. Mounted only while the sign is open, so each opening starts fresh: the
- * list is fetched again and nothing is chosen.
+ * list is fetched again, and the choice is the one the sign was opened with.
  */
-function DonateBody() {
+function DonateBody({ city: opening }: { city: string | null }) {
   const { t, locale } = useI18n();
-  const group = useId();
+  const cityLabel = useId();
+  const amountLabel = useId();
   const link = paymentLinkFor(locale, SITE_ID);
   const { state: list, cities } = useMilestones();
-  const [choice, setChoice] = useState<Choice>({ kind: "none" });
-  const [other, setOther] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [choice, setChoice] = useState<Choice>(
+    opening ? { kind: "city", name: opening } : { kind: "none" },
+  );
+  const [preset, setPreset] = useState<number>(AMOUNT_DEFAULT);
+  const [custom, setCustom] = useState("");
   const [pending, setPending] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
 
   const mode = donateMode({ api: API_URL !== "", link: link !== null, list, checkoutFailed });
-  const { rows, more } = listCities(cities, expanded);
-  const city = chosenCity(choice);
+  // what is typed counts as soon as it is a number; until then the last chip stands
+  const amount = (custom !== "" ? parseAmount(custom) : null) ?? preset;
+  const amountCents = amount * 100;
+  const name = chosenCity(choice);
+  const known = name ? findMilestone(cities, name) : null;
+  // the chosen city as it stands: one nobody has given to yet stands at zero
+  const standing = name
+    ? (known ?? { name, raisedCents: 0, goalCents: defaultGoal(cities) })
+    : null;
+  // the line about giving beyond the goal is said once: by the bar when this donation does so
+  const overGoal = standing !== null && previewBar(standing, amountCents).overCents > 0;
 
   const checkout = async () => {
     setPending(true);
     setCheckoutFailed(false);
     try {
       const api = await import("@/lib/donate-api");
-      const input = checkoutInput(choice, SITE_ID, locale, returnUrlOf(window.location));
+      const input = checkoutInput(choice, amount, SITE_ID, locale, returnUrlOf(window.location));
       // the page is left for the checkout: the button stays busy until it is gone
       window.location.assign(await api.createCheckout(input));
     } catch {
@@ -119,164 +119,136 @@ function DonateBody() {
 
       <div className="px-5 pt-3 pb-5">
         <p className="text-sm leading-relaxed text-paper-dim">
-          {mode === "api" ? t.donate.goal : t.donate.wish}
+          {mode === "api" ? `${t.donate.goal} ${t.donate.priority}` : t.donate.wish}
         </p>
 
         {mode === "api" && (
-          <fieldset className="-mx-2.5 mt-3 min-w-0" disabled={pending}>
-            <legend className="sr-only">{t.donate.cities}</legend>
-            {list === "loading" && (
-              <p role="status" className="px-2.5 py-2 text-sm text-paper-dim">
-                {t.donate.loading}
+          <>
+            <div className="pt-4">
+              <span id={cityLabel} className={LABEL}>
+                {t.donate.cities}
+              </span>
+              <CityPicker
+                labelledBy={cityLabel}
+                milestones={cities}
+                loading={list === "loading"}
+                builtNames={BUILT_CITIES}
+                choice={choice}
+                onChoice={setChoice}
+                disabled={pending}
+                locale={locale}
+                t={t}
+              />
+            </div>
+
+            <div className="pt-3">
+              {standing ? (
+                <FundingPreview
+                  city={standing}
+                  isNew={known === null && list === "ready"}
+                  amountCents={amountCents}
+                  locale={locale}
+                  t={t}
+                />
+              ) : (
+                <p className="rounded-xl bg-white/[0.045] px-3.5 py-3 text-[13px] leading-relaxed text-paper-dim">
+                  {t.donate.whole}
+                </p>
+              )}
+            </div>
+
+            <div className="pt-4">
+              <span id={amountLabel} className={LABEL}>
+                {t.donate.amount}
+              </span>
+              <AmountPicker
+                labelledBy={amountLabel}
+                amount={amount}
+                custom={custom}
+                onPreset={(dollars) => {
+                  setPreset(dollars);
+                  setCustom("");
+                }}
+                onCustom={setCustom}
+                disabled={pending}
+                locale={locale}
+                t={t}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={checkout}
+              disabled={pending}
+              aria-busy={pending}
+              data-rybbit-event="donate_checkout"
+              data-rybbit-prop-world={SITE_ID}
+              data-rybbit-prop-city={name ?? undefined}
+              data-rybbit-prop-amount={amount}
+              className={ACTION}
+            >
+              {pending ? (
+                <Loader2 aria-hidden className="size-4 animate-spin" strokeWidth={2.5} />
+              ) : (
+                <Heart aria-hidden className="size-4 fill-current" strokeWidth={2.5} />
+              )}
+              {pending
+                ? t.donate.pending
+                : t.donate.actionAmount.replace("{amount}", formatUsd(amountCents, locale))}
+            </button>
+            {checkoutFailed && (
+              <p role="alert" className="pt-3 text-center text-xs leading-relaxed text-paper">
+                {t.donate.failed}
               </p>
             )}
-            {rows.map((row) =>
-              selectable(row) ? (
-                <label key={row.id} className={ROW}>
-                  <input
-                    type="radio"
-                    name={group}
-                    className="sr-only"
-                    checked={choice.kind === "city" && choice.name === row.name}
-                    onChange={() => setChoice({ kind: "city", name: row.name })}
-                  />
-                  <Dot on={choice.kind === "city" && choice.name === row.name} />
-                  <MilestoneBar city={row} locale={locale} t={t} />
-                </label>
-              ) : (
-                // built already: nothing left to fund, only somewhere to go
-                <div key={row.id} className="flex items-center gap-3 px-2.5 py-2">
-                  <span aria-hidden className="size-4 shrink-0" />
-                  <MilestoneBar
-                    city={row}
-                    locale={locale}
-                    t={t}
-                    name={
-                      row.worldId ? (
-                        <a
-                          href={`/${row.worldId}/`}
-                          className="rounded-sm underline decoration-paper-dim/60 underline-offset-2 outline-none hover:decoration-taxi focus-visible:text-taxi"
-                        >
-                          {row.name}
-                        </a>
-                      ) : undefined
-                    }
-                  />
-                </div>
-              ),
-            )}
-            {more && (
-              <button
-                type="button"
-                onClick={() => setExpanded(!expanded)}
-                aria-expanded={expanded}
-                className="mx-2.5 my-1 rounded-sm text-xs font-semibold text-paper-dim underline decoration-paper-dim/50 underline-offset-2 outline-none hover:text-paper focus-visible:text-taxi"
-              >
-                {expanded ? t.donate.showFewer : t.donate.showAll}
-              </button>
-            )}
-
-            <label className={ROW}>
-              <input
-                type="radio"
-                name={group}
-                className="sr-only"
-                aria-label={t.donate.other}
-                checked={choice.kind === "other"}
-                onChange={() => setChoice({ kind: "other", text: other })}
-              />
-              <Dot on={choice.kind === "other"} />
-              <input
-                type="text"
-                name="city"
-                value={other}
-                maxLength={CITY_MAX}
-                aria-label={t.donate.other}
-                placeholder={`${t.donate.other}: ${t.donate.otherPlaceholder.toLowerCase()}`}
-                autoComplete="off"
-                enterKeyHint="done"
-                onFocus={() => setChoice({ kind: "other", text: other })}
-                onChange={(e) => {
-                  setOther(e.target.value);
-                  setChoice({ kind: "other", text: e.target.value });
-                }}
-                className="h-8 min-w-0 flex-1 rounded-md border border-sign-line bg-transparent px-2.5 text-sm text-paper outline-none placeholder:text-paper-dim/80 focus:border-taxi"
-              />
-            </label>
-            <label className={ROW}>
-              <input
-                type="radio"
-                name={group}
-                className="sr-only"
-                checked={choice.kind === "none"}
-                onChange={() => setChoice({ kind: "none" })}
-              />
-              <Dot on={choice.kind === "none"} />
-              <span className="text-sm font-medium text-paper">{t.donate.none}</span>
-            </label>
-          </fieldset>
+            <p className="pt-3 text-center text-xs leading-relaxed text-paper-dim">
+              {overGoal ? t.donate.footnoteApi : `${t.donate.over} ${t.donate.footnoteApi}`}
+            </p>
+          </>
         )}
 
-        {mode === "api" && (
-          <button
-            type="button"
-            onClick={checkout}
-            disabled={pending}
-            aria-busy={pending}
-            data-rybbit-event="donate_checkout"
-            data-rybbit-prop-world={SITE_ID}
-            data-rybbit-prop-city={city ?? undefined}
-            className={ACTION}
-          >
-            {pending ? (
-              <Loader2 aria-hidden className="size-4 animate-spin" strokeWidth={2.5} />
-            ) : (
-              <Heart aria-hidden className="size-4 fill-current" strokeWidth={2.5} />
-            )}
-            {pending ? t.donate.pending : t.donate.action}
-          </button>
-        )}
         {mode === "link" && link && (
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-rybbit-event="donate_checkout"
-            data-rybbit-prop-world={SITE_ID}
-            className={ACTION}
-          >
-            <Heart aria-hidden className="size-4 fill-current" strokeWidth={2.5} />
-            {t.donate.action}
-          </a>
+          <>
+            {API_URL !== "" && (
+              <p role="status" className="pt-2 text-[13px] leading-relaxed text-paper-dim">
+                {t.donate.linkNote}
+              </p>
+            )}
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-rybbit-event="donate_checkout"
+              data-rybbit-prop-world={SITE_ID}
+              className={ACTION}
+            >
+              <Heart aria-hidden className="size-4 fill-current" strokeWidth={2.5} />
+              {t.donate.action}
+            </a>
+            <p className="pt-3 text-center text-xs leading-relaxed text-paper-dim">
+              {t.donate.footnote}
+            </p>
+          </>
         )}
-        {mode === "api" && checkoutFailed && (
-          <p role="alert" className="pt-3 text-center text-xs leading-relaxed text-paper">
-            {t.donate.failed}
-          </p>
-        )}
-        <p className="pt-3 text-center text-xs leading-relaxed text-paper-dim">
-          {t.donate.footnote}
-        </p>
       </div>
     </>
   );
 }
 
-/** Why donate, which city to give towards, and the one button that leaves for the checkout. */
-export function DonateDialog({ open, onOpenChange }: DonateDialogProps) {
+/** Why donate, which city to give towards and how much, and the one button that leaves for the checkout. */
+export function DonateDialog({ open, onOpenChange, city = null }: DonateDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        // the sign itself takes the focus: the first control is a text field, and focusing that
-        // would raise a phone's keyboard over the list
+        // the sign itself takes the focus: focusing the first field would open its list at once
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus();
         }}
-        className="sign max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] gap-0 overflow-x-hidden overflow-y-auto p-0 ring-0 sm:max-w-sm"
+        className="sign max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] gap-0 overflow-x-hidden overflow-y-auto p-0 ring-0 sm:max-w-md"
       >
         <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />
-        <DonateBody />
+        <DonateBody city={city} />
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,5 @@
 import { tinynyc } from "./tinynyc";
+import { tinyorl } from "./tinyorl";
 import { tinyrao } from "./tinyrao";
 import type { World } from "./types";
 
@@ -8,7 +9,7 @@ export type { World, WorldCopy } from "./types";
  * Every world there is, in the order the front page shows them. Adding a city to the site is
  * adding it here (and building it): the front page, the build check and the tests follow.
  */
-export const WORLDS: Record<string, World> = { tinynyc, tinyrao };
+export const WORLDS: Record<string, World> = { tinynyc, tinyrao, tinyorl };
 export const DEFAULT_WORLD = "tinynyc";
 
 /** Not a world: the build of the front page that lists them. */

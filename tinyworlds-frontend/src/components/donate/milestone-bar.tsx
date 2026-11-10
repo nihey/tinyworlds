@@ -16,11 +16,13 @@ interface MilestoneBarProps {
   t: Strings;
   /** what stands in for the plain name (a link, for a city that is already built) */
   name?: React.ReactNode;
+  /** a quiet remark under the bar, after the status: how many donations, say */
+  note?: string;
   className?: string;
 }
 
 /** One city on its way to being built: its name, how much is in, and the bar that fills. */
-export function MilestoneBar({ city, locale, t, name, className }: MilestoneBarProps) {
+export function MilestoneBar({ city, locale, t, name, note, className }: MilestoneBarProps) {
   // a city that is already built is not collecting: its bar is simply full, with no sum beside it
   const built = city.status === "BUILT";
   const filled = built ? 1 : progress(city);
@@ -47,7 +49,12 @@ export function MilestoneBar({ city, locale, t, name, className }: MilestoneBarP
       >
         <div className="h-full rounded-full bg-taxi" style={{ width: `${filled * 100}%` }} />
       </div>
-      {status && <p className="pt-1 text-[11px] leading-tight font-medium text-taxi">{status}</p>}
+      {(status || note) && (
+        <p className="flex flex-wrap gap-x-2 pt-1 text-[11px] leading-tight">
+          {status && <span className="font-medium text-taxi">{status}</span>}
+          {note && <span className="text-paper-dim">{note}</span>}
+        </p>
+      )}
     </div>
   );
 }

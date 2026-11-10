@@ -64,7 +64,13 @@ export interface Strings {
     tagline: string;
     pitch: string;
     cities: string;
-    next: string;
+    /** the cities being funded, in order of funding; and the ones that reached their goal */
+    ranking: string;
+    funded: string;
+    /** nobody has given anything yet */
+    rankingEmpty: string;
+    /** names the button of a row: "{city}" is the city */
+    donateTo: string;
     /** why donate, when there is no list of cities to show */
     nextPitch: string;
     openSource: string;
@@ -74,7 +80,8 @@ export interface Strings {
   };
   /**
    * The donate sign. In `body`, "{wordmark}" stands for the world's name ("tinynyc"); in
-   * `progress`, "{raised}" and "{goal}" are amounts of money.
+   * `progress` and `preview`, "{raised}", "{added}" and "{goal}" are amounts of money; "{amount}"
+   * is one too, "{name}" a city and "{n}" a count.
    */
   donate: {
     title: string;
@@ -83,16 +90,46 @@ export interface Strings {
     wish: string;
     /** with the list: what a full bar means */
     goal: string;
+    /** cities with the most funding come first; what is given beyond a city's goal is not lost */
+    priority: string;
+    over: string;
     /** the button that opens the checkout, and what it says while that is on its way */
     action: string;
+    /** the same button once an amount is chosen */
+    actionAmount: string;
     pending: string;
+    /** under the button: with the payment link the amount is set on the checkout page… */
     footnote: string;
+    /** …and with the list it was set here */
+    footnoteApi: string;
+    /** the list could not be loaded, so the plain checkout is offered instead */
+    linkNote: string;
     /** the checkout could not be opened and there is no other way to offer */
     failed: string;
-    /** names the group of choices */
+    /** names the city field */
     cities: string;
     loading: string;
+    /** the city picker: its search box, its groups, and its special choices */
+    pickerPlaceholder: string;
+    groupFunding: string;
+    groupMore: string;
+    otherOption: string;
+    useTyped: string;
+    backToList: string;
+    noMatch: string;
+    alreadyBuilt: string;
+    /** the amount: its label, and the field for one that is not on a chip */
+    amount: string;
+    customAmount: string;
+    customPlaceholder: string;
     progress: string;
+    /** the bar with the donation about to be made added to it */
+    preview: string;
+    fills: string;
+    /** under the bar of a city nobody has given to yet; and when no city is chosen */
+    newCity: string;
+    whole: string;
+    donations: { none: string; one: string; other: string };
     status: { funded: string; building: string; built: string };
     showAll: string;
     showFewer: string;

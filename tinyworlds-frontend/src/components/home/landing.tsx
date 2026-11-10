@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowUpRight, Code, Heart } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight, BadgeCheck, Code, Heart } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { DonateDialog } from "@/components/donate/donate-dialog";
 import { MilestoneBar } from "@/components/donate/milestone-bar";
 import { Wordmark } from "@/components/map/wordmark";
@@ -10,17 +10,110 @@ import { useMilestones } from "@/hooks/use-milestones";
 import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
-import { API_URL, CITY_LIMIT, paymentLinkFor, selectable } from "@/lib/donate";
+import type { Locale, Strings } from "@/i18n";
+import { RANKING_LIMIT, rankCities } from "@/lib/city-picker";
+import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
+import { cn } from "@/lib/utils";
 import { GITHUB_URL, SITE_ID, worldCardUrl, worldUrl } from "@/site";
-import { WORLDS } from "@/worlds";
+import { WORLDS, type World } from "@/worlds";
 
 const HEADING =
   "pb-3 text-[11px] font-semibold tracking-[0.16em] uppercase text-[#15171a]/70 dusk:text-paper-dim";
 
+const SUBHEADING =
+  "flex items-center gap-1.5 pb-1 text-[10.5px] font-semibold tracking-[0.14em] text-paper-dim uppercase";
+
 const ACTION =
   "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-taxi px-5 text-[15px] font-semibold text-taxi-ink transition-[filter,transform] outline-none hover:brightness-110 focus-visible:shadow-[0_0_0_2px_var(--sign),0_0_0_4px_var(--taxi)] active:scale-[0.98]";
 
-/** The front page: what this is, the cities there are, the ones coming, and where the code lives. */
+const QUIET =
+  "rounded-sm text-xs font-semibold text-paper-dim underline decoration-paper-dim/50 underline-offset-2 outline-none hover:text-paper focus-visible:text-taxi";
+
+/** A world's share card as its picture; until there is one, its name on a plain plate. */
+function CardPicture({ world, alt }: { world: World; alt: string }) {
+  const [missing, setMissing] = useState(false);
+  const picture = useRef<HTMLImageElement>(null);
+  // a picture that failed before the page came alive never tells: ask it
+  useEffect(() => {
+    const img = picture.current;
+    if (img && img.complete && img.naturalWidth === 0) setMissing(true);
+  }, []);
+  if (missing)
+    return (
+      <div
+        role="img"
+        aria-label={alt}
+        className="flex aspect-[1200/630] w-full items-center justify-center bg-sign-raised"
+      >
+        <Wordmark suffix={world.wordmark} accent={world.accent.color} className="text-4xl" />
+      </div>
+    );
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a plain file from another build's folder
+    <img
+      ref={picture}
+      src={worldCardUrl(world.id)}
+      alt={alt}
+      width={1200}
+      height={630}
+      loading="lazy"
+      decoding="async"
+      onError={() => setMissing(true)}
+      className="block aspect-[1200/630] h-auto w-full bg-sign-raised object-cover"
+    />
+  );
+}
+
+interface CityRowProps {
+  city: CityMilestone;
+  /** its place in the ranking; a city that reached its goal carries a mark instead */
+  place?: number;
+  locale: Locale;
+  t: Strings;
+  onDonate: (city: string) => void;
+}
+
+/** One city of the ranking: the whole row opens the donate sign with that city chosen. */
+function CityRow({ city, place, locale, t, onDonate }: CityRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={() => onDonate(city.name)}
+      aria-label={t.home.donateTo.replace("{city}", city.name)}
+      data-rybbit-event="donate_open"
+      data-rybbit-prop-world={SITE_ID}
+      data-rybbit-prop-city={city.name}
+      className="group -mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors outline-none hover:bg-sign-raised focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
+    >
+      {place === undefined ? (
+        <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-taxi" strokeWidth={2.25} />
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            "w-5 shrink-0 text-right text-[15px] leading-5 font-bold tabular-nums",
+            place <= 3 && city.raisedCents > 0 ? "text-taxi" : "text-paper-dim",
+          )}
+        >
+          {place}
+        </span>
+      )}
+      <MilestoneBar
+        city={city}
+        locale={locale}
+        t={t}
+        note={donationsLabel(city.donations, locale, t.donate.donations)}
+      />
+      <Heart
+        aria-hidden
+        className="mt-0.5 size-4 shrink-0 text-paper-dim/60 transition-colors group-hover:fill-taxi group-hover:text-taxi"
+        strokeWidth={2.25}
+      />
+    </button>
+  );
+}
+
+/** The front page: what this is, the cities there are, the ones people are funding, and where the code lives. */
 export function Landing() {
   const { t, locale } = useI18n();
   const [prefs] = usePrefs();
@@ -28,11 +121,16 @@ export function Landing() {
   useDocumentLanguage(locale, t.home.title);
   useDonationReturn();
 
-  const [donateOpen, setDonateOpen] = useState(false);
+  // null: closed; otherwise open, with the city it was opened for (or none)
+  const [donate, setDonate] = useState<{ city: string | null } | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const milestones = useMilestones();
   const withList = API_URL !== "" && milestones.state !== "failed";
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
-  const next = milestones.cities.filter(selectable).slice(0, CITY_LIMIT);
+  const { funded, ranked, anyRaised } = rankCities(milestones.cities);
+  const shown = showAll ? ranked : ranked.slice(0, RANKING_LIMIT);
+  const worlds = Object.values(WORLDS);
+  const openFor = (city: string) => setDonate({ city });
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-12 sm:px-6 sm:pt-8">
@@ -53,8 +151,14 @@ export function Landing() {
         <h2 id="cities" className={HEADING}>
           {t.home.cities}
         </h2>
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {Object.values(WORLDS).map((world) => {
+        <ul
+          className={cn(
+            "grid gap-4",
+            worlds.length > 1 && "sm:grid-cols-2",
+            worlds.length > 2 && "lg:grid-cols-3",
+          )}
+        >
+          {worlds.map((world) => {
             const copy = world.copy[locale];
             return (
               <li key={world.id}>
@@ -62,16 +166,7 @@ export function Landing() {
                   href={worldUrl(world.id)}
                   className="group sign block h-full overflow-hidden transition-transform outline-none hover:-translate-y-0.5 focus-visible:shadow-[0_0_0_3px_var(--taxi)]"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- a plain file from another build's folder */}
-                  <img
-                    src={worldCardUrl(world.id)}
-                    alt={copy.cardAlt}
-                    width={1200}
-                    height={630}
-                    loading="lazy"
-                    decoding="async"
-                    className="block aspect-[1200/630] h-auto w-full bg-sign-raised object-cover"
-                  />
+                  <CardPicture world={world} alt={copy.cardAlt} />
                   <div className="flex items-start gap-3 px-4 py-3.5">
                     <div className="min-w-0 flex-1">
                       <h3 className="text-lg leading-tight font-semibold text-paper">
@@ -100,31 +195,71 @@ export function Landing() {
       </section>
 
       {takesDonations && (
-        <section aria-labelledby="next">
-          <h2 id="next" className={HEADING}>
-            {t.home.next}
+        <section aria-labelledby="ranking">
+          <h2 id="ranking" className={HEADING}>
+            {t.home.ranking}
           </h2>
           <div className="sign px-5 py-5 sm:px-6">
             <p className="max-w-2xl text-[15px] leading-relaxed text-paper">
-              {withList ? t.donate.goal : t.home.nextPitch}
+              {withList ? `${t.donate.goal} ${t.donate.priority}` : t.home.nextPitch}
             </p>
+            {withList && (
+              <p className="max-w-2xl pt-1.5 text-sm leading-relaxed text-paper-dim">
+                {t.donate.over}
+              </p>
+            )}
             {withList && milestones.state === "loading" && (
               <p role="status" className="pt-4 text-sm text-paper-dim">
                 {t.donate.loading}
               </p>
             )}
-            {withList && next.length > 0 && (
-              <ul className="grid gap-x-8 gap-y-4 pt-5 sm:grid-cols-2">
-                {next.map((city) => (
-                  <li key={city.id} className="flex">
-                    <MilestoneBar city={city} locale={locale} t={t} />
-                  </li>
-                ))}
-              </ul>
+
+            {withList && funded.length > 0 && (
+              <div className="pt-5">
+                <h3 className={SUBHEADING}>
+                  <BadgeCheck aria-hidden className="size-3.5 text-taxi" strokeWidth={2.5} />
+                  {t.home.funded}
+                </h3>
+                <ul className="grid gap-x-10 sm:grid-cols-2">
+                  {funded.map((city) => (
+                    <li key={city.id}>
+                      <CityRow city={city} locale={locale} t={t} onDonate={openFor} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
+
+            {withList && ranked.length > 0 && (
+              <div className="pt-5">
+                {funded.length > 0 && <h3 className={SUBHEADING}>{t.donate.groupFunding}</h3>}
+                {!anyRaised && (
+                  <p className="pb-1 text-sm leading-relaxed text-taxi">{t.home.rankingEmpty}</p>
+                )}
+                {/* down the first column, then the second: the ranking reads top to bottom */}
+                <ol className="gap-x-10 sm:columns-2">
+                  {shown.map((city, i) => (
+                    <li key={city.id} className="break-inside-avoid">
+                      <CityRow city={city} place={i + 1} locale={locale} t={t} onDonate={openFor} />
+                    </li>
+                  ))}
+                </ol>
+                {ranked.length > RANKING_LIMIT && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAll(!showAll)}
+                    aria-expanded={showAll}
+                    className={cn(QUIET, "mt-2")}
+                  >
+                    {showAll ? t.donate.showFewer : t.donate.showAll}
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={() => setDonateOpen(true)}
+              onClick={() => setDonate({ city: null })}
               data-rybbit-event="donate_open"
               data-rybbit-prop-world={SITE_ID}
               className={`${ACTION} mt-5`}
@@ -161,7 +296,13 @@ export function Landing() {
         {t.home.credits}
       </footer>
 
-      {takesDonations && <DonateDialog open={donateOpen} onOpenChange={setDonateOpen} />}
+      {takesDonations && (
+        <DonateDialog
+          open={donate !== null}
+          onOpenChange={(open) => !open && setDonate(null)}
+          city={donate?.city ?? null}
+        />
+      )}
     </main>
   );
 }

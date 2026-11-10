@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { GITHUB_URL, HOME_URL, SITE_ID, SITE_NAME, worldCardUrl, worldUrl } from "@/site";
+import {
+  BUILT_CITIES,
+  GITHUB_URL,
+  HOME_URL,
+  SITE_ID,
+  SITE_NAME,
+  worldCardUrl,
+  worldUrl,
+} from "@/site";
 
 describe("site", () => {
   it("is the default world unless the build says otherwise", () => {
@@ -17,6 +25,10 @@ describe("site", () => {
     expect(worldCardUrl("tinyrao")).toBe("/tinyrao/og/tinyrao.jpg");
     expect(worldUrl("tinynyc", "/worlds")).toBe("/worlds/tinynyc/");
     expect(worldCardUrl("tinynyc", "/worlds")).toBe("/worlds/tinynyc/og/tinynyc.jpg");
+  });
+
+  it("knows which cities are already worlds, by the names a donor would pick", () => {
+    expect(BUILT_CITIES).toEqual(["New York", "Ribeirão Preto", "Orlando"]);
   });
 
   it("can take the cards from one folder in development", () => {

@@ -14,6 +14,12 @@ describe("resolveWorld", () => {
     expect(resolveWorld("tinyrao").id).toBe("tinyrao");
     expect(resolveWorld("tinyrao").homeLocale).toBe("pt-BR");
     expect(resolveWorld("tinynyc").homeLocale).toBe("en-US");
+    expect(resolveWorld("tinyorl").id).toBe("tinyorl");
+    expect(resolveWorld("tinyorl").homeLocale).toBe("en-US");
+  });
+
+  it("lists the worlds in the order the front page shows them", () => {
+    expect(Object.keys(WORLDS)).toEqual(["tinynyc", "tinyrao", "tinyorl"]);
   });
 
   it("stops on an id it does not know, naming the ones it does", () => {
@@ -84,6 +90,17 @@ describe("worlds", () => {
     ]);
     expect(LOCALES.map((locale) => WORLDS.tinynyc.copy[locale].hoodLines.label)).toEqual([
       "Neighbourhood lines",
+      "Linhas dos bairros",
+      "Límites de barrios",
+    ]);
+    // Orlando's districts are the municipalities around it
+    expect(LOCALES.map((locale) => WORLDS.tinyorl.copy[locale].borough)).toEqual([
+      "City",
+      "Cidade",
+      "Ciudad",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinyorl.copy[locale].hoodLines.label)).toEqual([
+      "Neighborhood lines",
       "Linhas dos bairros",
       "Límites de barrios",
     ]);

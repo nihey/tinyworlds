@@ -120,27 +120,27 @@ export function formatUsd(cents: number, locale: Locale): string {
   }).format(cents / 100);
 }
 
+/** "3 donations", "1 donation", "No donations yet", in the visitor's language. `{n}` is the count. */
+export function donationsLabel(
+  count: number,
+  locale: Locale,
+  words: { none: string; one: string; other: string },
+): string {
+  if (!(count > 0)) return words.none;
+  const form = new Intl.PluralRules(locale).select(count) === "one" ? words.one : words.other;
+  return form.replace("{n}", new Intl.NumberFormat(locale).format(count));
+}
+
+/** How the visitor's language writes the dollar sign: "$", "US$". */
+export function usdSymbol(locale: Locale): string {
+  const parts = new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).formatToParts(
+    0,
+  );
+  return parts.find((part) => part.type === "currency")?.value ?? "$";
+}
+
 /** A built city is done: there is nothing left to fund. */
 export const selectable = (city: CityMilestone): boolean => city.status !== "BUILT";
-
-/** How many cities the list shows before "show all". */
-export const CITY_LIMIT = 6;
-
-/**
- * The rows of the list: the cities one can still fund, the first few of them until the list is
- * expanded; then also the ones already built, after the rest. `more` says whether expanding
- * would show anything else.
- */
-export function listCities(
-  cities: CityMilestone[],
-  expanded: boolean,
-  limit = CITY_LIMIT,
-): { rows: CityMilestone[]; more: boolean } {
-  const open = cities.filter(selectable);
-  const built = cities.filter((city) => !selectable(city));
-  const more = open.length > limit || built.length > 0;
-  return { rows: expanded ? [...open, ...built] : open.slice(0, limit), more };
-}
 
 // ---------------------------------------------------------------------------------------------
 // the donor's choice → a checkout
@@ -152,8 +152,35 @@ export type Choice =
 
 export const CITY_MAX = 60;
 
+// ---------------------------------------------------------------------------------------------
+// amounts
+// ---------------------------------------------------------------------------------------------
+
+/** Whole US dollars: what the chips offer, and the limits of what may be typed. */
+export const AMOUNT_PRESETS = [5, 10, 25, 50, 100] as const;
+export const AMOUNT_MIN = 1;
+export const AMOUNT_MAX = 10000;
+export const AMOUNT_DEFAULT = 10;
+
+export function clampAmount(dollars: number): number {
+  if (!Number.isFinite(dollars)) return AMOUNT_MIN;
+  return Math.min(AMOUNT_MAX, Math.max(AMOUNT_MIN, Math.round(dollars)));
+}
+
+/**
+ * What someone typed as an amount → whole dollars within the limits, or null when there is no
+ * number in it. "25", "$25" and "25.00" are all twenty-five: only the whole part is read.
+ */
+export function parseAmount(text: string): number | null {
+  const whole = /\d+/.exec(text)?.[0];
+  if (!whole) return null;
+  return clampAmount(Number(whole));
+}
+
 export interface CheckoutInput {
   city: string | null;
+  /** US cents; null leaves the amount to the checkout page. */
+  amountCents: number | null;
   world: string;
   locale: Locale;
   returnUrl: string;
@@ -163,16 +190,24 @@ export interface CheckoutInput {
 export function chosenCity(choice: Choice): string | null {
   const raw = choice.kind === "city" ? choice.name : choice.kind === "other" ? choice.text : "";
   const tidy = raw.replace(/\s+/g, " ").trim().slice(0, CITY_MAX).trim();
-  return tidy === "" ? null : tidy;
+  // a "name" with no letter or digit in it is no city
+  return /[\p{L}\p{N}]/u.test(tidy) ? tidy : null;
 }
 
 export function checkoutInput(
   choice: Choice,
+  amountDollars: number | null,
   world: string,
   locale: Locale,
   returnUrl: string,
 ): CheckoutInput {
-  return { city: chosenCity(choice), world, locale, returnUrl };
+  return {
+    city: chosenCity(choice),
+    amountCents: amountDollars === null ? null : clampAmount(amountDollars) * 100,
+    world,
+    locale,
+    returnUrl,
+  };
 }
 
 /** Where the checkout sends the donor back to: this page, without its query or hash. */
