@@ -5,6 +5,10 @@ import { isLocale, localeOfLang, type Locale } from './locales.js';
 /** How every session of this app is marked. The Stripe account is shared with other products. */
 export const APP_TAG = 'tinyworlds';
 
+/** A visit's id: a UUID, as browsers make them. */
+const VISIT_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** A world id as it appears in URLs: "tinynyc". */
 export const WORLD_PATTERN = /^[a-z0-9]{3,20}$/;
 
@@ -20,13 +24,15 @@ export interface DonationFacts {
   citySlug: string | null;
   world: string | null;
   locale: Locale | null;
+  /** The visit the checkout was started from, when the site said. */
+  visitId: string | null;
 }
 
 /**
  * Reads a Checkout session. Null unless it is a paid donation of this app.
  *
  * Sessions come from two places. The API's own (createDonationCheckout) carry the city, the
- * world and the locale in their metadata. The static payment links, which the site falls back
+ * world, the locale and the visit in their metadata. The static payment links, which the site falls back
  * to, carry the city in a custom field called "city", the world as the client reference, and a
  * short language tag in `metadata.lang`.
  */
@@ -67,5 +73,8 @@ export function donationFacts(
     citySlug: slug || null,
     world: WORLD_PATTERN.test(world) ? world : null,
     locale,
+    visitId: VISIT_PATTERN.test(metadata.visit_id ?? '')
+      ? metadata.visit_id.toLowerCase()
+      : null,
   };
 }

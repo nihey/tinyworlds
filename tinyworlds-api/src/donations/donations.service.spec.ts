@@ -12,6 +12,7 @@ import {
   TEST_WEBHOOK_SECRET,
 } from '../../test/fake-stripe.js';
 import type { Env } from '../config/env.js';
+import { FunnelService } from '../funnel/funnel.service.js';
 import { DonationsService } from './donations.service.js';
 
 const ENV = {
@@ -31,7 +32,12 @@ function setup() {
   const config = {
     get: (key: keyof typeof ENV) => ENV[key],
   } as unknown as ConfigService<Env, true>;
-  const service = new DonationsService(stripe, prisma.asService(), config);
+  const service = new DonationsService(
+    stripe,
+    prisma.asService(),
+    config,
+    new FunnelService(prisma.asService()),
+  );
   const deliver = (
     options: Parameters<typeof checkoutSession>[0],
     type?: string,
@@ -227,6 +233,50 @@ describe('DonationsService.createCheckout', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     }
     expect(stripe.calls).toHaveLength(0);
+  });
+
+  it('carries the visit to Stripe and notes that it reached the checkout', async () => {
+    const { service, stripe, prisma } = setup();
+    const visitId = '0B0E7A52-6C1D-4F0A-9C55-2F1B8E3D4A10';
+    await service.createCheckout({ ...input, amountCents: 2500, visitId });
+    expect(stripe.calls[0].metadata).toMatchObject({
+      visit_id: visitId.toLowerCase(),
+    });
+    expect(prisma.events).toEqual([
+      {
+        visitId: visitId.toLowerCase(),
+        step: 'CHECKOUT_STARTED',
+        world: 'tinynyc',
+        locale: 'en-US',
+        city: 'São Paulo',
+        amountCents: 2500,
+      },
+    ]);
+  });
+
+  it('notes nothing without a visit, nor when Stripe refuses', async () => {
+    const { service, stripe, prisma } = setup();
+    await service.createCheckout(input);
+    expect(stripe.calls[0].metadata).not.toHaveProperty('visit_id');
+    stripe.failWith = new Error('Stripe is down');
+    await expect(
+      service.createCheckout({
+        ...input,
+        visitId: '0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10',
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(prisma.events).toEqual([]);
+  });
+
+  it('still answers the checkout when the funnel cannot be written', async () => {
+    const { service, prisma } = setup();
+    prisma.failEvents = new Error('the database is away');
+    await expect(
+      service.createCheckout({
+        ...input,
+        visitId: '0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10',
+      }),
+    ).resolves.toMatch(/^https:\/\/checkout\.stripe\.test\//);
   });
 
   it('answers 503 when Stripe fails, so the site can fall back', async () => {
@@ -449,6 +499,7 @@ describe('DonationsService.handleWebhook', () => {
         cityText: 'Tokyo',
         world: 'tinynyc',
         locale: 'en-US',
+        visitId: null,
       });
     };
     await service.handleWebhook(body, signature);

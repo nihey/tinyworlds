@@ -2,6 +2,12 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+"""Someone signed in to the admin pages"""
+type Admin {
+  email: String!
+  id: ID!
+}
+
 """A city and how far it is from the donations that get it built"""
 type CityMilestone {
   """How many donations named this city"""
@@ -55,14 +61,155 @@ input CreateDonationCheckoutInput {
   returnUrl: String!
 
   """
+  The visit this checkout is started from (see trackFunnelStep): ties the donation to its funnel
+  """
+  visitId: ID
+
+  """
   The map the donor is on, e.g. "tinynyc"
   """
   world: String!
 }
 
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
 type DonationCheckout {
   """Stripe's checkout page for this donation"""
   url: String!
+}
+
+"""The donation funnel over a period"""
+type DonationFunnel {
+  """By day, oldest first, every day of the period"""
+  days: [FunnelDay!]!
+  from: DateTime!
+
+  """The latest donations of the period, newest first"""
+  recentDonations: [FunnelDonation!]!
+  timeZone: String!
+  to: DateTime!
+
+  """The whole site: a visit counts once, however many worlds it saw"""
+  totals: FunnelCounts!
+
+  """By world, the most visited first"""
+  worlds: [FunnelWorld!]!
+}
+
+input DonationFunnelInput {
+  """The start of the period (included)"""
+  from: DateTime!
+
+  """
+  The time zone days are counted in, as an IANA name ("America/Sao_Paulo"); UTC when left out
+  """
+  timeZone: String
+
+  """The end of the period (excluded); at most 366 days after the start"""
+  to: DateTime!
+}
+
+"""
+How many visits reached each step towards a donation, and what was given
+"""
+type FunnelCounts {
+  """Visits that came back from a checkout without paying"""
+  checkoutCancelled: Int!
+
+  """Visits that went on to a checkout"""
+  checkoutStarted: Int!
+
+  """Visits that opened the donate sign"""
+  donateOpened: Int!
+
+  """Donations paid"""
+  donations: Int!
+
+  """US cents given (donations in US dollars)"""
+  raisedCents: Int!
+
+  """Visits that opened a page"""
+  visits: Int!
+}
+
+"""The funnel of one day"""
+type FunnelDay {
+  """Visits that came back from a checkout without paying"""
+  checkoutCancelled: Int!
+
+  """Visits that went on to a checkout"""
+  checkoutStarted: Int!
+
+  """
+  The day, in the time zone asked for: "2026-11-10"
+  """
+  day: String!
+
+  """Visits that opened the donate sign"""
+  donateOpened: Int!
+
+  """Donations paid"""
+  donations: Int!
+
+  """US cents given (donations in US dollars)"""
+  raisedCents: Int!
+
+  """Visits that opened a page"""
+  visits: Int!
+}
+
+"""A paid donation, as the admin pages list it"""
+type FunnelDonation {
+  amountCents: Int!
+  city: String
+  createdAt: DateTime!
+
+  """
+  Lower case: "usd"
+  """
+  currency: String!
+  id: ID!
+  locale: String
+  world: String
+}
+
+"""
+A step of a visit towards a donation, in order; the last one, paying, is a donation itself
+"""
+enum FunnelStep {
+  CHECKOUT_CANCELLED
+  CHECKOUT_STARTED
+  DONATE_OPENED
+  VISIT
+}
+
+"""The funnel of one world, or of the front page"""
+type FunnelWorld {
+  """Visits that came back from a checkout without paying"""
+  checkoutCancelled: Int!
+
+  """Visits that went on to a checkout"""
+  checkoutStarted: Int!
+
+  """Visits that opened the donate sign"""
+  donateOpened: Int!
+
+  """Donations paid"""
+  donations: Int!
+
+  """US cents given (donations in US dollars)"""
+  raisedCents: Int!
+
+  """Visits that opened a page"""
+  visits: Int!
+
+  """
+  A world's id, "home" for the front page, or null for donations that name no world
+  """
+  world: String
 }
 
 type Mutation {
@@ -70,6 +217,11 @@ type Mutation {
   Starts a donation at Stripe and answers the page to send the donor to. The amount is the one given, from US$1; without one it is chosen on Stripe's page.
   """
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
+
+  """
+  Reports that a visit reached a step towards a donation. Says true; saying a step twice changes nothing.
+  """
+  trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
 }
 
 type Query {
@@ -78,6 +230,28 @@ type Query {
   """
   cityMilestones: [CityMilestone!]!
 
+  """
+  For admins: how many visits reached each step towards a donation over a period
+  """
+  donationFunnel(input: DonationFunnelInput!): DonationFunnel!
+
   """Liveness check for the app"""
   health: String!
+
+  """The admin this session belongs to"""
+  me: Admin!
+}
+
+input TrackFunnelStepInput {
+  """The interface language: en-US, pt-BR or es-ES"""
+  locale: String
+  step: FunnelStep!
+
+  """
+  The visit: a UUID the page makes up for its tab. It names no person and is gone with the tab's session.
+  """
+  visitId: ID!
+
+  """Where it happened: a world's id, or "home" for the front page"""
+  world: String!
 }

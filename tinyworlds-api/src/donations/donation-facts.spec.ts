@@ -24,7 +24,20 @@ describe('donationFacts', () => {
       citySlug: 'sao-paulo',
       world: 'tinynyc',
       locale: 'pt-BR',
+      visitId: null,
     });
+  });
+
+  it('reads the visit a checkout was started from, if it is one', () => {
+    const read = (visit_id: string) =>
+      donationFacts(
+        checkoutSession({ metadata: { app: 'tinyworlds', visit_id } }),
+      )?.visitId;
+    expect(read('0B0E7A52-6C1D-4F0A-9C55-2F1B8E3D4A10')).toBe(
+      '0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10',
+    );
+    expect(read('not-a-visit')).toBeNull();
+    expect(read('')).toBeNull();
   });
 
   it("reads a payment link's session: the city from its field, the world from the reference", () => {

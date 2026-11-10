@@ -1,23 +1,45 @@
 import type { INestApplication } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
+import { MAILER } from '../src/auth/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { FakeMailer } from './fake-mailer.js';
 import { checkoutSession, FakeStripe, signedEvent } from './fake-stripe.js';
 
 const MILESTONES =
   '{ cityMilestones { slug name raisedCents goalCents donations status worldId } }';
 const CHECKOUT =
   'mutation ($input: CreateDonationCheckoutInput!) { createDonationCheckout(input: $input) { url } }';
+const TRACK =
+  'mutation ($input: TrackFunnelStepInput!) { trackFunnelStep(input: $input) }';
+const COUNTS =
+  'visits donateOpened checkoutStarted checkoutCancelled donations raisedCents';
+const FUNNEL = `query ($input: DonationFunnelInput!) { donationFunnel(input: $input) {
+  timeZone totals { ${COUNTS} } worlds { world ${COUNTS} } days { day ${COUNTS} }
+  recentDonations { id createdAt amountCents currency city world locale } } }`;
+
+const ADMIN = 'admin@example.com';
+const ADMIN_PAGE = 'https://example.com/admin/';
 
 /** A GraphQL answer, as far as these tests read it. */
 interface Answer {
   data: {
     cityMilestones: Record<string, unknown>[];
     createDonationCheckout: { url: string };
+    trackFunnelStep: boolean;
+    me: { id: string; email: string };
+    donationFunnel: {
+      timeZone: string;
+      totals: Record<string, number>;
+      worlds: ({ world: string | null } & Record<string, number>)[];
+      days: ({ day: string } & Record<string, number>)[];
+      recentDonations: Record<string, unknown>[];
+    };
   };
   errors?: { message: string; extensions: { code: string } }[];
 }
@@ -28,6 +50,9 @@ describe('the API over HTTP', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let stripe: FakeStripe;
+  let mailer: FakeMailer;
+  /** The admin's session, once signed in: sign-in links are limited to one a minute. */
+  let session: { accessToken: string; admin: { id: string } } | null = null;
 
   const graphql = (query: string, variables?: Record<string, unknown>) =>
     request(app.getHttpServer())
@@ -42,20 +67,50 @@ describe('the API over HTTP', () => {
       .send(body.toString());
   };
 
+  const post = (path: string, body: Record<string, unknown>) =>
+    request(app.getHttpServer()).post(path).send(body);
+
+  /** Signs the admin in the way a person does: ask for a link, read the mail, open the link. */
+  const signIn = async () => {
+    if (session) return session;
+    await post('/api/auth/magic-link', {
+      email: ADMIN,
+      returnUrl: ADMIN_PAGE,
+    }).expect(202, { sent: true });
+    // the mail goes out after the answer
+    await vi.waitFor(() => expect(mailer.sent).toHaveLength(1));
+    const res = await post('/api/auth/verify', {
+      token: mailer.token(),
+    }).expect(200);
+    session = res.body as NonNullable<typeof session>;
+    return session;
+  };
+
+  /** A GraphQL request with the admin's session; answers once it has come back (200). */
+  const asAdmin = async (query: string, variables?: Record<string, unknown>) =>
+    graphql(query, variables)
+      .set('Authorization', `Bearer ${(await signIn()).accessToken}`)
+      .expect(200);
+
   beforeAll(async () => {
     stripe = new FakeStripe();
+    mailer = new FakeMailer();
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(STRIPE)
       .useValue(stripe)
+      .overrideProvider(MAILER)
+      .useValue(mailer)
       .compile();
     app = moduleRef.createNestApplication({ rawBody: true });
     configureHttp(app);
     await app.init();
     prisma = app.get(PrismaService);
+    await prisma.$executeRawUnsafe('TRUNCATE admins CASCADE');
   });
 
   beforeEach(async () => {
-    await prisma.$executeRawUnsafe('TRUNCATE donations, cities');
+    // not the admins: the session made by the first sign-in serves every test after it
+    await prisma.$executeRawUnsafe('TRUNCATE donations, cities, funnel_events');
     stripe.calls = [];
     stripe.priceLookups = [];
   });
@@ -300,5 +355,316 @@ describe('the API over HTTP', () => {
         'access-control-allow-origin'
       ],
     ).toBeUndefined();
+  });
+
+  describe('the admin pages', () => {
+    const period = {
+      from: '2026-01-01T00:00:00.000Z',
+      to: '2026-12-31T00:00:00.000Z',
+    };
+
+    it('are closed to anyone who is not signed in', async () => {
+      for (const [query, variables] of [
+        ['{ me { email } }', undefined],
+        [FUNNEL, { input: period }],
+      ] as const) {
+        const res = await graphql(query, variables).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('UNAUTHENTICATED');
+        expect((res.body as { data: unknown }).data).toBeNull();
+      }
+      // nor to a session this API did not sign
+      const forged = await new JwtService({
+        secret: 'someone-else-made-this-secret-up-entirely',
+      }).signAsync({ sub: '7a0d7d0e-3a55-4b0e-8f2a-0c1d2e3f4a5b' });
+      const res = await graphql('{ me { email } }')
+        .set('Authorization', `Bearer ${forged}`)
+        .expect(200);
+      expect(answer(res).errors?.[0].extensions.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('open to an admin through a link sent by mail, which works once', async () => {
+      const { accessToken, admin } = await signIn();
+      expect(mailer.sent[0].to).toBe(ADMIN);
+      expect(mailer.sent[0].text).toContain(`${ADMIN_PAGE}#token=`);
+
+      const res = await asAdmin('{ me { id email } }');
+      expect(answer(res).data.me).toEqual({ id: admin.id, email: ADMIN });
+      expect(accessToken.split('.')).toHaveLength(3);
+
+      // the link is spent
+      await post('/api/auth/verify', { token: mailer.token() }).expect(401);
+      // and only its hash was ever kept
+      const links = await prisma.magicLink.findMany();
+      expect(links).toHaveLength(1);
+      expect(links[0].usedAt).toBeInstanceOf(Date);
+      expect(JSON.stringify(links)).not.toContain(mailer.token());
+    });
+
+    it('answer anyone else the same, and mail them nothing', async () => {
+      await signIn();
+      const before = mailer.sent.length;
+      await post('/api/auth/magic-link', {
+        email: 'someone@example.com',
+        returnUrl: ADMIN_PAGE,
+        locale: 'pt-BR',
+      })
+        .set('x-forwarded-for', '203.0.113.30')
+        .expect(202, { sent: true });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(mailer.sent).toHaveLength(before);
+      expect(await prisma.admin.count()).toBe(1);
+    });
+
+    it('refuse a link to anywhere but the site, an address that is none, and a made-up token', async () => {
+      const from = (body: Record<string, unknown>, path = 'magic-link') =>
+        post(`/api/auth/${path}`, body).set('x-forwarded-for', '203.0.113.31');
+      await from({
+        email: ADMIN,
+        returnUrl: 'https://evil.test/admin/',
+      }).expect(400);
+      await from({ email: 'not-an-address', returnUrl: ADMIN_PAGE }).expect(
+        400,
+      );
+      await from({
+        email: ADMIN,
+        returnUrl: ADMIN_PAGE,
+        locale: 'fr-FR',
+      }).expect(400);
+      await from({ token: 'x'.repeat(43) }, 'verify').expect(401);
+      await from({ token: 'short' }, 'verify').expect(400);
+    });
+
+    it('limit how often one address may ask for a link', async () => {
+      const codes: number[] = [];
+      for (let i = 0; i < 7; i++) {
+        const res = await post('/api/auth/magic-link', {
+          email: 'someone@example.com',
+          returnUrl: ADMIN_PAGE,
+        }).set('x-forwarded-for', '203.0.113.32');
+        codes.push(res.status);
+      }
+      expect(codes).toEqual([202, 202, 202, 202, 202, 429, 429]);
+    });
+  });
+
+  describe('the donation funnel', () => {
+    const visit = (n: number) =>
+      `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const track = (
+      n: number,
+      step: string,
+      world = 'tinynyc',
+      locale: string | null = 'en-US',
+    ) =>
+      graphql(TRACK, { input: { visitId: visit(n), step, world, locale } }).set(
+        'x-forwarded-for',
+        '203.0.113.40',
+      );
+
+    it('takes a step from anyone, once per visit and world', async () => {
+      for (const world of ['tinynyc', 'tinynyc', 'home']) {
+        const res = await track(1, 'VISIT', world).expect(200);
+        expect(answer(res).data.trackFunnelStep).toBe(true);
+      }
+      const events = await prisma.funnelEvent.findMany({
+        orderBy: { world: 'asc' },
+      });
+      expect(events.map((event) => [event.step, event.world])).toEqual([
+        ['VISIT', 'home'],
+        ['VISIT', 'tinynyc'],
+      ]);
+      expect(events[0]).toMatchObject({ visitId: visit(1), locale: 'en-US' });
+    });
+
+    it('refuses a step that is not one, from a visit or a world that is not one', async () => {
+      const good = { visitId: visit(1), step: 'VISIT', world: 'tinynyc' };
+      for (const input of [
+        { ...good, visitId: 'me' },
+        { ...good, world: 'Tiny NYC' },
+        { ...good, locale: 'fr-FR' },
+      ]) {
+        const res = await graphql(TRACK, { input }).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+      // a step the schema does not know never reaches the resolver
+      await graphql(TRACK, { input: { ...good, step: 'PAID' } }).expect(400);
+      expect(await prisma.funnelEvent.count()).toBe(0);
+    });
+
+    it('follows visits from the page to the paid donation, by world and by day', async () => {
+      // five visits to New York, two of them by way of the front page, and one to Ribeirão Preto
+      for (const n of [1, 2, 3, 4, 5]) await track(n, 'VISIT').expect(200);
+      for (const n of [1, 2]) await track(n, 'VISIT', 'home').expect(200);
+      await track(6, 'VISIT', 'tinyrao', 'pt-BR').expect(200);
+      // three open the donate sign
+      for (const n of [1, 2, 3]) await track(n, 'DONATE_OPENED').expect(200);
+      // two go on to the checkout: the API notes that itself
+      for (const n of [1, 2]) {
+        const res = await graphql(CHECKOUT, {
+          input: {
+            city: 'Lisbon',
+            amountCents: 2500,
+            world: 'tinynyc',
+            locale: 'en-US',
+            returnUrl: 'https://example.com/tinynyc/',
+            visitId: visit(n),
+          },
+        })
+          .set('x-forwarded-for', '203.0.113.41')
+          .expect(200);
+        expect(answer(res).errors).toBeUndefined();
+        expect(stripe.calls.at(-1)?.metadata).toMatchObject({
+          visit_id: visit(n),
+        });
+      }
+      // one pays, one comes back without paying
+      await webhook({
+        id: 'cs_funnel',
+        amount: 2500,
+        metadata: {
+          app: 'tinyworlds',
+          city: 'Lisbon',
+          world: 'tinynyc',
+          locale: 'en-US',
+          visit_id: visit(1),
+        },
+      }).expect(200);
+      await track(2, 'CHECKOUT_CANCELLED').expect(200);
+      // and someone gives through the plain payment link: no visit, no world
+      await webhook({
+        id: 'cs_link',
+        amount: 1000,
+        metadata: { app: 'tinyworlds' },
+      }).expect(200);
+
+      const now = Date.now();
+      const res = await asAdmin(FUNNEL, {
+        input: {
+          from: new Date(now - 6 * 24 * 60 * 60 * 1000).toISOString(),
+          to: new Date(now + 60_000).toISOString(),
+          timeZone: 'America/Sao_Paulo',
+        },
+      });
+      expect(answer(res).errors).toBeUndefined();
+      const funnel = answer(res).data.donationFunnel;
+
+      expect(funnel.timeZone).toBe('America/Sao_Paulo');
+      // a visit counts once on the site, however many of its pages it saw
+      expect(funnel.totals).toEqual({
+        visits: 6,
+        donateOpened: 3,
+        checkoutStarted: 2,
+        checkoutCancelled: 1,
+        donations: 2,
+        raisedCents: 3500,
+      });
+      expect(funnel.worlds).toEqual([
+        {
+          world: 'tinynyc',
+          visits: 5,
+          donateOpened: 3,
+          checkoutStarted: 2,
+          checkoutCancelled: 1,
+          donations: 1,
+          raisedCents: 2500,
+        },
+        {
+          world: 'home',
+          visits: 2,
+          donateOpened: 0,
+          checkoutStarted: 0,
+          checkoutCancelled: 0,
+          donations: 0,
+          raisedCents: 0,
+        },
+        {
+          world: 'tinyrao',
+          visits: 1,
+          donateOpened: 0,
+          checkoutStarted: 0,
+          checkoutCancelled: 0,
+          donations: 0,
+          raisedCents: 0,
+        },
+        {
+          world: null,
+          visits: 0,
+          donateOpened: 0,
+          checkoutStarted: 0,
+          checkoutCancelled: 0,
+          donations: 1,
+          raisedCents: 1000,
+        },
+      ]);
+      // every day of the period is there, and today has it all
+      expect(funnel.days.length).toBeGreaterThanOrEqual(6);
+      expect(funnel.days.at(-1)).toMatchObject({
+        visits: 6,
+        donateOpened: 3,
+        checkoutStarted: 2,
+        donations: 2,
+        raisedCents: 3500,
+      });
+      expect(funnel.days[0]).toMatchObject({ visits: 0, donations: 0 });
+      expect(funnel.recentDonations).toHaveLength(2);
+      expect(funnel.recentDonations).toContainEqual(
+        expect.objectContaining({
+          amountCents: 2500,
+          currency: 'usd',
+          city: 'Lisbon',
+          world: 'tinynyc',
+          locale: 'en-US',
+        }),
+      );
+
+      const donation = await prisma.donation.findUnique({
+        where: { stripeSessionId: 'cs_funnel' },
+      });
+      expect(donation?.visitId).toBe(visit(1));
+      const started = await prisma.funnelEvent.findFirst({
+        where: { visitId: visit(1), step: 'CHECKOUT_STARTED' },
+      });
+      expect(started).toMatchObject({ city: 'Lisbon', amountCents: 2500 });
+    });
+
+    it('leaves out what happened outside the period asked for', async () => {
+      await track(1, 'VISIT').expect(200);
+      const res = await asAdmin(FUNNEL, {
+        input: {
+          from: '2020-01-01T00:00:00.000Z',
+          to: '2020-01-08T00:00:00.000Z',
+        },
+      });
+      const funnel = answer(res).data.donationFunnel;
+      expect(funnel.timeZone).toBe('UTC');
+      expect(funnel.totals.visits).toBe(0);
+      expect(funnel.worlds).toEqual([]);
+      expect(funnel.days.map((day) => day.day)).toEqual([
+        '2020-01-01',
+        '2020-01-02',
+        '2020-01-03',
+        '2020-01-04',
+        '2020-01-05',
+        '2020-01-06',
+        '2020-01-07',
+      ]);
+    });
+
+    it('refuses a period that makes no sense', async () => {
+      for (const input of [
+        { from: '2026-02-01T00:00:00.000Z', to: '2026-01-01T00:00:00.000Z' },
+        { from: '2024-01-01T00:00:00.000Z', to: '2026-01-01T00:00:00.000Z' },
+        {
+          ...{
+            from: '2026-01-01T00:00:00.000Z',
+            to: '2026-01-02T00:00:00.000Z',
+          },
+          timeZone: 'Mars/Olympus_Mons',
+        },
+      ]) {
+        const res = await asAdmin(FUNNEL, { input });
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+    });
   });
 });

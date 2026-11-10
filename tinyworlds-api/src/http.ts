@@ -17,7 +17,8 @@ export function configureHttp(app: INestApplication): void {
       .get(ConfigService<Env, true>)
       .get('ALLOWED_ORIGINS', { infer: true }),
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type'],
+    // Authorization: an admin's session, on the admin pages
+    allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 600,
   });
 }

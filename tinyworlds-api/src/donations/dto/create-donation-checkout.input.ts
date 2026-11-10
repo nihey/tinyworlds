@@ -1,4 +1,4 @@
-import { Field, InputType, Int } from '@nestjs/graphql';
+import { Field, ID, InputType, Int } from '@nestjs/graphql';
 import { Transform } from 'class-transformer';
 import {
   IsIn,
@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -68,4 +69,13 @@ export class CreateDonationCheckoutInput {
   })
   @MaxLength(300)
   returnUrl: string;
+
+  @Field(() => ID, {
+    nullable: true,
+    description:
+      'The visit this checkout is started from (see trackFunnelStep): ties the donation to its funnel',
+  })
+  @IsOptional()
+  @IsUUID()
+  visitId?: string | null;
 }

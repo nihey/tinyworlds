@@ -23,6 +23,40 @@ export interface DonationRow {
   cityText: string | null;
   world: string | null;
   locale: string | null;
+  visitId: string | null;
+}
+
+export interface FunnelEventRow {
+  visitId: string;
+  step: 'VISIT' | 'DONATE_OPENED' | 'CHECKOUT_STARTED' | 'CHECKOUT_CANCELLED';
+  world: string;
+  locale: string | null;
+  city: string | null;
+  amountCents: number | null;
+}
+
+export interface AdminRow {
+  id: string;
+  email: string;
+  lastLoginAt: Date | null;
+}
+
+export interface MagicLinkRow {
+  id: string;
+  adminId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  createdAt: Date;
+}
+
+/** The conditions the code puts on a link, as Prisma spells them. */
+interface LinkWhere {
+  id?: string;
+  adminId?: string;
+  usedAt?: null;
+  expiresAt?: { lt?: Date; gt?: Date };
+  createdAt?: { gt?: Date };
 }
 
 type Step = { increment: number } | number | undefined;
@@ -33,12 +67,17 @@ const unique = (target: string): Error =>
   });
 
 /**
- * The few Prisma calls the donations code makes, over two arrays. A transaction that throws
+ * The few Prisma calls the API makes, over a handful of arrays. A transaction that throws
  * leaves nothing behind, and unique columns refuse duplicates the way the database does.
  */
 export class FakePrisma {
   cities: CityRow[] = [];
   donations: DonationRow[] = [];
+  events: FunnelEventRow[] = [];
+  admins: AdminRow[] = [];
+  links: MagicLinkRow[] = [];
+  /** Set to make the next write of a funnel step fail, the way a database that is away does. */
+  failEvents: Error | null = null;
   /**
    * Something another connection commits while the next transaction is under way (right after
    * its first read): a way to stage a race. Being committed elsewhere, it survives that
@@ -142,6 +181,111 @@ export class FakePrisma {
       const row = { id: randomUUID(), ...args.data };
       this.donations.push(row);
       return Promise.resolve(row);
+    },
+  };
+
+  funnelEvent = {
+    createMany: (args: {
+      data: FunnelEventRow[];
+      skipDuplicates?: boolean;
+    }): Promise<{ count: number }> => {
+      if (this.failEvents) return Promise.reject(this.failEvents);
+      let count = 0;
+      for (const row of args.data) {
+        const there = this.events.some(
+          (e) =>
+            e.visitId === row.visitId &&
+            e.step === row.step &&
+            e.world === row.world,
+        );
+        if (there && !args.skipDuplicates)
+          throw unique('visit_id, step, world');
+        if (there) continue;
+        this.events.push({ ...row });
+        count++;
+      }
+      return Promise.resolve({ count });
+    },
+  };
+
+  admin = {
+    upsert: (args: {
+      where: { email: string };
+      create: { email: string };
+    }): Promise<AdminRow> => {
+      let row = this.admins.find((a) => a.email === args.where.email);
+      if (!row) {
+        row = { id: randomUUID(), email: args.create.email, lastLoginAt: null };
+        this.admins.push(row);
+      }
+      return Promise.resolve({ ...row });
+    },
+    findUnique: (args: { where: { id: string } }): Promise<AdminRow | null> => {
+      const row = this.admins.find((a) => a.id === args.where.id);
+      return Promise.resolve(row ? { ...row } : null);
+    },
+    update: (args: {
+      where: { id: string };
+      data: { lastLoginAt: Date };
+    }): Promise<AdminRow> => {
+      const row = this.admins.find((a) => a.id === args.where.id);
+      if (!row) throw new Error('No such admin');
+      row.lastLoginAt = args.data.lastLoginAt;
+      return Promise.resolve({ ...row });
+    },
+  };
+
+  private linksWhere(where: LinkWhere): MagicLinkRow[] {
+    return this.links.filter(
+      (link) =>
+        (where.id === undefined || link.id === where.id) &&
+        (where.adminId === undefined || link.adminId === where.adminId) &&
+        (where.usedAt === undefined || link.usedAt === null) &&
+        (where.expiresAt?.lt === undefined ||
+          link.expiresAt < where.expiresAt.lt) &&
+        (where.expiresAt?.gt === undefined ||
+          link.expiresAt > where.expiresAt.gt) &&
+        (where.createdAt?.gt === undefined ||
+          link.createdAt > where.createdAt.gt),
+    );
+  }
+
+  magicLink = {
+    create: (args: {
+      data: { adminId: string; tokenHash: string; expiresAt: Date };
+    }): Promise<MagicLinkRow> => {
+      if (this.links.some((l) => l.tokenHash === args.data.tokenHash))
+        throw unique('token_hash');
+      const row: MagicLinkRow = {
+        id: randomUUID(),
+        usedAt: null,
+        createdAt: new Date(),
+        ...args.data,
+      };
+      this.links.push(row);
+      return Promise.resolve({ ...row });
+    },
+    findFirst: (args: { where: LinkWhere }): Promise<MagicLinkRow | null> =>
+      Promise.resolve(this.linksWhere(args.where)[0] ?? null),
+    findUnique: (args: {
+      where: { tokenHash: string };
+    }): Promise<(MagicLinkRow & { admin: AdminRow }) | null> => {
+      const link = this.links.find((l) => l.tokenHash === args.where.tokenHash);
+      const admin = link && this.admins.find((a) => a.id === link.adminId);
+      return Promise.resolve(link && admin ? { ...link, admin } : null);
+    },
+    updateMany: (args: {
+      where: LinkWhere;
+      data: { usedAt: Date };
+    }): Promise<{ count: number }> => {
+      const found = this.linksWhere(args.where);
+      for (const link of found) link.usedAt = args.data.usedAt;
+      return Promise.resolve({ count: found.length });
+    },
+    deleteMany: (args: { where: LinkWhere }): Promise<{ count: number }> => {
+      const gone = new Set(this.linksWhere(args.where));
+      this.links = this.links.filter((link) => !gone.has(link));
+      return Promise.resolve({ count: gone.size });
     },
   };
 

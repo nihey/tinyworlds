@@ -7,9 +7,14 @@ import {
   type RawBodyRequest,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { Public } from '../auth/public.decorator.js';
 import { DonationsService } from './donations.service.js';
 
-/** Stripe's webhook: REST, the documented exception to GraphQL. */
+/**
+ * Stripe's webhook: REST, the documented exception to GraphQL. Public: what it trusts is the
+ * signature, not a session.
+ */
+@Public()
 @Controller('stripe')
 export class StripeWebhookController {
   constructor(private readonly donations: DonationsService) {}

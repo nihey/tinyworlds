@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { citySlug, cleanCityName } from '../cities/city-name.js';
 import type { Env } from '../config/env.js';
+import { FunnelService } from '../funnel/funnel.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
   APP_TAG,
@@ -48,6 +49,7 @@ export class DonationsService {
     @Inject(STRIPE) private readonly stripe: StripeClient,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
+    private readonly funnel: FunnelService,
   ) {}
 
   private productOf(locale: Locale): Promise<string> {
@@ -72,7 +74,7 @@ export class DonationsService {
    * Opens a Stripe Checkout for a donation and answers its URL. The amount is the one the donor
    * chose on the site; without one it is chosen on Stripe's page (the price is
    * pay-what-you-want). The city, if any, travels in the metadata and comes back through the
-   * webhook.
+   * webhook; so does the visit, which is also noted as having reached the checkout.
    */
   async createCheckout(input: CreateDonationCheckoutInput): Promise<string> {
     const returnUrl = acceptReturnUrl(
@@ -88,12 +90,14 @@ export class DonationsService {
     // a name with no letter or digit in it names no city
     const city = citySlug(typed) ? typed : '';
     const amountCents = input.amountCents ?? null;
+    const visitId = input.visitId?.toLowerCase() ?? null;
     const metadata: Record<string, string> = {
       app: APP_TAG,
       world: input.world,
       locale,
       ...(city ? { city } : {}),
       ...(amountCents !== null ? { amount_cents: String(amountCents) } : {}),
+      ...(visitId ? { visit_id: visitId } : {}),
     };
 
     let url: string | null;
@@ -144,6 +148,22 @@ export class DonationsService {
       throw new ServiceUnavailableException(
         "Couldn't start the checkout. Try again.",
       );
+    if (visitId)
+      // the funnel's own step; it must never stand between a donor and the checkout
+      await this.funnel
+        .track({
+          visitId,
+          step: 'CHECKOUT_STARTED',
+          world: input.world,
+          locale,
+          city: city || null,
+          amountCents,
+        })
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `A checkout's funnel step was not recorded: ${(error as Error).message}`,
+          ),
+        );
     return url;
   }
 
@@ -233,6 +253,7 @@ export class DonationsService {
           cityText: facts.cityName,
           world: facts.world,
           locale: facts.locale,
+          visitId: facts.visitId,
         },
       });
 

@@ -4,11 +4,13 @@ import { APP_PIPE } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import type { Request } from 'express';
 import { join } from 'node:path';
+import { AuthModule } from './auth/auth.module.js';
 import { CitiesModule } from './cities/cities.module.js';
 import './common/graphql-enums.js';
 import { RateLimitModule } from './common/rate-limit.module.js';
 import { AppConfigModule } from './config/config.module.js';
 import { DonationsModule } from './donations/donations.module.js';
+import { FunnelModule } from './funnel/funnel.module.js';
 import { HealthResolver } from './health/health.resolver.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -31,8 +33,10 @@ const isProduction = process.env.NODE_ENV === 'production';
       context: ({ req }: { req: Request }) => ({ req }),
     }),
     PrismaModule,
+    AuthModule,
     CitiesModule,
     DonationsModule,
+    FunnelModule,
   ],
   providers: [
     {

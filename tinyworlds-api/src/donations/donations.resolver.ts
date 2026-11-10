@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Resolver } from '@nestjs/graphql';
+import { Public } from '../auth/public.decorator.js';
 import { GqlThrottlerGuard } from '../common/gql-throttler.guard.js';
 import { DonationsService } from './donations.service.js';
 import { CreateDonationCheckoutInput } from './dto/create-donation-checkout.input.js';
@@ -9,6 +10,7 @@ import { DonationCheckout } from './models/donation-checkout.model.js';
 export class DonationsResolver {
   constructor(private readonly donations: DonationsService) {}
 
+  @Public()
   @UseGuards(GqlThrottlerGuard)
   @Mutation(() => DonationCheckout, {
     description:

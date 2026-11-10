@@ -58,4 +58,61 @@ describe('validateEnv', () => {
     ).toBe(25_000);
     expect(() => validateEnv({ ...base, CITY_GOAL_CENTS: '0' })).toThrow();
   });
+
+  it('needs nothing for signing in while there are no admins', () => {
+    const env = validateEnv(base);
+    expect(env.ADMIN_EMAILS).toEqual([]);
+    expect(env.JWT_SECRET).toBeUndefined();
+    expect(env.SMTP_PORT).toBe(587);
+  });
+
+  it('reads the admins as a tidy list of addresses', () => {
+    const env = validateEnv({
+      ...base,
+      ADMIN_EMAILS: ' Admin@Example.com, other@example.com ,admin@example.com,',
+      JWT_SECRET: 'x'.repeat(32),
+    });
+    expect(env.ADMIN_EMAILS).toEqual([
+      'admin@example.com',
+      'other@example.com',
+    ]);
+    expect(() =>
+      validateEnv({ ...base, ADMIN_EMAILS: 'not-an-address' }),
+    ).toThrow(/not an email address/);
+  });
+
+  it('refuses to start with an admin and no secret worth the name', () => {
+    const admins = { ...base, ADMIN_EMAILS: 'admin@example.com' };
+    expect(() => validateEnv(admins)).toThrow(/JWT_SECRET/);
+    expect(() => validateEnv({ ...admins, JWT_SECRET: 'short' })).toThrow(
+      /at least 32 characters/,
+    );
+    expect(
+      validateEnv({ ...admins, JWT_SECRET: 'x'.repeat(32) }).JWT_SECRET,
+    ).toHaveLength(32);
+  });
+
+  it('in production, refuses an admin without a mail server to send links through', () => {
+    const admins = {
+      ...base,
+      NODE_ENV: 'production',
+      ADMIN_EMAILS: 'admin@example.com',
+      JWT_SECRET: 'x'.repeat(32),
+    };
+    expect(() => validateEnv(admins)).toThrow(/SMTP_HOST/);
+    expect(() =>
+      validateEnv({ ...admins, SMTP_HOST: 'smtp.example.com' }),
+    ).toThrow(/MAIL_FROM/);
+    const env = validateEnv({
+      ...admins,
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_PORT: '465',
+      MAIL_FROM: 'tinyworlds <hello@example.com>',
+    });
+    expect(env.SMTP_PORT).toBe(465);
+    // and production without admins still starts as before
+    expect(validateEnv({ ...base, NODE_ENV: 'production' }).NODE_ENV).toBe(
+      'production',
+    );
+  });
 });
