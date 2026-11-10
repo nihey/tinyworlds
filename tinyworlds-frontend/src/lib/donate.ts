@@ -184,6 +184,8 @@ export interface CheckoutInput {
   world: string;
   locale: Locale;
   returnUrl: string;
+  /** this tab's visit (lib/funnel.ts), so the donation can be told apart in the funnel; null when visits are not counted */
+  visitId: string | null;
 }
 
 /** The name of the chosen city as it is sent: tidied, at most 60 characters, null for none. */
@@ -200,6 +202,7 @@ export function checkoutInput(
   world: string,
   locale: Locale,
   returnUrl: string,
+  visitId: string | null = null,
 ): CheckoutInput {
   return {
     city: chosenCity(choice),
@@ -207,6 +210,7 @@ export function checkoutInput(
     world,
     locale,
     returnUrl,
+    visitId,
   };
 }
 

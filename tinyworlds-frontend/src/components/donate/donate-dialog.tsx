@@ -1,7 +1,7 @@
 "use client";
 
 import { Heart, Loader2 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useI18n } from "@/hooks/use-i18n";
+import { activeLocale } from "@/i18n";
 import { useMilestones } from "@/hooks/use-milestones";
 import { defaultGoal, findMilestone, previewBar } from "@/lib/city-picker";
 import {
@@ -24,6 +25,7 @@ import {
   returnUrlOf,
   type Choice,
 } from "@/lib/donate";
+import { currentVisit, trackStep } from "@/lib/funnel";
 import { BUILT_CITIES, SITE_ID, SITE_NAME } from "@/site";
 import { AmountPicker } from "./amount-picker";
 import { CityPicker } from "./city-picker";
@@ -72,6 +74,11 @@ function DonateBody({ city: opening }: { city: string | null }) {
   const [pending, setPending] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
 
+  // the sign is open: a step of the donation funnel (the body is mounted once per opening)
+  useEffect(() => {
+    trackStep("DONATE_OPENED", SITE_ID, activeLocale());
+  }, []);
+
   const mode = donateMode({ api: API_URL !== "", link: link !== null, list, checkoutFailed });
   // what is typed counts as soon as it is a number; until then the last chip stands
   const amount = (custom !== "" ? parseAmount(custom) : null) ?? preset;
@@ -90,14 +97,25 @@ function DonateBody({ city: opening }: { city: string | null }) {
     setCheckoutFailed(false);
     try {
       const api = await import("@/lib/donate-api");
-      const input = checkoutInput(choice, amount, SITE_ID, locale, returnUrlOf(window.location));
+      // with the visit, so the API can note that it reached the checkout, and which donation it made
+      const input = checkoutInput(
+        choice,
+        amount,
+        SITE_ID,
+        locale,
+        returnUrlOf(window.location),
+        currentVisit(),
+      );
       // the page is left for the checkout: the button stays busy until it is gone
       window.location.assign(await api.createCheckout(input));
     } catch {
       // the API must never stand between a donor and donating: the plain checkout takes over
       setPending(false);
       setCheckoutFailed(true);
-      if (link) window.open(link, "_blank", "noopener,noreferrer");
+      if (link) {
+        trackStep("CHECKOUT_STARTED", SITE_ID, locale);
+        window.open(link, "_blank", "noopener,noreferrer");
+      }
     }
   };
 
@@ -218,6 +236,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
               href={link}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackStep("CHECKOUT_STARTED", SITE_ID, locale)}
               data-rybbit-event="donate_checkout"
               data-rybbit-prop-world={SITE_ID}
               className={ACTION}

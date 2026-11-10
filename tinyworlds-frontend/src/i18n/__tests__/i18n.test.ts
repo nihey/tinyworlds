@@ -42,6 +42,17 @@ describe("dictionaries", () => {
     }
   });
 
+  it("keep the placeholders of the admin pages", () => {
+    for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
+      const { admin } = dictionary;
+      expect(placeholders(admin.signIn.sent), locale).toEqual(["{email}", "{minutes}"]);
+      expect(placeholders(admin.signedInAs), locale).toEqual(["{email}"]);
+      expect(placeholders(admin.funnel.ofPrevious), locale).toEqual(["{share}"]);
+      expect(placeholders(admin.funnel.ofVisits), locale).toEqual(["{share}"]);
+      expect(placeholders(admin.days.note), locale).toEqual(["{zone}"]);
+    }
+  });
+
   it("keep the placeholders of the donate sign", () => {
     for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
       expect(placeholders(dictionary.donate.body), locale).toEqual(["{wordmark}"]);

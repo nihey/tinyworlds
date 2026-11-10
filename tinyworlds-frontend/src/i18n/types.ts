@@ -187,6 +187,84 @@ export interface Strings {
     decimal: string;
   };
   dialog: { close: string };
+  /**
+   * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
+   * and the donation funnel. "{email}" is an address, "{minutes}" a number of minutes,
+   * "{share}" a percentage, "{zone}" a time zone.
+   */
+  admin: {
+    title: string;
+    signIn: {
+      heading: string;
+      body: string;
+      email: string;
+      placeholder: string;
+      action: string;
+      sending: string;
+      /** after asking: said whoever the address belongs to */
+      sent: string;
+      again: string;
+      verifying: string;
+      /** the link was used already, or is too old */
+      expired: string;
+      /** the session ran out, or the address is no longer an admin's */
+      ended: string;
+      failed: string;
+      tooMany: string;
+      /** this build names no API */
+      unavailable: string;
+    };
+    signedInAs: string;
+    signOut: string;
+    frontPage: string;
+    /** names the choice of period, and the periods */
+    period: string;
+    ranges: { d7: string; d30: string; d90: string; d365: string };
+    loading: string;
+    loadFailed: string;
+    retry: string;
+    /** an admin's own visits are left out */
+    ownVisits: string;
+    funnel: {
+      heading: string;
+      note: string;
+      steps: { visits: string; donateOpened: string; checkoutStarted: string; donations: string };
+      ofPrevious: string;
+      ofVisits: string;
+      cancelled: string;
+      raised: string;
+      empty: string;
+    };
+    cities: {
+      heading: string;
+      note: string;
+      /** donations that name no map: given through the plain payment link */
+      noWorld: string;
+      columns: {
+        city: string;
+        visits: string;
+        donateOpened: string;
+        checkoutStarted: string;
+        donations: string;
+        raised: string;
+      };
+      empty: string;
+    };
+    days: {
+      heading: string;
+      note: string;
+      table: string;
+      day: string;
+    };
+    donations: {
+      heading: string;
+      empty: string;
+      noCity: string;
+      columns: { when: string; amount: string; city: string; from: string };
+    };
+    /** the link in the front page's footer that only a signed-in admin sees */
+    footerLink: string;
+  };
   /** "borough" is missing on purpose: what one is called depends on the city (world copy). */
   placeTypes: Record<Exclude<PlaceType, "borough">, string>;
   errors: {

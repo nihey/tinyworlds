@@ -6,7 +6,7 @@ import { DonateDialog } from "@/components/donate/donate-dialog";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePrefs } from "@/hooks/use-prefs";
-import { useDocumentLanguage, useDonationReturn } from "@/hooks/use-site-effects";
+import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { prefsStore } from "@/lib/prefs";
@@ -65,6 +65,7 @@ export function MapApp() {
   const { t, locale, copy } = useI18n();
   useDocumentLanguage(locale, copy.title);
   useDonationReturn();
+  useFunnelVisit();
   // donations are taken when the build names an API or a checkout for this language
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, WORLD.id) !== null;
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");

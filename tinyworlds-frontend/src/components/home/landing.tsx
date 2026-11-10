@@ -6,16 +6,18 @@ import { DonateDialog } from "@/components/donate/donate-dialog";
 import { MilestoneBar } from "@/components/donate/milestone-bar";
 import { MovingPicture } from "@/components/home/moving-picture";
 import { Wordmark } from "@/components/map/wordmark";
+import { useAdminSession } from "@/hooks/use-admin-session";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMilestones } from "@/hooks/use-milestones";
 import { usePrefs } from "@/hooks/use-prefs";
-import { useDocumentLanguage, useDonationReturn } from "@/hooks/use-site-effects";
+import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import type { Locale, Strings } from "@/i18n";
 import { RANKING_LIMIT, rankCities } from "@/lib/city-picker";
 import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import {
+  ADMIN_PATH,
   CONTACT_EMAIL,
   CONTACT_URL,
   GITHUB_URL,
@@ -171,6 +173,9 @@ export function Landing() {
   useTheme(prefs.theme);
   useDocumentLanguage(locale, t.home.title);
   useDonationReturn();
+  useFunnelVisit();
+  // only an admin who is signed in on this browser is shown the way to the admin pages
+  const admin = useAdminSession();
 
   // null: closed; otherwise open, with the city it was opened for (or none)
   const [donate, setDonate] = useState<{ city: string | null } | null>(null);
@@ -347,6 +352,16 @@ export function Landing() {
           {afterEmail}
         </p>
         <p>{t.home.credits}</p>
+        {admin && (
+          <p>
+            <a
+              href={ADMIN_PATH}
+              className="rounded-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper"
+            >
+              {t.admin.footerLink}
+            </a>
+          </p>
+        )}
       </footer>
 
       {takesDonations && (

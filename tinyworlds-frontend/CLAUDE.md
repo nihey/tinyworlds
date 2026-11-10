@@ -8,6 +8,8 @@ One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `t
 interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
 `tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
+With the API, every page also reports the steps of the donation funnel, and the front page's
+build carries the admin pages (`/admin/`) where signed-in admins read it.
 
 @AGENTS.md
 
@@ -69,7 +71,8 @@ pipeline's `home-card`) and `public/loops/` (the front page's moving pictures, m
 ```
 src/
 ├── app/                 # layout (fonts, metadata, theme script, accent), globals.css, and two
-│                        # pages: page.map.tsx (a world) and page.home.tsx (the front page)
+│                        # pages: page.map.tsx (a world) and page.home.tsx (the front page);
+│                        # admin/page.home.tsx: the admin pages, in the front page's build only
 ├── site.ts              # what this build is (world or front page): id, name, home language,
 │                        # accent, GITHUB_URL, CONTACT_EMAIL, where the worlds and their cards are
 ├── worlds/              # one config per world + index.ts (`WORLDS`, `WORLD`, `IS_HOME`)
@@ -89,13 +92,18 @@ src/
 │                        # and the city progress bar the front page's ranking uses
 ├── components/home/     # the front page: landing.tsx, and moving-picture.tsx (a still that
 │                        # comes alive: the hero and the cards)
+├── components/admin/    # the admin pages: admin-app.tsx (signed in or not), sign-in.tsx,
+│                        # funnel-report.tsx (the steps, the cities by visits, the days)
 ├── components/ui/       # shadcn/ui
-├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage, …
+├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
+│                        # useFunnelVisit, useAdminSession, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
                          # city-catalogue.ts (well-known cities to pick from), donate-api.ts
-                         # (Apollo Client; imported lazily)
+                         # (Apollo Client; imported lazily), funnel.ts (the visit and the
+                         # steps it reports), admin.ts (pure: the session, the funnel's
+                         # arithmetic), admin-api.ts (sign-in and the report; imported lazily)
 ```
 
 ## Targets: worlds and the front page
@@ -231,6 +239,42 @@ Optional, and never in the way: with nothing configured there is no heart, no di
 "donate_checkout"` with `data-rybbit-prop-world` (and `-city`, `-amount`).
 - Never put a real payment link, key or API host in the repository: they come from the
   environment at build time.
+
+## The donation funnel and the admin pages
+
+With `NEXT_PUBLIC_API_URL` set, the site tells the API which steps towards a donation each
+visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
+
+- **A visit** (`lib/funnel.ts`) is one tab's stay on the site: a UUID made here
+  (`crypto.randomUUID`) and kept in the tab's `sessionStorage` (`tinyworlds.visit`), shared by
+  the front page and every world because they are one origin. No cookie, nothing kept between
+  visits, and no visit at all where storage is blocked.
+- **What a page reports**, through `trackStep(step, SITE_ID, locale)`: `VISIT` when it opens
+  (`useFunnelVisit`, in the map and on the front page; this is also what each city's visits are
+  counted from), `DONATE_OPENED` when the donate sign opens, `CHECKOUT_CANCELLED` when the
+  checkout sends the donor back with `?donated=0`, and `CHECKOUT_STARTED` only for the plain
+  payment link: with the API, the checkout carries the visit (`checkoutInput(…, currentVisit())`)
+  and the API notes the step itself.
+- **It never costs a visitor anything.** A plain `fetch` with `keepalive` (not Apollo: the map
+  does not download Apollo to say it was opened), never awaited, every failure swallowed, each
+  step said once per page.
+- **Not counted:** a browser where an admin is signed in (their own visits would only blur the
+  numbers) and one driven by a program (`navigator.webdriver`).
+- **The admin pages** are `src/app/admin/page.home.tsx`: a route of the front page's build
+  only (`/admin/`; a world's build answers 404 there), `noindex`, and linked from nowhere
+  except the front page's footer **when an admin is signed in**. To anyone else it is a sign-in
+  form: an address, a button, and a link in the mail (`/admin/#token=…`). `AdminApp` takes the
+  token out of the address at once and trades it for a session (`lib/admin-api.ts`, REST), kept
+  in `localStorage` (`tinyworlds.admin`; `hooks/use-admin-session.ts` is its store) and sent as
+  `Authorization: Bearer …`. A session the API no longer knows signs the page out.
+- **The report** (`components/admin/funnel-report.tsx`, numbers from `donationFunnel`): the
+  four steps, each bar the share of the step before that went on; the maps ranked by visits,
+  with the front page set apart; visits per day, days counted in the admin's own time zone,
+  with a table behind it; the latest donations. One period for everything (7, 30, 90 days,
+  12 months: whole local days, `rangeOf`). One colour marks everything (`--taxi`), bars are
+  thin, and every figure a bar stands for is written beside it or in the table.
+- There is nothing secret in the page itself: the numbers come from the API, which gives them
+  to signed-in admins alone. Who the admins are is the API's `ADMIN_EMAILS`.
 
 ## The engine (`src/map/engine.ts`)
 

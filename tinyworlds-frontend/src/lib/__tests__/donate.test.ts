@@ -201,7 +201,12 @@ describe("the donor's choice", () => {
       world: "tinyrao",
       locale: "pt-BR",
       returnUrl: "https://example.com/tinyrao/",
+      visitId: null,
     });
+    const visit = "0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10";
+    expect(
+      checkoutInput({ kind: "none" }, 5, "home", "en-US", "https://example.com/", visit).visitId,
+    ).toBe(visit);
     const none = checkoutInput({ kind: "none" }, 1, "home", "en-US", "https://example.com/");
     expect(none.city).toBeNull();
     expect(none.amountCents).toBe(100);

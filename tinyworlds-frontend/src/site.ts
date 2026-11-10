@@ -70,6 +70,9 @@ export const LOOPS_BASE = `${BASE_PATH}/loops`;
 /** A world's card loop: its share card's picture, drifting. Silent, a few hundred kB. */
 export const worldLoopUrl = (id: string, base = LOOPS_BASE): string => `${base}/${id}.mp4`;
 
+/** The admin pages: part of the front page's build, linked only for an admin who is signed in. */
+export const ADMIN_PATH = `${BASE_PATH}/admin/`;
+
 /** The front page's own share card (public/og/tinyworlds.jpg, made by the pipeline's `home-card`). */
 export const HOME_CARD_PATH = `${BASE_PATH}/og/tinyworlds.jpg`;
 
