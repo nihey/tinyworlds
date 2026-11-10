@@ -557,8 +557,16 @@ export function chooseStyle(input: StyleInput, p: StyleProfile = NEW_YORK): Styl
     // the Brooklyn Bridge's towers are granite; the rest are steel
     const wall = Math.abs(h - 82.9) < 0.2 ? R.tan : h > 60 ? R.steel : R.greyStone;
     style = { wall, roof: wall, glass: R.glassDark, pattern: Pattern.None, roofShape: Roof.Flat, roofH: 0 };
-  } else if (cls === "statue" || cls === "statue_gold" || cls === "pier_column") {
-    const wall = cls === "statue" ? R.libertyGreen : cls === "statue_gold" ? R.gold : R.concrete;
+  } else if (cls === "statue" || cls === "statue_gold" || cls === "pier_column" || cls === "truss_post") {
+    // a cantilever bridge's posts are painted like its trusses (the renderer's truss colour)
+    const wall =
+      cls === "statue"
+        ? R.libertyGreen
+        : cls === "statue_gold"
+          ? R.gold
+          : cls === "truss_post"
+            ? R.tan
+            : R.concrete;
     style = { wall, roof: wall, glass: R.glassDark, pattern: Pattern.None, roofShape: Roof.Flat, roofH: 0 };
   } else if (cls !== null && cls.startsWith("deck")) {
     // a bridge deck: steel underneath, the roadway on top

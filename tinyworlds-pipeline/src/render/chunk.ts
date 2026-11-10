@@ -732,14 +732,19 @@ export class ChunkRenderer {
     }
   }
 
-  /** Bridge cables: thin 3D lines, hidden by whatever stands in front of them. */
+  /** Bridge cables and truss members: thin 3D lines, hidden by whatever stands in front of them. */
   private drawCables(job: ChunkJob): void {
     const { cab } = this.scene;
     const { sx0, sy0, SW, SH, col, hb, obj, face } = this;
     for (let n = 0; n < job.cables.length; n++) {
       const c = job.cables[n];
-      const main = cab.kind[c] === 0;
-      const colour = idx(R.steel, main ? S_DEEP : S_SHADE);
+      // 0 a main cable, 1 a suspender: bare steel, a pixel across. 2 a truss chord, 3 a lesser
+      // truss member: painted steel with some body to it, so a truss does not fade away from afar.
+      const truss = cab.kind[c] >= 2;
+      const main = cab.kind[c] === 0 || cab.kind[c] === 2;
+      const colour = idx(truss ? R.tan : R.steel, main ? S_DEEP : S_SHADE);
+      const across = truss ? 2 : 1;
+      const down = (main ? 2 : 1) + (truss ? 1 : 0);
       for (let v = cab.start[c]; v + 1 < cab.start[c + 1]; v++) {
         const x0 = cab.xyz[v * 3];
         const g0 = cab.xyz[v * 3 + 1];
@@ -753,10 +758,11 @@ export class ChunkRenderer {
           const H = Math.round(h0 + (h1 - h0) * t);
           const px = Math.round(x0 + (x1 - x0) * t) - sx0;
           const py = Math.round(g0 + (g1 - g0) * t) - H - sy0;
-          for (let thick = 0; thick < (main ? 2 : 1); thick++) {
-            const y = py + thick;
-            if (px < 0 || y < 0 || px >= SW || y >= SH) continue;
-            const i = y * SW + px;
+          for (let thick = 0; thick < down * across; thick++) {
+            const x = px + (thick % across);
+            const y = py + Math.floor(thick / across);
+            if (x < 0 || y < 0 || x >= SW || y >= SH) continue;
+            const i = y * SW + x;
             if (H < hb[i]) continue;
             col[i] = colour;
             hb[i] = H;

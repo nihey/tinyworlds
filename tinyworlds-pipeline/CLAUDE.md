@@ -67,6 +67,7 @@ src/
 │   ├── styles.ts      # footprint + height + class → materials; StyleProfile per building stock
 │   ├── fog.ts         # distance-from-the-city grid (where the map ends), built-up detection
 │   ├── decks.ts       # where a bridge deck stays up: settled per bridge, not per point
+│   ├── truss.ts       # the steel of a cantilever bridge, in elevation: chords, posts, braces
 │   ├── heights.ts     # heights read off the raster, with its correction curve
 │   ├── kinds.ts       # ground kinds and their paint order (PAINT_RANK), patterns, roofs
 │   ├── synthetic.ts   # the builder a generated city draws on; its scene and its index
@@ -276,6 +277,16 @@ whose shadows reach it, and margins for both.
   stays at the lower of their crests (the Queensboro over Roosevelt Island, the Throgs Neck over
   its point, a tower's footing). A ramp down to that land still lets it land there. It never
   lowers a deck, so a bridge over one stretch of water is drawn as before.
+- Two towers of one height carry cables; **three or more of one height in a row are a cantilever
+  bridge** (the Queensboro), and nothing in a city's file says so. Its towers become masonry piers
+  up to the deck with a pair of pointed steel posts above, braced across; a truss stands each side
+  of the roadway (`cantileverTruss` in `scene/truss.ts`: the top chord sweeps down from every
+  tower top, anchor arms reach past the outer towers); and its deck runs level through the steel,
+  0.36 of the way up the towers, coming down by ramps to where the bridge ends (a step outside the
+  steel stands at its share of the way from the ground to the steel, `distanceAlong`).
+- Trusses are drawn like cables, as 3D lines (`cab` in the scene): kinds 0 and 1 are a main cable
+  and a suspender, bare steel a pixel across; 2 and 3 are a truss chord and a lesser member,
+  painted and two pixels across, so a truss still reads from afar.
 - New ground kinds go at the **end** of `G` too and get their place in the paint order from
   `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
   already on disk keep their meaning.

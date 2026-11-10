@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { holdDecks, type DeckRun } from "./decks.js";
+import { distanceAlong, holdDecks, type DeckPath, type DeckRun } from "./decks.js";
 
 const run = (a: number, b: number, h: number[]): DeckRun => ({ a, b, h: [...h] });
 
@@ -88,5 +88,46 @@ describe("holdDecks", () => {
     const runs = [run(0, 1, [0, 5, 0]), run(1, 0, [0, 7, 0]), run(2, 3, [])];
     expect(holdDecks(runs)).toBe(0);
     expect(runs.map((r) => r.h)).toEqual([[0, 5, 0], [0, 7, 0], []]);
+  });
+});
+
+const path = (a: number, b: number, at: number[], length: number): DeckPath => ({ a, b, at, length });
+
+describe("distanceAlong", () => {
+  it("measures to the ends of a bridge when nothing is marked", () => {
+    expect(distanceAlong([path(0, 1, [10, 30, 50, 70, 90], 100)])).toEqual([[10, 30, 50, 30, 10]]);
+  });
+
+  it("goes on through the joints of a bridge mapped in pieces", () => {
+    const paths = [path(0, 1, [25, 75], 100), path(1, 2, [50], 100), path(2, 3, [25, 75], 100)];
+    expect(distanceAlong(paths)).toEqual([[25, 75], [150], [75, 25]]);
+  });
+
+  it("measures to the marked steps instead, along a piece and across the joints", () => {
+    const paths = [path(0, 1, [25, 75], 100), path(1, 2, [10, 50, 90], 100), path(2, 3, [25, 75], 100)];
+    const marked = [
+      [false, false],
+      [false, true, false],
+      [false, false],
+    ];
+    expect(distanceAlong(paths, marked)).toEqual([
+      [125, 75],
+      [40, 0, 40],
+      [75, 125],
+    ]);
+  });
+
+  it("takes the shorter way round", () => {
+    // two ways from the marked piece to the far one: 30 m of ramp, or 200 m of roadway
+    const paths = [path(0, 1, [5], 10), path(1, 2, [15], 30), path(1, 2, [100], 200), path(2, 3, [5], 10)];
+    const marked = [[true], [false], [false], [false]];
+    expect(distanceAlong(paths, marked)).toEqual([[0], [20], [105], [40]]);
+  });
+
+  it("is infinite where no way leads", () => {
+    // a ring has no end to measure to, and a bridge apart has no marked step
+    expect(distanceAlong([path(0, 1, [5], 10), path(1, 0, [5], 10)])).toEqual([[Infinity], [Infinity]]);
+    const marked = [[true], [false]];
+    expect(distanceAlong([path(0, 1, [5], 10), path(2, 3, [5], 10)], marked)).toEqual([[0], [Infinity]]);
   });
 });

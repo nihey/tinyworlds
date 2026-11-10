@@ -16,10 +16,11 @@ import {
   type FogGrid,
   type Footprint,
 } from "./fog.js";
-import { holdDecks, type DeckRun } from "./decks.js";
+import { distanceAlong, holdDecks, type DeckPath, type DeckRun } from "./decks.js";
 import { hashString, mix, rand } from "./hash.js";
 import { loadHeights } from "./heights.js";
 import { buildSyntheticScene } from "./synthetic.js";
+import { cantileverTruss, type Truss } from "./truss.js";
 import { F_FLOATING, F_NO_OUTLINE, G, Pattern, Roof } from "./kinds.js";
 import { LineSink, PolySink } from "./sinks.js";
 import { f32, u32, u8, writeScene } from "./store.js";
@@ -1174,24 +1175,109 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   );
 
   // ---- bridges: towers from the data, decks raised over the water, cables strung between towers
-  const towers: { p: number; q: number; height: number }[] = [];
+  const DECK = 2.4;
+  interface Tower {
+    p: number;
+    q: number;
+    height: number;
+    /** Which of `supports` it is, and its footprint in grid metres. */
+    support: number;
+    ring: number[];
+  }
+  const towers: Tower[] = [];
+  const supportParts: (Float64Array[][] | null)[] = [];
   for (let i = 0; i < supports.length; i++) {
     const g = readWkb(supports[i].bytes);
+    supportParts.push(g && g.kind === GeomKind.Polygon ? g.parts : null);
     if (!g || g.kind !== GeomKind.Polygon) continue;
     const ring = g.parts[0][0];
+    const grid: number[] = [];
     let p = 0;
     let q = 0;
     for (let j = 0; j < ring.length; j += 2) {
       const [gp, gq] = proj.toGrid(ring[j], ring[j + 1]);
+      grid.push(gp, gq);
       p += gp / (ring.length / 2);
       q += gq / (ring.length / 2);
     }
-    if (supports[i].height >= 80) towers.push({ p, q, height: supports[i].height });
-    for (const rings of g.parts)
-      addVolume(rings, mix(i, 777), supports[i].height, 0, { cls: "bridge_support" });
+    if (supports[i].height >= 80) towers.push({ p, q, height: supports[i].height, support: i, ring: grid });
   }
 
-  const DECK = 2.4;
+  // Two towers of one height carry cables. Three or more of one height standing in a row are a
+  // cantilever bridge (the Queensboro): steel between them, a level deck, and no cables.
+  interface Cantilever {
+    /** Its first tower, and which way the bridge runs from there. */
+    p0: number;
+    q0: number;
+    up: number;
+    uq: number;
+    /** Where its towers stand along it, metres from the first. */
+    stations: number[];
+    /** From the middle of the bridge out to each of its two trusses. */
+    half: number;
+    deck: number;
+    truss: Truss;
+  }
+  /** A cantilever bridge's deck stands this share of the way up its towers. */
+  const DECK_SHARE = 0.36;
+  const cantilevers: Cantilever[] = [];
+  const cantileverOf = new Map<number, Cantilever>();
+  const sameHeight = new Map<number, Tower[]>();
+  for (const tower of towers) {
+    const key = Math.round(tower.height * 2);
+    sameHeight.set(key, [...(sameHeight.get(key) ?? []), tower]);
+  }
+  for (const group of sameHeight.values()) {
+    if (group.length < 3) continue;
+    // the two furthest apart give the line the others must stand on
+    let first = group[0];
+    let last = group[1];
+    let span = 0;
+    for (const s of group)
+      for (const t of group) {
+        const d = Math.hypot(t.p - s.p, t.q - s.q);
+        if (d > span) [first, last, span] = [s, t, d];
+      }
+    const up = (last.p - first.p) / span;
+    const uq = (last.q - first.q) / span;
+    const along = (t: Tower): number => (t.p - first.p) * up + (t.q - first.q) * uq;
+    const row = [...group].sort((s, t) => along(s) - along(t));
+    const stations = row.map(along);
+    const inLine = row.every((t) => Math.abs((t.q - first.q) * up - (t.p - first.p) * uq) < 25);
+    const spaced = stations.every(
+      (s, i) => i === 0 || (s - stations[i - 1] > 80 && s - stations[i - 1] < 800),
+    );
+    if (!inLine || !spaced) continue;
+    // the trusses stand just inside the ends of the towers' footprints
+    let across = 0;
+    for (const t of row)
+      for (let j = 0; j < t.ring.length; j += 2)
+        across = Math.max(across, Math.abs((t.ring[j + 1] - t.q) * up - (t.ring[j] - t.p) * uq));
+    const deck = Math.round(row[0].height * DECK_SHARE);
+    const cantilever: Cantilever = {
+      p0: first.p,
+      q0: first.q,
+      up,
+      uq,
+      stations,
+      half: Math.max(6, across - 2.2),
+      deck,
+      truss: cantileverTruss({ towers: stations, top: row[0].height, deck }),
+    };
+    cantilevers.push(cantilever);
+    for (const t of row) cantileverOf.set(t.support, cantilever);
+  }
+  for (let i = 0; i < supports.length; i++) {
+    const parts = supportParts[i];
+    if (!parts) continue;
+    // a cantilever's tower is a masonry pier up to the deck: its steel comes with the trusses
+    const pier = cantileverOf.get(i);
+    for (const rings of parts)
+      addVolume(rings, mix(i, 777), pier ? pier.deck - DECK : supports[i].height, 0, {
+        cls: "bridge_support",
+      });
+  }
+
   /** One step of a deck: the stretch [a, z] of the leg that starts at (p0, q0) and runs along (up, uq). */
   interface DeckStep {
     leg: number;
@@ -1204,10 +1290,14 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     z: number;
     mp: number;
     mq: number;
+    /** How far along the piece its middle is. */
+    at: number;
   }
+  const pieceLength: number[] = [];
   /** The steps a bridge piece is laid in, seven metres or so each. */
   const stepsOf = (pts: number[]): DeckStep[] => {
     const out: DeckStep[] = [];
+    let walked = 0;
     for (let i = 0; i + 1 < pts.length / 2; i++) {
       const [p0, q0] = proj.mapToGrid(pts[i * 2], pts[i * 2 + 1]);
       const [p1, q1] = proj.mapToGrid(pts[i * 2 + 2], pts[i * 2 + 3]);
@@ -1221,9 +1311,23 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         const a = Math.max(0, (s / steps) * len - 0.4);
         const z = Math.min(len, ((s + 1) / steps) * len + 0.4);
         const mid = (a + z) / 2;
-        out.push({ leg: i, step: s, p0, q0, up, uq, a, z, mp: p0 + up * mid, mq: q0 + uq * mid });
+        out.push({
+          leg: i,
+          step: s,
+          p0,
+          q0,
+          up,
+          uq,
+          a,
+          z,
+          mp: p0 + up * mid,
+          mq: q0 + uq * mid,
+          at: walked + mid,
+        });
       }
+      walked += len;
     }
+    pieceLength.push(walked);
     return out;
   };
   // Pieces that meet end to end are one bridge. The water under each step says how high it would
@@ -1246,6 +1350,48 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     b: jointAt(pts[pts.length - 2], pts[pts.length - 1]),
     h: laid[b].map((st) => deckHeight(st.mp, st.mq)),
   }));
+  // A cantilever bridge carries its deck level through its steel, and comes down by ramps to
+  // where the bridge ends: a step outside the steel stands as high as its share of the way there.
+  const RAMP_REACH = 900;
+  const steelBorne = laid.map((steps) => steps.map(() => false));
+  if (cantilevers.length > 0) {
+    const paths: DeckPath[] = runs.map((r, b) => ({
+      a: r.a,
+      b: r.b,
+      length: pieceLength[b],
+      at: laid[b].map((st) => st.at),
+    }));
+    const toGround = distanceAlong(paths);
+    for (const c of cantilevers) {
+      // what runs along the bridge between its trusses is on it; what merely crosses under is not
+      const onIt = laid.map((steps) =>
+        steps.map((st) => {
+          const s = (st.mp - c.p0) * c.up + (st.mq - c.q0) * c.uq;
+          const off = (st.mq - c.q0) * c.up - (st.mp - c.p0) * c.uq;
+          return (
+            s >= c.truss.from &&
+            s <= c.truss.to &&
+            Math.abs(off) <= c.half + 4 &&
+            Math.abs(st.up * c.up + st.uq * c.uq) > 0.9
+          );
+        }),
+      );
+      const toSteel = distanceAlong(paths, onIt);
+      runs.forEach((r, b) =>
+        r.h.forEach((h, n) => {
+          if (onIt[b][n]) {
+            steelBorne[b][n] = true;
+            r.h[n] = Math.max(h, c.deck);
+            return;
+          }
+          const down = toGround[b][n];
+          const back = toSteel[b][n];
+          if (back <= RAMP_REACH && Number.isFinite(down))
+            r.h[n] = Math.max(h, (c.deck * down) / (down + back));
+        }),
+      );
+    }
+  }
   const heldUp = holdDecks(runs);
   // what hangs over a deck must know where it was held up
   const lifted: { p: number; q: number; h: number }[] = [];
@@ -1315,7 +1461,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       decks++;
       // piers hold up the approaches; the main span over deep water hangs free
       sincePier += z - a - 0.8;
-      if (roadway && sincePier >= 64 && h > 5 && fogAt(shore, mp, mq) < 150) {
+      if (roadway && !steelBorne[b][n] && sincePier >= 64 && h > 5 && fogAt(shore, mp, mq) < 150) {
         sincePier = 0;
         addShape(disc(mp, mq, 2, 6), mix(b, leg + 9000), h - DECK, 0, "pier_column", F_NO_OUTLINE);
       }
@@ -1353,9 +1499,9 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   let spans = 0;
   for (let i = 0; i < towers.length; i++) {
     const a = towers[i];
-    const sameHeight = towers.filter((t) => Math.abs(t.height - a.height) < 0.5);
-    if (sameHeight.length !== 2) continue; // four towers is a truss, not a suspension span
-    const b = sameHeight[0] === a ? sameHeight[1] : sameHeight[0];
+    const pair = towers.filter((t) => Math.abs(t.height - a.height) < 0.5);
+    if (pair.length !== 2) continue; // more of one height are a cantilever bridge, above
+    const b = pair[0] === a ? pair[1] : pair[0];
     if (towers.indexOf(b) < i) continue;
     const span = Math.hypot(b.p - a.p, b.q - a.q);
     if (span < 250 || span > 1600) continue;
@@ -1394,8 +1540,67 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       }
     }
   }
+
+  // ---- the steel of a cantilever bridge: a truss each side of the roadway, tied across the top,
+  // and at every tower a pair of posts on the pier, braced across and pointed on top
+  const POST = 2.3;
+  for (let c = 0; c < cantilevers.length; c++) {
+    const { p0, q0, up, uq, half, deck, truss, stations } = cantilevers[c];
+    const top = truss.topAt(stations[0]);
+    /** A point of the bridge: `s` along it, `side` (−1 to 1) across it from truss to truss, `z` up. */
+    const at = (s: number, side: number, z: number): [number, number, number] => [
+      p0 + up * s - uq * half * side,
+      q0 + uq * s + up * half * side,
+      z,
+    ];
+    for (const side of [-1, 1]) {
+      for (const chord of truss.chords) {
+        const path: number[] = [];
+        for (let i = 0; i < chord.length; i += 2) path.push(...at(chord[i], side, chord[i + 1]));
+        cable(2, path);
+      }
+      for (const [s0, z0, s1, z1] of truss.members) cable(3, [...at(s0, side, z0), ...at(s1, side, z1)]);
+    }
+    for (const s of truss.panels)
+      if (!stations.includes(s)) cable(3, [...at(s, -1, truss.topAt(s)), ...at(s, 1, truss.topAt(s))]);
+    stations.forEach((s, t) => {
+      for (const side of [-1, 1]) {
+        const [p, q] = at(s, side, 0);
+        addShape(
+          [
+            p - up * POST - uq * POST,
+            q - uq * POST + up * POST,
+            p + up * POST - uq * POST,
+            q + uq * POST + up * POST,
+            p + up * POST + uq * POST,
+            q + uq * POST - up * POST,
+            p - up * POST + uq * POST,
+            q - uq * POST - up * POST,
+          ],
+          mix(c, t * 2 + (side + 1) / 2 + 500),
+          top,
+          deck - DECK,
+          "truss_post",
+          0,
+          { roofShape: Roof.Pyramid, roofH: 9 },
+        );
+      }
+      // across the roadway: a portal clear of the traffic, crossed braces, a strut at the top
+      const clear = deck + 12;
+      const tiers = Math.max(1, Math.round((top - clear) / 14));
+      for (let k = 0; k <= tiers; k++) {
+        const z = clear + ((top - clear) * k) / tiers;
+        cable(k === 0 || k === tiers ? 2 : 3, [...at(s, -1, z), ...at(s, 1, z)]);
+        if (k === tiers) break;
+        const above = clear + ((top - clear) * (k + 1)) / tiers;
+        cable(3, [...at(s, -1, z), ...at(s, 1, above)]);
+        cable(3, [...at(s, 1, z), ...at(s, -1, above)]);
+      }
+    });
+  }
   lap(
-    `bridges: ${supports.length} supports, ${decks} deck pieces (${heldUp} held up over land), ${spans} suspension spans`,
+    `bridges: ${supports.length} supports, ${decks} deck pieces (${heldUp} held up over land), ` +
+      `${spans} suspension spans, ${cantilevers.length} cantilever`,
   );
 
   // ---- statues: what is not a building, so is not in the data

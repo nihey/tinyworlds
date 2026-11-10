@@ -93,3 +93,86 @@ export function holdDecks(runs: DeckRun[]): number {
   });
   return raised;
 }
+
+/** A piece of a bridge as a path: how long it is, and how far along it each of its steps lies. */
+export interface DeckPath {
+  a: number;
+  b: number;
+  /** Its length from `a` to `b`, metres. */
+  length: number;
+  /** The distance from `a` to the middle of each step. */
+  at: number[];
+}
+
+/**
+ * How far every step is, travelling along the bridges, from the nearest marked step: across the
+ * joints, whichever way is shorter. With nothing marked it measures to the ground instead, which
+ * is where a bridge stops (a joint that only one piece reaches). Infinity where no way leads.
+ */
+export function distanceAlong(paths: DeckPath[], marked?: boolean[][]): number[][] {
+  const index = new Map<number, number>();
+  const at = (joint: number): number => {
+    let i = index.get(joint);
+    if (i === undefined) {
+      i = index.size;
+      index.set(joint, i);
+    }
+    return i;
+  };
+  const ends = paths.map((path): [number, number] => [at(path.a), at(path.b)]);
+  const n = index.size;
+
+  // how far each joint is from the nearest of what is measured to
+  const reach = new Float64Array(n).fill(Infinity);
+  if (marked) {
+    paths.forEach((path, i) => {
+      const first = marked[i].indexOf(true);
+      if (first < 0) return;
+      const last = marked[i].lastIndexOf(true);
+      reach[ends[i][0]] = Math.min(reach[ends[i][0]], path.at[first]);
+      reach[ends[i][1]] = Math.min(reach[ends[i][1]], path.length - path.at[last]);
+    });
+  } else {
+    const reached = new Uint32Array(n);
+    for (const [a, b] of ends) {
+      reached[a]++;
+      reached[b]++;
+    }
+    for (let j = 0; j < n; j++) if (reached[j] === 1) reach[j] = 0;
+  }
+  // from joint to joint along the pieces, until no shorter way turns up
+  for (let shorter = true; shorter;) {
+    shorter = false;
+    for (let i = 0; i < paths.length; i++) {
+      const [a, b] = ends[i];
+      const length = paths[i].length;
+      if (reach[a] + length < reach[b]) {
+        reach[b] = reach[a] + length;
+        shorter = true;
+      }
+      if (reach[b] + length < reach[a]) {
+        reach[a] = reach[b] + length;
+        shorter = true;
+      }
+    }
+  }
+
+  return paths.map((path, i) => {
+    const [a, b] = ends[i];
+    const out = path.at.map((s) => Math.min(reach[a] + s, reach[b] + path.length - s));
+    if (marked) {
+      // and to the marked steps of the piece itself
+      let seen = -Infinity;
+      for (let s = 0; s < out.length; s++) {
+        if (marked[i][s]) seen = path.at[s];
+        out[s] = Math.min(out[s], path.at[s] - seen);
+      }
+      seen = Infinity;
+      for (let s = out.length - 1; s >= 0; s--) {
+        if (marked[i][s]) seen = path.at[s];
+        out[s] = Math.min(out[s], seen - path.at[s]);
+      }
+    }
+    return out;
+  });
+}
