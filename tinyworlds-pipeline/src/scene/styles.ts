@@ -144,6 +144,60 @@ export const NEW_YORK: StyleProfile = {
 };
 
 /**
+ * Central Florida: stucco houses in cream, tan and pastels under asphalt shingles or barrel
+ * tile; strip malls and big boxes under white flat roofs; a small downtown of glass and precast.
+ */
+export const FLORIDA: StyleProfile = {
+  rowWalls: [R.cream, R.tan, R.whiteBrick, R.limestone, R.sidingYellow, R.salmon, R.greyStone],
+  midWalls: [R.cream, R.tan, R.tan, R.whiteBrick, R.limestone, R.salmon, R.greyStone, R.sidingYellow],
+  slabWalls: [R.whiteBrick, R.cream, R.limestone, R.greyStone, R.tan],
+  houseWalls: [
+    R.cream,
+    R.cream,
+    R.tan,
+    R.tan,
+    R.whiteBrick,
+    R.limestone,
+    R.sidingYellow,
+    R.salmon,
+    R.mint,
+    R.sidingBlue,
+    R.greyStone,
+    R.sidingSage,
+  ],
+  houseRoofs: [
+    R.roofBrown,
+    R.roofBrown,
+    R.roofSlate,
+    R.roofSlate,
+    R.roofGravel,
+    R.roofGravel,
+    R.roofTar,
+    R.roofTerracotta,
+    R.roofClay,
+    R.roofClay,
+  ],
+  houseMaxArea: 460,
+  flatRoofs: [R.roofWhite, R.roofWhite, R.roofGravel, R.roofSilver, R.roofGravel, R.roofTar],
+  lowRoofs: [R.roofWhite, R.roofWhite, R.roofGravel, R.roofSilver, R.roofClay, R.roofBrown],
+  lowPitched: 0.15,
+  towerRoofs: [R.roofGravel, R.roofWhite, R.roofSilver],
+  glass: [R.glassBlue, R.glassBlue, R.glassTeal, R.glassGreen, R.glassSilver, R.glassDark, R.glassBronze],
+  stoneTowers: [R.cream, R.limestone, R.tan, R.whiteBrick, R.greyStone, R.salmon],
+  industrialWalls: [R.whiteBrick, R.greyStone, R.cream, R.concrete, R.tan, R.steel],
+  industrialRoofs: [R.roofWhite, R.roofWhite, R.roofSilver, R.roofGravel],
+  civicWalls: [R.cream, R.limestone, R.tan, R.whiteBrick, R.salmon, R.greyStone],
+  sacredWalls: [R.whiteBrick, R.cream, R.tan, R.limestone, R.brickRed],
+  sacredRoofs: [R.roofBrown, R.roofSlate, R.roofTerracotta, R.roofGravel],
+  outbuildingWalls: [R.whiteBrick, R.greyStone, R.cream, R.tan],
+  outbuildingRoofs: [R.roofGravel, R.roofBrown, R.roofSlate, R.roofSilver],
+  windows: [R.glassDark, R.glassDark, R.glassBlack, R.glassBlue],
+  mid: [0.42, 0.3],
+  high: [0.55, 0.25],
+  superTall: 0.75,
+};
+
+/**
  * The interior of São Paulo state: rendered walls in white, cream and pastels under clay-tile
  * roofs; sheds roofed in metal and fibre cement; residential towers in pale render with banded
  * balconies, and only the odd glass office block.

@@ -458,16 +458,35 @@ export async function cityFog(conn: DuckDBConnection, proj: Projection): Promise
     const polygons = readAreas(path.join(DIRS.raw, limits.file)).flatMap((f) => f.polygons);
     return buildFog(polygons, proj);
   }
-  const outline = await conn.runAndReadAll(
-    `SELECT ST_AsGeoJSON(geometry) FROM '${quote("division_area.parquet")}'
-     WHERE names."primary" = '${limits.division.replaceAll("'", "''")}' AND subtype = 'locality'
-     ORDER BY ST_Area(geometry) DESC LIMIT 1`,
-  );
-  const row = outline.getRows()[0];
-  if (!row) throw new Error(`no division area called "${limits.division}" in the raw data`);
-  const geometry = JSON.parse(String(row[0])) as { type: string; coordinates: unknown };
-  const polygons =
-    geometry.type === "Polygon" ? [geometry.coordinates as number[][][]] : (geometry.coordinates as Polygons);
+  let polygons: Polygons;
+  if (limits.division) {
+    const outline = await conn.runAndReadAll(
+      `SELECT ST_AsGeoJSON(geometry) FROM '${quote("division_area.parquet")}'
+       WHERE names."primary" = '${limits.division.replaceAll("'", "''")}' AND subtype = 'locality'
+       ORDER BY ST_Area(geometry) DESC LIMIT 1`,
+    );
+    const row = outline.getRows()[0];
+    if (!row) throw new Error(`no division area called "${limits.division}" in the raw data`);
+    const geometry = JSON.parse(String(row[0])) as { type: string; coordinates: unknown };
+    polygons =
+      geometry.type === "Polygon"
+        ? [geometry.coordinates as number[][][]]
+        : (geometry.coordinates as Polygons);
+  } else {
+    // no division: whatever is built up inside the bounding box
+    const { west, south, east, north } = CITY.bbox;
+    polygons = [
+      [
+        [
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+          [west, south],
+        ],
+      ],
+    ];
+  }
 
   // square degrees → m² at the city's latitude
   const rad = Math.PI / 180;
@@ -880,7 +899,9 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     ridgeY: number,
     attrs: VolumeAttrs,
   ): { h: number; style: Style } | null => {
-    const h = height && height > 0 ? height : fallbackHeight(attrs.cls, attrs.floors ?? null, area, seed);
+    const fixed = attrs.name ? CITY.heightFixes?.[attrs.name.toLowerCase()] : undefined;
+    const h =
+      fixed ?? (height && height > 0 ? height : fallbackHeight(attrs.cls, attrs.floors ?? null, area, seed));
     if (h - base < 0.4) return null;
     const style = chooseStyle(
       {
@@ -906,6 +927,10 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       if (landmark.roof !== undefined && !attrs.roofColor) style.roof = landmark.roof;
       if (landmark.glass !== undefined) style.glass = landmark.glass;
       if (landmark.pattern !== undefined && h - base >= 2.6) style.pattern = landmark.pattern;
+      if (landmark.dome !== undefined) {
+        style.roofShape = Roof.Dome;
+        style.roofH = (h - base) * landmark.dome;
+      }
     }
     if (attrs.force) Object.assign(style, attrs.force);
     // a canopy is a thin slab on nothing
@@ -1146,6 +1171,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   const sampler = CITY.heights.raster ? loadHeights(DIRS.raw) : null;
   if (CITY.heights.raster && !sampler) throw new Error("no height raster: run fetch first");
   let estimated = 0;
+  const caps = (CITY.heightCaps ?? []).map((cap) => ({ ...cap, at: proj.toGrid(cap.lon, cap.lat) }));
   let withParts = 0;
   await each(
     conn,
@@ -1169,6 +1195,11 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
           if (fogAt(fog, p, q) >= keepLimit) continue;
           height = sampler.estimate(rings[0]);
           if (height !== null) estimated++;
+        }
+        if (caps.length > 0 && height !== null && !str(row[12])) {
+          const [p, q] = proj.toGrid(rings[0][0], rings[0][1]);
+          for (const cap of caps)
+            if (height > cap.max && Math.hypot(p - cap.at[0], q - cap.at[1]) < cap.radius) height = cap.max;
         }
         addVolume(rings, seed, height, num(row[3]) ?? 0, {
           cls: str(row[5]),

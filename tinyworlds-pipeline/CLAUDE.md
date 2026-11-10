@@ -9,6 +9,7 @@ chosen with `--city` (default `tinynyc`).
 | --------- | ------------------- | -------------------- |
 | `tinynyc` | ≈ 5 min             | 0.8 GB, 30,000 files |
 | `tinyrao` | ≈ 2.5 min           | 0.3 GB, 11,000 files |
+| `tinyorl` | ≈ 4 min             | 0.6 GB, 27,000 files |
 
 ## Commands
 
@@ -39,12 +40,14 @@ src/
 ├── cities/            # one definition per city: everything that differs between them
 │   ├── types.ts       # the City contract
 │   ├── tinynyc.ts (+ .landmarks.ts, .places.ts)
-│   └── tinyrao.ts (+ .places.ts)
+│   ├── tinyrao.ts (+ .places.ts)
+│   └── tinyorl.ts (+ .places.ts)
 ├── config.ts          # which city this process draws (CITY) and its directories (DIRS)
 ├── env.ts             # city-independent settings (tile size, Overture release, user agent)
 ├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
 ├── sources/           # DataSource providers: overture.ts (DuckDB over public S3), nycOpenData.ts,
-│                      # ibge.ts (census areas), openBuildings.ts (satellite height raster)
+│                      # ibge.ts (census areas), openBuildings.ts (satellite height raster),
+│                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions)
 ├── geom/              # wkb.ts (WKB reader), geojson.ts, utm.ts
 ├── scene/
 │   ├── build.ts       # raw → scene: ground polygons, lines, volumes, trees, cables, fog
@@ -73,10 +76,14 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
    an entry in `src/cities/index.ts`. The decisions that matter:
    - `origin`, `betaDeg` (the street grid's bearing: measure it, don't guess) and `bbox`;
    - `limits`: polygons that are "the city" (`geojson`), or the built-up part of an Overture
-     division (`built-up`) for a municipality that is mostly farmland;
+     division (`built-up`) for a municipality that is mostly farmland, or of the whole bounding
+     box (`built-up` with no division) for a metropolis that ignores its municipal limits;
    - `heights.raster`: `true` where buildings have no mapped heights (add `openBuildings` to
      `sources`, after `overture`);
-   - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, or a new one);
+   - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`, or a
+     new one);
+   - `heightFixes` / `heightCaps`: the few places where the mapped heights are plainly wrong
+     (look at the tallest buildings in a preview before trusting them);
    - `areas()`: the districts (context lines) and the outlined areas, from whatever the city
      publishes;
    - `curated`: take coordinates from the data, not from memory.
@@ -108,7 +115,8 @@ whose shadows reach it, and margins for both.
 - Light comes from the upper left (sun bearing 254°): left walls lit, right walls shaded, shadows
   fall straight to the right.
 - The view is aligned to the city's street grid (`betaDeg`: Manhattan's avenues at 28.9°,
-  Ribeirão Preto's central grid at 38.97°) so its streets are exact 2:1 lines.
+  Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°) so its streets are
+  exact 2:1 lines.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
@@ -145,5 +153,7 @@ raster is read as the median inside the footprint and corrected with a curve fit
   `cartography.min_zoom >= 8` is used.
 - A ground polygon can be far larger than the map (100 km² of cropland): whether to keep it is
   decided from its bounding box (`nearRing`), not from its first vertex.
-- Street trees in Ribeirão Preto are planted by rule (`trees.street`), not surveyed; New York's
-  come from the census.
+- Street trees in Ribeirão Preto and Orlando are planted by rule (`trees.street`), not
+  surveyed; New York's come from the census.
+- Overture's primary name of a division is sometimes in another script; `overtureAreas` prefers
+  the English common name.

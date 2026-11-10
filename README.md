@@ -3,9 +3,9 @@
 Whole cities, pocket-sized: each one drawn as an isometric pixel-art map you can pan, zoom and
 search, every building at its height.
 
-| tinynyc · New York | tinyrao · Ribeirão Preto |
-| --- | --- |
-| ![Central Park and the blocks around it](tinyworlds-frontend/public/og/tinynyc.jpg) | ![Downtown Ribeirão Preto](tinyworlds-frontend/public/og/tinyrao.jpg) |
+| tinynyc · New York | tinyrao · Ribeirão Preto | tinyorl · Orlando |
+| --- | --- | --- |
+| ![Central Park and the blocks around it](tinyworlds-frontend/public/og/tinynyc.jpg) | ![Downtown Ribeirão Preto](tinyworlds-frontend/public/og/tinyrao.jpg) | ![Downtown Orlando and Lake Eola](tinyworlds-frontend/public/og/tinyorl.jpg) |
 
 Nothing is drawn by hand and no image model is involved. The maps are rendered procedurally from
 open data by a software rasterizer written for the purpose: building footprints and heights,
@@ -17,6 +17,8 @@ a few minutes to render on a desktop machine.
 - **tinyrao**: Ribeirão Preto (São Paulo, Brazil). Almost no building there has a mapped height,
   so heights are read from a satellite-derived raster and calibrated against the buildings whose
   floors are mapped; around the city, the cane fields.
+- **tinyorl**: Orlando, Florida: everything built up from Walt Disney World to Winter Park, with
+  downtown and Lake Eola, the lakes, the airport and the resorts.
 
 ## Layout
 
@@ -76,7 +78,8 @@ A city is one definition file in the pipeline (`src/cities/<id>.ts`: where it is
 street grid runs, what counts as its limits, what its buildings look like) and one in the viewer
 (`src/worlds/<id>.ts`: its name and words). See the `CLAUDE.md` in each sub-project.
 
-Cities get built as donations reach US$100 for them; you can also open a pull request with one.
+Cities get built as donations reach US$100 for them, the most funded first; you can also open a
+pull request with one.
 
 ## Deploy
 

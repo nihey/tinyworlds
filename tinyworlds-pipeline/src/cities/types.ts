@@ -11,6 +11,8 @@ export interface LandmarkStyle {
   roof?: number;
   glass?: number;
   pattern?: Pattern;
+  /** The top is a dome, taking this share (0–1) of the building's height: a sphere, a rotunda. */
+  dome?: number;
 }
 
 /** Something that is not a building, so it is not in the data: a stack of prisms on a spot. */
@@ -93,9 +95,10 @@ export interface City {
   /**
    * What counts as "the city": the fog is measured from it. Either polygons in a raw GeoJSON
    * file, or the built-up part of an Overture division area (for a municipality that is mostly
-   * farmland, where the legal limits would make a map of fields).
+   * farmland, where the legal limits would make a map of fields) or, with no division named, of
+   * the whole bounding box (for a metropolis that ignores its municipal limits).
    */
-  limits: { kind: "geojson"; file: string } | { kind: "built-up"; division: string };
+  limits: { kind: "geojson"; file: string } | { kind: "built-up"; division?: string };
   /** Metres from the city at which the map starts to dissolve, and where it is gone. */
   fog: { start: number; end: number };
   areas(rawDir: string): Areas;
@@ -109,6 +112,13 @@ export interface City {
   };
   style: StyleProfile;
   landmarks: Record<string, LandmarkStyle>;
+  /** Heights (metres) for named buildings whose mapped height is plainly a mistake. Keyed like `landmarks`. */
+  heightFixes?: Record<string, number>;
+  /**
+   * Spots where the mapped heights of unnamed buildings are known to be wrong (a survey that
+   * measured the landmark overhanging them): within `radius` metres they are no taller than `max`.
+   */
+  heightCaps?: { lon: number; lat: number; radius: number; max: number }[];
   statues: Statue[];
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };
@@ -118,7 +128,7 @@ export interface City {
     /** No census: line the streets by rule, one candidate spot every `spacing` metres on each side, kept with this chance. */
     street?: { spacing: number; chance: number };
   };
-  flora: "temperate" | "tropical";
+  flora: "temperate" | "tropical" | "subtropical";
   /** Local reading of the data's land classes: Overture subtype/class → ground kind (see scene/kinds.ts). */
   ground: {
     landCover?: Record<string, number>;
@@ -136,5 +146,7 @@ export interface City {
     bridge: RegExp;
     /** Appended to rail station names, or null to leave stations out. */
     stationSuffix: string | null;
+    /** Rank of the districts themselves in search (default 100: above everything, as boroughs are). */
+    districtRank?: number;
   };
 }

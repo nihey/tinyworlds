@@ -179,6 +179,10 @@ function lineInfo(
   };
 }
 
+/** "Sand Lake Road" → "Sand Lake Road station", but "Church Street Station" stays as it is. */
+const withSuffix = (name: string, suffix: string): string =>
+  name.toLowerCase().endsWith(suffix.trim().toLowerCase()) ? name : `${name}${suffix}`;
+
 /** Overture's coarse place category → what the search calls it. Everything else is left out. */
 const PLACE_CATEGORIES: Record<string, PlaceType> = {
   museum: "museum",
@@ -238,7 +242,13 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
 
   // ---- districts: boroughs, zones
   for (const district of areas.districts) {
-    add({ n: district.name, t: "borough", ...centreOf(district.polygons), b: CITY.title, r: 100 });
+    add({
+      n: district.name,
+      t: "borough",
+      ...centreOf(district.polygons),
+      b: CITY.title,
+      r: CITY.search.districtRank ?? 100,
+    });
   }
 
   // ---- the areas the viewer outlines: lines for the map, names for the search
@@ -359,7 +369,7 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
       const lat = numberOf(row[2]);
       const context = contextAt(lon, lat);
       if (context !== null)
-        add({ n: `${text(row[0])}${stationSuffix}`, t: "station", lon, lat, b: context, r: 30 });
+        add({ n: withSuffix(text(row[0]), stationSuffix), t: "station", lon, lat, b: context, r: 30 });
     }
   }
 

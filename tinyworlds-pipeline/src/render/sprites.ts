@@ -64,14 +64,20 @@ export function treeSprite(setting: number, seed: number): Sprite {
   return set[seed % set.length];
 }
 
-export type Flora = "temperate" | "tropical";
+export type Flora = "temperate" | "tropical" | "subtropical";
 
 /**
  * Mostly green. In a temperate city now and then one has already turned; in a tropical one it is
- * in flower instead: a yellow or pink ipê, a red flamboyant.
+ * in flower instead: a yellow or pink ipê, a red flamboyant; in a subtropical one it is all green.
  */
 export function treeRamp(seed: number, flora: Flora = "temperate"): number {
   const r = seed % 200;
+  if (flora === "subtropical") {
+    // evergreen: live oaks and palms, nothing turning and nothing in flower
+    if (r < 70) return R.leaf;
+    if (r < 118) return R.leafLight;
+    return R.leafDark;
+  }
   if (flora === "tropical") {
     if (r < 66) return R.leaf;
     if (r < 108) return R.leafLight;

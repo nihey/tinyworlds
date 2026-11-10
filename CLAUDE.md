@@ -8,6 +8,7 @@ map under its own path:
 | --------- | ------------------------------------ | ------------------------------------------------------------ |
 | `tinynyc` | New York City, the five boroughs     | surveyed building heights, street-tree census, ferries       |
 | `tinyrao` | Ribeirão Preto, São Paulo, Brazil    | heights estimated from a satellite raster, cane fields around |
+| `tinyorl` | Orlando, Florida (the built-up area) | downtown, the lakes, the airport and theme-park country      |
 
 A front page lists the worlds, the cities people are funding next, and links the source.
 
@@ -38,8 +39,10 @@ Each sub-project has its own `CLAUDE.md`.
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
 - **The API exists only for donations.** Each proposed city is built when donations for it reach
-  its goal (US$100). The Donate dialog and the front page read `cityMilestones` and start a
-  Stripe Checkout through `createDonationCheckout`; a Stripe webhook records what was paid. If
+  its goal (US$100); what comes in above the goal pays for servers and upkeep, and the most
+  funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
+  ranking) and start a Stripe Checkout through `createDonationCheckout` for the city and amount
+  the donor chose; a Stripe webhook records what was paid. If
   the API is unreachable the viewer falls back to static payment links, so donating never
   depends on it.
 - **The interface follows the visitor's language** (en-US, pt-BR, es-ES), whatever the city.
@@ -173,13 +176,13 @@ GraphQL at `/api/graphql` (same origin in production):
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
 type Query { health: String!  cityMilestones: [CityMilestone!]! }
-input CreateDonationCheckoutInput { city: String  world: String!  locale: String!  returnUrl: String! }
+input CreateDonationCheckoutInput { city: String  amountCents: Int  world: String!  locale: String!  returnUrl: String! }
 type DonationCheckout { url: String! }
 type Mutation { createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout! }
 ```
 
-The amount is chosen on Stripe's page (from US$1). `POST /api/stripe/webhook` is the only REST
-route. Details in `tinyworlds-api/CLAUDE.md`.
+`amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
+(from US$1). `POST /api/stripe/webhook` is the only REST route. Details in `tinyworlds-api/CLAUDE.md`.
 
 ## Running and deploying
 
