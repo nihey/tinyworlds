@@ -72,12 +72,15 @@ export function pickerOptions(
       return rank(a) - rank(b) || a.name.localeCompare(b.name, "en");
     });
 
+  // "kings landing" is King's Landing, "newyork" is New York: for this the spaces do not count
+  const tight = (name: string): string => name.replaceAll(" ", "");
+  const isNamed = (name: string): boolean =>
+    namesFor(name).some((spelling) => tight(spelling) === tight(whole));
   const built =
     whole === ""
       ? null
-      : (milestones.find((city) => !selectable(city) && namesFor(city.name).includes(whole)) ??
-        null);
-  const builtHere = builtNames.some((name) => namesFor(name).includes(whole));
+      : (milestones.find((city) => !selectable(city) && isNamed(city.name)) ?? null);
+  const builtHere = whole !== "" && builtNames.some(isNamed);
   const typed = tidyCity(query);
   // what was typed becomes a city of its own only when the list has nothing to offer for it
   const nothing = funding.length === 0 && more.length === 0 && built === null && !builtHere;

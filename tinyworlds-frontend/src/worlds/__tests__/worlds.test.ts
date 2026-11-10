@@ -20,10 +20,23 @@ describe("resolveWorld", () => {
     expect(resolveWorld("tinyfte").homeLocale).toBe("es-ES");
     expect(resolveWorld("tinyvlc").id).toBe("tinyvlc");
     expect(resolveWorld("tinyvlc").homeLocale).toBe("es-ES");
+    for (const id of ["tinylas", "tinywinterfell", "tinykingslanding"]) {
+      expect(resolveWorld(id).id).toBe(id);
+      expect(resolveWorld(id).homeLocale).toBe("en-US");
+    }
   });
 
   it("lists the worlds in the order the front page shows them", () => {
-    expect(Object.keys(WORLDS)).toEqual(["tinynyc", "tinyrao", "tinyorl", "tinyfte", "tinyvlc"]);
+    expect(Object.keys(WORLDS)).toEqual([
+      "tinynyc",
+      "tinyrao",
+      "tinyorl",
+      "tinyfte",
+      "tinyvlc",
+      "tinylas",
+      "tinywinterfell",
+      "tinykingslanding",
+    ]);
   });
 
   it("stops on an id it does not know, naming the ones it does", () => {
@@ -125,9 +138,71 @@ describe("worlds", () => {
         "Linhas dos bairros",
         "Límites de barrios",
       ]);
+    // Las Vegas' districts are the municipalities of the valley, as in Orlando
+    expect(LOCALES.map((locale) => WORLDS.tinylas.copy[locale].borough)).toEqual([
+      "City",
+      "Cidade",
+      "Ciudad",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinylas.copy[locale].hoodLines.label)).toEqual([
+      "Neighborhood lines",
+      "Linhas dos bairros",
+      "Límites de barrios",
+    ]);
+    // a castle has areas, a walled capital has quarters; both are outlined as districts
+    expect(LOCALES.map((locale) => WORLDS.tinywinterfell.copy[locale].borough)).toEqual([
+      "Area",
+      "Área",
+      "Zona",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinykingslanding.copy[locale].borough)).toEqual([
+      "Quarter",
+      "Bairro",
+      "Barrio",
+    ]);
+    for (const id of ["tinywinterfell", "tinykingslanding"])
+      expect(LOCALES.map((locale) => WORLDS[id].copy[locale].hoodLines.label)).toEqual([
+        "Districts",
+        "Distritos",
+        "Distritos",
+      ]);
+  });
+
+  it("mark the places that do not exist, and say so in every language", () => {
+    const imagined = Object.values(WORLDS).filter((world) => world.fictional);
+    expect(imagined.map((world) => world.id)).toEqual(["tinywinterfell", "tinykingslanding"]);
+    for (const world of imagined) {
+      for (const locale of LOCALES) {
+        const { about, description } = world.copy[locale];
+        const said = [about.intro, ...about.notes].join(" ");
+        // whose story it is, and that neither its author nor the series stands behind this map
+        expect(said, `${world.id} ${locale}`).toMatch(/George R\. R\. Martin/);
+        expect(said, `${world.id} ${locale}`).toMatch(/HBO/);
+        // nothing here comes from open data, and nothing may claim it does
+        expect(`${said} ${description}`, `${world.id} ${locale}`).not.toMatch(
+          /open data|dados abertos|datos abiertos|OpenStreetMap/i,
+        );
+      }
+      expect(world.copy["en-US"].about.notes[0]).toMatch(/unofficial, fan-made/);
+      expect(world.copy["en-US"].about.notes[1]).toMatch(/invented for this map/);
+      expect(world.credit).not.toMatch(/OpenStreetMap|Overture/);
+    }
+    // and every other world is a real place drawn from real data
+    for (const world of Object.values(WORLDS).filter((w) => !w.fictional))
+      expect(world.credit).toMatch(/OpenStreetMap/);
   });
 
   it("are named in each language the way that language names the city", () => {
+    expect(LOCALES.map((locale) => WORLDS.tinykingslanding.copy[locale].city)).toEqual([
+      "King's Landing",
+      "Porto Real",
+      "Desembarco del Rey",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinylas.copy[locale].tagline)).toEqual([
+      "Las Vegas, pocket-sized",
+      "Las Vegas, em miniatura",
+      "Las Vegas, en miniatura",
+    ]);
     expect(LOCALES.map((locale) => WORLDS.tinyvlc.copy[locale].city)).toEqual([
       "Valencia",
       "Valência",
@@ -146,6 +221,7 @@ describe("worlds", () => {
     expect(WORLDS.tinyorl.copy["en-US"].about.notes[0]).not.toMatch(/no height on record/);
     expect(WORLDS.tinyfte.copy["en-US"].about.notes[0]).toMatch(/satellite/);
     expect(WORLDS.tinyvlc.copy["en-US"].about.notes[0]).toMatch(/number of floors/);
+    expect(WORLDS.tinylas.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {

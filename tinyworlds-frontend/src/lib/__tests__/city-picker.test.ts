@@ -76,12 +76,29 @@ describe("pickerOptions", () => {
 
   it("never offers a city this site already has, going by the worlds registry", () => {
     const offered = pickerOptions([], CITY_CATALOGUE, "", BUILT_CITIES).more.map((c) => c.name);
-    for (const built of ["New York", "Orlando", "Valencia"]) expect(offered).not.toContain(built);
+    for (const built of ["New York", "Orlando", "Valencia", "Las Vegas"])
+      expect(offered).not.toContain(built);
     expect(offered).toContain("Barcelona");
     // by another spelling it is recognised as built rather than offered as a new city
     expect(pickerOptions([], CITY_CATALOGUE, "valência", BUILT_CITIES).typed).toBeNull();
     expect(pickerOptions([], CITY_CATALOGUE, "valencia", BUILT_CITIES).more).toEqual([]);
     expect(pickerOptions([], CITY_CATALOGUE, "el calafate", BUILT_CITIES).typed).toBeNull();
+    expect(pickerOptions([], CITY_CATALOGUE, "las vegas", BUILT_CITIES).more).toEqual([]);
+    expect(pickerOptions([], CITY_CATALOGUE, "las vegas", BUILT_CITIES).typed).toBeNull();
+    // the made-up places are worlds too: not to be funded again, under any of their names
+    for (const name of [
+      "Winterfell",
+      "invernalia",
+      "King's Landing",
+      "kings landing",
+      "porto real",
+    ]) {
+      const options = pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES);
+      expect(options.typed, name).toBeNull();
+      expect(options.more, name).toEqual([]);
+    }
+    for (const fictional of ["Winterfell", "King's Landing"])
+      expect(offered).not.toContain(fictional);
   });
 
   it("finds a city by the start of any word, accents or not", () => {

@@ -45,6 +45,7 @@ export const esES: Strings = {
     mapData: "Datos del mapa",
     allCities: "Todas las ciudades",
     openSource: "Código abierto en GitHub",
+    contact: "Contacto",
   },
   home: {
     title: "tinyworlds · ciudades enteras, en miniatura",
@@ -54,6 +55,7 @@ export const esES: Strings = {
     pitch:
       "Cada ciudad es una miniatura isométrica de pixel art generada por un programa a partir de datos abiertos, y explorarla es gratis.",
     cities: "Ciudades",
+    imagined: "Lugares imaginarios",
     ranking: "Ranking de ciudades",
     funded: "Meta alcanzada",
     rankingEmpty: "Todavía no hay donaciones: la primera pone su ciudad en cabeza.",
@@ -66,6 +68,7 @@ export const esES: Strings = {
     github: "Ver el código en GitHub",
     credits:
       "Datos de los mapas © colaboradores de OpenStreetMap, Overture Maps Foundation y otros. Cada mapa indica sus fuentes.",
+    contact: "¿Dudas, ideas, una ciudad que quieres ver? Escribe a {email}.",
   },
   donate: {
     title: "Que sigan llegando ciudades",
@@ -135,6 +138,7 @@ export const esES: Strings = {
   },
   credit: {
     short: "© OpenStreetMap y otros",
+    fictional: "Hecho por fans · mapa inventado",
     north: "N",
     south: "S",
     east: "E",

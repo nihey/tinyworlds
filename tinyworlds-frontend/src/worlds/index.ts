@@ -1,8 +1,11 @@
 import { tinyfte } from "./tinyfte";
+import { tinykingslanding } from "./tinykingslanding";
+import { tinylas } from "./tinylas";
 import { tinynyc } from "./tinynyc";
 import { tinyorl } from "./tinyorl";
 import { tinyrao } from "./tinyrao";
 import { tinyvlc } from "./tinyvlc";
+import { tinywinterfell } from "./tinywinterfell";
 import type { World } from "./types";
 
 export type { World, WorldCopy } from "./types";
@@ -11,7 +14,16 @@ export type { World, WorldCopy } from "./types";
  * Every world there is, in the order the front page shows them. Adding a city to the site is
  * adding it here (and building it): the front page, the build check and the tests follow.
  */
-export const WORLDS: Record<string, World> = { tinynyc, tinyrao, tinyorl, tinyfte, tinyvlc };
+export const WORLDS: Record<string, World> = {
+  tinynyc,
+  tinyrao,
+  tinyorl,
+  tinyfte,
+  tinyvlc,
+  tinylas,
+  tinywinterfell,
+  tinykingslanding,
+};
 export const DEFAULT_WORLD = "tinynyc";
 
 /** Not a world: the build of the front page that lists them. */

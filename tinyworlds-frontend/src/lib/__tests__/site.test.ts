@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   BUILT_CITIES,
+  CONTACT_EMAIL,
+  CONTACT_URL,
   GITHUB_URL,
   HOME_URL,
   SITE_ID,
@@ -27,13 +29,27 @@ describe("site", () => {
     expect(worldCardUrl("tinynyc", "/worlds")).toBe("/worlds/tinynyc/og/tinynyc.jpg");
   });
 
-  it("knows which cities are already worlds, by the names a donor would pick", () => {
+  it("says where to write about the project", () => {
+    expect(CONTACT_EMAIL).toBe("me@nihey.org");
+    expect(CONTACT_URL).toBe("mailto:me@nihey.org");
+  });
+
+  it("knows which places are already worlds, under every name a donor might type", () => {
     expect(BUILT_CITIES).toEqual([
       "New York",
+      "Nova York",
+      "Nueva York",
       "Ribeirão Preto",
       "Orlando",
       "El Calafate",
       "Valencia",
+      "Valência",
+      "Las Vegas",
+      "Winterfell",
+      "Invernalia",
+      "King's Landing",
+      "Porto Real",
+      "Desembarco del Rey",
     ]);
   });
 

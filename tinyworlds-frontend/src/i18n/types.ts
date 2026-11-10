@@ -53,9 +53,10 @@ export interface Strings {
     keysTogglesNoHoods: string;
     link: string;
     mapData: string;
-    /** quiet links at the foot of the sign: to the front page, and to the source */
+    /** quiet links at the foot of the sign: to the front page, to the source, and to the author's inbox */
     allCities: string;
     openSource: string;
+    contact: string;
   };
   /** The front page that lists the worlds. `title` and `description` are the page's metadata. */
   home: {
@@ -64,6 +65,8 @@ export interface Strings {
     tagline: string;
     pitch: string;
     cities: string;
+    /** the heading of the worlds that are not real places */
+    imagined: string;
     /** the cities being funded, in order of funding; and the ones that reached their goal */
     ranking: string;
     funded: string;
@@ -77,6 +80,8 @@ export interface Strings {
     openSourceBody: string;
     github: string;
     credits: string;
+    /** in the footer; "{email}" becomes the address, as a link */
+    contact: string;
   };
   /**
    * The donate sign. In `body`, "{wordmark}" stands for the world's name ("tinynyc"); in
@@ -168,6 +173,8 @@ export interface Strings {
   credit: {
     /** on narrow screens, in place of the world's full credit line */
     short: string;
+    /** in place of the data credit, for a place that does not exist */
+    fictional: string;
     north: string;
     south: string;
     east: string;

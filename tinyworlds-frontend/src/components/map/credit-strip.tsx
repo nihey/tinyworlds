@@ -2,18 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import type { Strings } from "@/i18n";
+import { viewReadout } from "@/lib/readout";
 import { cn } from "@/lib/utils";
 import type { MapEngine } from "@/map/engine";
 import { WORLD } from "@/worlds";
-
-function coords(lat: number, lon: number, scale: number, c: Strings["credit"]): string {
-  const fixed = (value: number, digits: number) => value.toFixed(digits).replace(".", c.decimal);
-  const ns = lat >= 0 ? c.north : c.south;
-  const ew = lon >= 0 ? c.east : c.west;
-  const zoom = scale >= 1 ? `${fixed(scale, 1)}×` : `${Math.round(scale * 100)}%`;
-  return `${fixed(Math.abs(lat), 4)}° ${ns}  ${fixed(Math.abs(lon), 4)}° ${ew}  ·  ${zoom}`;
-}
 
 interface CreditStripProps {
   engine: MapEngine;
@@ -22,7 +14,7 @@ interface CreditStripProps {
   style?: React.CSSProperties;
 }
 
-/** Bottom corner: where the centre of the view is, and whose data this is. */
+/** Bottom corner: where the centre of the view is (for a real place), and whose data this is. */
 export function CreditStrip({ engine, onAbout, className, style }: CreditStripProps) {
   const readout = useRef<HTMLSpanElement>(null);
   const { t } = useI18n();
@@ -32,7 +24,13 @@ export function CreditStrip({ engine, onAbout, className, style }: CreditStripPr
     const write = () => {
       const c = engine.getCentre();
       if (readout.current)
-        readout.current.textContent = coords(c.lat, c.lon, engine.getView().scale, t.credit);
+        readout.current.textContent = viewReadout(
+          c.lat,
+          c.lon,
+          engine.getView().scale,
+          t.credit,
+          WORLD.fictional,
+        );
     };
     write();
     return engine.on("view", write);
@@ -53,8 +51,15 @@ export function CreditStrip({ engine, onAbout, className, style }: CreditStripPr
         onClick={onAbout}
         className="rounded-sm whitespace-nowrap outline-none hover:text-paper focus-visible:text-taxi"
       >
-        <span className="max-sm:hidden">{WORLD.credit}</span>
-        <span className="sm:hidden">{t.credit.short}</span>
+        {WORLD.fictional ? (
+          // no open data behind a made-up place: say what the map is instead, at every width
+          t.credit.fictional
+        ) : (
+          <>
+            <span className="max-sm:hidden">{WORLD.credit}</span>
+            <span className="sm:hidden">{t.credit.short}</span>
+          </>
+        )}
       </button>
     </div>
   );

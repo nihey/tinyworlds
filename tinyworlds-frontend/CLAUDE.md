@@ -2,8 +2,10 @@
 
 The map viewer: a Next.js 16 static export that draws the tiles and indexes written by
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
-One build is one **target**: a **world** (city) — `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
-(El Calafate), `tinyvlc` (Valencia) — or `home`, the front page that lists the worlds. The interface speaks the visitor's language (English, Brazilian
+One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
+(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), and two places that do not exist,
+`tinywinterfell` and `tinykingslanding` — or `home`, the front page that lists the worlds. The
+interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
 `tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
 
@@ -67,7 +69,7 @@ src/
 ├── app/                 # layout (fonts, metadata, theme script, accent), globals.css, and two
 │                        # pages: page.map.tsx (a world) and page.home.tsx (the front page)
 ├── site.ts              # what this build is (world or front page): id, name, home language,
-│                        # accent, GITHUB_URL, where the worlds and their cards are
+│                        # accent, GITHUB_URL, CONTACT_EMAIL, where the worlds and their cards are
 ├── worlds/              # one config per world + index.ts (`WORLDS`, `WORLD`, `IS_HOME`)
 ├── i18n/                # the interface's words: types.ts (the contract), en.ts, pt-BR.ts,
 │                        # es-ES.ts, locale.ts (which language), index.ts (`localeStore`)
@@ -109,6 +111,21 @@ src/
   is not there yet shows its wordmark on a plain plate instead.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
   link back to the front page (`NEXT_PUBLIC_HOME_URL`).
+- **Contact.** `CONTACT_EMAIL` in `site.ts` is the one place the project's address lives: the
+  front page's footer shows it (a `mailto:` in a localized sentence), and About in every map has
+  a quiet "Contact" link.
+- **Fictional worlds** (`fictional: true` on the `World`: Winterfell, King's Landing) are places
+  from a story, on a layout invented for the map. The flag does three things: the corner readout
+  shows only the zoom (`viewReadout` in `lib/readout.ts`: the coordinates mean nothing) and says
+  "fan-made" in the visitor's language instead of crediting map data; About sets the world's
+  notes apart as a disclaimer (unofficial, invented layout, not affiliated with the author or
+  the series — `worlds.test.ts` checks every fictional world says so in every language and
+  never claims open data); and the front page lists them in their own group ("Imagined places")
+  after the cities. They are worlds like any other for everything else (share links, search,
+  donations), and the donate picker never offers them as cities to fund.
+- **Long wordmarks.** `tinykingslanding` is sixteen letters where an airport code makes seven:
+  `Wordmark` sets a name longer than ten letters smaller in proportion (`wordmarkScale` in
+  `lib/wordmark.ts`), so the search sign, the cards and the splash need no special case.
 
 ## Words: languages and worlds
 
@@ -117,8 +134,8 @@ src/
   `es-ES`), else English; the settings panel can override it (`prefs.lang`, default `"auto"`).
 - **`useI18n()`** (`hooks/use-i18n.ts`) gives components `{ locale, t, copy }`: `t` is the
   dictionary, `copy` the world's own words in that language. It is a `useSyncExternalStore` whose
-  server snapshot is the site's **home language** (`WORLD.homeLocale`: en-US for tinynyc and
-  tinyorl, pt-BR for tinyrao, es-ES for tinyfte and tinyvlc), so the static HTML hydrates cleanly
+  server snapshot is the site's **home language** (`WORLD.homeLocale`: pt-BR for tinyrao, es-ES
+  for tinyfte and tinyvlc, en-US for the others), so the static HTML hydrates cleanly
   and then switches. Code outside React
   (errors thrown while loading) uses `activeStrings()`.
 - **No hard-coded UI strings in components**: every visible string and aria-label comes from `t`
@@ -146,8 +163,11 @@ src/
   unaccented.
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
   tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
-  `#ffa62b` for tinyvlc); the engine and the minimap read the world's value for canvas drawing. Don't write the yellow as a literal. `worlds.test.ts` checks the
-  contrast of each pair.
+  `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#a9c7e8` for tinywinterfell, `#ea5257` for
+  tinykingslanding); the engine and the minimap read the world's value for canvas drawing. Don't
+  write the yellow as a literal. `worlds.test.ts` checks the contrast of each pair against its
+  ink and against the signs in both themes, which is why King's Landing's red is a shade lighter
+  than a flag red.
 - A world may ship an empty `hoods.json`: the settings row, the `B` key and the help line then
   disappear.
 

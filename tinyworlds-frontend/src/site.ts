@@ -22,13 +22,20 @@ export const SITE_HOME_LOCALE: Locale = IS_HOME ? "en-US" : WORLD.homeLocale;
 /** The brand colour (--taxi) and the ink that reads on it. The front page keeps the stylesheet's taxi yellow. */
 export const SITE_ACCENT = IS_HOME ? { color: "#f7c21b", ink: "#1a1503" } : WORLD.accent;
 
-/** The cities that are already worlds of this site, by their English names: nothing left to fund there. */
-export const BUILT_CITIES: string[] = Object.values(WORLDS).map(
-  (world) => world.copy["en-US"].city,
-);
+/**
+ * The places that are already worlds of this site, under every name they go by in the languages
+ * the interface speaks (the English one first): nothing left to fund there.
+ */
+export const BUILT_CITIES: string[] = Object.values(WORLDS).flatMap((world) => [
+  ...new Set([world.copy["en-US"].city, ...Object.values(world.copy).map((copy) => copy.city)]),
+]);
 
 /** The project's source. */
 export const GITHUB_URL = "https://github.com/nihey/tinyworlds";
+
+/** Where to write about the project: questions, ideas, a city someone wants to see. */
+export const CONTACT_EMAIL = "me@nihey.org";
+export const CONTACT_URL = `mailto:${CONTACT_EMAIL}`;
 
 const trimmed = (value: string | undefined) => (value ?? "").trim().replace(/\/+$/, "");
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Code, Heart, LayoutGrid } from "lucide-react";
+import { Code, Heart, LayoutGrid, Mail } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useI18n } from "@/hooks/use-i18n";
-import { GITHUB_URL, HOME_URL } from "@/site";
+import { cn } from "@/lib/utils";
+import { CONTACT_URL, GITHUB_URL, HOME_URL } from "@/site";
+import { WORLD } from "@/worlds";
 import { Wordmark } from "./wordmark";
 
 interface AboutDialogProps {
@@ -73,7 +75,7 @@ export function AboutDialog({
       <DialogContent className="sign max-h-[min(44rem,calc(100dvh-2rem))] gap-0 overflow-y-auto p-0 ring-0 sm:max-w-md">
         <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />
         <DialogHeader className="gap-2 px-5 pt-5 text-left">
-          <DialogTitle className="flex items-baseline gap-3 text-base font-semibold">
+          <DialogTitle className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 text-base font-semibold">
             <Wordmark className="text-[34px]" />
             <span className="text-paper-dim">{copy.tagline}</span>
           </DialogTitle>
@@ -83,9 +85,17 @@ export function AboutDialog({
         </DialogHeader>
 
         <div className="space-y-4 px-5 pt-4 pb-5 text-sm leading-relaxed text-paper-dim">
-          {copy.about.notes.map((note) => (
-            <p key={note}>{note}</p>
-          ))}
+          {/* for a made-up place the notes are the disclaimer: set apart, so nobody takes it for an official map */}
+          <div
+            className={cn(
+              "space-y-4",
+              WORLD.fictional && "rounded-lg border border-sign-line bg-sign-raised px-3.5 py-3",
+            )}
+          >
+            {copy.about.notes.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </div>
 
           <section>
             <h3 className="pb-1.5 text-[10.5px] font-semibold tracking-[0.14em] uppercase">
@@ -135,6 +145,10 @@ export function AboutDialog({
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={QUIET}>
               <Code aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
               {t.about.openSource}
+            </a>
+            <a href={CONTACT_URL} className={QUIET}>
+              <Mail aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
+              {t.about.contact}
             </a>
           </nav>
         </div>

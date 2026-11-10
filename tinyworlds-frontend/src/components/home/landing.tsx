@@ -14,7 +14,7 @@ import type { Locale, Strings } from "@/i18n";
 import { RANKING_LIMIT, rankCities } from "@/lib/city-picker";
 import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { cn } from "@/lib/utils";
-import { GITHUB_URL, SITE_ID, worldCardUrl, worldUrl } from "@/site";
+import { CONTACT_EMAIL, CONTACT_URL, GITHUB_URL, SITE_ID, worldCardUrl, worldUrl } from "@/site";
 import { WORLDS, type World } from "@/worlds";
 
 const HEADING =
@@ -61,6 +61,70 @@ function CardPicture({ world, alt }: { world: World; alt: string }) {
       onError={() => setMissing(true)}
       className="block aspect-[1200/630] h-auto w-full bg-sign-raised object-cover"
     />
+  );
+}
+
+/** One group of worlds as cards: the cities, or the places that only exist in stories. */
+function WorldGrid({
+  id,
+  heading,
+  worlds,
+  columns,
+  locale,
+}: {
+  id: string;
+  heading: string;
+  worlds: World[];
+  /** how many cards the widest group has: the grid is laid out for that many */
+  columns: number;
+  locale: Locale;
+}) {
+  return (
+    <section aria-labelledby={id}>
+      <h2 id={id} className={HEADING}>
+        {heading}
+      </h2>
+      {/* the same columns for every group, so a card is the same size wherever it is listed */}
+      <ul
+        className={cn(
+          "grid gap-4",
+          columns > 1 && "sm:grid-cols-2",
+          columns > 2 && "lg:grid-cols-3",
+        )}
+      >
+        {worlds.map((world) => {
+          const copy = world.copy[locale];
+          return (
+            <li key={world.id}>
+              <a
+                href={worldUrl(world.id)}
+                className="group sign block h-full overflow-hidden transition-transform outline-none hover:-translate-y-0.5 focus-visible:shadow-[0_0_0_3px_var(--taxi)]"
+              >
+                <CardPicture world={world} alt={copy.cardAlt} />
+                <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-4 py-3.5">
+                  <div className="min-w-[9rem] flex-1">
+                    <h3 className="text-lg leading-tight font-semibold text-paper">{copy.city}</h3>
+                    <p className="pt-1 text-sm leading-snug text-paper-dim">{copy.card}</p>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-1 pt-0.5">
+                    <Wordmark
+                      suffix={world.wordmark}
+                      accent={world.accent.color}
+                      className="text-xl"
+                    />
+                    <ArrowUpRight
+                      aria-hidden
+                      className="size-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                      strokeWidth={2.25}
+                    />
+                  </span>
+                </div>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -129,8 +193,12 @@ export function Landing() {
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
   const { funded, ranked, anyRaised } = rankCities(milestones.cities);
   const shown = showAll ? ranked : ranked.slice(0, RANKING_LIMIT);
-  const worlds = Object.values(WORLDS);
+  // the real cities first, then the places that only exist in stories
+  const cities = Object.values(WORLDS).filter((world) => !world.fictional);
+  const imagined = Object.values(WORLDS).filter((world) => world.fictional);
+  const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
+  const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-12 sm:px-6 sm:pt-8">
@@ -147,52 +215,22 @@ export function Landing() {
         </div>
       </header>
 
-      <section aria-labelledby="cities">
-        <h2 id="cities" className={HEADING}>
-          {t.home.cities}
-        </h2>
-        <ul
-          className={cn(
-            "grid gap-4",
-            worlds.length > 1 && "sm:grid-cols-2",
-            worlds.length > 2 && "lg:grid-cols-3",
-          )}
-        >
-          {worlds.map((world) => {
-            const copy = world.copy[locale];
-            return (
-              <li key={world.id}>
-                <a
-                  href={worldUrl(world.id)}
-                  className="group sign block h-full overflow-hidden transition-transform outline-none hover:-translate-y-0.5 focus-visible:shadow-[0_0_0_3px_var(--taxi)]"
-                >
-                  <CardPicture world={world} alt={copy.cardAlt} />
-                  <div className="flex items-start gap-3 px-4 py-3.5">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-lg leading-tight font-semibold text-paper">
-                        {copy.city}
-                      </h3>
-                      <p className="pt-1 text-sm leading-snug text-paper-dim">{copy.card}</p>
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1 pt-0.5">
-                      <Wordmark
-                        suffix={world.wordmark}
-                        accent={world.accent.color}
-                        className="text-xl"
-                      />
-                      <ArrowUpRight
-                        aria-hidden
-                        className="size-4 text-paper-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                        strokeWidth={2.25}
-                      />
-                    </span>
-                  </div>
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <WorldGrid
+        id="cities"
+        heading={t.home.cities}
+        worlds={cities}
+        columns={columns}
+        locale={locale}
+      />
+      {imagined.length > 0 && (
+        <WorldGrid
+          id="imagined"
+          heading={t.home.imagined}
+          worlds={imagined}
+          columns={columns}
+          locale={locale}
+        />
+      )}
 
       {takesDonations && (
         <section aria-labelledby="ranking">
@@ -292,8 +330,18 @@ export function Landing() {
         </div>
       </section>
 
-      <footer className="mt-auto pt-2 text-xs leading-relaxed text-[#15171a]/65 dusk:text-paper-dim">
-        {t.home.credits}
+      <footer className="mt-auto space-y-1.5 pt-2 text-xs leading-relaxed text-[#15171a]/65 dusk:text-paper-dim">
+        <p>
+          {beforeEmail}
+          <a
+            href={CONTACT_URL}
+            className="rounded-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper"
+          >
+            {CONTACT_EMAIL}
+          </a>
+          {afterEmail}
+        </p>
+        <p>{t.home.credits}</p>
       </footer>
 
       {takesDonations && (
