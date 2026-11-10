@@ -8,7 +8,8 @@ Two things run in production:
   files for New York) to live in git or in an image, which is why they are copied rather than
   baked in.
 - **The API** (`tinyworlds-api`): one container built from its `Dockerfile`, with a PostgreSQL
-  database beside it. It only serves the donation milestones; the maps work without it.
+  database beside it. It serves the donation milestones and keeps the donation funnel for the
+  admin pages; the maps work without it.
 
 Where any of this is hosted is deliberately not recorded in this repository. The script reads
 it from `deploy/.env` (gitignored; see `.env.example`):
@@ -43,7 +44,9 @@ change.
 - a PostgreSQL 17 database reachable only from the API;
 - the image built from `tinyworlds-api/Dockerfile` (build context `tinyworlds-api`), which runs
   `prisma migrate deploy` and then the server on port 4000; its environment is listed in
-  `tinyworlds-api/.env.example` (database URL, Stripe keys and price ids, allowed origins);
+  `tinyworlds-api/.env.example` (database URL, Stripe keys and price ids, allowed origins;
+  and, for the admin pages, who may sign in, a secret for their sessions and the mail server
+  that sends their sign-in links);
 - route `https://<site>/api/` to it on the same host name as the site (a path rule on the
   reverse proxy, no prefix stripping: the API serves under `/api`), so the browser needs no CORS;
 - in Stripe, a webhook endpoint for `https://<site>/api/stripe/webhook` sending
@@ -67,4 +70,10 @@ always revalidated, and it is copied last so a new build is only announced once 
 `deploy.sh` also copies `nginx.conf` (in place, because it is a single-file bind mount); after
 changing it, reload nginx in the container (`nginx -s reload`).
 
-The API is redeployed by rebuilding its image from the repository.
+The API is redeployed by rebuilding its image from the repository; its migrations run when the
+container starts. When a change touches both, **deploy the API first**, then the viewers: a
+viewer may send a field an older API does not know.
+
+The admin pages are part of the front page (`/admin/`), so `deploy/deploy.sh home` publishes
+them; the funnel's reporting is in every viewer, so each world needs its own
+`deploy/deploy.sh <world> --no-data` to start counting its visits.

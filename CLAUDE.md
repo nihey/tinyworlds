@@ -31,7 +31,7 @@ such strings before every commit.
 tinyworlds/
 ├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
 ├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world) and the front page
-├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations and per-city funding milestones
+├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins)
 ├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film
 ├── deploy/                # nginx config, deploy script, .env.example
 ├── dev.sh                 # tmux launcher
@@ -51,6 +51,12 @@ Each sub-project has its own `CLAUDE.md`.
   the donor chose; a Stripe webhook records what was paid. If
   the API is unreachable the viewer falls back to static payment links, so donating never
   depends on it.
+- **The funnel is the site's own.** Every page says to the API that a visit opened it, and
+  then which steps towards a donation that visit took (the donate sign, the checkout, giving
+  up); a visit is a tab's stay, named by an id made up in the browser and kept nowhere else
+  (no cookie, no address). That gives the donation funnel and each city's count of visits,
+  which admins read at `/admin/` (part of the front page's build). Admins sign in through a
+  link sent by email; who they are is the API's `ADMIN_EMAILS`, never a tracked file.
 - **The front page moves.** Its hero and each world's card play a short silent loop made by
   `tinyworlds-videos` from the world's own tiles, over a still; the loops are the front page's
   own files, so nothing but its build needs deploying for them.
@@ -64,7 +70,11 @@ Each sub-project has its own `CLAUDE.md`.
 - **The frontend is a static export** (`output: "export"`), one build per world under
   `/<world>` plus one for the front page. No server components fetch at request time; Apollo
   Client is used only where the API is (the Donate dialog, the front page's milestones).
-- **No auth.** Nothing is user-specific; the API's two operations are public and throttled.
+- **No accounts for visitors.** What the site calls for them is public and throttled. Auth
+  exists for admins only, and without passwords: a sign-in link by email, then a JWT in local
+  storage (`tinyworlds-api/CLAUDE.md`). Signing in is REST, as the global stack has it.
+- **Funnel steps go out with plain `fetch`**, not Apollo Client: every page sends one, and
+  Apollo is only downloaded when the donate sign or the admin page asks for it.
 
 ## Adding a world
 
@@ -188,13 +198,23 @@ GraphQL at `/api/graphql` (same origin in production):
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
 type Query { health: String!  cityMilestones: [CityMilestone!]! }
-input CreateDonationCheckoutInput { city: String  amountCents: Int  world: String!  locale: String!  returnUrl: String! }
+input CreateDonationCheckoutInput { city: String  amountCents: Int  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
-type Mutation { createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout! }
+enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
+input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
+type Mutation {
+  createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
+  trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
+}
+# admins only (Authorization: Bearer <session>): me, donationFunnel
 ```
 
 `amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
-(from US$1). `POST /api/stripe/webhook` is the only REST route. Details in `tinyworlds-api/CLAUDE.md`.
+(from US$1). `visitId` is the tab's visit (a UUID from session storage); `world` is a world's id
+or `"home"`. REST: `POST /api/stripe/webhook`, and signing in (`POST /api/auth/magic-link`,
+`POST /api/auth/verify`). When the contract grows, deploy the API before the viewers: an older
+API refuses a checkout that carries a field it does not know, and the site then falls back to
+its payment link. Details in `tinyworlds-api/CLAUDE.md`.
 
 ## Running and deploying
 

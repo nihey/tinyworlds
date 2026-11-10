@@ -48,7 +48,7 @@ the Wall to Asshai as one toy-scale diorama (unofficial; places from *A Song of 
 |------|------|
 | `tinyworlds-pipeline/` | TypeScript CLI: downloads the data, builds the scene, renders the tiles and indexes |
 | `tinyworlds-frontend/` | Next.js 16 static site: the map viewer (one build per city) and the front page |
-| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations and per-city funding milestones |
+| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, and the donation funnel for admins |
 | `tinyworlds-videos/` | HyperFrames: the front page's loops, city flyovers and the showcase film, all from the real tiles and viewer |
 | `deploy/` | nginx config and the deploy script |
 
@@ -68,7 +68,8 @@ npm install
 NEXT_PUBLIC_WORLD=tinynyc npm run dev      # http://localhost:3000
 ```
 
-The API is only needed for the donation milestones:
+The API is only needed for the donation milestones and the admin pages (the donation funnel
+and each city's visits, at `/admin/` of the front page):
 
 ```bash
 cd tinyworlds-api
@@ -78,6 +79,10 @@ docker compose up -d               # local Postgres
 npx prisma migrate deploy && npm run seed
 npm run start:dev                  # http://localhost:4000/api/graphql
 ```
+
+To sign in to the admin pages locally, put an address in `ADMIN_EMAILS` and a secret in
+`JWT_SECRET` (`.env`), ask for a link at `/admin/`, and copy it from the API's log: without a
+mail server that is where the mail goes.
 
 Or `./dev.sh [world]` for all three in tmux.
 
@@ -94,6 +99,7 @@ variables:
 | `NEXT_PUBLIC_BASE_PATH` | frontend | empty | sub-path the build is served under (`/tinynyc`) |
 | `NEXT_PUBLIC_API_URL` | frontend | unset | the API's GraphQL endpoint; unset = no milestones |
 | `DATABASE_URL`, `STRIPE_*` | api | — | see `tinyworlds-api/.env.example` |
+| `ADMIN_EMAILS`, `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | who may sign in to the admin pages, and the mail server that sends their sign-in links |
 
 ## Adding a city
 
