@@ -24,6 +24,9 @@ export interface SearchIndex {
   suggest(limit?: number): Place[];
 }
 
+/** Matches nothing: for languages that do not write "d'" or "l'" onto the next word. */
+const NO_ELISION = /(?!)/g;
+
 /** Lowercase, unaccented, punctuation-free; ordinals and number words become digits. */
 export function normalize(text: string, rules: SearchRules = WORLD.search): string {
   return text
@@ -31,6 +34,7 @@ export function normalize(text: string, rules: SearchRules = WORLD.search): stri
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/&/g, ` ${rules.and} `)
+    .replace(rules.elision ?? NO_ELISION, "$1 ")
     .replace(/['’.]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()

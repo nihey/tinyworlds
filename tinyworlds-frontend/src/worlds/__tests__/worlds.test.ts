@@ -16,10 +16,14 @@ describe("resolveWorld", () => {
     expect(resolveWorld("tinynyc").homeLocale).toBe("en-US");
     expect(resolveWorld("tinyorl").id).toBe("tinyorl");
     expect(resolveWorld("tinyorl").homeLocale).toBe("en-US");
+    expect(resolveWorld("tinyfte").id).toBe("tinyfte");
+    expect(resolveWorld("tinyfte").homeLocale).toBe("es-ES");
+    expect(resolveWorld("tinyvlc").id).toBe("tinyvlc");
+    expect(resolveWorld("tinyvlc").homeLocale).toBe("es-ES");
   });
 
   it("lists the worlds in the order the front page shows them", () => {
-    expect(Object.keys(WORLDS)).toEqual(["tinynyc", "tinyrao", "tinyorl"]);
+    expect(Object.keys(WORLDS)).toEqual(["tinynyc", "tinyrao", "tinyorl", "tinyfte", "tinyvlc"]);
   });
 
   it("stops on an id it does not know, naming the ones it does", () => {
@@ -104,6 +108,44 @@ describe("worlds", () => {
       "Linhas dos bairros",
       "Límites de barrios",
     ]);
+    // a town has parts, a Spanish city has districts
+    expect(LOCALES.map((locale) => WORLDS.tinyfte.copy[locale].borough)).toEqual([
+      "Area",
+      "Zona",
+      "Zona",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinyvlc.copy[locale].borough)).toEqual([
+      "District",
+      "Distrito",
+      "Distrito",
+    ]);
+    for (const id of ["tinyfte", "tinyvlc"])
+      expect(LOCALES.map((locale) => WORLDS[id].copy[locale].hoodLines.label)).toEqual([
+        "Neighbourhood lines",
+        "Linhas dos bairros",
+        "Límites de barrios",
+      ]);
+  });
+
+  it("are named in each language the way that language names the city", () => {
+    expect(LOCALES.map((locale) => WORLDS.tinyvlc.copy[locale].city)).toEqual([
+      "Valencia",
+      "Valência",
+      "Valencia",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinyfte.copy[locale].tagline)).toEqual([
+      "El Calafate, pocket-sized",
+      "El Calafate, em miniatura",
+      "El Calafate, en miniatura",
+    ]);
+  });
+
+  it("say truthfully where each city's building heights come from", () => {
+    // Orlando's are on record; Ribeirão Preto's and El Calafate's are read off satellite imagery
+    expect(WORLDS.tinyorl.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
+    expect(WORLDS.tinyorl.copy["en-US"].about.notes[0]).not.toMatch(/no height on record/);
+    expect(WORLDS.tinyfte.copy["en-US"].about.notes[0]).toMatch(/satellite/);
+    expect(WORLDS.tinyvlc.copy["en-US"].about.notes[0]).toMatch(/number of floors/);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {

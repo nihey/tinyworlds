@@ -11,6 +11,7 @@ import {
   regionNames,
   tidyCity,
 } from "../city-picker";
+import { BUILT_CITIES } from "@/site";
 import { CITY_MAX, type CityMilestone } from "../donate";
 
 const city = (over: Partial<CityMilestone> & { name: string }): CityMilestone => ({
@@ -71,6 +72,16 @@ describe("pickerOptions", () => {
   it("also leaves out this site's own worlds, whatever the API says", () => {
     const { more } = pickerOptions([], CATALOGUE, "", ["New York", "São Paulo"]);
     expect(more.map((c) => c.name)).toEqual(["Lisbon", "London", "Los Angeles", "San Francisco"]);
+  });
+
+  it("never offers a city this site already has, going by the worlds registry", () => {
+    const offered = pickerOptions([], CITY_CATALOGUE, "", BUILT_CITIES).more.map((c) => c.name);
+    for (const built of ["New York", "Orlando", "Valencia"]) expect(offered).not.toContain(built);
+    expect(offered).toContain("Barcelona");
+    // by another spelling it is recognised as built rather than offered as a new city
+    expect(pickerOptions([], CITY_CATALOGUE, "valência", BUILT_CITIES).typed).toBeNull();
+    expect(pickerOptions([], CITY_CATALOGUE, "valencia", BUILT_CITIES).more).toEqual([]);
+    expect(pickerOptions([], CITY_CATALOGUE, "el calafate", BUILT_CITIES).typed).toBeNull();
   });
 
   it("finds a city by the start of any word, accents or not", () => {

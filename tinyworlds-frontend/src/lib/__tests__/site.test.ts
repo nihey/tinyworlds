@@ -28,7 +28,13 @@ describe("site", () => {
   });
 
   it("knows which cities are already worlds, by the names a donor would pick", () => {
-    expect(BUILT_CITIES).toEqual(["New York", "Ribeirão Preto", "Orlando"]);
+    expect(BUILT_CITIES).toEqual([
+      "New York",
+      "Ribeirão Preto",
+      "Orlando",
+      "El Calafate",
+      "Valencia",
+    ]);
   });
 
   it("can take the cards from one folder in development", () => {

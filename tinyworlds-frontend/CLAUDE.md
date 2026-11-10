@@ -2,8 +2,8 @@
 
 The map viewer: a Next.js 16 static export that draws the tiles and indexes written by
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
-One build is one **target**: a **world** (city) — `tinynyc`, `tinyrao`, `tinyorl` — or `home`, the front
-page that lists the worlds. The interface speaks the visitor's language (English, Brazilian
+One build is one **target**: a **world** (city) — `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
+(El Calafate), `tinyvlc` (Valencia) — or `home`, the front page that lists the worlds. The interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
 `tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
 
@@ -117,8 +117,9 @@ src/
   `es-ES`), else English; the settings panel can override it (`prefs.lang`, default `"auto"`).
 - **`useI18n()`** (`hooks/use-i18n.ts`) gives components `{ locale, t, copy }`: `t` is the
   dictionary, `copy` the world's own words in that language. It is a `useSyncExternalStore` whose
-  server snapshot is the site's **home language** (`WORLD.homeLocale`: en-US for tinynyc, pt-BR
-  for tinyrao, en-US for tinyorl), so the static HTML hydrates cleanly and then switches. Code outside React
+  server snapshot is the site's **home language** (`WORLD.homeLocale`: en-US for tinynyc and
+  tinyorl, pt-BR for tinyrao, es-ES for tinyfte and tinyvlc), so the static HTML hydrates cleanly
+  and then switches. Code outside React
   (errors thrown while loading) uses `activeStrings()`.
 - **No hard-coded UI strings in components**: every visible string and aria-label comes from `t`
   (language) or `copy` (city). `Strings` in `types.ts` is the contract, so a key missing from one
@@ -136,11 +137,16 @@ src/
 - **Search rules** (`map/search-rules.ts`) belong to the **world**, not the interface: they
   follow the language of the map's names. `EN_RULES` turns ordinals and number words into digits;
   `PT_RULES` makes every way of writing a number find the others ("9 de julho", "nove de julho";
-  "15", "quinze", "XV"). An alternate written `=word` only matches a whole word. Names and
-  queries are always compared unaccented.
+  "15", "quinze", "XV"). `ES_RULES` does the same for Spanish and, because Valencia's map names
+  its streets in Valencian, makes each language's word find the other's ("calle" ↔ "carrer",
+  "plaza del ayuntamiento" → "Plaça de l'Ajuntament", "9 de octubre" → "Nou d'Octubre"); its
+  `elision` keeps "d'" and "l'" as words of their own, so the word after the apostrophe can be
+  found. A world adds its own shorthand on top (`tinyvlc`: "ruzafa" ↔ "Russafa", "malvarrosa").
+  An alternate written `=word` only matches a whole word. Names and queries are always compared
+  unaccented.
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
-  tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl); the engine and the minimap read the world's
-  value for canvas drawing. Don't write the yellow as a literal. `worlds.test.ts` checks the
+  tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
+  `#ffa62b` for tinyvlc); the engine and the minimap read the world's value for canvas drawing. Don't write the yellow as a literal. `worlds.test.ts` checks the
   contrast of each pair.
 - A world may ship an empty `hoods.json`: the settings row, the `B` key and the help line then
   disappear.

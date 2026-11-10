@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Place } from "../manifest";
 import { createSearchIndex, normalize } from "../search";
-import { PT_RULES, roman } from "../search-rules";
+import { ES_RULES, PT_RULES, roman } from "../search-rules";
 
 const p = (n: string, t: Place["t"], r: number, b?: string): Place => ({
   n,
@@ -189,5 +189,133 @@ describe("search in Portuguese", () => {
 
   it("builds initials without the small words", () => {
     expect(found("cmss")).toEqual(["Catedral Metropolitana de São Sebastião"]);
+  });
+});
+
+describe("search in Spanish and Valencian", () => {
+  const vlc = createSearchIndex(
+    [
+      p("Carrer de Colón", "street", 60, "Ciutat Vella"),
+      p("Avinguda del Regne de València", "street", 58, "L'Eixample"),
+      p("Plaça de l'Ajuntament", "place", 96, "Ciutat Vella"),
+      p("Plaça de la Mare de Déu", "place", 90, "Ciutat Vella"),
+      p("Ciutat de les Arts i les Ciències", "landmark", 99, "Quatre Carreres"),
+      p("Estació del Nord", "station", 92, "Ciutat Vella"),
+      p("Mercat Central", "landmark", 95, "Ciutat Vella"),
+      p("Passeig de l'Albereda", "street", 55, "El Pla del Real"),
+      p("Carrer del Nou d'Octubre", "street", 40, "L'Olivereta"),
+      p("Nou Mestalla", "landmark", 70, "Benicalap"),
+      p("Carrer de Sant Vicent Màrtir", "street", 57, "Extramurs"),
+      p("Avinguda del Primer de Maig", "street", 30, "Patraix"),
+      p("Carrer de Jaume I", "street", 20),
+      p("Pont de l'Exposició", "bridge", 50),
+      p("Platja de la Malva-rosa", "place", 88, "Poblats Marítims"),
+    ],
+    ES_RULES,
+  );
+  const fte = createSearchIndex(
+    [
+      p("Avenida del Libertador General San Martín", "street", 80),
+      p("Calle 9 de Julio", "street", 50),
+      p("Calle 1º de Mayo", "street", 45),
+      p("Calle Gobernador Moyano", "street", 44),
+      p("Calle Comandante Tomás Espora", "street", 43),
+      p("Laguna Nimez", "park", 90),
+      p("Calle Alfonso XIII", "street", 10),
+      p("Pasaje Los Ñires", "street", 12),
+    ],
+    ES_RULES,
+  );
+  const found = (q: string) => vlc.search(q).map((h) => h.place.n);
+  const foundFte = (q: string) => fte.search(q).map((h) => h.place.n);
+
+  it("splits an article or preposition from the word it is written onto", () => {
+    expect(normalize("Plaça de l'Ajuntament", ES_RULES)).toBe("placa de l ajuntament");
+    expect(normalize("Carrer del Nou d'Octubre", ES_RULES)).toBe("carrer del nou d octubre");
+    // other languages keep dropping the apostrophe
+    expect(normalize("St. Patrick's")).toBe("st patricks");
+  });
+
+  it("finds a Valencian name by its Spanish words, and the other way round", () => {
+    expect(found("calle colon")).toEqual(["Carrer de Colón"]);
+    expect(found("carrer colon")).toEqual(["Carrer de Colón"]);
+    expect(found("plaza del ayuntamiento")).toEqual(["Plaça de l'Ajuntament"]);
+    expect(found("plaza de la virgen")).toEqual(["Plaça de la Mare de Déu"]);
+    expect(found("ciudad de las artes y las ciencias")).toEqual([
+      "Ciutat de les Arts i les Ciències",
+    ]);
+    expect(found("estacion del norte")).toEqual(["Estació del Nord"]);
+    expect(found("mercado central")).toEqual(["Mercat Central"]);
+    expect(found("paseo de la alameda")).toEqual(["Passeig de l'Albereda"]);
+    expect(found("paseo albereda")).toEqual(["Passeig de l'Albereda"]);
+    expect(found("avenida reino de valencia")).toEqual(["Avinguda del Regne de València"]);
+    expect(found("san vicente")[0]).toBe("Carrer de Sant Vicent Màrtir");
+    expect(found("puente exposicio")).toEqual(["Pont de l'Exposició"]);
+    expect(found("playa malva")).toEqual(["Platja de la Malva-rosa"]);
+  });
+
+  it("finds the word after an apostrophe", () => {
+    expect(found("ajuntament")).toEqual(["Plaça de l'Ajuntament"]);
+    expect(found("albereda")).toEqual(["Passeig de l'Albereda"]);
+    expect(found("l'ajuntament")).toEqual(["Plaça de l'Ajuntament"]);
+  });
+
+  it("understands street-type and title shorthand", () => {
+    expect(found("c/ colon")).toEqual(["Carrer de Colón"]);
+    expect(found("avda regne de valencia")).toEqual(["Avinguda del Regne de València"]);
+    expect(found("pza ajuntament")).toEqual(["Plaça de l'Ajuntament"]);
+    expect(found("pº albereda")).toEqual(["Passeig de l'Albereda"]);
+    expect(foundFte("av libertador")).toEqual(["Avenida del Libertador General San Martín"]);
+    expect(foundFte("av del libertador gral san martin")).toEqual([
+      "Avenida del Libertador General San Martín",
+    ]);
+    expect(foundFte("gdor moyano")).toEqual(["Calle Gobernador Moyano"]);
+    expect(foundFte("cte espora")).toEqual(["Calle Comandante Tomás Espora"]);
+    expect(foundFte("los nires")).toEqual(["Pasaje Los Ñires"]);
+  });
+
+  it("reads dates and regnal numbers in digits, words or Roman numerals", () => {
+    expect(foundFte("nueve de julio")).toEqual(["Calle 9 de Julio"]);
+    expect(foundFte("9 de julio")).toEqual(["Calle 9 de Julio"]);
+    expect(foundFte("primero de mayo")).toEqual(["Calle 1º de Mayo"]);
+    expect(foundFte("1 de mayo")).toEqual(["Calle 1º de Mayo"]);
+    expect(foundFte("alfonso 13")).toEqual(["Calle Alfonso XIII"]);
+    expect(foundFte("alfonso trece")).toEqual(["Calle Alfonso XIII"]);
+    expect(found("9 de octubre")).toEqual(["Carrer del Nou d'Octubre"]);
+    expect(found("nueve de octubre")).toEqual(["Carrer del Nou d'Octubre"]);
+    expect(found("1 de mayo")).toEqual(["Avinguda del Primer de Maig"]);
+    expect(found("jaume 1")).toEqual(["Carrer de Jaume I"]);
+    // a near miss in the other language's spelling is forgiven like any typo
+    expect(found("jaime 1")).toEqual(["Carrer de Jaume I"]);
+    expect(found("jaume primero")).toEqual(["Carrer de Jaume I"]);
+  });
+
+  it('still reads "nou" as new', () => {
+    expect(found("nuevo mestalla")).toEqual(["Nou Mestalla"]);
+    expect(found("nou mestalla")).toEqual(["Nou Mestalla"]);
+  });
+});
+
+describe("Valencia's own shorthand", () => {
+  it("finds places by the name the other language gives them", async () => {
+    const { WORLDS } = await import("@/worlds");
+    const index = createSearchIndex(
+      [
+        p("Platja de la Malva-rosa", "place", 88),
+        p("Russafa", "hood", 60),
+        p("Torres dels Serrans", "landmark", 90),
+        p("El Micalet", "landmark", 92),
+        p("Carrer de Xàtiva", "street", 50),
+        p("L'Oceanogràfic", "landmark", 95),
+      ],
+      WORLDS.tinyvlc.search,
+    );
+    const found = (q: string) => index.search(q).map((h) => h.place.n);
+    expect(found("playa de la malvarrosa")).toEqual(["Platja de la Malva-rosa"]);
+    expect(found("ruzafa")).toEqual(["Russafa"]);
+    expect(found("torres de serranos")).toEqual(["Torres dels Serrans"]);
+    expect(found("miguelete")).toEqual(["El Micalet"]);
+    expect(found("calle jativa")).toEqual(["Carrer de Xàtiva"]);
+    expect(found("oceanografico")).toEqual(["L'Oceanogràfic"]);
   });
 });

@@ -16,6 +16,12 @@ export interface SearchRules {
   abbreviations: Record<string, string[]>;
   /** Small words left out when a name is reduced to its initials. */
   initialsSkip: string[];
+  /**
+   * Articles and prepositions written onto the next word with an apostrophe ("d'Octubre",
+   * "l'Ajuntament"): the first group is kept as a word of its own, so the word after it can be
+   * found. Without this the apostrophe is simply dropped ("Patrick's" → "patricks").
+   */
+  elision?: RegExp;
 }
 
 export const EN_RULES: SearchRules = {
@@ -193,4 +199,259 @@ export const PT_RULES: SearchRules = {
     shop: ["shopping"],
   },
   initialsSkip: ["de", "da", "do", "das", "dos", "e", "a", "o", "em"],
+};
+
+const ES_CARDINALS = [
+  "",
+  "uno",
+  "dos",
+  "tres",
+  "cuatro",
+  "cinco",
+  "seis",
+  "siete",
+  "ocho",
+  "nueve",
+  "diez",
+  "once",
+  "doce",
+  "trece",
+  "catorce",
+  "quince",
+  "dieciseis",
+  "diecisiete",
+  "dieciocho",
+  "diecinueve",
+  "veinte",
+  "veintiuno",
+  "veintidos",
+  "veintitres",
+  "veinticuatro",
+  "veinticinco",
+  "veintiseis",
+  "veintisiete",
+  "veintiocho",
+  "veintinueve",
+  "treinta",
+];
+const ES_ORDINALS = [
+  "",
+  "primero",
+  "segundo",
+  "tercero",
+  "cuarto",
+  "quinto",
+  "sexto",
+  "septimo",
+  "octavo",
+  "noveno",
+  "decimo",
+];
+/** Valencian numbers that turn up in street names ("Nou d'Octubre", "Primer de Maig"). */
+const VA_NUMBERS: Record<number, string[]> = {
+  1: ["primer"],
+  3: ["tercer"],
+  4: ["quatre"],
+  5: ["cinc"],
+  6: ["sis"],
+  7: ["set"],
+  8: ["huit", "vuit"],
+  9: ["nou"],
+};
+
+/**
+ * Spanish streets are named after dates and after kings and popes too: "9 de Julio",
+ * "Primero de Mayo", "Alfonso XIII", "Jaume I". Every way of writing a number finds the others,
+ * as whole words only.
+ */
+function esNumbers(): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (let n = 1; n <= 30; n++) {
+    const forms = [String(n), roman(n), ES_CARDINALS[n]];
+    if (ES_ORDINALS[n]) forms.push(ES_ORDINALS[n]);
+    forms.push(...(VA_NUMBERS[n] ?? []));
+    for (const form of forms)
+      out[form] = forms.filter((other) => other !== form).map((other) => `=${other}`);
+  }
+  return out;
+}
+
+/**
+ * The same thing in Spanish and in Valencian. Valencia's map names its streets in Valencian
+ * ("Carrer de Colón", "Plaça de l'Ajuntament", "Ciutat de les Arts i les Ciències") and people
+ * type either, so each word finds the other. Written as the search compares them: no accents.
+ */
+const ES_VA: [string, string][] = [
+  ["calle", "carrer"],
+  ["avenida", "avinguda"],
+  ["plaza", "placa"],
+  ["paseo", "passeig"],
+  ["camino", "cami"],
+  ["puente", "pont"],
+  ["puerto", "port"],
+  ["puerta", "porta"],
+  ["playa", "platja"],
+  ["jardin", "jardi"],
+  ["jardines", "jardins"],
+  ["parque", "parc"],
+  ["rio", "riu"],
+  ["mercado", "mercat"],
+  ["iglesia", "esglesia"],
+  ["palacio", "palau"],
+  ["museo", "museu"],
+  ["estacion", "estacio"],
+  ["ayuntamiento", "ajuntament"],
+  ["lonja", "llotja"],
+  ["ciudad", "ciutat"],
+  ["artes", "arts"],
+  ["ciencias", "ciencies"],
+  ["universidad", "universitat"],
+  ["colegio", "collegi"],
+  ["barrio", "barri"],
+  ["san", "sant"],
+  ["virgen", "mare"],
+  ["norte", "nord"],
+  ["sur", "sud"],
+  ["nuevo", "nou"],
+  ["nueva", "nova"],
+  ["viejo", "vell"],
+  ["reino", "regne"],
+  ["y", "i"],
+  ["alameda", "albereda"],
+  ["enero", "gener"],
+  ["febrero", "febrer"],
+  ["marzo", "marc"],
+  ["mayo", "maig"],
+  ["junio", "juny"],
+  ["julio", "juliol"],
+  ["agosto", "agost"],
+  ["septiembre", "setembre"],
+  ["noviembre", "novembre"],
+  ["diciembre", "desembre"],
+];
+
+/** Abbreviations and their meanings, merged: a word may be in several lists ("nou" is 9 and "new"). */
+function merge(...lists: Record<string, string[]>[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const list of lists)
+    for (const [word, also] of Object.entries(list))
+      out[word] = [...new Set([...(out[word] ?? []), ...also])];
+  return out;
+}
+
+function bothWays(pairs: [string, string][]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [es, va] of pairs) {
+    if (es === va) continue;
+    out[es] = [...(out[es] ?? []), `=${va}`];
+    out[va] = [...(out[va] ?? []), `=${es}`];
+  }
+  return out;
+}
+
+/** Spanish, with Valencian beside it: Valencia's map is in both, El Calafate's in the first. */
+export const ES_RULES: SearchRules = {
+  and: "y",
+  numberWords: {},
+  ordinal: null,
+  abbreviations: merge(esNumbers(), bothWays(ES_VA), {
+    // the small words differ too: "del Ayuntamiento" is "de l'Ajuntament", "de los" is "dels"
+    del: ["=de", "=dels"],
+    de: ["=d", "=del"],
+    d: ["=de"],
+    la: ["=l", "=les"],
+    el: ["=l", "=els"],
+    l: ["=la", "=el"],
+    los: ["=els", "=dels"],
+    las: ["=les"],
+    les: ["=las", "=los"],
+    els: ["=los"],
+    dels: ["=del", "=los"],
+    c: ["calle", "carrer"],
+    cl: ["calle"],
+    av: ["avenida", "avinguda"],
+    avda: ["avenida", "avinguda"],
+    avd: ["avenida", "avinguda"],
+    avgda: ["avinguda", "avenida"],
+    pl: ["plaza", "placa"],
+    pza: ["plaza", "placa"],
+    plza: ["plaza", "placa"],
+    pca: ["placa", "plaza"],
+    p: ["paseo", "passeig"],
+    ps: ["paseo", "passeig"],
+    pso: ["paseo", "passeig"],
+    pg: ["passeig", "paseo"],
+    ctra: ["carretera"],
+    cra: ["carretera"],
+    cno: ["camino", "cami"],
+    pje: ["pasaje"],
+    psje: ["pasaje"],
+    bv: ["bulevar", "boulevard"],
+    blvd: ["bulevar", "boulevard"],
+    rda: ["ronda"],
+    gv: ["gran"],
+    rn: ["ruta"],
+    rp: ["ruta"],
+    urb: ["urbanizacion"],
+    bo: ["barrio"],
+    pq: ["parque", "parc"],
+    pque: ["parque", "parc"],
+    est: ["estacion", "estacio"],
+    dr: ["doctor"],
+    dra: ["doctora"],
+    prof: ["profesor", "profesora", "professor"],
+    ing: ["ingeniero"],
+    arq: ["arquitecto", "arquitecte"],
+    gral: ["general"],
+    gdor: ["gobernador"],
+    gob: ["gobernador"],
+    pte: ["presidente"],
+    pdte: ["presidente"],
+    int: ["intendente"],
+    cnel: ["coronel"],
+    cdte: ["comandante"],
+    cte: ["comandante"],
+    tte: ["teniente"],
+    cap: ["capitan"],
+    sgto: ["sargento"],
+    alte: ["almirante"],
+    mtro: ["maestro"],
+    mons: ["monsenor"],
+    hno: ["hermano"],
+    hnos: ["hermanos"],
+    pe: ["padre"],
+    fr: ["fray"],
+    dn: ["don"],
+    sta: ["santa"],
+    sto: ["santo"],
+    s: ["san", "sant"],
+    ntra: ["nuestra"],
+    sra: ["senora"],
+    ns: ["nuestra", "senora"],
+    hosp: ["hospital"],
+    univ: ["universidad", "universitat"],
+    cc: ["centro", "centre"],
+    pto: ["puerto", "port"],
+    pta: ["punta", "puerta"],
+  }),
+  initialsSkip: [
+    "de",
+    "del",
+    "la",
+    "las",
+    "el",
+    "los",
+    "y",
+    "e",
+    "en",
+    "a",
+    "al",
+    "d",
+    "l",
+    "les",
+    "els",
+    "i",
+    "dels",
+  ],
+  elision: /\b([dl])['’](?=[a-z])/g,
 };
