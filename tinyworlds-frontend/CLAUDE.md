@@ -136,15 +136,13 @@ src/
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
   link back to the front page (`NEXT_PUBLIC_HOME_URL`).
-- **The invitation to the other places** (`components/map/explore-banner.tsx`, rules in
-  `lib/explore.ts`): a small sign under the search box, "8 more cities and worlds to explore",
-  linking to the front page's list (`/#cities`). Most visitors land on one map and never see
-  that there are others. It arrives last, after the map's own signs, for everyone, however they
-  got to the map; it can be put away, which is remembered for every map
-  (`localStorage` `tinyworlds.explore` holds how many other places there were) until the site
-  has more places than then; and it steps aside while the search box is in use (a `:has()`
-  rule in `globals.css`), because the results open over that spot. Its little skyline is lit
-  in four other worlds' colours. Analytics hooks: `explore_more`, `explore_dismiss`.
+- **The invitation to the other places** (`components/map/explore-banner.tsx`): a small sign
+  under the search box, "8 more cities and worlds to explore", linking to the front page's
+  list (`placesUrl` in `lib/explore.ts`: `/#cities`). Most visitors land on one map and never
+  see that there are others. It is **always there**, for everyone: it goes up with the map's
+  other signs and cannot be put away. The one moment it is not drawn is while the search box
+  is in use (a `:has()` rule in `globals.css`), because the results open over that spot. Its
+  little skyline is lit in four other worlds' colours. Analytics hook: `explore_more`.
 - **Contact.** `CONTACT_EMAIL` in `site.ts` is the one place the project's address lives: the
   front page's footer shows it (a `mailto:` in a localized sentence), and About in every map has
   a quiet "Contact" link.

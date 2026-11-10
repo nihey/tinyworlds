@@ -299,10 +299,10 @@ export function MapApp() {
             style={delay(60)}
           />
           {/* under the search sign, and clear of the tools that sit beside it on a narrow screen;
-              the last sign to arrive, once the map has had a moment to itself */}
+              it goes up with the map's other signs and stays */}
           <ExploreBanner
             className="sign-in fixed top-[calc(var(--edge-t)+3.9375rem)] left-(--edge-l) max-w-[calc(100vw-var(--edge-l)-var(--edge-r)-3.5rem)] sm:max-w-[25rem]"
-            style={delay(1400)}
+            style={delay(100)}
           />
           <ToolColumn
             northDeg={session.manifest.northDeg}
