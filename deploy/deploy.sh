@@ -64,7 +64,7 @@ build() {
 
 if [[ "$MODE" != "--data" ]]; then
   build
-  ssh "$DEPLOY_HOST" "mkdir -p '$SITE/data'"
+  ssh "$DEPLOY_HOST" "mkdir -p '$SITE'"
   if [[ "$WORLD" == "home" ]]; then
     # the worlds live in folders beside the front page: replace its own files, delete nothing else
     rsync -az --delete "$FRONTEND/out/_next/" "$DEPLOY_HOST:$SITE/_next/"
