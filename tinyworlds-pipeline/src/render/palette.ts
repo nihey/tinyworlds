@@ -108,6 +108,15 @@ const RAMP_DEFS = {
   steppe: "#bfb47f",
   steppeDark: "#96905c",
   roofGreen: "#5f8c6a",
+  // ---- a medieval town (generated cities)
+  snow: "#edf1f4",
+  cobble: "#a59e93",
+  dirtRoad: "#a58d67",
+  thatch: "#c9aa5f",
+  timber: "#70503a",
+  redStone: "#c2725b",
+  weirwood: "#ebe6dc",
+  pine: "#3c6a4e",
 } as const;
 
 export type RampName = keyof typeof RAMP_DEFS;

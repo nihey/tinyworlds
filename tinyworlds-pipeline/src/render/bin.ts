@@ -1,3 +1,4 @@
+import { PAINT_RANK } from "../scene/kinds.js";
 import { PAD, SUN_DROP, type ChunkJob } from "./chunk.js";
 import type { Scene } from "./scene.js";
 
@@ -47,10 +48,12 @@ export function orderJob(
   lines: number[],
 ): { ground: Uint32Array; lines: Uint32Array } {
   const gk = scene.ground.kind;
-  ground.sort((a, b) => gk[a] - gk[b] || a - b);
+  ground.sort((a, b) => PAINT_RANK[gk[a]] - PAINT_RANK[gk[b]] || a - b);
   const lk = scene.lines.kind;
   const lf = scene.lines.flags;
-  lines.sort((a, b) => (lf[a] & LINE_BRIDGE) - (lf[b] & LINE_BRIDGE) || lk[a] - lk[b] || a - b);
+  lines.sort(
+    (a, b) => (lf[a] & LINE_BRIDGE) - (lf[b] & LINE_BRIDGE) || PAINT_RANK[lk[a]] - PAINT_RANK[lk[b]] || a - b,
+  );
   return { ground: Uint32Array.from(ground), lines: Uint32Array.from(lines) };
 }
 

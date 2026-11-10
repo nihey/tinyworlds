@@ -1,5 +1,6 @@
 import type { Pattern } from "../scene/kinds.js";
 import type { StyleProfile } from "../scene/styles.js";
+import type { SyntheticBuilder } from "../scene/synthetic.js";
 import type { DataSource } from "../sources/types.js";
 
 /**
@@ -13,6 +14,8 @@ export interface LandmarkStyle {
   pattern?: Pattern;
   /** The top is a dome, taking this share (0–1) of the building's height: a sphere, a rotunda. */
   dome?: number;
+  /** The top tapers to a point over this share (0–1) of the height: a pyramid, a spire. */
+  pyramid?: number;
 }
 
 /** Something that is not a building, so it is not in the data: a stack of prisms on a spot. */
@@ -128,7 +131,7 @@ export interface City {
     /** No census: line the streets by rule, one candidate spot every `spacing` metres on each side, kept with this chance. */
     street?: { spacing: number; chance: number };
   };
-  flora: "temperate" | "tropical" | "subtropical";
+  flora: "temperate" | "tropical" | "subtropical" | "boreal";
   /** Local reading of the data's land classes: Overture subtype/class → ground kind (see scene/kinds.ts). */
   ground: {
     landCover?: Record<string, number>;
@@ -136,6 +139,15 @@ export interface City {
     /** Farm tracks are bare earth, not paved paths. */
     dirtTracks?: boolean;
   };
+
+  /**
+   * For a place that exists on no map: lays the whole city out by code instead of reading it
+   * from data (see scene/synthetic.ts for the builder it draws with). When set, nothing is
+   * fetched, and `limits`, `areas`, `heights`, `style`, `landmarks`, `trees`, `ground`, `curated`
+   * and `search` are not consulted: the generator says where the map ends, what stands on it and
+   * what can be searched for. It must be deterministic.
+   */
+  synthetic?: (builder: SyntheticBuilder) => void;
 
   curated: Curated[];
   flights: Flight[];

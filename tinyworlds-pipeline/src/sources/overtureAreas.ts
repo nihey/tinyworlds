@@ -39,7 +39,8 @@ export function overtureAreas(opts: OvertureAreasOptions = {}): DataSource {
       const db = await DuckDBInstance.create(":memory:");
       const conn = await db.connect();
       await conn.run("INSTALL spatial; LOAD spatial;");
-      // the English name where the primary one is in another script; nothing as large as a county
+      // the English name where the primary one is in another script; nothing as large as a county.
+      // A district counts if it reaches into the box at all; a neighbourhood if its middle is inside.
       await conn.run(
         `CREATE TABLE area AS
          SELECT subtype, coalesce(nullif(names.common['en'], ''), names."primary") AS name, geometry,
@@ -52,8 +53,10 @@ export function overtureAreas(opts: OvertureAreasOptions = {}): DataSource {
         `${t}lon > ${west} AND ${t}lon < ${east} AND ${t}lat > ${south} AND ${t}lat < ${north}`;
       const reader = await conn.runAndReadAll(
         `SELECT 'locality', name, NULL, ST_AsGeoJSON(geometry) FROM area
-         WHERE subtype IN (${list(districts)}) AND ${inBox("")}
-         UNION ALL
+           WHERE subtype IN (${list(districts)})
+             AND ST_XMax(geometry) > ${west} AND ST_XMin(geometry) < ${east}
+             AND ST_YMax(geometry) > ${south} AND ST_YMin(geometry) < ${north}
+           UNION ALL
          SELECT 'hood', h.name,
                 (SELECT string_agg(l.name, '\t' ORDER BY ST_Area(l.geometry)) FROM area l
                  WHERE l.subtype IN (${list(districts)}) AND ST_Contains(l.geometry, ST_Point(h.lon, h.lat))),

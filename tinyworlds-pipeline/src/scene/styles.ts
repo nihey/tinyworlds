@@ -198,6 +198,54 @@ export const FLORIDA: StyleProfile = {
 };
 
 /**
+ * The Mojave: stucco houses in tan and cream under concrete tile, flat white roofs on everything
+ * commercial, and resort towers in gold, bronze and blue glass.
+ */
+export const MOJAVE: StyleProfile = {
+  rowWalls: [R.tan, R.cream, R.cream, R.salmon, R.limestone, R.whiteBrick, R.ochre],
+  midWalls: [R.tan, R.tan, R.cream, R.limestone, R.salmon, R.whiteBrick, R.greyStone, R.ochre],
+  slabWalls: [R.cream, R.whiteBrick, R.limestone, R.tan, R.greyStone],
+  houseWalls: [R.tan, R.tan, R.cream, R.cream, R.salmon, R.limestone, R.ochre, R.whiteBrick, R.greyStone],
+  houseRoofs: [
+    R.roofTerracotta,
+    R.roofTerracotta,
+    R.roofClay,
+    R.roofClay,
+    R.roofBrown,
+    R.roofBrown,
+    R.roofGravel,
+    R.roofSlate,
+  ],
+  houseMaxArea: 420,
+  flatRoofs: [R.roofWhite, R.roofWhite, R.roofGravel, R.roofSilver, R.roofGravel],
+  lowRoofs: [R.roofWhite, R.roofWhite, R.roofGravel, R.roofSilver, R.roofClay],
+  lowPitched: 0.1,
+  towerRoofs: [R.roofGravel, R.roofWhite, R.roofSilver],
+  glass: [
+    R.glassBronze,
+    R.glassBronze,
+    R.gold,
+    R.glassBlue,
+    R.glassBlue,
+    R.glassDark,
+    R.glassTeal,
+    R.glassSilver,
+  ],
+  stoneTowers: [R.cream, R.tan, R.limestone, R.whiteBrick, R.salmon],
+  industrialWalls: [R.whiteBrick, R.greyStone, R.cream, R.concrete, R.tan],
+  industrialRoofs: [R.roofWhite, R.roofWhite, R.roofSilver, R.roofGravel],
+  civicWalls: [R.cream, R.tan, R.limestone, R.whiteBrick, R.greyStone],
+  sacredWalls: [R.whiteBrick, R.cream, R.tan, R.limestone],
+  sacredRoofs: [R.roofTerracotta, R.roofBrown, R.roofGravel],
+  outbuildingWalls: [R.whiteBrick, R.greyStone, R.cream, R.tan],
+  outbuildingRoofs: [R.roofGravel, R.roofWhite, R.roofBrown, R.roofSilver],
+  windows: [R.glassDark, R.glassDark, R.glassBlack, R.glassBlue],
+  mid: [0.4, 0.28],
+  high: [0.6, 0.25],
+  superTall: 0.85,
+};
+
+/**
  * The Spanish Mediterranean: apartment blocks of five to eight floors in render, ochre and bare
  * brick with tiled terraces on top, low houses under clay tile, church domes in glazed blue.
  */

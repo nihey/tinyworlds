@@ -1,5 +1,5 @@
 import { hash2 } from "../scene/hash.js";
-import { G, isWater } from "../scene/kinds.js";
+import { G, isWater, PAINT_RANK, WAY_RANK } from "../scene/kinds.js";
 import { idx, R, S_DEEP, S_HALF, S_HIGH, S_LIT, S_SHADE } from "./palette.js";
 
 /**
@@ -25,6 +25,8 @@ const NATURAL_BANK = new Set<number>([
   G.Fairway,
   G.GolfGreen,
   G.Rock,
+  G.Snow,
+  G.Meadow,
 ]);
 
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
@@ -159,6 +161,28 @@ export function groundColor(ctx: GroundContext, kind: number, x: number, y: numb
       if ((rows & 3) === 0) return idx(R.cane, S_HALF);
       return (h & 15) === 0 ? idx(R.caneYoung, S_LIT) : idx(R.cane, S_LIT);
     }
+    case G.Meadow: {
+      // open grass country: a park's green without the park, in broad drifts of paler grass
+      if ((h & 63) === 0) return idx(R.park, S_HALF);
+      const drift = hash2(x >> 5, y >> 4);
+      if ((drift & 7) < 3 && ((h >>> 5) & 3) !== 0) return idx(R.lawn, S_LIT);
+      return idx(R.park, S_LIT);
+    }
+    case G.Snow: {
+      // fresh snow: white, a glint here and there, and thin blue streaks where the wind has combed it
+      if ((h & 127) === 0) return idx(R.snow, S_HIGH);
+      const streak = hash2(x >> 4, y);
+      if ((streak & 31) === 0 && ((x >> 4) + y) % 3 === 0) return idx(R.snow, S_HALF);
+      return (h & 255) === 1 ? idx(R.snow, S_HALF) : idx(R.snow, S_LIT);
+    }
+    case G.Cobble:
+      // setts in a small diamond bond, the odd one worn pale
+      if ((a & 3) === 0 || (b & 3) === 0) return idx(R.cobble, S_HALF);
+      return (h & 15) === 0 ? idx(R.cobble, S_HIGH) : idx(R.cobble, S_LIT);
+    case G.DirtRoad:
+      // packed earth with ruts and stones
+      if ((h & 7) === 0) return idx(R.dirtRoad, S_HALF);
+      return (h & 63) === 1 ? idx(R.dirtRoad, S_HIGH) : idx(R.dirtRoad, S_LIT);
     case G.Steppe: {
       // dry grassland: straw dotted with dark tussocks, paler where the wind has combed it
       if ((h & 15) === 0) return idx(R.steppeDark, S_LIT);
@@ -223,7 +247,7 @@ export function groundColor(ctx: GroundContext, kind: number, x: number, y: numb
     case G.Road:
     case G.RoadMajor:
       // a shadow line under the far kerb
-      return ctx.gk[gi - ctx.GW] < G.Path ? idx(R.asphalt, S_HALF) : idx(R.asphalt, S_LIT);
+      return PAINT_RANK[ctx.gk[gi - ctx.GW]] < WAY_RANK ? idx(R.asphalt, S_HALF) : idx(R.asphalt, S_LIT);
     case G.Highway:
       return atEdge(ctx, kind, gi, 1) ? idx(R.markingWhite, S_HALF) : idx(R.asphaltDark, S_LIT);
     case G.Runway:

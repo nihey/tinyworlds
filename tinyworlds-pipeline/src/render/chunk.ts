@@ -1,5 +1,5 @@
 import { hash2, mix } from "../scene/hash.js";
-import { F_FLOATING, F_NO_OUTLINE, G, G_COUNT, isWater, Pattern, Roof } from "../scene/kinds.js";
+import { F_FLOATING, F_NO_OUTLINE, G, G_COUNT, isWater, PAINT_RANK, Pattern, Roof } from "../scene/kinds.js";
 import { groundColor, type GroundContext } from "./ground.js";
 import {
   idx,
@@ -84,6 +84,7 @@ TREE_CHANCE[G.Lawn] = 9;
 TREE_CHANCE[G.Fairway] = 5;
 TREE_CHANCE[G.Wetland] = 10;
 TREE_CHANCE[G.Steppe] = 5;
+TREE_CHANCE[G.Meadow] = 6;
 const CELL_X = 9;
 const CELL_Y = 5;
 
@@ -103,6 +104,8 @@ for (const kind of [
   G.Court,
   G.CourtGreen,
   G.Track,
+  G.Cobble,
+  G.DirtRoad,
 ])
   TREE_OK[kind] = 0;
 
@@ -241,6 +244,7 @@ export class ChunkRenderer {
       const f = job.lines[n];
       const kind = lines.kind[f];
       const half = lines.width[f] / 2;
+      const rank = PAINT_RANK[kind];
       const overWater = (lines.flags[f] & LINE_BRIDGE) !== 0 || kind === G.Pier || kind === G.Lake;
       const span = (y: number, a: number, b: number): void => {
         const row = y * GW;
@@ -248,7 +252,7 @@ export class ChunkRenderer {
         else
           for (let i = row + a; i < row + b; i++) {
             const under = gk[i];
-            if (under !== G.Water && under !== G.Lake && under < kind) gk[i] = kind;
+            if (under !== G.Water && under !== G.Lake && PAINT_RANK[under] < rank) gk[i] = kind;
           }
       };
       // a ground circle of this radius is an ellipse twice as wide as it is tall

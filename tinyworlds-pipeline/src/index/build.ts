@@ -8,6 +8,7 @@ import { makeProjection, type Projection } from "../projection.js";
 import { fillPolygon } from "../render/raster.js";
 import { cityFog, GEO } from "../scene/build.js";
 import { FOG, fogAt } from "../scene/fog.js";
+import { buildSyntheticIndex } from "../scene/synthetic.js";
 
 /**
  * The viewer's indexes: what can be searched for (places.json), the outlines of the city's
@@ -199,6 +200,8 @@ const PLACE_CATEGORIES: Record<string, PlaceType> = {
 };
 
 export async function buildIndex(opts: { out?: string; log?: (m: string) => void } = {}): Promise<void> {
+  // a generated city names its own places
+  if (CITY.synthetic) return buildSyntheticIndex(opts);
   const log = opts.log ?? ((m: string) => console.log(m));
   const out = path.resolve(opts.out ?? DIRS.out);
   fs.mkdirSync(out, { recursive: true });
@@ -249,6 +252,9 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
 
   // ---- districts: boroughs, zones
   for (const district of areas.districts) {
+    // a district that only reaches into the map from outside is context, not a destination
+    const centre = centreOf(district.polygons);
+    if (!onMap(centre.lon, centre.lat)) continue;
     add({
       n: district.name,
       t: "borough",

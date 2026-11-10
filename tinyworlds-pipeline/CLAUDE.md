@@ -5,13 +5,15 @@ viewer: a pyramid of isometric pixel-art tiles plus search and overlay indexes. 
 queue; run it by hand when the data or the drawing rules change. One process draws one city,
 chosen with `--city` (default `tinynyc`).
 
-| City      | Full run (20 cores) | Output               |
-| --------- | ------------------- | -------------------- |
-| `tinynyc` | ≈ 5 min             | 0.8 GB, 30,000 files |
-| `tinyrao` | ≈ 2.5 min           | 0.3 GB, 11,000 files |
-| `tinyorl` | ≈ 4 min             | 1.1 GB, 29,000 files |
-| `tinyfte` | seconds             | a few MB             |
-| `tinyvlc` | ≈ 1 min             | 0.2 GB               |
+| City               | Full run (20 cores) | Output               |
+| ------------------ | ------------------- | -------------------- |
+| `tinynyc`          | ≈ 5 min             | 0.8 GB, 30,000 files |
+| `tinyrao`          | ≈ 2.5 min           | 0.3 GB, 11,000 files |
+| `tinyorl`          | ≈ 4 min             | 1.1 GB, 29,000 files |
+| `tinyfte`          | seconds             | a few MB             |
+| `tinyvlc`          | ≈ 1 min             | 0.2 GB               |
+| `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
+| `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 
 ## Commands
 
@@ -45,7 +47,9 @@ src/
 │   ├── tinyrao.ts (+ .places.ts)
 │   ├── tinyorl.ts (+ .places.ts)
 │   ├── tinyfte.ts (+ .places.ts)   # El Calafate (the id is its airport code)
-│   └── tinyvlc.ts (+ .places.ts)   # Valencia
+│   ├── tinyvlc.ts (+ .places.ts)   # Valencia
+│   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
+│   └── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 ├── config.ts          # which city this process draws (CITY) and its directories (DIRS)
 ├── env.ts             # city-independent settings (tile size, Overture release, user agent)
 ├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
@@ -58,17 +62,19 @@ src/
 │   ├── styles.ts      # footprint + height + class → materials; StyleProfile per building stock
 │   ├── fog.ts         # distance-from-the-city grid (where the map ends), built-up detection
 │   ├── heights.ts     # heights read off the raster, with its correction curve
-│   ├── kinds.ts       # ground kinds (their numeric order is the paint order), patterns, roofs
-│   └── hash.ts store.ts
+│   ├── kinds.ts       # ground kinds and their paint order (PAINT_RANK), patterns, roofs
+│   ├── synthetic.ts   # the builder a generated city draws on; its scene and its index
+│   ├── medieval.ts    # pure helpers for generated places: walls, towers, lanes, rows of houses
+│   └── hash.ts store.ts sinks.ts
 ├── render/
 │   ├── palette.ts     # ~80 materials × 6 shades; shading only ever moves along a ramp
 │   ├── raster.ts      # scanline polygon fill, no anti-aliasing
 │   ├── chunk.ts       # ChunkRenderer: one rectangle of the map
 │   ├── ground.ts      # ground kind → textured colour; shorelines; cane fields
-│   ├── sprites.ts     # procedural trees (temperate or tropical colours)
+│   ├── sprites.ts     # procedural trees (temperate, tropical, subtropical or boreal colours)
 │   ├── card.ts        # the 1200 × 630 share card with the pixel wordmark
 │   ├── bin.ts run.ts worker.ts pyramid.ts encode.ts scene.ts
-└── index/build.ts     # search index, area outlines, ferry routes and flights
+└── index/build.ts     # search index, area outlines, ferry routes and flights (from data)
 ```
 
 The renderer (`render/`) never imports the city: everything it needs is in the scene (including
@@ -98,6 +104,59 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
 After changing shared code, check New York has not moved: render a few `preview`s before and
 after and `cmp` them (they should be byte-identical unless the change was meant to show).
 
+## Generated cities (`scene/synthetic.ts`, `scene/medieval.ts`)
+
+A city with a `synthetic` function has no data at all: `fetch` finds nothing to do, `scene` and
+`index` call the function instead of reading Overture, and `render` and `card` cannot tell the
+difference. `generatedCity()` in `cities/generated.ts` fills in the rest of the `City` contract
+(origin 0/0, `betaDeg` 0, `k` 2, no sources), so a generator is one file:
+
+```ts
+export const tinywinterfell = generatedCity({
+  id, title, accent, flora, attribution,
+  start: { p, q, scale }, card: { p, q, shrink }, fog: { start, end },
+  generate(b: SyntheticBuilder) { … },
+});
+```
+
+Everything is in the grid's metres: `p` runs up and to the right on screen, `q` down and to the
+right, so the viewer stands at the +q, −p corner. Rings and paths are flat `[p0, q0, p1, q1, …]`.
+For `preview --at`, a point is `lon = q / 111194.93`, `lat = p / 111194.93`.
+
+| Builder call                                       | Draws                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------- |
+| `ground(kind, ring \| [outer, ...holes])`          | a ground polygon (water is the default: start with `G.Land`)        |
+| `line(kind, width, path, overWater?)`              | a road, stream or quay with a true width                            |
+| `volume(corners, height, base, look)`              | an extruded footprint from `base` to `height` metres, roof included |
+| `prism(p, q, radius, sides, height, base, look)`   | a regular prism: towers, columns, tents                             |
+| `tree(p, q)`                                       | one tree sprite                                                     |
+| `limits(ring)`                                     | what counts as the place: the fog is measured from it               |
+| `place({ n, t, p, q, b?, r, s? })`                 | a search result                                                     |
+| `hood(name, district, ring)` / `route(name, path)` | an outlined area (also searchable) / a route a boat sails           |
+
+A `Look` says exactly how a volume is drawn (`wall`, `roof`, `glass`, `pattern`, `roofShape`,
+`roofH`): nothing is guessed from a style profile.
+
+`medieval.ts` is what such places are made of, and knows nothing of either city: geometry
+(`rect`, `disc`, `blob`, `inset`, `ribbon`, `chaikin`, `wander`, `pointAlong`), an `Occupancy`
+grid so nothing is built on anything else, `curtain` (a wall round a ring with towers and
+gatehouses; returns where the gates ended up and which way is out), `tower`, `wallPiece`,
+`steps`, `growLanes` (lanes grown off streets, generation by generation, until the allowed
+ground is full), `lineWithHouses` (plots stepped off along a street, richer or poorer by a
+wealth map) and `standingTree`.
+
+- **Deterministic.** The generator runs once for the scene and again for the index, and must draw
+  the same place both times: every choice is a hash (`rand`, `mix`, `pick`), never `Math.random`.
+  `cities/generated.test.ts` checks it.
+- **Hills are volumes.** The map is flat, so a rock or a terrace is a wide, low volume and what
+  stands on it has a `base` (`tower`, `wallPiece` and `curtain` take one). The ground under a
+  terrace does not show: its floor is the roof colour, patches of paving or grass are thin slabs
+  on top, and trees up there are `standingTree`s, not sprites.
+- **Paint order still rules the ground.** A base wash must be a low-ranked kind (`G.Snow`,
+  `G.Meadow`) or everything painted after it disappears under it.
+- These two are fan work on invented layouts: only names are borrowed, no map is followed, and
+  `attribution` says so. Keep it that way.
+
 ## How a tile is drawn (`render/chunk.ts`)
 
 1. **Ground kinds.** Every ground pixel gets a kind (water, pavement, park, road…). Polygons are
@@ -125,6 +184,9 @@ whose shadows reach it, and margins for both.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
+- New ground kinds go at the **end** of `G` too and get their place in the paint order from
+  `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
+  already on disk keep their meaning.
 - New palette ramps go at the **end** of `RAMP_DEFS`: a ramp's id is its position, and scenes
   store ids.
 
@@ -165,4 +227,5 @@ raster is read as the median inside the footprint and corrected with a curve fit
   by country (Valencia's districts are "macrohoods"): set them per city.
 - A city with no building parts gets an empty `building_part.parquet` whose geometry column has
   lost its type: the scene builder skips the parts pass when the file has no rows.
-- Adding a ground kind renumbers the ones after it: rebuild every city's scene afterwards.
+- Never insert a ground kind in the middle of `G`: it renumbers the ones after it and every
+  scene on disk would have to be rebuilt. Append it and rank it (see "Rules of the look").
