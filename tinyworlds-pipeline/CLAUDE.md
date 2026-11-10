@@ -66,6 +66,7 @@ src/
 │   ├── build.ts       # raw → scene: ground polygons, lines, volumes, trees, cables, fog
 │   ├── styles.ts      # footprint + height + class → materials; StyleProfile per building stock
 │   ├── fog.ts         # distance-from-the-city grid (where the map ends), built-up detection
+│   ├── decks.ts       # where a bridge deck stays up: settled per bridge, not per point
 │   ├── heights.ts     # heights read off the raster, with its correction curve
 │   ├── kinds.ts       # ground kinds and their paint order (PAINT_RANK), patterns, roofs
 │   ├── synthetic.ts   # the builder a generated city draws on; its scene and its index
@@ -270,6 +271,11 @@ whose shadows reach it, and margins for both.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
+- A deck only comes down where its bridge ends. Pieces that meet end to end are one bridge, and
+  `holdDecks` (`scene/decks.ts`) keeps it up over land it merely passes: between two crossings it
+  stays at the lower of their crests (the Queensboro over Roosevelt Island, the Throgs Neck over
+  its point, a tower's footing). A ramp down to that land still lets it land there. It never
+  lowers a deck, so a bridge over one stretch of water is drawn as before.
 - New ground kinds go at the **end** of `G` too and get their place in the paint order from
   `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
   already on disk keep their meaning.

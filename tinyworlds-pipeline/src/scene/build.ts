@@ -16,6 +16,7 @@ import {
   type FogGrid,
   type Footprint,
 } from "./fog.js";
+import { holdDecks, type DeckRun } from "./decks.js";
 import { hashString, mix, rand } from "./hash.js";
 import { loadHeights } from "./heights.js";
 import { buildSyntheticScene } from "./synthetic.js";
@@ -1191,10 +1192,80 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   }
 
   const DECK = 2.4;
+  /** One step of a deck: the stretch [a, z] of the leg that starts at (p0, q0) and runs along (up, uq). */
+  interface DeckStep {
+    leg: number;
+    step: number;
+    p0: number;
+    q0: number;
+    up: number;
+    uq: number;
+    a: number;
+    z: number;
+    mp: number;
+    mq: number;
+  }
+  /** The steps a bridge piece is laid in, seven metres or so each. */
+  const stepsOf = (pts: number[]): DeckStep[] => {
+    const out: DeckStep[] = [];
+    for (let i = 0; i + 1 < pts.length / 2; i++) {
+      const [p0, q0] = proj.mapToGrid(pts[i * 2], pts[i * 2 + 1]);
+      const [p1, q1] = proj.mapToGrid(pts[i * 2 + 2], pts[i * 2 + 3]);
+      const len = Math.hypot(p1 - p0, q1 - q0);
+      if (len < 0.05) continue;
+      const steps = Math.max(1, Math.ceil(len / 7));
+      const up = (p1 - p0) / len;
+      const uq = (q1 - q0) / len;
+      for (let s = 0; s < steps; s++) {
+        // a little overlap hides the seams on a curve
+        const a = Math.max(0, (s / steps) * len - 0.4);
+        const z = Math.min(len, ((s + 1) / steps) * len + 0.4);
+        const mid = (a + z) / 2;
+        out.push({ leg: i, step: s, p0, q0, up, uq, a, z, mp: p0 + up * mid, mq: q0 + uq * mid });
+      }
+    }
+    return out;
+  };
+  // Pieces that meet end to end are one bridge. The water under each step says how high it would
+  // stand; the bridge as a whole says where it may come down (holdDecks): not on an island it
+  // only passes over.
+  const joints = new Map<string, number>();
+  const jointAt = (x: number, y: number): number => {
+    const [p, q] = proj.mapToGrid(x, y);
+    const key = `${Math.round(p * 10)},${Math.round(q * 10)}`;
+    let id = joints.get(key);
+    if (id === undefined) {
+      id = joints.size;
+      joints.set(key, id);
+    }
+    return id;
+  };
+  const laid = bridgePieces.map((piece) => stepsOf(piece.pts));
+  const runs: DeckRun[] = bridgePieces.map(({ pts }, b) => ({
+    a: jointAt(pts[0], pts[1]),
+    b: jointAt(pts[pts.length - 2], pts[pts.length - 1]),
+    h: laid[b].map((st) => deckHeight(st.mp, st.mq)),
+  }));
+  const heldUp = holdDecks(runs);
+  // what hangs over a deck must know where it was held up
+  const lifted: { p: number; q: number; h: number }[] = [];
+  runs.forEach((r, b) =>
+    r.h.forEach((h, n) => {
+      const { mp, mq } = laid[b][n];
+      if (h > deckHeight(mp, mq) + 0.01) lifted.push({ p: mp, q: mq, h });
+    }),
+  );
+  /** How high the deck stands at a point: as the water has it, or held up over land. */
+  const deckAt = (p: number, q: number): number => {
+    let h = deckHeight(p, q);
+    for (const s of lifted) if (s.h > h && Math.hypot(s.p - p, s.q - q) < 20) h = s.h;
+    return h;
+  };
+
   let decks = 0;
   const flat: number[] = [];
   for (let b = 0; b < bridgePieces.length; b++) {
-    const { pts, kind, width } = bridgePieces[b];
+    const { kind, width } = bridgePieces[b];
     const half = width / 2;
     const roadway = kind === G.Road || kind === G.RoadMajor || kind === G.Highway || kind === G.Rail;
     const cls =
@@ -1211,55 +1282,42 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       flat.length = 0;
     };
     let sincePier = 40;
-    for (let i = 0; i + 1 < pts.length / 2; i++) {
-      const [p0, q0] = proj.mapToGrid(pts[i * 2], pts[i * 2 + 1]);
-      const [p1, q1] = proj.mapToGrid(pts[i * 2 + 2], pts[i * 2 + 3]);
-      const len = Math.hypot(p1 - p0, q1 - q0);
-      if (len < 0.05) continue;
-      const steps = Math.max(1, Math.ceil(len / 7));
-      const up = (p1 - p0) / len;
-      const uq = (q1 - q0) / len;
-      for (let s = 0; s < steps; s++) {
-        // a little overlap hides the seams on a curve
-        const a = Math.max(0, (s / steps) * len - 0.4);
-        const z = Math.min(len, ((s + 1) / steps) * len + 0.4);
-        const mp = p0 + up * ((a + z) / 2);
-        const mq = q0 + uq * ((a + z) / 2);
-        const h = deckHeight(mp, mq);
-        if (h < 1.6) {
-          const [x0, y0] = proj.gridToMap(p0 + up * a, q0 + uq * a);
-          const [x1, y1] = proj.gridToMap(p0 + up * z, q0 + uq * z);
-          if (flat.length === 0) flat.push(x0, y0);
-          flat.push(x1, y1);
-          continue;
-        }
-        flush();
-        const np = -uq * half;
-        const nq = up * half;
-        addShape(
-          [
-            p0 + up * a + np,
-            q0 + uq * a + nq,
-            p0 + up * z + np,
-            q0 + uq * z + nq,
-            p0 + up * z - np,
-            q0 + uq * z - nq,
-            p0 + up * a - np,
-            q0 + uq * a - nq,
-          ],
-          mix(b, i * 64 + s),
-          h,
-          Math.max(0, h - DECK),
-          cls,
-          F_NO_OUTLINE | F_FLOATING,
-        );
-        decks++;
-        // piers hold up the approaches; the main span over deep water hangs free
-        sincePier += z - a - 0.8;
-        if (roadway && sincePier >= 64 && h > 5 && fogAt(shore, mp, mq) < 150) {
-          sincePier = 0;
-          addShape(disc(mp, mq, 2, 6), mix(b, i + 9000), h - DECK, 0, "pier_column", F_NO_OUTLINE);
-        }
+    for (let n = 0; n < laid[b].length; n++) {
+      const { leg, step, p0, q0, up, uq, a, z, mp, mq } = laid[b][n];
+      const h = runs[b].h[n];
+      if (h < 1.6) {
+        const [x0, y0] = proj.gridToMap(p0 + up * a, q0 + uq * a);
+        const [x1, y1] = proj.gridToMap(p0 + up * z, q0 + uq * z);
+        if (flat.length === 0) flat.push(x0, y0);
+        flat.push(x1, y1);
+        continue;
+      }
+      flush();
+      const np = -uq * half;
+      const nq = up * half;
+      addShape(
+        [
+          p0 + up * a + np,
+          q0 + uq * a + nq,
+          p0 + up * z + np,
+          q0 + uq * z + nq,
+          p0 + up * z - np,
+          q0 + uq * z - nq,
+          p0 + up * a - np,
+          q0 + uq * a - nq,
+        ],
+        mix(b, leg * 64 + step),
+        h,
+        Math.max(0, h - DECK),
+        cls,
+        F_NO_OUTLINE | F_FLOATING,
+      );
+      decks++;
+      // piers hold up the approaches; the main span over deep water hangs free
+      sincePier += z - a - 0.8;
+      if (roadway && sincePier >= 64 && h > 5 && fogAt(shore, mp, mq) < 150) {
+        sincePier = 0;
+        addShape(disc(mp, mq, 2, 6), mix(b, leg + 9000), h - DECK, 0, "pier_column", F_NO_OUTLINE);
       }
     }
     flush();
@@ -1315,12 +1373,12 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         const [p, q] = at(along);
         if (along < 0 || along > span) {
           const s = Math.min(1, (along < 0 ? -along : along - span) / side);
-          const end = deckHeight(...at(along < 0 ? -side : span + side)) + 1;
+          const end = deckAt(...at(along < 0 ? -side : span + side)) + 1;
           return end + (top - end) * (1 - s) ** 1.5;
         }
-        const low = deckHeight(...at(span / 2)) + 3;
+        const low = deckAt(...at(span / 2)) + 3;
         const t = (2 * along) / span - 1;
-        return Math.max(deckHeight(p, q) + 1, low + (top - low) * t * t);
+        return Math.max(deckAt(p, q) + 1, low + (top - low) * t * t);
       };
       const main: number[] = [];
       for (let along = -side; along <= span + side + 0.01; along += 5) {
@@ -1330,13 +1388,15 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       cable(0, main);
       for (let along = -side + 16; along < span + side; along += 16) {
         const [p, q] = at(along);
-        const from = deckHeight(p, q);
+        const from = deckAt(p, q);
         const to = cableAt(along);
         if (to - from > 3) cable(1, [p, q, from, p, q, to]);
       }
     }
   }
-  lap(`bridges: ${supports.length} supports, ${decks} deck pieces, ${spans} suspension spans`);
+  lap(
+    `bridges: ${supports.length} supports, ${decks} deck pieces (${heldUp} held up over land), ${spans} suspension spans`,
+  );
 
   // ---- statues: what is not a building, so is not in the data
   for (const statue of CITY.statues) {
