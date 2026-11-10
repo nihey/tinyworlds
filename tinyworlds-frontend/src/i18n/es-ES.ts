@@ -149,6 +149,10 @@ export const esES: Strings = {
     decimal: ",",
   },
   dialog: { close: "Cerrar" },
+  explore: {
+    more: "{n} ciudades y mundos más por explorar",
+    dismiss: "Ocultar",
+  },
   admin: {
     title: "administración de tinyworlds",
     signIn: {

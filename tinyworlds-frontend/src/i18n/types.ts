@@ -187,6 +187,12 @@ export interface Strings {
     decimal: string;
   };
   dialog: { close: string };
+  /** On a map: the invitation to the site's other places. "{n}" is how many there are. */
+  explore: {
+    more: string;
+    /** names the button that puts the invitation away */
+    dismiss: string;
+  };
   /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
    * and the donation funnel. "{email}" is an address, "{minutes}" a number of minutes,

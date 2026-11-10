@@ -148,6 +148,10 @@ export const en: Strings = {
     decimal: ".",
   },
   dialog: { close: "Close" },
+  explore: {
+    more: "{n} more cities and worlds to explore",
+    dismiss: "Hide this",
+  },
   admin: {
     title: "tinyworlds admin",
     signIn: {

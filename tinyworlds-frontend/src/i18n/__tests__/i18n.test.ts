@@ -42,6 +42,12 @@ describe("dictionaries", () => {
     }
   });
 
+  it("say how many other places there are", () => {
+    for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
+      expect(placeholders(dictionary.explore.more), locale).toEqual(["{n}"]);
+    }
+  });
+
   it("keep the placeholders of the admin pages", () => {
     for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
       const { admin } = dictionary;

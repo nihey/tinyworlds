@@ -149,6 +149,10 @@ export const ptBR: Strings = {
     decimal: ",",
   },
   dialog: { close: "Fechar" },
+  explore: {
+    more: "Mais {n} cidades e mundos para explorar",
+    dismiss: "Ocultar",
+  },
   admin: {
     title: "administração do tinyworlds",
     signIn: {

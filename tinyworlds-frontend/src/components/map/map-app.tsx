@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 import { DonateDialog } from "@/components/donate/donate-dialog";
+import { ExploreBanner } from "@/components/map/explore-banner";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePrefs } from "@/hooks/use-prefs";
@@ -296,6 +297,12 @@ export function MapApp() {
             inputRef={searchRef}
             className="sign-in fixed top-(--edge-t) right-(--edge-r) left-(--edge-l) sm:right-auto sm:w-[25rem]"
             style={delay(60)}
+          />
+          {/* under the search sign, and clear of the tools that sit beside it on a narrow screen;
+              the last sign to arrive, once the map has had a moment to itself */}
+          <ExploreBanner
+            className="sign-in fixed top-[calc(var(--edge-t)+3.9375rem)] left-(--edge-l) max-w-[calc(100vw-var(--edge-l)-var(--edge-r)-3.5rem)] sm:max-w-[25rem]"
+            style={delay(1400)}
           />
           <ToolColumn
             northDeg={session.manifest.northDeg}

@@ -333,6 +333,12 @@
   animation-delay: var(--sign-delay, 0ms);
 }
 
+/* the invitation to the other places steps aside while the search box is in use: its results
+   open over that spot. (Hidden, not faded: the arrival animation holds the opacity.) */
+.map-root:has([role="search"] input:focus) .explore-banner {
+  visibility: hidden;
+}
+
 /* loading: a skyline going up, one storey at a time */
 @keyframes storey {
   0%,
