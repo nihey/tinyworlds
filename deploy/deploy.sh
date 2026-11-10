@@ -70,7 +70,8 @@ if [[ "$MODE" != "--data" ]]; then
     rsync -az --delete "$FRONTEND/out/_next/" "$DEPLOY_HOST:$SITE/_next/"
     rsync -az --exclude '/_next/' "$FRONTEND/out/" "$DEPLOY_HOST:$SITE/"
   else
-    rsync -az --delete --exclude '/data/' "$FRONTEND/out/" "$DEPLOY_HOST:$SITE/"
+    # the loops are the front page's own pictures: a world's folder does not carry them
+    rsync -az --delete --exclude '/data/' --exclude '/loops/' "$FRONTEND/out/" "$DEPLOY_HOST:$SITE/"
   fi
   # in place: the container bind-mounts this one file, and a renamed copy would leave it reading the old one
   rsync -az --inplace "$ROOT/deploy/nginx.conf" "$DEPLOY_HOST:$DEPLOY_DIR/nginx.conf"

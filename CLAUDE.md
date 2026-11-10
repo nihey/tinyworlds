@@ -32,6 +32,7 @@ tinyworlds/
 ├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
 ├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world) and the front page
 ├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations and per-city funding milestones
+├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film
 ├── deploy/                # nginx config, deploy script, .env.example
 ├── dev.sh                 # tmux launcher
 └── CLAUDE.md / README.md
@@ -50,6 +51,9 @@ Each sub-project has its own `CLAUDE.md`.
   the donor chose; a Stripe webhook records what was paid. If
   the API is unreachable the viewer falls back to static payment links, so donating never
   depends on it.
+- **The front page moves.** Its hero and each world's card play a short silent loop made by
+  `tinyworlds-videos` from the world's own tiles, over a still; the loops are the front page's
+  own files, so nothing but its build needs deploying for them.
 - **The interface follows the visitor's language** (en-US, pt-BR, es-ES), whatever the city.
   City data (street and place names) stays in the city's own language.
 
@@ -68,7 +72,10 @@ Each sub-project has its own `CLAUDE.md`.
    `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
 2. Viewer: `tinyworlds-frontend/src/worlds/<id>.ts` and its registry entry.
 3. API: mark the city `BUILT` with its `worldId` (see `tinyworlds-api/CLAUDE.md`).
-4. `deploy/deploy.sh <id>` and `deploy/deploy.sh home`.
+4. Videos: `npm run plates -- <id> && npm run loops` in `tinyworlds-videos` gives the world its
+   card loop on the front page (`tinyworlds-frontend/public/loops/<id>.mp4`); without one its
+   card simply stays still.
+5. `deploy/deploy.sh <id>` and `deploy/deploy.sh home`.
 
 The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
 `NEXT_PUBLIC_WORLD`, the data folder and the URL path.
@@ -201,7 +208,11 @@ type Mutation { createDonationCheckout(input: CreateDonationCheckoutInput!): Don
 
 - npm, Node 22, TypeScript strict, ESLint + Prettier in every sub-project.
 - Raw downloads and generated tiles are never committed (`tinyworlds-pipeline/data/`,
-  `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/` are.
+  `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/` and
+  the front page's loops in `tinyworlds-frontend/public/loops/` are; the videos' plates, takes,
+  sound and renders are not.
+- Every picture of a map, still or moving, is cut from the real tiles or filmed from the real
+  viewer (`tinyworlds-videos`): nothing is redrawn for a card, a loop or a film.
 - Attribution is part of the product: the About panel credits each world's data sources
   (`manifest.attribution`).
 - No hard-coded interface strings in the viewer: everything goes through its i18n dictionaries
