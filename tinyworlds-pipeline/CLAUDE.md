@@ -9,7 +9,9 @@ chosen with `--city` (default `tinynyc`).
 | --------- | ------------------- | -------------------- |
 | `tinynyc` | ≈ 5 min             | 0.8 GB, 30,000 files |
 | `tinyrao` | ≈ 2.5 min           | 0.3 GB, 11,000 files |
-| `tinyorl` | ≈ 4 min             | 0.6 GB, 27,000 files |
+| `tinyorl` | ≈ 4 min             | 1.1 GB, 29,000 files |
+| `tinyfte` | seconds             | a few MB             |
+| `tinyvlc` | ≈ 1 min             | 0.2 GB               |
 
 ## Commands
 
@@ -41,7 +43,9 @@ src/
 │   ├── types.ts       # the City contract
 │   ├── tinynyc.ts (+ .landmarks.ts, .places.ts)
 │   ├── tinyrao.ts (+ .places.ts)
-│   └── tinyorl.ts (+ .places.ts)
+│   ├── tinyorl.ts (+ .places.ts)
+│   ├── tinyfte.ts (+ .places.ts)   # El Calafate (the id is its airport code)
+│   └── tinyvlc.ts (+ .places.ts)   # Valencia
 ├── config.ts          # which city this process draws (CITY) and its directories (DIRS)
 ├── env.ts             # city-independent settings (tile size, Overture release, user agent)
 ├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
@@ -80,8 +84,9 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
      box (`built-up` with no division) for a metropolis that ignores its municipal limits;
    - `heights.raster`: `true` where buildings have no mapped heights (add `openBuildings` to
      `sources`, after `overture`);
-   - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`, or a
-     new one);
+   - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`,
+     `MEDITERRANEAN`, `PATAGONIA`, or a new one);
+   - `ground`: how the data's land classes read locally (cane fields, dry steppe, market gardens);
    - `heightFixes` / `heightCaps`: the few places where the mapped heights are plainly wrong
      (look at the tallest buildings in a preview before trusting them);
    - `areas()`: the districts (context lines) and the outlined areas, from whatever the city
@@ -156,4 +161,8 @@ raster is read as the median inside the footprint and corrected with a curve fit
 - Street trees in Ribeirão Preto and Orlando are planted by rule (`trees.street`), not
   surveyed; New York's come from the census.
 - Overture's primary name of a division is sometimes in another script; `overtureAreas` prefers
-  the English common name.
+  the English common name. Which division subtypes are districts and which are outlines differs
+  by country (Valencia's districts are "macrohoods"): set them per city.
+- A city with no building parts gets an empty `building_part.parquet` whose geometry column has
+  lost its type: the scene builder skips the parts pass when the file has no rows.
+- Adding a ground kind renumbers the ones after it: rebuild every city's scene afterwards.

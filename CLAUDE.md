@@ -9,6 +9,8 @@ map under its own path:
 | `tinynyc` | New York City, the five boroughs     | surveyed building heights, street-tree census, ferries       |
 | `tinyrao` | Ribeirão Preto, São Paulo, Brazil    | heights estimated from a satellite raster, cane fields around |
 | `tinyorl` | Orlando, Florida (the built-up area) | downtown, the lakes, the airport and theme-park country      |
+| `tinyfte` | El Calafate, Patagonia, Argentina    | the town on Lago Argentino and the steppe; heights from the raster |
+| `tinyvlc` | Valencia, Spain                      | old town, Turia gardens, City of Arts and Sciences, port and beaches |
 
 A front page lists the worlds, the cities people are funding next, and links the source.
 

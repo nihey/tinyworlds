@@ -1216,36 +1216,39 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     },
   );
   const wholeBuildings = volumes.count;
-  await each(
-    conn,
-    `SELECT p.building_id, coalesce(p.height, b.height), p.num_floors, coalesce(p.min_height, p.min_floor * 3.4, 0), b.subtype, b.class,
+  // a city with no building parts gets an empty file whose geometry column has lost its type
+  const partRows = Number((await conn.runAndReadAll(`SELECT count(*) FROM '${part}'`)).getRows()[0][0]);
+  if (partRows > 0)
+    await each(
+      conn,
+      `SELECT p.building_id, coalesce(p.height, b.height), p.num_floors, coalesce(p.min_height, p.min_floor * 3.4, 0), b.subtype, b.class,
             p.roof_shape, p.roof_height, coalesce(p.facade_color, b.facade_color), coalesce(p.facade_material, b.facade_material),
             coalesce(p.roof_color, b.roof_color), ST_AsWKB(p.geometry), b.names."primary"
      FROM '${part}' p LEFT JOIN '${building}' b ON p.building_id = b.id
      WHERE NOT coalesce(p.is_underground, false)`,
-    (row) => {
-      const bytes = blob(row[11]);
-      if (!bytes) return;
-      const g = readWkb(bytes);
-      if (!g || g.kind !== GeomKind.Polygon) return;
-      const seed = hashString((row[0] as string) ?? "part");
-      withParts++;
-      for (const rings of g.parts) {
-        addVolume(rings, seed, num(row[1]), num(row[3]) ?? 0, {
-          cls: str(row[5]),
-          subtype: str(row[4]),
-          floors: num(row[2]),
-          roofShape: str(row[6]),
-          roofHeight: num(row[7]),
-          facadeColor: str(row[8]),
-          facadeMaterial: str(row[9]),
-          roofColor: str(row[10]),
-          isPart: true,
-          name: str(row[12]),
-        });
-      }
-    },
-  );
+      (row) => {
+        const bytes = blob(row[11]);
+        if (!bytes) return;
+        const g = readWkb(bytes);
+        if (!g || g.kind !== GeomKind.Polygon) return;
+        const seed = hashString((row[0] as string) ?? "part");
+        withParts++;
+        for (const rings of g.parts) {
+          addVolume(rings, seed, num(row[1]), num(row[3]) ?? 0, {
+            cls: str(row[5]),
+            subtype: str(row[4]),
+            floors: num(row[2]),
+            roofShape: str(row[6]),
+            roofHeight: num(row[7]),
+            facadeColor: str(row[8]),
+            facadeMaterial: str(row[9]),
+            roofColor: str(row[10]),
+            isPart: true,
+            name: str(row[12]),
+          });
+        }
+      },
+    );
   for (let i = 0; i < tanks.length; i++) {
     const g = readWkb(tanks[i].bytes);
     if (!g || g.kind !== GeomKind.Polygon) continue;

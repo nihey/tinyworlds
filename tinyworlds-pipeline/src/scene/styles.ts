@@ -198,6 +198,118 @@ export const FLORIDA: StyleProfile = {
 };
 
 /**
+ * The Spanish Mediterranean: apartment blocks of five to eight floors in render, ochre and bare
+ * brick with tiled terraces on top, low houses under clay tile, church domes in glazed blue.
+ */
+export const MEDITERRANEAN: StyleProfile = {
+  rowWalls: [
+    R.cream,
+    R.cream,
+    R.ochre,
+    R.tan,
+    R.salmon,
+    R.yellowBrick,
+    R.whiteBrick,
+    R.brickRed,
+    R.limestone,
+    R.sidingYellow,
+  ],
+  midWalls: [
+    R.cream,
+    R.tan,
+    R.ochre,
+    R.brickRed,
+    R.brickRed,
+    R.yellowBrick,
+    R.whiteBrick,
+    R.limestone,
+    R.salmon,
+    R.greyStone,
+  ],
+  slabWalls: [R.whiteBrick, R.cream, R.limestone, R.tan, R.brickRed],
+  houseWalls: [R.whiteBrick, R.whiteBrick, R.cream, R.ochre, R.sidingYellow, R.salmon, R.tan],
+  houseRoofs: [
+    R.roofTerracotta,
+    R.roofTerracotta,
+    R.roofTerracotta,
+    R.roofClay,
+    R.roofClay,
+    R.roofClay,
+    R.roofRed,
+    R.roofBrown,
+  ],
+  houseMaxArea: 300,
+  flatRoofs: [R.roofClay, R.roofClay, R.roofTerracotta, R.roofGravel, R.roofGravel, R.roofWhite],
+  lowRoofs: [R.roofClay, R.roofTerracotta, R.roofGravel, R.roofSilver, R.roofWhite],
+  lowPitched: 0.35,
+  towerRoofs: [R.roofGravel, R.roofWhite, R.roofClay],
+  glass: [R.glassBlue, R.glassGreen, R.glassDark, R.glassSilver, R.glassBronze, R.glassTeal],
+  stoneTowers: [R.cream, R.limestone, R.tan, R.whiteBrick, R.brickRed, R.ochre],
+  industrialWalls: [R.greyStone, R.whiteBrick, R.cream, R.concrete, R.steel, R.tan],
+  industrialRoofs: [R.roofSilver, R.roofSilver, R.roofWhite, R.roofGravel],
+  civicWalls: [R.limestone, R.cream, R.tan, R.ochre, R.brickRed],
+  sacredWalls: [R.tan, R.limestone, R.cream, R.ochre],
+  sacredRoofs: [R.roofTerracotta, R.roofClay, R.glassBlue, R.roofTerracotta],
+  outbuildingWalls: [R.whiteBrick, R.greyStone, R.cream, R.tan],
+  outbuildingRoofs: [R.roofGravel, R.roofSilver, R.roofTerracotta, R.roofClay],
+  windows: [R.glassDark, R.glassDark, R.glassBlack, R.glassBlue],
+  mid: [0.55, 0.38],
+  high: [0.2, 0.45],
+  superTall: 0.5,
+};
+
+/**
+ * A Patagonian town: low houses of block, timber and stone under painted sheet-metal roofs
+ * (red, green, bare zinc), almost all of them pitched against the wind and the snow.
+ */
+export const PATAGONIA: StyleProfile = {
+  rowWalls: [R.whiteBrick, R.cream, R.tan, R.brownstone, R.greyStone, R.salmon, R.sidingSage],
+  midWalls: [R.cream, R.tan, R.whiteBrick, R.brownstone, R.greyStone, R.limestone],
+  slabWalls: [R.whiteBrick, R.cream, R.greyStone, R.tan],
+  houseWalls: [
+    R.whiteBrick,
+    R.cream,
+    R.tan,
+    R.tan,
+    R.brownstone,
+    R.greyStone,
+    R.sidingSage,
+    R.sidingBlue,
+    R.salmon,
+    R.brickRed,
+  ],
+  houseRoofs: [
+    R.roofRed,
+    R.roofRed,
+    R.roofGreen,
+    R.roofGreen,
+    R.roofSilver,
+    R.roofSilver,
+    R.roofTar,
+    R.roofBrown,
+    R.roofSlate,
+  ],
+  houseMaxArea: 420,
+  flatRoofs: [R.roofSilver, R.roofGravel, R.roofTar, R.roofRed],
+  lowRoofs: [R.roofSilver, R.roofRed, R.roofGreen, R.roofGravel, R.roofBrown],
+  lowPitched: 0.75,
+  towerRoofs: [R.roofGravel, R.roofSilver],
+  glass: [R.glassBlue, R.glassDark, R.glassSilver],
+  stoneTowers: [R.cream, R.tan, R.greyStone, R.whiteBrick],
+  industrialWalls: [R.greyStone, R.whiteBrick, R.steel, R.cream, R.tan],
+  industrialRoofs: [R.roofSilver, R.roofSilver, R.roofGravel, R.roofRed],
+  civicWalls: [R.cream, R.tan, R.greyStone, R.whiteBrick, R.brownstone],
+  sacredWalls: [R.whiteBrick, R.cream, R.greyStone, R.tan],
+  sacredRoofs: [R.roofRed, R.roofGreen, R.roofSlate],
+  outbuildingWalls: [R.whiteBrick, R.greyStone, R.tan, R.brownstone],
+  outbuildingRoofs: [R.roofSilver, R.roofRed, R.roofGravel, R.roofGreen],
+  windows: [R.glassDark, R.glassDark, R.glassBlack, R.glassBlue],
+  mid: [0.7, 0.25],
+  high: [0.2, 0.6],
+  superTall: 0.3,
+};
+
+/**
  * The interior of São Paulo state: rendered walls in white, cream and pastels under clay-tile
  * roofs; sheds roofed in metal and fibre cement; residential towers in pale render with banded
  * balconies, and only the odd glass office block.

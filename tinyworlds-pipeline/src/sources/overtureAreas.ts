@@ -3,15 +3,30 @@ import path from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import type { DataSource, FetchContext } from "./types.js";
 
+export interface OvertureAreasOptions {
+  /** Corrects names the data has only in another script. */
+  rename?: Record<string, string>;
+  /** Division subtypes that count as districts (default: localities). */
+  districts?: ("locality" | "macrohood")[];
+  /** Division subtypes that count as outlined areas (default: neighbourhoods and macrohoods). */
+  hoods?: ("neighborhood" | "macrohood" | "microhood")[];
+  /** District names to leave out: the city itself where its own districts are listed, regions larger than a town. */
+  skip?: RegExp;
+}
+
 /**
- * A city's subdivisions as Overture has them: localities (municipalities and census places) and
- * the neighbourhoods inside them, written as `areas.geojson` with `name`, `kind` ("locality" or
- * "hood") and, for a hood, the `district` (locality) its middle lies in. Runs after the Overture
- * source, from its `division_area.parquet`. For cities whose own open-data portal is not needed
- * for this. `rename` corrects names the data has only in another script.
+ * A city's subdivisions as Overture has them: districts (localities by default: municipalities
+ * and census places) and the neighbourhoods inside them, written as `areas.geojson` with `name`,
+ * `kind` ("locality" or "hood") and, for a hood, the `district` its middle lies in. Runs after
+ * the Overture source, from its `division_area.parquet`. For cities whose own open-data portal
+ * is not needed for this.
  */
-export function overtureAreas(opts: { rename?: Record<string, string> } = {}): DataSource {
+export function overtureAreas(opts: OvertureAreasOptions = {}): DataSource {
   const rename = opts.rename ?? {};
+  const districts: string[] = opts.districts ?? ["locality"];
+  const hoods: string[] = (opts.hoods ?? ["neighborhood", "macrohood"]).filter((h) => !districts.includes(h));
+  const list = (items: string[]): string => items.map((i) => `'${i}'`).join(", ");
+  const skipped = (name: string): boolean => !!opts.skip && opts.skip.test(name);
   return {
     name: "overture-areas",
     files: ["areas.geojson"],
@@ -27,41 +42,49 @@ export function overtureAreas(opts: { rename?: Record<string, string> } = {}): D
       // the English name where the primary one is in another script; nothing as large as a county
       await conn.run(
         `CREATE TABLE area AS
-       SELECT subtype, coalesce(nullif(names.common['en'], ''), names."primary") AS name, geometry,
-              ST_X(ST_Centroid(geometry)) AS lon, ST_Y(ST_Centroid(geometry)) AS lat
-       FROM '${file}'
-       WHERE subtype IN ('locality', 'neighborhood', 'macrohood') AND coalesce(is_land, true)
-         AND names."primary" IS NOT NULL AND ST_Area(geometry) < 0.05`,
+         SELECT subtype, coalesce(nullif(names.common['en'], ''), names."primary") AS name, geometry,
+                ST_X(ST_Centroid(geometry)) AS lon, ST_Y(ST_Centroid(geometry)) AS lat
+         FROM '${file}'
+         WHERE subtype IN (${list([...districts, ...hoods])}) AND coalesce(is_land, true)
+           AND names."primary" IS NOT NULL AND ST_Area(geometry) < 0.05`,
       );
-      const inBox = `lon > ${west} AND lon < ${east} AND lat > ${south} AND lat < ${north}`;
+      const inBox = (t: string): string =>
+        `${t}lon > ${west} AND ${t}lon < ${east} AND ${t}lat > ${south} AND ${t}lat < ${north}`;
       const reader = await conn.runAndReadAll(
-        `SELECT 'locality', name, NULL, ST_AsGeoJSON(geometry) FROM area WHERE subtype = 'locality' AND ${inBox}
-       UNION ALL
-       SELECT 'hood', h.name,
-              (SELECT l.name FROM area l WHERE l.subtype = 'locality' AND ST_Contains(l.geometry, ST_Point(h.lon, h.lat))
-               ORDER BY ST_Area(l.geometry) LIMIT 1),
-              ST_AsGeoJSON(h.geometry)
-       FROM area h WHERE h.subtype <> 'locality' AND ${inBox.replaceAll("lon", "h.lon").replaceAll("lat", "h.lat")}
-       ORDER BY 1, 2`,
+        `SELECT 'locality', name, NULL, ST_AsGeoJSON(geometry) FROM area
+         WHERE subtype IN (${list(districts)}) AND ${inBox("")}
+         UNION ALL
+         SELECT 'hood', h.name,
+                (SELECT string_agg(l.name, '\t' ORDER BY ST_Area(l.geometry)) FROM area l
+                 WHERE l.subtype IN (${list(districts)}) AND ST_Contains(l.geometry, ST_Point(h.lon, h.lat))),
+                ST_AsGeoJSON(h.geometry)
+         FROM area h WHERE h.subtype IN (${list(hoods.length > 0 ? hoods : ["-"])}) AND ${inBox("h.")}
+         ORDER BY 1, 2`,
       );
       const named = (name: string): string => rename[name] ?? name;
-      const features = reader.getRows().map((row) => ({
-        type: "Feature",
-        properties: {
-          kind: String(row[0]),
-          name: named(String(row[1])),
-          ...(row[2] ? { district: named(String(row[2])) } : {}),
-        },
-        geometry: JSON.parse(String(row[3])) as unknown,
-      }));
+      const features: { type: string; properties: Record<string, string>; geometry: unknown }[] = [];
+      for (const row of reader.getRows()) {
+        const kind = String(row[0]);
+        const name = String(row[1]);
+        if (kind === "locality" && skipped(name)) continue;
+        // the smallest district around a hood that is not one of the skipped ones
+        const district = row[2]
+          ? String(row[2])
+              .split("\t")
+              .find((d) => !skipped(d))
+          : undefined;
+        features.push({
+          type: "Feature",
+          properties: { kind, name: named(name), ...(district ? { district: named(district) } : {}) },
+          geometry: JSON.parse(String(row[3])) as unknown,
+        });
+      }
       conn.closeSync();
       if (features.length === 0)
         throw new Error("overture-areas: no localities or neighbourhoods in the box");
       fs.writeFileSync(dest, JSON.stringify({ type: "FeatureCollection", features }));
-      const hoods = features.filter((f) => f.properties.kind === "hood").length;
-      ctx.log(
-        `overture-areas: areas.geojson, ${features.length - hoods} localities, ${hoods} neighbourhoods`,
-      );
+      const count = features.filter((f) => f.properties.kind === "hood").length;
+      ctx.log(`overture-areas: areas.geojson, ${features.length - count} districts, ${count} neighbourhoods`);
     },
   };
 }

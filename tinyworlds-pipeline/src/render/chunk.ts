@@ -83,6 +83,7 @@ TREE_CHANCE[G.Garden] = 40;
 TREE_CHANCE[G.Lawn] = 9;
 TREE_CHANCE[G.Fairway] = 5;
 TREE_CHANCE[G.Wetland] = 10;
+TREE_CHANCE[G.Steppe] = 5;
 const CELL_X = 9;
 const CELL_Y = 5;
 
@@ -399,7 +400,7 @@ export class ChunkRenderer {
           h >>> 16,
           kind === G.Forest
             ? TREE_FOREST
-            : kind === G.Scrub || kind === G.Wetland || kind === G.Garden
+            : kind === G.Scrub || kind === G.Wetland || kind === G.Garden || kind === G.Steppe
               ? TREE_SCRUB
               : TREE_PARK,
         );

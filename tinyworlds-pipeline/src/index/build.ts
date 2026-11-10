@@ -238,7 +238,14 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
   };
 
   // ---- hand-picked: the places people will type first
-  for (const c of CITY.curated) add({ ...c, b: c.b ?? contextOf(c.lon, c.lat) });
+  for (const c of CITY.curated) {
+    // a pin in the fog helps nobody
+    if (!onMap(c.lon, c.lat)) {
+      log(`index: "${c.n}" is off the map, left out`);
+      continue;
+    }
+    add({ ...c, b: c.b ?? contextOf(c.lon, c.lat) });
+  }
 
   // ---- districts: boroughs, zones
   for (const district of areas.districts) {

@@ -7,6 +7,10 @@ search, every building at its height.
 | --- | --- | --- |
 | ![Central Park and the blocks around it](tinyworlds-frontend/public/og/tinynyc.jpg) | ![Downtown Ribeirão Preto](tinyworlds-frontend/public/og/tinyrao.jpg) | ![Downtown Orlando and Lake Eola](tinyworlds-frontend/public/og/tinyorl.jpg) |
 
+| tinyfte · El Calafate | tinyvlc · Valencia |
+| --- | --- |
+| ![El Calafate on Lago Argentino](tinyworlds-frontend/public/og/tinyfte.jpg) | ![The City of Arts and Sciences](tinyworlds-frontend/public/og/tinyvlc.jpg) |
+
 Nothing is drawn by hand and no image model is involved. The maps are rendered procedurally from
 open data by a software rasterizer written for the purpose: building footprints and heights,
 streets, parks, water and trees go in; a pyramid of pixel-art tiles comes out. A full city takes
@@ -19,6 +23,10 @@ a few minutes to render on a desktop machine.
   floors are mapped; around the city, the cane fields.
 - **tinyorl**: Orlando, Florida: everything built up from Walt Disney World to Winter Park, with
   downtown and Lake Eola, the lakes, the airport and the resorts.
+- **tinyfte**: El Calafate, Patagonia: the town on the shore of Lago Argentino, Laguna Nimez and
+  the steppe around it.
+- **tinyvlc**: Valencia, Spain: the old town, the Turia gardens, the City of Arts and Sciences,
+  the port and the beaches, with the city's street trees one by one.
 
 ## Layout
 

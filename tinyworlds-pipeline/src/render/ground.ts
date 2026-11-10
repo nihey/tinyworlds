@@ -159,6 +159,14 @@ export function groundColor(ctx: GroundContext, kind: number, x: number, y: numb
       if ((rows & 3) === 0) return idx(R.cane, S_HALF);
       return (h & 15) === 0 ? idx(R.caneYoung, S_LIT) : idx(R.cane, S_LIT);
     }
+    case G.Steppe: {
+      // dry grassland: straw dotted with dark tussocks, paler where the wind has combed it
+      if ((h & 15) === 0) return idx(R.steppeDark, S_LIT);
+      if ((h & 63) === 1) return idx(R.steppeDark, S_HALF);
+      const patch = hash2(x >> 5, y >> 4);
+      if ((patch & 7) === 0 && ((h >>> 6) & 3) === 0) return idx(R.steppe, S_HIGH);
+      return idx(R.steppe, S_LIT);
+    }
     case G.Earth:
       if ((h & 7) === 0) return idx(R.terraRoxa, S_HALF);
       if ((h & 31) === 1) return idx(R.terraRoxa, S_HIGH);

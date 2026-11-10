@@ -7,7 +7,8 @@ import type { Curated } from "./types.js";
 export const CURATED: Curated[] = [
   { n: "Lake Eola Park", t: "park", lon: -81.3725, lat: 28.54388, r: 99, s: 1 },
   { n: "Downtown Orlando", t: "place", lon: -81.37968, lat: 28.53767, r: 98, s: 0.75 },
-  { n: "Walt Disney World", t: "place", lon: -81.56698, lat: 28.38234, b: "Bay Lake", r: 98, s: 0.12 },
+  // the resort's own centre is woodland the map leaves in the fog: its front door stands in for it
+  { n: "Walt Disney World", t: "place", lon: -81.57949, lat: 28.40563, b: "Bay Lake", r: 98, s: 0.25 },
   {
     n: "Magic Kingdom",
     t: "landmark",

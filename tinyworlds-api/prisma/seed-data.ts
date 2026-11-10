@@ -11,6 +11,8 @@ export const BUILT: SeedCity[] = [
   { slug: 'new-york', name: 'New York', worldId: 'tinynyc' },
   { slug: 'ribeirao-preto', name: 'Ribeirão Preto', worldId: 'tinyrao' },
   { slug: 'orlando', name: 'Orlando', worldId: 'tinyorl' },
+  { slug: 'el-calafate', name: 'El Calafate', worldId: 'tinyfte' },
+  { slug: 'valencia', name: 'Valencia', worldId: 'tinyvlc' },
 ];
 
 /** Suggestions to start the list with, each at zero. Donors add their own. */

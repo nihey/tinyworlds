@@ -105,6 +105,9 @@ const RAMP_DEFS = {
   ipeYellow: "#edc531",
   ipePink: "#d98bb4",
   flamboyant: "#dd5a33",
+  steppe: "#bfb47f",
+  steppeDark: "#96905c",
+  roofGreen: "#5f8c6a",
 } as const;
 
 export type RampName = keyof typeof RAMP_DEFS;

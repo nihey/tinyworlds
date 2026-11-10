@@ -1,0 +1,52 @@
+import type { Curated } from "./types.js";
+
+/** The places people look for in El Calafate, at the coordinates the map data gives them. */
+export const CURATED: Curated[] = [
+  { n: "Reserva Laguna Nimez", t: "park", lon: -72.26875, lat: -50.32498, r: 99, s: 1 },
+  {
+    n: "Centro de El Calafate",
+    t: "place",
+    lon: -72.2648,
+    lat: -50.3379,
+    b: "Avenida del Libertador",
+    r: 98,
+    s: 1,
+  },
+  {
+    n: "Glaciarium · Museo del Hielo Patagónico",
+    t: "museum",
+    lon: -72.33977,
+    lat: -50.33666,
+    r: 95,
+    s: 1.5,
+  },
+  { n: "Centro de Interpretación Histórica", t: "museum", lon: -72.26508, lat: -50.33142, r: 90, s: 2 },
+  {
+    n: "Intendencia del Parque Nacional Los Glaciares",
+    t: "landmark",
+    lon: -72.26452,
+    lat: -50.33825,
+    r: 90,
+    s: 2,
+  },
+  { n: "Terminal de Ómnibus", t: "station", lon: -72.24537, lat: -50.33738, r: 88, s: 1.5 },
+  { n: "Municipalidad de El Calafate", t: "place", lon: -72.25994, lat: -50.33782, r: 82, s: 2 },
+  { n: "Anfiteatro del Bosque", t: "park", lon: -72.27266, lat: -50.33953, r: 84, s: 1.5 },
+  { n: "Parque Manuel Belgrano", t: "park", lon: -72.26717, lat: -50.34176, r: 80, s: 1.5 },
+  { n: "Plaza Héroes de Malvinas", t: "park", lon: -72.25986, lat: -50.34158, r: 78, s: 2 },
+  { n: "Museo Regional", t: "museum", lon: -72.25568, lat: -50.33938, r: 80, s: 2 },
+  { n: "Museo Argentino del Juguete", t: "museum", lon: -72.26246, lat: -50.33837, r: 78, s: 2 },
+  { n: "La Aldea de los Gnomos", t: "place", lon: -72.26313, lat: -50.33838, r: 76, s: 2 },
+  { n: "Casino Club El Calafate", t: "place", lon: -72.26387, lat: -50.33842, r: 72, s: 2 },
+  { n: "Hospital Gobernador Cepernic", t: "place", lon: -72.23884, lat: -50.33405, r: 72, s: 1.5 },
+  { n: "Punta Soberana", t: "place", lon: -72.3122, lat: -50.31128, r: 78, s: 1 },
+  {
+    n: "Reserva Provincial Isla Solitaria",
+    t: "park",
+    lon: -72.29091,
+    lat: -50.30089,
+    b: "Lago Argentino",
+    r: 76,
+    s: 1,
+  },
+];
