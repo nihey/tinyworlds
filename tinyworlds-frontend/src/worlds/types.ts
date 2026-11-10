@@ -1,0 +1,61 @@
+import type { Locale } from "@/i18n/locale";
+import type { SearchRules } from "@/map/search-rules";
+
+/**
+ * What a world says about itself, in one language. Every world has this in every language the
+ * interface speaks (src/i18n), because the language follows the visitor, not the city.
+ */
+export interface WorldCopy {
+  /** The city's name, and one line about its map: its card on the front page. */
+  city: string;
+  card: string;
+  /** Page <title>. */
+  title: string;
+  /** Page and share-card description. */
+  description: string;
+  /** What the share-card picture (public/og/<id>.jpg) shows, for people who cannot see it. */
+  cardAlt: string;
+  /** Next to the wordmark in the About sign. */
+  tagline: string;
+  about: {
+    /** What this is, in the About sign's lead paragraph. */
+    intro: string;
+    /** Smaller paragraphs under it: caveats, why north leans. */
+    notes: string[];
+  };
+  /**
+   * What the outlines in hoods.json are called here: neighbourhoods in one city, planning
+   * sectors in another. `label` names the setting; `inSentence` completes "B draws …".
+   */
+  hoodLines: { label: string; inSentence: string };
+  /** What a "borough" search result is here: a borough in one city, a region in another. */
+  borough: string;
+  /** aria-label of the map canvas. */
+  mapLabel: string;
+  searchPlaceholder: string;
+  /** Under the wordmark while the manifest loads. */
+  splash: string;
+}
+
+/**
+ * Everything that makes the viewer one city's rather than another's. The map itself (tiles,
+ * projection, places) comes from the data set; this is the lettering around it.
+ */
+export interface World {
+  /** Also the data folder and the localStorage namespace: "tinynyc". */
+  id: string;
+  /** The half of the wordmark after "tiny", lit in the accent colour. */
+  wordmark: string;
+  /**
+   * The language of the place. What is baked into the HTML (title, description, share card,
+   * <html lang>) is in it, and it is what the page shows until the visitor's own is known.
+   */
+  homeLocale: Locale;
+  copy: Record<Locale, WorldCopy>;
+  /** Whose data this is, in the bottom corner (wide screens). The same in every language. */
+  credit: string;
+  /** The brand colour (--taxi) and the ink that reads on it (--taxi-ink). */
+  accent: { color: string; ink: string };
+  /** How queries are read. This follows the language of the map's names, not the interface's. */
+  search: SearchRules;
+}
