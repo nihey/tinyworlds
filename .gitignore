@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+.DS_Store
+*.log
+
+# generated, reproducible with the pipeline
+tinyworlds-pipeline/data/
+tinyworlds-pipeline/dist/
+tinyworlds-frontend/public/data/
+tinyworlds-frontend/.next/
+tinyworlds-frontend/out/
+tinyworlds-frontend/.data-stash.*/
+*.tsbuildinfo

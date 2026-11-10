@@ -1,0 +1,200 @@
+# tinyworlds
+
+Miniature, explorable pixel-art cities. Each **world** is one city redrawn as an isometric
+pixel-art map, generated procedurally from open data and served as a pannable, zoomable tile
+map under its own path:
+
+| World     | City                                 | Notes                                                        |
+| --------- | ------------------------------------ | ------------------------------------------------------------ |
+| `tinynyc` | New York City, the five boroughs     | surveyed building heights, street-tree census, ferries       |
+| `tinyrao` | Ribeirão Preto, São Paulo, Brazil    | heights estimated from a satellite raster, cane fields around |
+
+A front page lists the worlds, the cities people are funding next, and links the source.
+
+## This repository is public
+
+Nothing about where or how the site is deployed belongs in a tracked file: no domain, host, IP,
+server path, hosting-panel ids, analytics host or site id, payment links, and of course no keys.
+All of that lives in the gitignored `deploy/.env` (template: `deploy/.env.example`) and in the
+hosting panel's own env vars. Docs and examples use `example.com`. Check `git diff --cached` for
+such strings before every commit.
+
+## Layout
+
+```
+tinyworlds/
+├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
+├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world) and the front page
+├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations and per-city funding milestones
+├── deploy/                # nginx config, deploy script, .env.example
+├── dev.sh                 # tmux launcher
+└── CLAUDE.md / README.md
+```
+
+Each sub-project has its own `CLAUDE.md`.
+
+## How the pieces fit
+
+- **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
+  served as files; the viewer needs nothing else to show a city.
+- **The API exists only for donations.** Each proposed city is built when donations for it reach
+  its goal (US$100). The Donate dialog and the front page read `cityMilestones` and start a
+  Stripe Checkout through `createDonationCheckout`; a Stripe webhook records what was paid. If
+  the API is unreachable the viewer falls back to static payment links, so donating never
+  depends on it.
+- **The interface follows the visitor's language** (en-US, pt-BR, es-ES), whatever the city.
+  City data (street and place names) stays in the city's own language.
+
+### Deviations from the global stack (deliberate)
+
+- **The pipeline is a CLI, not a BullMQ worker.** It follows the worker conventions that apply
+  (TypeScript ESM, Commander.js entry point, swappable data-source providers) but has no queue.
+- **The frontend is a static export** (`output: "export"`), one build per world under
+  `/<world>` plus one for the front page. No server components fetch at request time; Apollo
+  Client is used only where the API is (the Donate dialog, the front page's milestones).
+- **No auth.** Nothing is user-specific; the API's two operations are public and throttled.
+
+## Adding a world
+
+1. Pipeline: `tinyworlds-pipeline/src/cities/<id>.ts` (see that project's `CLAUDE.md`), then
+   `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
+2. Viewer: `tinyworlds-frontend/src/worlds/<id>.ts` and its registry entry.
+3. API: mark the city `BUILT` with its `worldId` (see `tinyworlds-api/CLAUDE.md`).
+4. `deploy/deploy.sh <id>` and `deploy/deploy.sh home`.
+
+The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
+`NEXT_PUBLIC_WORLD`, the data folder and the URL path.
+
+## Data contract (pipeline → viewer)
+
+The pipeline writes everything a viewer needs into `tinyworlds-frontend/public/data/<world>/`
+(gitignored, reproducible). In production the same folder is served at `/<world>/data/`.
+
+```
+data/<world>/
+├── manifest.json            # projection, pyramid, tile bitsets
+├── tiles/{z}/{tx}_{ty}.webp # lossless WebP, binary alpha (transparent = off the map)
+├── overview.webp            # whole map, small: the minimap
+├── places.json              # search index
+├── hoods.json               # outlines of the city's areas (may be empty)
+└── life.json                # ferry routes and flights for the animated layer
+```
+
+### Map space and projection
+
+Map space is pixels at native resolution (level 0); x grows right, y grows down. Geodata in the
+JSON files stays in lon/lat and the viewer projects it with `manifest.geo`:
+
+```
+east  = (lon - lon0) · π/180 · R · cos(lat0)        R = 6371008.8
+north = (lat - lat0) · π/180 · R
+p = east·sin β + north·cos β        // metres "uptown" (along the grid's main axis)
+q = east·cos β − north·sin β        // metres crosstown
+X = (p + q) · k
+Y = (q − p) · k/2 − h · kz          // h = metres above ground
+```
+
+β is the bearing of the city's street grid, so its streets run at exact 2:1 pixel slopes. True
+north points `manifest.northDeg` clockwise from screen-up.
+
+### manifest.json
+
+```ts
+interface Manifest {
+  name: string;                 // the world id: "tinynyc"
+  build: string;                // cache-busting id; append as ?v= to every data URL
+  tileSize: number;             // 512
+  origin: { x: number; y: number };   // map-px position of tile (z, 0, 0)'s top-left, all levels
+  levels: {
+    z: number;                  // 0 = native; level z is downsampled by 2^z
+    cols: number; rows: number;
+    tiles: string;              // base64 bitset, row-major, bit (tx + ty·cols), LSB-first: 1 = file exists
+  }[];
+  bounds: { minX: number; minY: number; maxX: number; maxY: number }; // content bounds, map px
+  start: { lon: number; lat: number; scale: number };                 // first view
+  maxScale: number;             // deepest zoom, screen px per map px
+  northDeg: number;
+  geo: { lon0: number; lat0: number; betaDeg: number; k: number; kz: number };
+  overview: { src: string; width: number; height: number };           // image spans `bounds`
+  attribution: string[];        // shown as they are, in every interface language
+}
+```
+
+Tile `(z, tx, ty)` covers map px `[origin.x + tx·T·2^z, origin.x + (tx+1)·T·2^z)` horizontally and
+likewise vertically (`T = tileSize`). Missing tiles are off the map: the viewer leaves the page
+background showing.
+
+### places.json
+
+```ts
+type Place = {
+  n: string;                    // name
+  t: "borough" | "hood" | "landmark" | "park" | "bridge" | "museum" | "station" | "street" | "place";
+  lon: number; lat: number;
+  b?: string;                   // context line: borough, zone, …
+  r: number;                    // rank, higher first on ties
+  s?: number;                   // suggested scale when flying there
+};
+// file: { places: Place[] }
+```
+
+`borough` is whatever the city's large divisions are (boroughs in New York; zones and planning
+sub-sectors in Ribeirão Preto); the viewer labels the types per world.
+
+### hoods.json
+
+```ts
+// file: { hoods: { name: string; borough: string; lon: number; lat: number; rings: number[][] }[] }
+// rings: flat [lon0, lat0, lon1, lat1, ...] per ring, simplified
+```
+
+### life.json
+
+```ts
+// file: {
+//   ferries: { name: string; path: number[] }[];   // flat [lon, lat, ...]; a boat sails it there and back
+//   flights?: {
+//     kind: "helicopter" | "plane";
+//     path: number[];      // flat [lon, lat, metresAboveGround, ...]
+//     loop: boolean;       // a closed circuit flown forever, or start → end repeated after `pause`
+//     speed?: number;      // ground metres per second
+//     pause?: number;      // seconds
+//   }[];
+// }
+```
+
+Optional for the viewer: without it the map is simply still.
+
+## API contract (viewer ↔ API)
+
+GraphQL at `/api/graphql` (same origin in production):
+
+```graphql
+enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
+type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
+type Query { health: String!  cityMilestones: [CityMilestone!]! }
+input CreateDonationCheckoutInput { city: String  world: String!  locale: String!  returnUrl: String! }
+type DonationCheckout { url: String! }
+type Mutation { createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout! }
+```
+
+The amount is chosen on Stripe's page (from US$1). `POST /api/stripe/webhook` is the only REST
+route. Details in `tinyworlds-api/CLAUDE.md`.
+
+## Running and deploying
+
+- `./dev.sh [world]` opens tmux with the viewer's dev server, the API and a pipeline shell.
+- The pipeline is run by hand (`npm run all -- --city <id>` in `tinyworlds-pipeline`).
+- `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the world's data) to the
+  web server; the API is a container built from `tinyworlds-api/Dockerfile`. See
+  `deploy/README.md`.
+
+## Conventions
+
+- npm, Node 22, TypeScript strict, ESLint + Prettier in every sub-project.
+- Raw downloads and generated tiles are never committed (`tinyworlds-pipeline/data/`,
+  `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/` are.
+- Attribution is part of the product: the About panel credits each world's data sources
+  (`manifest.attribution`).
+- No hard-coded interface strings in the viewer: everything goes through its i18n dictionaries
+  in the three languages.

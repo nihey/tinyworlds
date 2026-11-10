@@ -1,0 +1,20 @@
+# Local development only: the API's database. `docker compose up -d` in tinyworlds-api/.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tinyworlds
+      POSTGRES_PASSWORD: tinyworlds
+      POSTGRES_DB: tinyworlds
+    ports:
+      - "5434:5432"
+    volumes:
+      - tinyworlds-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinyworlds -d tinyworlds"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  tinyworlds-pg:

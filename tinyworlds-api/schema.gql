@@ -1,0 +1,78 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""A city and how far it is from the donations that get it built"""
+type CityMilestone {
+  """How many donations named this city"""
+  donations: Int!
+
+  """US cents it takes to get it built"""
+  goalCents: Int!
+  id: ID!
+  name: String!
+
+  """US cents donated toward this city"""
+  raisedCents: Int!
+
+  """The name without accents, case or punctuation"""
+  slug: String!
+  status: CityStatus!
+
+  """
+  The id of its map once it is built, e.g. "tinynyc"
+  """
+  worldId: String
+}
+
+"""
+PROPOSED until its goal is met, then FUNDED; BUILDING and BUILT are set by hand
+"""
+enum CityStatus {
+  BUILDING
+  BUILT
+  FUNDED
+  PROPOSED
+}
+
+input CreateDonationCheckoutInput {
+  """
+  The city the donation is for: one from the list or a new one. Leave out for none in particular.
+  """
+  city: String
+
+  """The interface language: en-US, pt-BR or es-ES"""
+  locale: String!
+
+  """
+  The page to come back to, without query or hash; "?donated=1" (or 0 on cancel) is added
+  """
+  returnUrl: String!
+
+  """
+  The map the donor is on, e.g. "tinynyc"
+  """
+  world: String!
+}
+
+type DonationCheckout {
+  """Stripe's checkout page for this donation"""
+  url: String!
+}
+
+type Mutation {
+  """
+  Starts a donation at Stripe (the amount is chosen there, from US$1) and answers the page to send the donor to
+  """
+  createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
+}
+
+type Query {
+  """
+  Cities people can fund and the ones already built: most raised first, built ones last
+  """
+  cityMilestones: [CityMilestone!]!
+
+  """Liveness check for the app"""
+  health: String!
+}

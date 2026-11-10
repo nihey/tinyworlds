@@ -1,0 +1,61 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Where a city stands. PROPOSED and FUNDED follow the donations; BUILDING and BUILT are set by hand.
+enum CityStatus {
+  PROPOSED
+  FUNDED
+  BUILDING
+  BUILT
+}
+
+/// A city people can fund, or one that is already on the map.
+model City {
+  id            String     @id @default(uuid()) @db.Uuid
+  /// The name without accents, case or punctuation: what makes "São Paulo" and "sao paulo" one city.
+  slug          String     @unique
+  /// As first typed by a donor (or seeded).
+  name          String
+  status        CityStatus @default(PROPOSED)
+  goalCents     Int        @map("goal_cents")
+  /// US dollars only, in cents. Kept in step with the donations inside one transaction.
+  raisedCents   Int        @default(0) @map("raised_cents")
+  donationCount Int        @default(0) @map("donation_count")
+  /// The world's id once it is built: "tinynyc".
+  worldId       String?    @map("world_id")
+  /// Kept out of the public list (a name that should not be shown).
+  hidden        Boolean    @default(false)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  donations     Donation[]
+
+  @@map("cities")
+}
+
+/// One paid Stripe Checkout session.
+model Donation {
+  id                    String   @id @default(uuid()) @db.Uuid
+  stripeSessionId       String   @unique @map("stripe_session_id")
+  stripePaymentIntentId String?  @map("stripe_payment_intent_id")
+  amountCents           Int      @map("amount_cents")
+  currency              String
+  cityId                String?  @map("city_id") @db.Uuid
+  city                  City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  /// What the donor typed, cleaned up.
+  cityText              String?  @map("city_text")
+  /// The map the donor came from: "tinynyc".
+  world                 String?
+  locale                String?
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([cityId])
+  @@map("donations")
+}

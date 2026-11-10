@@ -1,0 +1,39 @@
+{
+  "name": "tinyworlds-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open data in, an isometric pixel-art city out.",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "tinyworlds": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "cli": "tsc -p tsconfig.json && node dist/cli.js",
+    "fetch": "npm run cli -- fetch",
+    "render": "npm run cli -- render",
+    "all": "npm run cli -- all",
+    "test": "vitest run",
+    "lint": "eslint . && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write ."
+  },
+  "dependencies": {
+    "@duckdb/node-api": "^2.0.0-r.1",
+    "commander": "^15.1.0",
+    "geotiff": "^3.0.5",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  }
+}
