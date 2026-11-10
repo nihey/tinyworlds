@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { EARTH_RADIUS } from "../projection.js";
 import { disc, insideRing } from "../scene/medieval.js";
 import type { SyntheticBuilder, SyntheticPlace } from "../scene/synthetic.js";
+import { lonLatOf } from "./generated.js";
 import { tinykingslanding } from "./tinykingslanding.js";
+import { tinywesteros } from "./tinywesteros.js";
 import { tinywinterfell } from "./tinywinterfell.js";
 import type { City } from "./types.js";
 
@@ -36,6 +39,7 @@ function run(city: City): {
 describe.each([
   ["tinywinterfell", tinywinterfell, 1000],
   ["tinykingslanding", tinykingslanding, 100000],
+  ["tinywesteros", tinywesteros, 400000],
 ] as [string, City, number][])("%s", (_id, city, least) => {
   const first = run(city);
 
@@ -64,5 +68,32 @@ describe.each([
     expect(city.attribution.join(" ")).toMatch(/fan-made/);
     expect(city.attribution.join(" ")).toMatch(/George R\. R\. Martin/);
     expect(city.flights).toEqual([]);
+  });
+});
+
+describe("lonLatOf", () => {
+  const perDegree = (Math.PI / 180) * EARTH_RADIUS;
+
+  it("reads p as north and q as east unless the grid is turned", () => {
+    const flat = lonLatOf(1000, 250);
+    expect(flat.lat).toBeCloseTo(1000 / perDegree, 9);
+    expect(flat.lon).toBeCloseTo(250 / perDegree, 9);
+  });
+
+  it("puts a world drawn north-up back on the compass", () => {
+    // p = (e + n)/√2, q = (e − n)/√2
+    const e = 3000;
+    const n = -1200;
+    const turned = lonLatOf((e + n) * Math.SQRT1_2, (e - n) * Math.SQRT1_2, 45);
+    expect(turned.lon).toBeCloseTo(e / perDegree, 9);
+    expect(turned.lat).toBeCloseTo(n / perDegree, 9);
+  });
+
+  it("opens tinywesteros a little north-east of King's Landing, at the origin of its sketch", () => {
+    expect(tinywesteros.betaDeg).toBe(45);
+    expect(tinywesteros.start.lon).toBeGreaterThan(0);
+    expect(tinywesteros.start.lon).toBeLessThan(0.01);
+    expect(tinywesteros.start.lat).toBeGreaterThan(0);
+    expect(tinywesteros.start.lat).toBeLessThan(0.01);
   });
 });

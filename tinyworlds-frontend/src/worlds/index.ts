@@ -5,6 +5,7 @@ import { tinynyc } from "./tinynyc";
 import { tinyorl } from "./tinyorl";
 import { tinyrao } from "./tinyrao";
 import { tinyvlc } from "./tinyvlc";
+import { tinywesteros } from "./tinywesteros";
 import { tinywinterfell } from "./tinywinterfell";
 import type { World } from "./types";
 
@@ -23,6 +24,7 @@ export const WORLDS: Record<string, World> = {
   tinylas,
   tinywinterfell,
   tinykingslanding,
+  tinywesteros,
 };
 export const DEFAULT_WORLD = "tinynyc";
 

@@ -20,6 +20,7 @@ export const BUILT: SeedCity[] = [
     name: "King's Landing",
     worldId: 'tinykingslanding',
   },
+  { slug: 'westeros', name: 'Westeros', worldId: 'tinywesteros' },
 ];
 
 /** Suggestions to start the list with, each at zero. Donors add their own. */

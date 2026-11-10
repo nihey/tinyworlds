@@ -36,6 +36,7 @@ describe("resolveWorld", () => {
       "tinylas",
       "tinywinterfell",
       "tinykingslanding",
+      "tinywesteros",
     ]);
   });
 
@@ -170,7 +171,11 @@ describe("worlds", () => {
 
   it("mark the places that do not exist, and say so in every language", () => {
     const imagined = Object.values(WORLDS).filter((world) => world.fictional);
-    expect(imagined.map((world) => world.id)).toEqual(["tinywinterfell", "tinykingslanding"]);
+    expect(imagined.map((world) => world.id)).toEqual([
+      "tinywinterfell",
+      "tinykingslanding",
+      "tinywesteros",
+    ]);
     for (const world of imagined) {
       for (const locale of LOCALES) {
         const { about, description } = world.copy[locale];

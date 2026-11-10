@@ -148,6 +148,12 @@ export interface City {
    * what can be searched for. It must be deterministic.
    */
   synthetic?: (builder: SyntheticBuilder) => void;
+  /**
+   * For a generated world whose limits are a rectangle on screen: cut the map off cleanly at the
+   * limits' bounding rectangle instead of letting it dissolve (the fog grid would notch a straight
+   * screen edge into a row of teeth).
+   */
+  framed?: boolean;
 
   curated: Curated[];
   flights: Flight[];

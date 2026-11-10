@@ -262,12 +262,27 @@ export async function buildSyntheticScene(opts: { log?: (msg: string) => void } 
     }
   }
   const pad = fog.cell * k * 2;
-  const bounds = {
+  let bounds = {
     minX: Math.floor(minX - pad),
     minY: Math.floor(minY - pad),
     maxX: Math.ceil(maxX + pad),
     maxY: Math.ceil(maxY + pad),
   };
+  // a framed world ends exactly at the rectangle its limits span on screen
+  let clip: typeof bounds | undefined;
+  if (CITY.framed) {
+    clip = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    for (const ring of gen.limits) {
+      for (let i = 0; i < ring.length; i += 2) {
+        const [x, y] = proj.gridToMap(ring[i], ring[i + 1]);
+        clip.minX = Math.min(clip.minX, Math.round(x));
+        clip.maxX = Math.max(clip.maxX, Math.round(x));
+        clip.minY = Math.min(clip.minY, Math.round(y));
+        clip.maxY = Math.max(clip.maxY, Math.round(y));
+      }
+    }
+    bounds = clip;
+  }
 
   const none32 = u32();
   none32.push(0);
@@ -303,6 +318,7 @@ export async function buildSyntheticScene(opts: { log?: (msg: string) => void } 
     {
       geo,
       bounds,
+      ...(clip ? { clip } : {}),
       flora: CITY.flora,
       fog: {
         p0: fog.p0,

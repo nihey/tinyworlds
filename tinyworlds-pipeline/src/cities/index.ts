@@ -5,6 +5,7 @@ import { tinynyc } from "./tinynyc.js";
 import { tinyorl } from "./tinyorl.js";
 import { tinyrao } from "./tinyrao.js";
 import { tinyvlc } from "./tinyvlc.js";
+import { tinywesteros } from "./tinywesteros.js";
 import { tinywinterfell } from "./tinywinterfell.js";
 import type { City } from "./types.js";
 
@@ -19,5 +20,6 @@ export const CITIES: Record<string, City> = {
   tinylas,
   tinywinterfell,
   tinykingslanding,
+  tinywesteros,
 };
 export const DEFAULT_CITY = "tinynyc";

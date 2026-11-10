@@ -15,6 +15,7 @@ chosen with `--city` (default `tinynyc`).
 | `tinylas`          | ≈ 1 min             | 0.2 GB               |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
+| `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
 
 ## Commands
 
@@ -51,7 +52,8 @@ src/
 │   ├── tinyvlc.ts (+ .places.ts)   # Valencia
 │   ├── tinylas.ts (+ .places.ts)   # Las Vegas
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
-│   └── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
+│   ├── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
+│   └── tinywesteros.ts (+ .land.ts, .places.ts)  # a whole imagined world as a toy-scale diorama
 ├── config.ts          # which city this process draws (CITY) and its directories (DIRS)
 ├── env.ts             # city-independent settings (tile size, Overture release, user agent)
 ├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
@@ -67,6 +69,7 @@ src/
 │   ├── kinds.ts       # ground kinds and their paint order (PAINT_RANK), patterns, roofs
 │   ├── synthetic.ts   # the builder a generated city draws on; its scene and its index
 │   ├── medieval.ts    # pure helpers for generated places: walls, towers, lanes, rows of houses
+│   ├── worldkit.ts    # pure helpers for generated worlds: coasts, a land mask, mountains, model kits
 │   └── hash.ts store.ts sinks.ts
 ├── render/
 │   ├── palette.ts     # ~80 materials × 6 shades; shading only ever moves along a ramp
@@ -111,7 +114,7 @@ after and `cmp` them (they should be byte-identical unless the change was meant 
 A city with a `synthetic` function has no data at all: `fetch` finds nothing to do, `scene` and
 `index` call the function instead of reading Overture, and `render` and `card` cannot tell the
 difference. `generatedCity()` in `cities/generated.ts` fills in the rest of the `City` contract
-(origin 0/0, `betaDeg` 0, `k` 2, no sources), so a generator is one file:
+(origin 0/0, `betaDeg` 0 unless the spec gives one, `k` 2, no sources), so a generator is one file:
 
 ```ts
 export const tinywinterfell = generatedCity({
@@ -156,8 +159,85 @@ wealth map) and `standingTree`.
   on top, and trees up there are `standingTree`s, not sprites.
 - **Paint order still rules the ground.** A base wash must be a low-ranked kind (`G.Snow`,
   `G.Meadow`) or everything painted after it disappears under it.
-- These two are fan work on invented layouts: only names are borrowed, no map is followed, and
+- These are fan work on invented layouts: only names are borrowed, no map is followed, and
   `attribution` says so. Keep it that way.
+
+## Generated worlds (`scene/worldkit.ts`, `cities/tinywesteros*.ts`)
+
+`tinywesteros` is not a place but a world: Westeros from beyond the Wall to Dorne, Essos from
+Braavos to Asshai, the islands and seas between, on one map of 82,000 × 32,000 px. Three things
+set it apart from the two generated cities.
+
+- **Toy scale.** About four units ("metres") to a kilometre, so the continents are small, and
+  every place is a model far bigger than it should be: a castle is ~100 units across, a great
+  city ~400, a mountain a pyramid ~150 wide. Forests are the renderer's own scattered trees,
+  which at this scale read as texture. Think of pieces on a war table.
+- **North is up.** `betaDeg: 45` (a `generatedCity` option) turns the grid 45° from the compass,
+  so `manifest.northDeg` is 0. The layout is written in world coordinates, `e` east and `n`
+  north, and converted with `toPQ(e, n)`: `p = (e + n)/√2`, `q = (e − n)/√2` (`toEN` goes back,
+  `pathPQ` does a flat path). Models are still built along the grid, where boxes draw best, so
+  they stand at 45° to the compass. For `preview --at`: `lon = e / 111195.08`,
+  `lat = n / 111195.08`.
+- **A stretched sketch.** The view halves everything north–south, so a continent drawn square
+  looks squat. The geography is sketched in steps of `EAST` = 80 units eastward and `NORTH` = 125
+  northward (`tinywesteros.land.ts`): King's Landing is at 0, 0, the Wall at 76 north. Sizes of
+  models stay in plain units.
+
+The data is in two files and the assembly in a third:
+
+| File                     | Holds                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `tinywesteros.land.ts`   | coasts (a few dozen named corners each), islands, lakes, rivers, ranges,      |
+|                          | ground colours (`BIOMES`), regions, roads, sea lanes, names of seas and capes |
+| `tinywesteros.places.ts` | every place: name, kit, position in the sketch, region, rank, style           |
+| `tinywesteros.ts`        | styles per region, the builders of the places that have their own, the order  |
+
+How a run goes (`generate`): coasts are roughened and rasterised into a `LandMask` (lakes and
+rivers taken out again); every place is `settle`d onto dry ground near its sketch position; then
+ground, roads, places, the Wall, mountains, hamlets and camps, names. It throws if a place ends
+up in the water or two places overlap, naming them: fix the sketch.
+
+`worldkit.ts` is what it is made of, and knows nothing of Westeros:
+
+| Helper                                     | Does                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `roughen(points, seed, opts)`              | midpoint displacement: a few corners become a coast. Keeps the     |
+|                                            | corners it is given, and a segment roughens the same from either   |
+|                                            | end, so two outlines sharing an edge still share it                |
+| `sketch`, `isle`                           | sketch steps → units; a wobbly island ring                         |
+| `LandMask`, `settle`, `nearestWater`       | where the land is; move a disc off the water; which way the sea is |
+| `nearestOnPath`                            | the point of a river nearest a place and the way it runs there     |
+| `range(b, path, opts)`, `peak`             | a mountain range: rows of pyramids, capped above a height          |
+| `grove`                                    | trees one by one (for woods on snow, where none are scattered)     |
+| `castle`, `holdfast`, `ruin`, `camp`       | the small kits; `castle` takes `double`, `moat`, `sides`, `base`   |
+| `city(b, p, q, radius, style, seed, opts)` | walls, gates, a landmark (keep, sept, dome, pyramid, tower), a     |
+|                                            | citadel, piers towards the water, houses; `open` for no walls      |
+| `wallRing`, `houses`, `harbour`, `ship`    | the parts of those, for places built by hand                       |
+| `round`, `keep`, `hall`, `block`, `dome`,  | single pieces: a round tower, a keep, a house, a box, a dome, a    |
+| `ziggurat`, `crag`, `bigTree`              | stepped pyramid, a rock to stand a castle on, a tree as volumes    |
+
+A `Style` (`stone`, `tower`, `cone`, `roof`, house `walls` and `roofs`, `floor`, `flat`) is what
+a region builds with; `STYLES` in `tinywesteros.ts` has one per region.
+
+To add a place: a row in `tinywesteros.places.ts` with one of the kits (`castle`, `greatcastle`,
+`holdfast`, `tower`, `ruin`, `village`, `town`, `port`, `city`, `portcity`, `pyramid`, `camp`,
+`weirwood`). For a model of its own, give it the kit `special`, add a builder under its name to
+`SPECIALS` and its radius to `SPECIAL` (`fixed` if it must stay exactly where sketched: on a
+river, an islet, the Wall).
+
+- **Regions are hoods.** A `Region` is a ring made of stretches of coast between named corners
+  (`"wall-e>vale-n"`) and inland corners; borders are roughened pairwise so neighbours meet.
+- **Snow is painted under grass** (`PAINT_RANK`), so the snow patches of the North are holes in
+  the one grass polygon. Holes must not overlap: even-odd fill turns an overlap back to grass.
+- **Earth and steppe get a quay wall where they meet water** (the renderer only knows natural
+  banks for green kinds, sand and rock). Keep them off the coast (a band of `G.Sand` or
+  `G.Scrub`, which paint over them) and give rivers through them `banks: true`.
+- **No ground shows on a paved floor.** A garden inside a castle is `bigTree`s; lava and the
+  sand of an arena are thin slabs.
+- **A preview is one picture**: `sharp` refuses more than 268 million px, so `--shrink 12` with
+  `--size 1500,900` is about the widest view (the share card uses `shrink: 18`).
+- The geography is sketched from nothing but the commonly known arrangement of the world and
+  roughened by code. Do not trace a map, official or fan-made, into it.
 
 ## How a tile is drawn (`render/chunk.ts`)
 
@@ -231,3 +311,5 @@ raster is read as the median inside the footprint and corrected with a curve fit
   lost its type: the scene builder skips the parts pass when the file has no rows.
 - Never insert a ground kind in the middle of `G`: it renumbers the ones after it and every
   scene on disk would have to be rebuilt. Append it and rank it (see "Rules of the look").
+- A generated world whose limits are a rectangle on screen sets `framed: true`: the renderer then
+  cuts it off at that rectangle (`scene.clip`) instead of letting the fog notch the straight edge.

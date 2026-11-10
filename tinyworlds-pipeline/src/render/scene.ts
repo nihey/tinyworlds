@@ -46,6 +46,8 @@ export interface Scene {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   /** Which trees grow here: decides the odd crown that is not green. */
   flora: Flora;
+  /** A framed world: nothing is drawn outside this rectangle of map px (max edges exclusive). */
+  clip?: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
 export interface Poly {
@@ -69,6 +71,7 @@ export function sceneFrom(data: SceneData): Scene {
     bounds: Scene["bounds"];
     fog: Omit<Scene["fog"], "d">;
     flora?: Flora;
+    clip?: Scene["clip"];
   };
   const poly = (prefix: string): Poly => ({
     ringStart: a[`${prefix}.ringStart`] as Uint32Array,
@@ -120,6 +123,7 @@ export function sceneFrom(data: SceneData): Scene {
     geo: meta.geo,
     bounds: meta.bounds,
     flora: meta.flora ?? "temperate",
+    clip: meta.clip,
   };
 }
 

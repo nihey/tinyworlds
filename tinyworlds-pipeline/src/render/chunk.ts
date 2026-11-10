@@ -816,6 +816,7 @@ export class ChunkRenderer {
     const out = new Uint16Array(job.w * job.h);
     const ctx: GroundContext = { gk, wd, GW };
     const fogSpan = fog.end - fog.start;
+    const clip = this.scene.clip;
 
     for (let y = 0; y < job.h; y++) {
       const my = job.y0 + y;
@@ -823,6 +824,11 @@ export class ChunkRenderer {
       let o = y * job.w;
       for (let x = 0; x < job.w; x++, i++, o++) {
         const mx = job.x0 + x;
+        // a framed world stops dead at its rectangle
+        if (clip && (mx < clip.minX || mx >= clip.maxX || my < clip.minY || my >= clip.maxY)) {
+          out[o] = TRANSPARENT;
+          continue;
+        }
         const H = hb[i];
         const who = obj[i];
         // where on the ground this surface stands

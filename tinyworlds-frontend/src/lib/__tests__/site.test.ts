@@ -50,6 +50,8 @@ describe("site", () => {
       "King's Landing",
       "Porto Real",
       "Desembarco del Rey",
+      "Westeros",
+      "Poniente",
     ]);
   });
 
