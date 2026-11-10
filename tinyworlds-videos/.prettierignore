@@ -1,0 +1,8 @@
+node_modules
+out
+**/renders
+**/.hyperframes
+**/assets
+package-lock.json
+**/.waveform-cache
+**/.thumbnails

@@ -1,0 +1,258 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+      font-family: "Archivo", sans-serif;
+    }
+    #map-take {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      object-fit: contain;
+    }
+    /* a sign in the site's manner: black enamel, paper lettering, twice the viewer's own size */
+    .map-sign {
+      position: absolute;
+      background: #15171a;
+      color: #f4f2ec;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .map-line {
+      padding: 24px 40px 26px;
+      font-size: 56px;
+      line-height: 1.1;
+    }
+    #map-l1-sign,
+    #map-l2-sign {
+      left: 96px;
+      bottom: 104px;
+    }
+    /* clear of the viewer's own signs: left of the tool column, above the credit line */
+    #map-l3-sign {
+      right: 176px;
+      top: 812px;
+    }
+    /* the title: the largest sign, with the yellow line the viewer's search sign carries */
+    #map-title-sign {
+      left: 96px;
+      top: 96px;
+      width: 1108px;
+      height: 178px;
+      overflow: hidden;
+    }
+    #map-title-strip {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 6px;
+      background: #f7c21b;
+    }
+    #map-title-text {
+      position: absolute;
+      left: 48px;
+      top: 40px;
+      font-size: 88px;
+      line-height: 1.1;
+      letter-spacing: -0.015em;
+    }
+    #map-cursor {
+      position: absolute;
+      inset: 0;
+    }
+    #map-cursor-arrow {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 62px;
+      height: 88px;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="map"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[
+      {"id":"line1","type":"string","label":"First line","default":"Every building at its real height"},
+      {"id":"line2","type":"string","label":"Second line","default":"All five boroughs"},
+      {"id":"title","type":"string","label":"Title","default":"Whole cities, pocket-sized"},
+      {"id":"line3","type":"string","label":"Third line","default":"Free to explore"}
+    ]'
+  >
+    <!-- one continuous take of the real viewer, 662 frames -->
+    <video
+      id="map-take"
+      class="clip"
+      data-start="0"
+      data-duration="22.04"
+      data-track-index="0"
+      src="assets/takes/main.mp4"
+      muted
+      playsinline
+    ></video>
+
+    <div id="map-l1" class="clip" data-start="2.04" data-duration="2.5" data-track-index="1">
+      <div id="map-l1-sign" class="map-sign map-line" data-var-text="line1">
+        Every building at its real height
+      </div>
+    </div>
+    <div id="map-l2" class="clip" data-start="6.54" data-duration="1.5" data-track-index="1">
+      <div id="map-l2-sign" class="map-sign map-line" data-var-text="line2">All five boroughs</div>
+    </div>
+
+    <!-- the title lands when the whole city is in view, then becomes the viewer's search sign -->
+    <div id="map-title" class="clip" data-start="8.04" data-duration="2.32" data-track-index="2">
+      <div id="map-title-sign" class="map-sign">
+        <div id="map-title-strip"></div>
+        <div id="map-title-text" data-var-text="title">Whole cities, pocket-sized</div>
+      </div>
+    </div>
+
+    <div id="map-l3" class="clip" data-start="18.34" data-duration="1.62" data-track-index="1">
+      <div id="map-l3-sign" class="map-sign map-line" data-var-text="line3">Free to explore</div>
+    </div>
+
+    <!-- the pointer: its path is the one the take's own mouse followed (takes/main.json) -->
+    <div
+      id="map-cursor"
+      class="clip"
+      data-start="10.06"
+      data-duration="3.34"
+      data-track-index="3"
+      data-layout-ignore
+    >
+      <svg id="map-cursor-arrow" viewBox="0 0 31 44" aria-hidden="true">
+        <path
+          d="M2 2v33.5l8.4-7.6 5.6 13.4 6-2.5-5.6-13.2H28.5z"
+          fill="#15171a"
+          stroke="#f4f2ec"
+          stroke-width="2.6"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // signs arrive and leave the way pixels do: in steps, never eased
+    const signIn = (id, at) =>
+      tl.fromTo(id, { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, at);
+    const signOut = (id, at) =>
+      tl.fromTo(
+        id,
+        { y: 0, opacity: 1 },
+        { y: -28, opacity: 0, duration: 0.17, ease: "steps(3)", immediateRender: false },
+        at,
+      );
+
+    signIn("#map-l1-sign", 2.04);
+    signOut("#map-l1-sign", 4.34);
+    signIn("#map-l2-sign", 6.54);
+    signOut("#map-l2-sign", 7.84);
+
+    // the title is stamped on, on the beat the music opens
+    tl.fromTo(
+      "#map-title-sign",
+      { opacity: 0, x: 0, y: 0, scaleX: 1.18, scaleY: 1.18, transformOrigin: "0% 0%" },
+      { opacity: 1, scaleX: 1, scaleY: 1, duration: 0.2, ease: "steps(4)" },
+      8.04,
+    );
+    tl.fromTo(
+      "#map-title-strip",
+      { scaleX: 0, transformOrigin: "0% 50%" },
+      { scaleX: 1, duration: 0.4, ease: "power2.out" },
+      8.1,
+    );
+    // …and becomes the search sign: it shrinks onto the place the viewer's own sign fades in at
+    // (24, 22, 800 × 82 in the take), and lets go as that one arrives
+    tl.fromTo(
+      "#map-title-text",
+      { opacity: 1 },
+      { opacity: 0, duration: 0.1, ease: "none", immediateRender: false },
+      9.66,
+    );
+    tl.fromTo(
+      "#map-title-sign",
+      { x: 0, y: 0, scaleX: 1, scaleY: 1 },
+      {
+        x: -72,
+        y: -74,
+        scaleX: 800 / 1108,
+        scaleY: 82 / 178,
+        duration: 0.32,
+        ease: "power3.inOut",
+        immediateRender: false,
+      },
+      9.74,
+    );
+    tl.fromTo(
+      "#map-title-sign",
+      { opacity: 1 },
+      { opacity: 0, duration: 0.2, ease: "none", immediateRender: false },
+      10.12,
+    );
+
+    signIn("#map-l3-sign", 18.34);
+    signOut("#map-l3-sign", 19.76);
+
+    // the pointer: in from the right to the search field, a click; on to the first result, a click; away
+    const arrow = "#map-cursor-arrow";
+    tl.fromTo(
+      arrow,
+      { x: 2000, y: 670, scale: 1, transformOrigin: "6% 5%" },
+      { x: 526, y: 78, duration: 0.39, ease: "power2.inOut" },
+      10.09,
+    );
+    tl.fromTo(
+      arrow,
+      { scale: 1 },
+      { scale: 0.8, duration: 0.05, ease: "none", immediateRender: false },
+      10.5,
+    );
+    tl.fromTo(
+      arrow,
+      { scale: 0.8 },
+      { scale: 1, duration: 0.12, ease: "power2.out", immediateRender: false },
+      10.56,
+    );
+    tl.fromTo(
+      arrow,
+      { x: 526, y: 78 },
+      { x: 324, y: 178, duration: 0.36, ease: "power2.inOut", immediateRender: false },
+      12.12,
+    );
+    tl.fromTo(
+      arrow,
+      { scale: 1 },
+      { scale: 0.8, duration: 0.05, ease: "none", immediateRender: false },
+      12.5,
+    );
+    tl.fromTo(
+      arrow,
+      { scale: 0.8 },
+      { scale: 1, duration: 0.12, ease: "power2.out", immediateRender: false },
+      12.56,
+    );
+    tl.fromTo(
+      arrow,
+      { x: 324, y: 178 },
+      { x: 844, y: 1200, duration: 0.6, ease: "power2.inOut", immediateRender: false },
+      12.74,
+    );
+    window.__timelines["map"] = tl;
+  </script>
+</template>

@@ -1,0 +1,210 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+    }
+    /* the camera: everything inside is laid out in the front page's own CSS px (1280 wide, as
+       takes/page.json has it), and the camera scales and slides the lot */
+    #page-cam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1280px;
+      height: 1818px;
+    }
+    #page-still {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1280px;
+      height: 1818px;
+    }
+    /* each card's picture comes alive: its loop over the still, as on the page */
+    .page-card {
+      position: absolute;
+      width: 314.67px;
+      height: 165.2px;
+      object-fit: cover;
+      border-radius: 10px 10px 0 0;
+    }
+    #page-hero {
+      position: absolute;
+      left: 152px;
+      top: 32px;
+      width: 976px;
+      height: 488px;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+    /* the hero's sign, cut from the still, back on top of its loop */
+    #page-sign {
+      position: absolute;
+      left: 172px;
+      top: 209.3px;
+      width: 448px;
+      height: 290.8px;
+      border-radius: 10px;
+      box-shadow:
+        0 0 0 1px rgb(0 0 0 / 0.6),
+        0 16px 34px -14px rgb(0 0 0 / 0.65),
+        0 2px 6px -1px rgb(0 0 0 / 0.3);
+    }
+    #page-take {
+      position: absolute;
+      inset: 0;
+    }
+    /* edged and shadowed, so that as it shrinks it reads as a picture being set down */
+    #page-take-img {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      box-shadow:
+        0 0 0 3px rgb(0 0 0 / 0.55),
+        0 40px 90px -30px rgb(0 0 0 / 0.6);
+    }
+  </style>
+  <div id="root" data-composition-id="page" data-width="1920" data-height="1080">
+    <div id="page-cam" data-layout-allow-overflow>
+      <img
+        id="page-still"
+        class="clip"
+        data-start="0"
+        data-duration="8.96"
+        data-track-index="1"
+        src="assets/takes/page.png"
+        alt=""
+      />
+      <video
+        id="page-nyc"
+        class="clip page-card"
+        style="left: 152px; top: 596.5px"
+        data-start="0.3"
+        data-duration="4"
+        data-track-index="2"
+        src="assets/takes/loops/tinynyc.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="page-rao"
+        class="clip page-card"
+        style="left: 482.67px; top: 596.5px"
+        data-start="0.3"
+        data-duration="4"
+        data-track-index="3"
+        src="assets/takes/loops/tinyrao.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="page-orl"
+        class="clip page-card"
+        style="left: 813.33px; top: 596.5px"
+        data-start="0.3"
+        data-duration="4"
+        data-track-index="4"
+        src="assets/takes/loops/tinyorl.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="page-fte"
+        class="clip page-card"
+        style="left: 152px; top: 870.7px"
+        data-start="0.3"
+        data-duration="4"
+        data-track-index="5"
+        src="assets/takes/loops/tinyfte.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="page-vlc"
+        class="clip page-card"
+        style="left: 482.67px; top: 870.7px"
+        data-start="0.3"
+        data-duration="4"
+        data-track-index="6"
+        src="assets/takes/loops/tinyvlc.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="page-las"
+        class="clip page-card"
+        style="left: 813.33px; top: 870.7px"
+        data-start="0.3"
+        data-duration="4"
+        data-track-index="7"
+        src="assets/takes/loops/tinylas.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="page-hero"
+        class="clip"
+        data-start="2.6"
+        data-duration="6.36"
+        data-track-index="8"
+        src="assets/takes/hero.mp4"
+        data-hf-media-start-basis="local"
+        muted
+        playsinline
+      ></video>
+      <img
+        id="page-sign"
+        class="clip"
+        data-start="2.6"
+        data-duration="6.36"
+        data-track-index="9"
+        src="assets/takes/page-sign.png"
+        alt=""
+      />
+    </div>
+
+    <!-- the take's last frame, the whole city: it shrinks onto New York's card and the card's own
+         loop takes over -->
+    <div id="page-take" class="clip" data-start="0" data-duration="0.62" data-track-index="10">
+      <img id="page-take-img" src="assets/takes/main-last.png" alt="" />
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // the two places the camera rests: the six cities, then the page's hero
+    const CARDS = { x: -221.5, y: -1052.2, scale: 1.846 };
+    const HERO = { x: -255.8, y: -0.8, scale: 1.9 };
+    tl.set("#page-cam", { ...CARDS, transformOrigin: "0% 0%" }, 0);
+    // the whole city becomes one card: onto New York's picture (59, 49, 581 × 305 in the frame)
+    tl.fromTo(
+      "#page-take-img",
+      { x: 0, y: 0, scaleX: 1, scaleY: 1, transformOrigin: "0% 0%" },
+      { x: 59.1, y: 48.9, scaleX: 0.3026, scaleY: 0.2824, duration: 0.5, ease: "power3.inOut" },
+      0,
+    );
+    tl.fromTo(
+      "#page-take-img",
+      { opacity: 1 },
+      { opacity: 0, duration: 0.14, ease: "none", immediateRender: false },
+      0.44,
+    );
+    // up the page to its hero
+    tl.fromTo(
+      "#page-cam",
+      { ...CARDS },
+      { ...HERO, duration: 1, ease: "power3.inOut", immediateRender: false },
+      3,
+    );
+    window.__timelines["page"] = tl;
+  </script>
+</template>

@@ -1,0 +1,277 @@
+<!doctype html>
+<!--
+  "Pull back": the showcase film, 1920 × 1080, 31 s. One continuous take of the real New York
+  map (filmed by `npm run takes -- main`) from a tower's windows out to the whole city, into a
+  typed search and back out, until the city is one card among the others on the real front page
+  (`npm run takes -- page`). Everything that claims to be the site is the site; what is added on
+  top is a few signs in the site's own manner, a pointer, and sound. See SPEC.md.
+
+  The site's address is never written here (the repository is public): it is the `address`
+  variable, given at render time by `npm run film`.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"address","type":"string","label":"Site address on the end card","default":"example.com"},
+    {"id":"cta","type":"string","label":"Line above the address","default":"Want yours next?"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      :root {
+        --fog: #e9e6df;
+        --sign: #15171a;
+        --paper: #f4f2ec;
+        --paper-dim: #b4b1a8;
+        --taxi: #f7c21b;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--fog);
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: "Archivo", sans-serif;
+      }
+      /* the end card's sign: the site's own black enamel, at the size the film shows the page */
+      #cta {
+        position: absolute;
+        right: 73px;
+        bottom: 131px;
+        z-index: 5;
+      }
+      #cta-sign {
+        background: var(--sign);
+        color: var(--paper);
+        border-radius: 19px;
+        padding: 34px 44px 36px;
+        box-shadow:
+          inset 0 2px 0 rgb(255 255 255 / 0.08),
+          0 0 0 2px rgb(0 0 0 / 0.6),
+          0 30px 64px -26px rgb(0 0 0 / 0.65),
+          0 4px 12px -2px rgb(0 0 0 / 0.3);
+        white-space: nowrap;
+      }
+      #cta-line {
+        font-size: 64px;
+        line-height: 1.1;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      #cta-address {
+        padding-top: 12px;
+        font-size: 52px;
+        line-height: 1.15;
+        font-weight: 500;
+        color: var(--taxi);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="31"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- the map: the take, its signs, the pointer -->
+      <div
+        id="map"
+        data-composition-id="map"
+        data-composition-src="compositions/map.html"
+        data-start="0"
+        data-duration="22.04"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <!-- the front page: the city becomes one card of several, then the page's own hero -->
+      <div
+        id="page"
+        data-composition-id="page"
+        data-composition-src="compositions/page.html"
+        data-start="22.04"
+        data-duration="8.96"
+        data-track-index="2"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <!-- the call to action lands on the music's peak -->
+      <div id="cta" class="clip" data-start="28.05" data-duration="2.95" data-track-index="3">
+        <div id="cta-sign">
+          <div id="cta-line" data-var-text="cta">Want yours next?</div>
+          <div id="cta-address" data-var-text="address">example.com</div>
+        </div>
+      </div>
+
+      <!-- sound: the bed (npm run sound), and an effect for each thing the pointer or the camera does.
+           Each effect starts early by where its hit is in the file, to land a frame after its picture. -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/bed.mp3"
+        data-start="0"
+        data-duration="31"
+        data-track-index="10"
+        data-volume="0.8"
+        data-fade-out="1.6"
+      ></audio>
+      <!-- the boroughs: a soft tick as each is named, on the half beats -->
+      <audio
+        id="sfx-borough-1"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="6.45"
+        data-duration="0.72"
+        data-track-index="16"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-borough-2"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="6.75"
+        data-duration="0.37"
+        data-track-index="17"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-borough-3"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="6.95"
+        data-duration="0.72"
+        data-track-index="18"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-borough-4"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="7.25"
+        data-duration="0.37"
+        data-track-index="19"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-borough-5"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="7.45"
+        data-duration="0.72"
+        data-track-index="20"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-click-1"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="10.5"
+        data-duration="0.37"
+        data-track-index="11"
+        data-volume="0.7"
+      ></audio>
+      <audio
+        id="sfx-typing"
+        class="clip"
+        src="assets/sfx/typing.mp3"
+        data-start="10.32"
+        data-duration="1.54"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="sfx-click-2"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="12.5"
+        data-duration="0.37"
+        data-track-index="11"
+        data-volume="0.8"
+      ></audio>
+      <audio
+        id="sfx-dive"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="12.62"
+        data-duration="0.57"
+        data-track-index="13"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-slip"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="17.2"
+        data-duration="0.57"
+        data-track-index="13"
+        data-volume="0.35"
+      ></audio>
+      <audio
+        id="sfx-riser"
+        class="clip"
+        src="assets/sfx/riser.mp3"
+        data-start="21.03"
+        data-duration="2.2"
+        data-media-start="2"
+        data-track-index="14"
+        data-volume="0.42"
+      ></audio>
+      <audio
+        id="sfx-land"
+        class="clip"
+        src="assets/sfx/impact-bass-1.mp3"
+        data-start="22.5"
+        data-duration="2.1"
+        data-track-index="15"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-cta"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="27.96"
+        data-duration="0.72"
+        data-track-index="11"
+        data-volume="0.8"
+      ></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      // signs arrive the way pixels do, in steps
+      tl.fromTo(
+        "#cta-sign",
+        { y: 42, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" },
+        28.05,
+      );
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

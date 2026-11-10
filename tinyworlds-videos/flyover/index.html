@@ -1,0 +1,129 @@
+<!doctype html>
+<!--
+  A city's flyover: one slow lap over a spot worth seeing, 1920 × 1080, silent, ending where it
+  began so it loops. With its sign it is a clip to share; the hero of the front page is one
+  without, on a smaller lap. The plates come from `npm run plates`; one row of
+  flyover/batch/*.json sets the variables (`npm run flyovers` renders them all).
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"plate","type":"string","label":"Map plate","default":"assets/plates/tinynyc.png"},
+    {"id":"sign","type":"string","label":"Sign sheet","default":"assets/plates/tinynyc-sign.png"},
+    {"id":"a","type":"number","label":"Lap half-width, px","default":260,"min":0,"max":260},
+    {"id":"b","type":"number","label":"Lap half-height, px","default":130,"min":0,"max":130}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #map {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+      /* the plate is cut finer than the picture and drawn small: the measures are
+         scripts/lib/drift.ts's FLYOVER_DRIFT (1920 + 2 × (260 + 8) by 1080 + 2 × (130 + 8)) */
+      #plate {
+        position: absolute;
+        left: -268px;
+        top: -138px;
+        width: 2456px;
+        height: 1356px;
+        max-width: none;
+      }
+      #sign {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="12"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div
+        id="map"
+        class="clip"
+        data-start="0"
+        data-duration="12"
+        data-track-index="0"
+        data-layout-allow-overflow
+      >
+        <img id="plate" data-var-src="plate" src="assets/plates/tinynyc.png" alt="" />
+      </div>
+      <img
+        id="sign"
+        class="clip"
+        data-start="0"
+        data-duration="12"
+        data-track-index="1"
+        data-var-src="sign"
+        src="assets/plates/tinynyc-sign.png"
+        alt=""
+      />
+    </div>
+    <script>
+      const T = 12; // one lap
+      const vars = (window.__hyperframes && window.__hyperframes.getVariables()) || {};
+      const A = Math.min(260, Math.max(0, Number(vars.a ?? 260))); // the ellipse's half-axes, px
+      const B = Math.min(130, Math.max(0, Number(vars.b ?? 130)));
+
+      // The view goes round the framing's centre: x = −A·cos θ, y = B·sin θ, so the plate is at
+      // (A·cos θ, −B·sin θ). Each tween below is one arc of a sine, so together they are that
+      // ellipse exactly and the speed never changes: nothing gives the loop point away.
+      const tl = gsap.timeline({ paused: true });
+      const far = A;
+      tl.fromTo("#plate", { x: far }, { x: -far, duration: T / 2, ease: "sine.inOut" }, 0);
+      tl.fromTo(
+        "#plate",
+        { x: -far },
+        { x: far, duration: T / 2, ease: "sine.inOut", immediateRender: false },
+        T / 2,
+      );
+      tl.fromTo("#plate", { y: 0 }, { y: -B, duration: T / 4, ease: "sine.out" }, 0);
+      tl.fromTo(
+        "#plate",
+        { y: -B },
+        { y: B, duration: T / 2, ease: "sine.inOut", immediateRender: false },
+        T / 4,
+      );
+      tl.fromTo(
+        "#plate",
+        { y: B },
+        { y: 0, duration: T / 4, ease: "sine.in", immediateRender: false },
+        (3 * T) / 4,
+      );
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

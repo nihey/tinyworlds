@@ -1,0 +1,130 @@
+<!doctype html>
+<!--
+  A world's card loop for the front page: the share card's own picture, drifting round an ellipse
+  and back to where it began, so the last frame hands over to the first. 1200 × 630, silent.
+  The plate and the wordmark sheet come from `npm run plates`; one row of loop/batch/cards.json
+  per world sets the variables (`npm run loops` renders them all).
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"plate","type":"string","label":"Map plate","default":"assets/plates/tinynyc-card.png"},
+    {"id":"sign","type":"string","label":"Wordmark sheet","default":"assets/plates/tinynyc-card-sign.png"},
+    {"id":"dir","type":"number","label":"Sets off to the left (-1) or right (1)","default":-1,"min":-1,"max":1,"step":2}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200, height=630" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+      }
+      #map {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+      }
+      /* the plate is cut at twice the picture's density and drawn at half size: the measures are
+         scripts/lib/drift.ts's CARD_DRIFT (1200 + 2 × (150 + 8) by 630 + 2 × (75 + 8)) */
+      #plate {
+        position: absolute;
+        left: -158px;
+        top: -83px;
+        width: 1516px;
+        height: 796px;
+        max-width: none;
+      }
+      #sign {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1200px;
+        height: 630px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="10"
+      data-width="1200"
+      data-height="630"
+    >
+      <div
+        id="map"
+        class="clip"
+        data-start="0"
+        data-duration="10"
+        data-track-index="0"
+        data-layout-allow-overflow
+      >
+        <img id="plate" data-var-src="plate" src="assets/plates/tinynyc-card.png" alt="" />
+      </div>
+      <img
+        id="sign"
+        class="clip"
+        data-start="0"
+        data-duration="10"
+        data-track-index="1"
+        data-var-src="sign"
+        src="assets/plates/tinynyc-card-sign.png"
+        alt=""
+      />
+    </div>
+    <script>
+      const A = 150; // the ellipse's half-axes, output px (CARD_DRIFT)
+      const B = 75;
+      const T = 10; // one lap
+      const vars = (window.__hyperframes && window.__hyperframes.getVariables()) || {};
+      const dir = Number(vars.dir) === 1 ? 1 : -1;
+
+      // The view goes round x = dir·A·(1 − cos θ), y = B·sin θ, so the plate is at
+      // (dir·A·cos θ, −B·sin θ).
+      // Each tween below is one arc of a sine, so together they are that ellipse exactly and the
+      // speed never changes: no ease-in at the start, nothing to give the loop point away.
+      const tl = gsap.timeline({ paused: true });
+      const far = dir * A; // the plate sits this far to one side when the card's framing shows
+      tl.fromTo("#plate", { x: far }, { x: -far, duration: T / 2, ease: "sine.inOut" }, 0);
+      tl.fromTo(
+        "#plate",
+        { x: -far },
+        { x: far, duration: T / 2, ease: "sine.inOut", immediateRender: false },
+        T / 2,
+      );
+      tl.fromTo("#plate", { y: 0 }, { y: -B, duration: T / 4, ease: "sine.out" }, 0);
+      tl.fromTo(
+        "#plate",
+        { y: -B },
+        { y: B, duration: T / 2, ease: "sine.inOut", immediateRender: false },
+        T / 4,
+      );
+      tl.fromTo(
+        "#plate",
+        { y: B },
+        { y: 0, duration: T / 4, ease: "sine.in", immediateRender: false },
+        (3 * T) / 4,
+      );
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "name": "tinyworlds-videos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The moving pictures: card loops for the front page, city flyovers and the showcase film, made with HyperFrames from the real tiles and the real viewer.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "context": "tsx scripts/context.ts",
+    "plates": "tsx scripts/plates.ts",
+    "loops": "tsx scripts/loops.ts",
+    "flyovers": "tsx scripts/flyovers.ts",
+    "probe": "tsx scripts/probe.ts",
+    "takes": "tsx scripts/takes.ts",
+    "sound": "tsx scripts/sound.ts",
+    "film": "tsx scripts/film.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write ."
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.16.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "eslint-config-prettier": "^10.1.8",
+    "hyperframes": "^0.9.29",
+    "polygon-clipping": "^0.15.7",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}
