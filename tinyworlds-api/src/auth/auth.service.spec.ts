@@ -562,19 +562,32 @@ describe('AuthService, for donors', () => {
     expect(prisma.admins).toEqual([]);
   });
 
-  it('mails nobody for an address with no donations, or for a donor asked as an admin', async () => {
+  it('mails anyone who asks as a donor, given or not, making the account the first time', async () => {
     const { service, mailer, prisma } = setup();
-    seedDonor(prisma);
     seedDonor(prisma, 'nogift@example.com', false);
     expect(
       await service.sendLink('nogift@example.com', HOME, 'en-US', 'donor'),
-    ).toBe(false);
+    ).toBe(true);
     expect(
-      await service.sendLink('someone@example.com', HOME, 'en-US', 'donor'),
-    ).toBe(false);
+      await service.sendLink(' Someone@Example.com ', HOME, 'en-US', 'donor'),
+    ).toBe(true);
+    // an admin may look at their own giving too, as a donor
+    expect(await service.sendLink(ADMIN, HOME, 'en-US', 'donor')).toBe(true);
+    expect(mailer.sent.map((mail) => mail.to)).toEqual([
+      'nogift@example.com',
+      'someone@example.com',
+      ADMIN,
+    ]);
+    expect(prisma.donors.map((donor) => donor.email).sort()).toEqual(
+      ['nogift@example.com', 'someone@example.com', ADMIN].sort(),
+    );
+    expect(prisma.admins).toEqual([]);
+  });
+
+  it('still mails nobody for a donor asked as an admin', async () => {
+    const { service, mailer, prisma } = setup();
+    seedDonor(prisma);
     expect(await service.sendLink(DONOR, PAGE, 'en-US', 'admin')).toBe(false);
-    // and an admin who has never given is no donor
-    expect(await service.sendLink(ADMIN, HOME, 'en-US', 'donor')).toBe(false);
     expect(mailer.sent).toEqual([]);
     expect(prisma.links).toEqual([]);
     expect(prisma.admins).toEqual([]);

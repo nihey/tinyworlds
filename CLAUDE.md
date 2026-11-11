@@ -64,9 +64,9 @@ Each sub-project has its own `CLAUDE.md`.
   visited first. An open map tells the API every half minute while it is in view
   (`trackPresence`), which keeps its visit's `last_seen_at` fresh: a visit keeps when it started
   and when it was last seen, for whatever the data is wanted for later.
-- **Donors and benefactors.** A donor is an email address Stripe gave at checkout: no
-  password, no account made by hand. A donor who signs in (a link or a 6-digit code sent by email,
-  `purpose: "donor"`) reads their own page, "Your cities" at `/me/` of the front page's build:
+- **Donors and benefactors.** A donor is an email address: the one Stripe took at checkout, or
+  any address that signs in. No password, no account made by hand. Anyone may sign in (a link
+  or a 6-digit code sent by email, `purpose: "donor"`) and read their own page, "Your cities" at `/me/` of the front page's build:
   what they gave, the badges they earned (founding number, first stone, keystone) and whether
   they are named. Each city's public benefactors (`cityBenefactors`: founders, then benefactors
   by amount, one stone per US$1) are shown on a sign from the front page and from About in a map; a built

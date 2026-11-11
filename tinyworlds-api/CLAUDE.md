@@ -217,19 +217,20 @@ each, and each gets its own links.
   the repository, and taking one off the list ends its sessions at once: the JWT strategy asks
   on every request). An `admins` row is made the first time an address on the list asks for a
   link; it is the account (its id is the session's subject, `last_login_at` its last sign-in).
-- **A donor** is a `donors` row with at least one donation: the webhook makes it (see
-  Benefactors), nothing else does. If the donor step fails, the webhook still records the
+- **A donor** is any address that asks, given or not: its `donors` row is made the first time
+  it asks for a link as a donor, or by the webhook when it gives (see Benefactors), whichever
+  comes first; gifts made with the address are its own either way. If the donor step fails, the webhook still records the
   donation (unlisted, no donor; the backfill fills it in later) and logs the failure without the address. Signing in sets its `last_login_at`.
 
 `magic_links` belong to one account: `admin_id` or `donor_id`, exactly one of them (the check
 `magic_links_one_owner`, in the migration since Prisma has no checks).
 
 1. `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (`purpose` defaults to
-   `admin`) → `202 { sent: true }`, whoever asks. It mails a link to `returnUrl#token=…` only
-   to an admin's address asked as an admin, or a donor's (one with a donation) asked as a
-   donor; `returnUrl` must be a plain page of `ALLOWED_ORIGINS` (the site's `/admin/`, or the
+   `admin`) → `202 { sent: true }`, whoever asks. It mails a link to `returnUrl#token=…` to
+   any address asked as a donor, and only to an admin's address asked as an admin; `returnUrl` must be a plain page of `ALLOWED_ORIGINS` (the site's `/admin/`, or the
    page a donor asked from). The mail goes out after the answer (`setImmediate`), so neither
-   the answer nor its timing tells an admin's address, or a donor's, from any other. One link
+   the answer nor its timing tells an admin's address from any other (nor, since anyone may
+   sign in as one, says who has given). One link
    a minute per account (`LINK_EVERY_MS`), five requests a minute per address.
 2. The mail carries the link and a **6-digit code** (`CODE_DIGITS`; in the subject, `482 913`).
    The token is 32 random bytes; only its SHA-256 is stored (`magic_links`). The code is never

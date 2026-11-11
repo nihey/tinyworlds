@@ -668,25 +668,48 @@ describe('the API over HTTP', () => {
       }
     });
 
-    it('asking for a donor link answers the same for any address', async () => {
+    it('lets anyone sign in as a donor, given or not, and answers them all alike', async () => {
       await give();
-      // not a donor: someone who has never given, and an admin who has not either
+      // the donor, someone who has never given, and an admin who has not either
       const asked = [DONOR, 'stranger@example.com', ADMIN];
-      const before = mailer.sent.length;
       const answers = [];
+      const codes = new Map<string, string>();
       for (const [i, email] of asked.entries()) {
+        const before = mailer.sent.length;
         const res = await askAsDonor(email, `203.0.113.6${i}`);
         answers.push({ status: res.status, body: res.body as unknown });
+        expect((await mailFollows(before)).to).toBe(email);
+        codes.set(email, mailer.code());
       }
       expect(answers[0]).toEqual({ status: 202, body: { sent: true } });
       expect(answers[1]).toEqual(answers[0]);
       expect(answers[2]).toEqual(answers[0]);
-      await mailFollows(before);
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      expect(mailer.sent.slice(before).map((mail) => mail.to)).toEqual([DONOR]);
+
+      // the stranger signs in with the code, and has given nothing yet
+      const signedIn = await verify(
+        {
+          email: 'stranger@example.com',
+          code: codes.get('stranger@example.com'),
+          purpose: 'donor',
+        },
+        '203.0.113.68',
+      ).expect(200);
+      const session = signedIn.body as {
+        accessToken: string;
+        donor: { email: string };
+      };
+      expect(session.donor.email).toBe('stranger@example.com');
+      const theirs = await graphql(
+        '{ myGiving { displayName projectCents cities { slug } } }',
+      )
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .expect(200);
+      expect(
+        (theirs.body as { data: { myGiving: unknown } }).data.myGiving,
+      ).toEqual({ displayName: null, projectCents: 0, cities: [] });
 
       // and a wrong code is refused alike, the donor's or the stranger's
-      const right = mailer.code();
+      const right = codes.get(DONOR) ?? '';
       const wrong = right === '000000' ? '111111' : '000000';
       const refusals = [];
       for (const [i, email] of asked.slice(0, 2).entries()) {
