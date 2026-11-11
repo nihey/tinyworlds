@@ -124,6 +124,10 @@ export function button({ label, href, ghost = false }: Button): string {
   return `<a href="${attr(href)}" style="display:inline-block;${look}border-radius:999px;font:700 14px/20px ${FONT};text-decoration:none;margin:0 8px 8px 0;">${escapeHtml(label)}</a>`;
 }
 
+/** A `mailto:` link that opens a mail to a friend, with its subject and body filled in. */
+export const mailto = (subject: string, body: string): string =>
+  `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
 /** A row of buttons. */
 export const buttons = (list: Button[]): string =>
   `<p style="margin:18px 0 4px;">${list.map(button).join('')}</p>`;

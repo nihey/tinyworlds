@@ -239,6 +239,38 @@ describe('the API over HTTP', () => {
     ]);
   });
 
+  it('thanks the donor by mail once Stripe has confirmed the gift, and only once', async () => {
+    const gift = {
+      id: 'cs_thanks',
+      amount: 1200,
+      email: 'Thea@example.com',
+      metadata: {
+        app: 'tinyworlds',
+        city: 'Lisbon',
+        world: 'tinynyc',
+        locale: 'en-US',
+        benefactor_name: 'Thea',
+      },
+    };
+    await webhook(gift).expect(200);
+    await vi.waitFor(() =>
+      expect(mailer.others('thea@example.com')).toHaveLength(1),
+    );
+    // Stripe delivers again: nothing new is recorded, and nobody is thanked twice
+    await webhook(gift).expect(200);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const thanks = mailer.others('thea@example.com');
+    expect(thanks).toHaveLength(1);
+    expect(thanks[0].subject).toBe('You laid stones 1–12 of Lisbon');
+    expect(thanks[0].text).toContain(
+      "You're on Lisbon's Founding Benefactors as Thea.",
+    );
+    expect(thanks[0].html).toContain('href="https://example.com/me/"');
+    expect(thanks[0].html).toContain(
+      'src="https://example.com/email/wordmark.png"',
+    );
+  });
+
   it('refuses a webhook with a bad signature, and one with none', async () => {
     const { body } = signedEvent(
       checkoutSession({ metadata: { app: 'tinyworlds', city: 'Paris' } }),
@@ -964,11 +996,17 @@ describe('the API over HTTP', () => {
       answer(await graphql(WORLD_VISITS, { input: { worlds } }).expect(200))
         .data.worldVisits;
     /** Time passes (only as the API's clock tells it): past the counts kept in memory. */
-    let clock = Date.now();
+    let clock = 0;
     const wait = (ms: number) => {
       clock += ms;
       vi.setSystemTime(clock);
     };
+
+    beforeAll(() => {
+      // from now, not from when the file was read: the thank-yous of the tests before counted
+      // visits too, and their counts are kept in memory
+      clock = Date.now();
+    });
 
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ['Date'], now: clock });

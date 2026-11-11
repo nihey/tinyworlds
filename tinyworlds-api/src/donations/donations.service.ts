@@ -18,19 +18,18 @@ import {
   donationFacts,
   type DonationFacts,
 } from './donation-facts.js';
+import { COUNTED_CURRENCY } from './currency.js';
 import type { CreateDonationCheckoutInput } from './dto/create-donation-checkout.input.js';
 import { LOCALE_FACTS, type Locale } from './locales.js';
 import { acceptReturnUrl } from './return-url.js';
 import { STRIPE, type StripeClient } from './stripe.provider.js';
+import { ThanksService } from './thanks.service.js';
 
 /** The checkout events that can mean "this donation is paid". */
 const PAID_EVENTS = new Set([
   'checkout.session.completed',
   'checkout.session.async_payment_succeeded',
 ]);
-
-/** Only US dollars fill a city's bar: the goal is in dollars. */
-export const COUNTED_CURRENCY = 'usd';
 
 const isUniqueViolation = (error: unknown): boolean =>
   (error as { code?: string } | null)?.code === 'P2002';
@@ -52,6 +51,7 @@ export class DonationsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
     private readonly funnel: FunnelService,
+    private readonly thanks: ThanksService,
   ) {}
 
   private productOf(locale: Locale): Promise<string> {
@@ -202,18 +202,24 @@ export class DonationsService {
   /**
    * Records a paid donation once, however often Stripe reports it, and moves its city's bar
    * in the same transaction: the city is found by slug or created, dollars are added to what
-   * it has raised, and a PROPOSED city that reaches its goal becomes FUNDED.
+   * it has raised, and a PROPOSED city that reaches its goal becomes FUNDED. A new donation with
+   * a donor is then thanked by mail, once the transaction is done and without holding up the
+   * webhook's answer; a replay is not thanked again.
    */
   async record(facts: DonationFacts): Promise<void> {
     let current = facts;
     for (let attempt = 0; ; attempt++) {
       try {
         const recorded = await this.insert(current);
-        if (recorded)
+        if (recorded) {
           this.logger.log(
             `Donation ${facts.stripeSessionId}: ${facts.amountCents} ${facts.currency}` +
               (facts.citySlug ? ` for ${facts.citySlug}` : ''),
           );
+          // the thank-you logs its own failure and never throws: it cannot undo the donation
+          if (recorded.donorId)
+            setImmediate(() => void this.thanks.send(recorded.id));
+        }
         return;
       } catch (error) {
         if (!isUniqueViolation(error)) {
@@ -241,14 +247,16 @@ export class DonationsService {
     }
   }
 
-  /** False when the donation was already there. */
-  private insert(facts: DonationFacts): Promise<boolean> {
+  /** The donation recorded, or null when it was already there. */
+  private insert(
+    facts: DonationFacts,
+  ): Promise<{ id: string; donorId: string | null } | null> {
     return this.prisma.$transaction(async (tx) => {
       const seen = await tx.donation.findUnique({
         where: { stripeSessionId: facts.stripeSessionId },
         select: { id: true },
       });
-      if (seen) return false;
+      if (seen) return null;
 
       const city =
         facts.citySlug && facts.cityName
@@ -280,7 +288,8 @@ export class DonationsService {
           });
       }
 
-      await tx.donation.create({
+      const donation = await tx.donation.create({
+        select: { id: true, donorId: true },
         data: {
           stripeSessionId: facts.stripeSessionId,
           stripePaymentIntentId: facts.stripePaymentIntentId,
@@ -312,7 +321,7 @@ export class DonationsService {
             data: { status: 'FUNDED' },
           });
       }
-      return true;
+      return donation;
     });
   }
 }

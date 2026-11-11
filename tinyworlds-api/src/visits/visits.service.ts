@@ -8,6 +8,9 @@ export const LIVE_MS = 75_000;
 /** How long a count is answered from memory: every front page asks every half minute. */
 export const CACHE_MS = 10_000;
 
+/** The funnel's name for the front page, which is not a world. */
+export const HOME = 'home';
+
 /** A page that is still open, as the map says it every half minute. */
 export interface PresenceFacts {
   visitId: string;
@@ -64,6 +67,15 @@ export class VisitsService {
       visits: visits.get(world) ?? 0,
       live: live.get(world) ?? 0,
     }));
+  }
+
+  /**
+   * The visits of the worlds asked, added up, the front page's own ("home") left out: what the
+   * front page's cards say, together.
+   */
+  async totalOf(worlds: string[]): Promise<number> {
+    const counted = await this.ofWorlds(worlds.filter((w) => w !== HOME));
+    return counted.reduce((sum, world) => sum + world.visits, 0);
   }
 
   /** Every world's counts, from memory while they are fresh; a failed count is not kept. */

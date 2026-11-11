@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { COUNTED_CURRENCY } from '../donations/donations.service.js';
+import { COUNTED_CURRENCY } from '../donations/currency.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CityBenefactorsInput } from './dto/city-benefactors.input.js';
 import { cleanDisplayName } from './display-name.js';
