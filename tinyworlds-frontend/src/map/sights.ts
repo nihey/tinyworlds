@@ -123,6 +123,16 @@ function inside(paths: Float64Array[], x: number, y: number): boolean {
   return hit;
 }
 
+/** Whether any of a sight's outline can be on a screen showing this map-px rectangle (by its box). */
+export function sightInView(
+  s: SightShape,
+  view: { left: number; top: number; right: number; bottom: number },
+): boolean {
+  return (
+    s.right >= view.left && s.left <= view.right && s.bottom >= view.top && s.top <= view.bottom
+  );
+}
+
 /** The sight under map point (x, y): of those whose outline holds it, the one nearest the viewer. -1 for none. */
 export function sightAt(shapes: SightShape[], x: number, y: number): number {
   let best = -1;

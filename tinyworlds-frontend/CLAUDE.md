@@ -391,6 +391,10 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
   building, so the sign takes the pointer and its link can be reached; a click elsewhere, the
   sign's close button or Esc lets it go; a second click on it too. Double-tap zoom is unchanged.
   The pinned sign is a labelled group, not a dialog, so the map's keys keep working.
+- **Out of view, out of the spotlight.** Once the view leaves a lit building wholly behind (a
+  drag, the wheel, the keys, a flight from the search or the minimap), it lets go, pinned or
+  hovered (`keepInView`, checked each frame against the outline's box, `sightInView`): the map
+  is never left dimmed with nothing lit on screen, and its sign goes with it.
 - **The sign** (`SightSign`) is placed through a ref on every `view` event (`placeSign`: right of
   the anchor, or left where there is no room; out of the way of the map's own signs at the top,
   the search, the banner and the tools, by moving left of a column or below a sign that spans

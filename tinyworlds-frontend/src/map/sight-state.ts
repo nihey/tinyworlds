@@ -49,6 +49,17 @@ export function release(s: SightState): SightState {
   return s.pinned === null ? s : { ...s, pinned: null };
 }
 
+/**
+ * The view moved: a sight now wholly off screen lets go, pinned or hovered, so the map is not
+ * left dimmed with nothing lit on it. Unchanged state comes back as it was.
+ */
+export function keepInView(s: SightState, inView: (id: string) => boolean): SightState {
+  const pinned = s.pinned !== null && !inView(s.pinned) ? null : s.pinned;
+  const hoverGone = s.hovered !== null && !inView(s.hovered);
+  if (pinned === s.pinned && !hoverGone) return s;
+  return hoverGone ? { hovered: null, pinned, leftAt: null } : { ...s, pinned };
+}
+
 /** What is lit: the pinned sight over the hovered one. */
 export function shown(s: SightState): { id: string; pinned: boolean } | null {
   if (s.pinned !== null) return { id: s.pinned, pinned: true };

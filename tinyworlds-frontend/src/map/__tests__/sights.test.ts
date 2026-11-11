@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildSightShapes, parseSights, parseSightTexts, sightAt, type Sight } from "../sights";
+import {
+  buildSightShapes,
+  parseSights,
+  parseSightTexts,
+  sightAt,
+  sightInView,
+  type Sight,
+} from "../sights";
 
 const square = (x: number, y: number, s: number): number[] => [
   x,
@@ -41,6 +48,25 @@ describe("sightAt", () => {
       sight("in front", [square(0, 0, 20)], 20),
     ]);
     expect(shapes[sightAt(shapes, 10, 5)].id).toBe("in front");
+  });
+});
+
+describe("sightInView", () => {
+  const view = { left: 0, top: 0, right: 100, bottom: 100 };
+  const at = (x: number, y: number, size: number) =>
+    sightInView(buildSightShapes([sight("a", [square(x, y, size)], 0)])[0], view);
+
+  it("is in view while any of it is on screen", () => {
+    expect(at(40, 40, 10)).toBe(true); // wholly inside
+    expect(at(95, -5, 10)).toBe(true); // across a corner
+    expect(at(-50, -50, 300)).toBe(true); // bigger than the screen
+  });
+
+  it("is out of view once all of it is off screen, on any side", () => {
+    expect(at(101, 40, 10)).toBe(false);
+    expect(at(-11, 40, 10)).toBe(false);
+    expect(at(40, 101, 10)).toBe(false);
+    expect(at(40, -11, 10)).toBe(false);
   });
 });
 

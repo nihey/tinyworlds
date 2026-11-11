@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { HOLD_MS, hover, leave, press, release, shown, tap, type SightState } from "../sight-state";
+import {
+  HOLD_MS,
+  hover,
+  keepInView,
+  leave,
+  press,
+  release,
+  shown,
+  tap,
+  type SightState,
+} from "../sight-state";
 
 const idle: SightState = { hovered: null, pinned: null, leftAt: null };
 
@@ -53,5 +63,35 @@ describe("the sight under the pointer", () => {
 
   it("moves the pin to another sight pressed while one is pinned", () => {
     expect(shown(press(press(idle, "a"), "b"))).toEqual({ id: "b", pinned: true });
+  });
+});
+
+describe("a sight the view leaves behind", () => {
+  const only =
+    (...ids: string[]) =>
+    (id: string) =>
+      ids.includes(id);
+
+  it("lets a pinned sight go once it is wholly off screen", () => {
+    const pinned = press(idle, "a");
+    expect(keepInView(pinned, only("a"))).toBe(pinned);
+    expect(shown(keepInView(pinned, only()))).toBeNull();
+  });
+
+  it("lets a hovered sight go too, held or not", () => {
+    const onA = hover(idle, "a", 0);
+    expect(shown(keepInView(onA, only()))).toBeNull();
+    const held = hover(onA, null, 1000);
+    expect(keepInView(held, only())).toEqual(idle);
+  });
+
+  it("keeps whatever is still on screen", () => {
+    const both = hover(press(idle, "a"), "b");
+    expect(shown(keepInView(both, only("b")))).toEqual({ id: "b", pinned: false });
+    expect(shown(keepInView(both, only("a")))).toEqual({ id: "a", pinned: true });
+  });
+
+  it("does not ask about anything when nothing is lit", () => {
+    expect(keepInView(idle, () => false)).toBe(idle);
   });
 });
