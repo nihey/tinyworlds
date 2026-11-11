@@ -283,8 +283,8 @@ export interface Strings {
   };
   /**
    * "Your cities" (the front page's build, at /me/): a donor signs in and sees what they gave,
-   * the badges they earned and whether they are named. "{cities}", "{stones}" and "{given}" make
-   * the summary; "{amount}" is money, "{ranges}" stone ranges ("1–12"), "{left}" money still
+   * the badges they earned and whether they are named. the summary line is built from
+   * `summaryCities`, `summaryStones` and `summaryGiven`; "{amount}" is money, "{ranges}" stone ranges ("1–12"), "{left}" money still
    * missing, "{city}" a city's name, "{name}" the donor's, "{email}" their address, "{n}" a number.
    */
   me: {
@@ -377,6 +377,16 @@ export interface Strings {
       empty: string;
       noCity: string;
       columns: { when: string; amount: string; city: string; from: string };
+    };
+    /** the donors' names on benefactors pages, and hiding them; "{cities}" is a list of city names */
+    names: {
+      heading: string;
+      note: string;
+      empty: string;
+      hide: string;
+      unhide: string;
+      hidden: string;
+      cities: string;
     };
     /** the link in the front page's footer that only a signed-in admin sees */
     footerLink: string;

@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { replaceUrl } from "@/map/hash";
 import { HOME_URL } from "@/site";
 import { FunnelReport } from "./funnel-report";
+import { Names } from "./names";
 import { SignIn, type SignInNotice } from "@/components/sign-in/sign-in";
 
 /** The token of a sign-in link in the address, when the page was opened from one. */
@@ -136,6 +137,7 @@ function Report({ session, onEnded }: { session: AdminSession; onEnded: () => vo
           className={cn("flex flex-col gap-8 transition-opacity", waiting && "opacity-50")}
         >
           <FunnelReport funnel={funnel} locale={locale} t={t} />
+          <Names session={session} locale={locale} t={t} onEnded={onEnded} />
         </div>
       ) : (
         <div className="sign px-5 py-5 sm:px-6">

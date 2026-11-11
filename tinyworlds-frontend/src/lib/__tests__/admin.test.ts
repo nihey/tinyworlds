@@ -7,6 +7,7 @@ import {
   normalizeCode,
   niceMax,
   parseFunnel,
+  parseNames,
   parseSession,
   rangeOf,
   rankWorlds,
@@ -233,5 +234,45 @@ describe("parseFunnel", () => {
     expect(funnel.worlds).toEqual([]);
     expect(funnel.days).toEqual([]);
     expect(funnel.timeZone).toBe("UTC");
+  });
+});
+
+describe("the benefactor names", () => {
+  const row = {
+    donorId: "d1",
+    name: "Ada",
+    hidden: false,
+    cities: ["New York", "Orlando"],
+    lastGiftAt: "2026-11-10T12:00:00.000Z",
+  };
+
+  it("keeps valid rows in the order given", () => {
+    const second = { ...row, donorId: "d2", name: "Bo", hidden: true, cities: [] };
+    expect(parseNames([row, second])).toEqual([row, second]);
+  });
+
+  it("drops rows that are malformed", () => {
+    expect(
+      parseNames([
+        row,
+        { ...row, donorId: "" },
+        { ...row, name: 5 },
+        { ...row, name: "  " },
+        { ...row, hidden: "yes" },
+        { ...row, lastGiftAt: "not a date" },
+        null,
+        "x",
+      ]),
+    ).toEqual([row]);
+  });
+
+  it("keeps only the text among a row's cities", () => {
+    expect(parseNames([{ ...row, cities: ["Rome", 3, null, ""] }])[0].cities).toEqual(["Rome"]);
+    expect(parseNames([{ ...row, cities: undefined }])[0].cities).toEqual([]);
+  });
+
+  it("is empty for anything that is not a list", () => {
+    expect(parseNames(null)).toEqual([]);
+    expect(parseNames({})).toEqual([]);
   });
 });

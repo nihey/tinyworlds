@@ -24,7 +24,7 @@ npm run test:e2e          # boots the app on database tinyworlds_test (needs the
                           # E2E_DATABASE_URL=postgresql://… npm run test:e2e   # on another database
 npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, without Stripe
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
-npm run donors:backfill   # past donations get their donors from Stripe: run once after deploying (safe to repeat)
+npm run donors:backfill   # past donations get their donors from Stripe: run once after deploying (safe to repeat: sessions without an email, or whose lookup failed, are asked again)
 ```
 
 ## Structure
@@ -177,8 +177,8 @@ benefactors.
 `donors` holds one row per lower-case email (`display_name`, `name_hidden`, `last_login_at`);
 `donations.donor_id` ties a gift to it (null when Stripe gave no usable address) and
 `donations.listed` says the donor asked to be named for that gift. A name is shown only when the
-gift is listed, the donor has a name, and `name_hidden` is false; hiding it (SQL:
-`UPDATE donors SET name_hidden = true WHERE …`) changes no stones or numbers. Emails never reach
+gift is listed, the donor has a name, and `name_hidden` is false; an admin hides one
+on the admin page (`setNameHidden`), which changes no stones or numbers. Emails never reach
 GraphQL types or logs.
 
 `myGiving` (`@ForDonors()`) reads the signed-in donor's places from the same `cityStanding` as the
@@ -190,8 +190,12 @@ lists names and sets `name_hidden`.
 
 `prisma/backfill-donors.ts` (`backfillDonors`) gives donations that have no donor theirs: it asks
 Stripe for each session, reads the address with `donorEmailOf`, upserts the donor and sets
-`donor_id`. It never touches `listed`, prints counts only, and a second run fills nothing new. Hidden cities still appear on their own
-donors' pages (hiding only keeps a city off the public list).
+`donor_id`. It never touches `listed` and prints counts only. Running it again is safe: donations that
+already have a donor are skipped, but sessions without an email, or whose Stripe lookup failed,
+are asked about again on each run.
+
+Hidden cities still appear on their own donors' pages (hiding only keeps a city off the public
+list).
 
 ## Signing in, for admins and donors (`auth/`)
 
@@ -324,7 +328,7 @@ FROM cities c LEFT JOIN donations d ON d.city_id = c.id GROUP BY c.id;
 
 ## Running the list by hand
 
-The admin pages only read (the funnel). Changes to a city are SQL (or `npx prisma studio`):
+The admin pages read the funnel and hide or show donors' names (`setNameHidden`). Changes to a city are SQL (or `npx prisma studio`):
 
 ```sql
 UPDATE cities SET status = 'BUILDING' WHERE slug = 'sao-paulo';                     -- work has started

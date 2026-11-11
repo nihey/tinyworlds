@@ -30,8 +30,8 @@ such strings before every commit.
 ```
 tinyworlds/
 ├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
-├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world) and the front page
-├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins)
+├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world), the front page, `/admin/` and `/me/`
+├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins), benefactors and donors' own page (`/me/`)
 ├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film, a tour of tinywesteros
 ├── deploy/                # nginx config, deploy script, .env.example
 ├── dev.sh                 # tmux launcher
@@ -57,6 +57,14 @@ Each sub-project has its own `CLAUDE.md`.
   (no cookie, no address). That gives the donation funnel and each city's count of visits,
   which admins read at `/admin/` (part of the front page's build). Admins sign in through a
   link sent by email; who they are is the API's `ADMIN_EMAILS`, never a tracked file.
+- **Donors and benefactors.** A donor is an email address Stripe gave at checkout: no
+  password, no account made by hand. A donor who signs in (a link or a 6-digit code sent by email,
+  `purpose: "donor"`) reads their own page, "Your cities" at `/me/` of the front page's build:
+  what they gave, the badges they earned (founding number, first stone, keystone) and whether
+  they are named. Each city's public benefactors (`cityBenefactors`: founders, then benefactors
+  by amount, one stone per US$1) are shown on a sign from the front page and from About in a map; a built
+  city, which the Donate sign does not offer, reaches Donate only through that sign. Names are the donor's choice, per city; admins can hide one on `/admin/`. Emails never
+  appear in the API's answers, and no answer says whether an address has donated.
 - **The front page moves.** Its hero and each world's card play a short silent loop made by
   `tinyworlds-videos` from the world's own tiles, over a still; the loops are the front page's
   own files, so nothing but its build needs deploying for them.
@@ -236,8 +244,13 @@ GraphQL at `/api/graphql` (same origin in production):
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
-type Query { health: String!  cityMilestones: [CityMilestone!]! }
-input CreateDonationCheckoutInput { city: String  amountCents: Int  world: String!  locale: String!  returnUrl: String!  visitId: ID }
+type Query {
+  health: String!
+  cityMilestones: [CityMilestone!]!
+  cityBenefactors(input: CityBenefactorsInput!): CityBenefactors   # public; null for an unknown or hidden city
+}
+input CityBenefactorsInput { slug: String  world: String }          # one of the two
+input CreateDonationCheckoutInput { city: String  amountCents: Int  world: String!  locale: String!  returnUrl: String!  visitId: ID  benefactorName: String }
 type DonationCheckout { url: String! }
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
@@ -245,12 +258,20 @@ type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
 }
-# admins only (Authorization: Bearer <an admin's session>): me, donationFunnel
+# donors only (Authorization: Bearer <a donor's session>):
+#   query    myGiving: MyGiving!                         # their cities, stones, badges, listing
+#   mutation setListing(input: { city: String!, listed: Boolean! }): Boolean!
+#   mutation setDisplayName(input: { name: String! }): String!   # answers the cleaned name
+# admins only (Authorization: Bearer <an admin's session>):
+#   me, donationFunnel
+#   query    benefactorNames: [BenefactorName!]!         # newest listed gift first, at most 100
+#   mutation setNameHidden(input: { donorId: ID!, hidden: Boolean! }): Boolean!
 ```
 
 `amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
 (from US$1). `visitId` is the tab's visit (a UUID from session storage); `world` is a world's id
-or `"home"`. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
+or `"home"`. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
+city's benefactors for this gift; without it the gift is counted and not listed. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
 `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
 `POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered
 `{ accessToken, expiresAt, admin | donor: { id, email } }`. `purpose` is `"admin"` (the default)
