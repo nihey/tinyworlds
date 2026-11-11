@@ -136,8 +136,12 @@ describe('the API over HTTP', () => {
   });
 
   it('is alive under /api', async () => {
-    const res = await graphql('{ health }').expect(200);
-    expect(res.body).toEqual({ data: { health: 'ok' } });
+    const res = await graphql('{ health uptime }').expect(200);
+    const { data } = res.body as { data: { health: string; uptime: number } };
+    expect(data.health).toBe('ok');
+    // the seconds this process (the app's, in the tests) has been up: what a deploy waits on
+    expect(data.uptime).toBeGreaterThanOrEqual(0);
+    expect(data.uptime).toBeLessThanOrEqual(process.uptime());
     await request(app.getHttpServer())
       .post('/graphql')
       .send({ query: '{ health }' })

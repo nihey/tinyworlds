@@ -113,15 +113,17 @@ Each sub-project has its own `CLAUDE.md`.
 1. Pipeline: `tinyworlds-pipeline/src/cities/<id>.ts` (see that project's `CLAUDE.md`), then
    `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
 2. Viewer: `tinyworlds-frontend/src/worlds/<id>.ts` and its registry entry.
-3. API: mark the city `BUILT` with its `worldId` (a line in `seed-data.ts`, then deploy the API
-   and run the seed; see `tinyworlds-api/CLAUDE.md`).
+3. API: mark the city `BUILT` with its `worldId` (a line in `seed-data.ts`; the seed runs
+   whenever the API starts; see `tinyworlds-api/CLAUDE.md`).
 4. Videos: `npm run plates -- <id> && npm run loops -- <id>` in `tinyworlds-videos` gives the world its
    card loop on the front page (`tinyworlds-frontend/public/loops/<id>.mp4`); without one its
    card simply stays still.
 5. `deploy/deploy.sh check` (every world in the registry has its data, card, pipeline city and
-   docs, this one included), then `deploy/deploy.sh <id>` and `deploy/deploy.sh home`. Deploying
-   the world also tells its city's donors that it is built (once; it needs `API_SERVICE` in
-   `deploy/.env` and the city marked `BUILT` by the seed first).
+   docs, this one included), then send its data, `deploy/deploy.sh <id> --data`, **before** the
+   merge to main: the push deploys the API (whose seed marks the city `BUILT`), then every
+   viewer, and refuses while a world in the registry has no data on the server. Deploying the
+   world also tells its city's donors that it is built (once; it needs `ANNOUNCE_HOST` or
+   `API_SERVICE`).
 
 The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
 `NEXT_PUBLIC_WORLD`, the data folder and the URL path.
@@ -290,6 +292,7 @@ enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
 type Query {
   health: String!
+  uptime: Int!                                                       # seconds since the API process started
   cityMilestones: [CityMilestone!]!
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors   # public; null for an unknown or hidden city
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!          # public; the worlds asked, in that order
@@ -341,12 +344,23 @@ it does not know, and the site then falls back to its payment link. Details in
 
 - `./dev.sh [world]` opens tmux with the viewer's dev server, the API and a pipeline shell.
 - The pipeline is run by hand (`npm run all -- --city <id>` in `tinyworlds-pipeline`).
-- `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the world's data) to the
-  web server; `deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data]` checks and builds
-  every world in the viewer's registry and the front page, and uploads only if all of them
-  built. After uploading a world it runs the API's announce command in the API's container
-  (`API_SERVICE`), which mails a newly built city's donors once. The API is a container built
-  from `tinyworlds-api/Dockerfile`. See `deploy/README.md`.
+- **A push to `main` deploys itself** (`.github/workflows/deploy.yml` runs `deploy/deploy.sh
+  release`): the API, through its host's deploy webhook, when `tinyworlds-api/` changed, waiting
+  until the new one answers; then every viewer and the front page, without map data, when
+  `tinyworlds-frontend/` or `deploy/` changed. The server keeps which commit each part came from
+  (`deployed/api`, `deployed/viewers`), so a failed or skipped run is made up by the next one
+  (or the daily one). Nothing of where it goes is in the workflow: it reads the repository's
+  `production` environment secrets.
+- By hand: map data, which is not in git (`deploy/deploy.sh <world> --data`, or `--index` for
+  the indexes); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
+  world's data) to the web server; `deploy/deploy.sh all [--parallel[=N] | --serial]
+  [--no-data]` checks and builds every world in the viewer's registry and the front page, and
+  uploads only if all of them built. A build from a tree that lacks what the server runs is
+  refused. Uploads use rsync alone, with a key that can do nothing else. After uploading a world
+  it runs the API's announce command in the API's container (through `ANNOUNCE_HOST`, a key
+  that may run only that, or a shell and `API_SERVICE`), which mails a newly built city's
+  donors once. The API is a container built from `tinyworlds-api/Dockerfile`. See
+  `deploy/README.md`.
 
 ## Conventions
 

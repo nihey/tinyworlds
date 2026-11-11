@@ -1,0 +1,84 @@
+name: Deploy
+
+# Whatever reaches main goes live: `deploy/deploy.sh release` compares main with what the server
+# was last given (deployed/api, deployed/viewers beside the site) and redeploys the API when
+# tinyworlds-api changed, then every viewer, without its map data, when the frontend or deploy/
+# did. Map data is not in git: it still goes up by hand (deploy/deploy.sh <world> --data).
+#
+# Where it goes lives in the `production` environment's secrets (deploy/README.md), never here.
+
+on:
+  push:
+    branches: [main]
+  # once a day: catches up with a run that failed, and with a deploy made by hand from a branch
+  schedule:
+    - cron: "23 7 * * *"
+  workflow_dispatch:
+    inputs:
+      everything:
+        description: "Redeploy the API and every viewer, even if nothing changed"
+        type: boolean
+        default: false
+
+# one deploy at a time, in order; a newer push waits for the running one instead of cancelling it
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # the history: what changed since the server's commits, and whether they are on main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tinyworlds-frontend/package-lock.json
+
+      - name: Reach the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          API_DEPLOY_WEBHOOK: ${{ secrets.API_DEPLOY_WEBHOOK }}
+          ANNOUNCE_HOST: ${{ secrets.ANNOUNCE_HOST }}
+        run: |
+          # the logs are public: mask the host names inside the secrets too, for errors that name one
+          host_of() { local rest="${1#*://}"; rest="${rest#*@}"; echo "${rest%%[/:]*}"; }
+          for value in "$DEPLOY_HOST" "$DEPLOY_URL" "$API_DEPLOY_WEBHOOK" "$ANNOUNCE_HOST"; do
+            if [[ -n "$value" ]]; then echo "::add-mask::$(host_of "$value")"; fi
+          done
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" >~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" >~/.ssh/known_hosts
+
+      - name: Deploy what main has and the server does not
+        env:
+          # the key is held to the deploy directory on the server (rrsync): paths are relative to it
+          DEPLOY_DIR: "."
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          API_URL: ${{ secrets.API_URL }}
+          ANALYTICS_SRC: ${{ secrets.ANALYTICS_SRC }}
+          ANALYTICS_SITE_ID: ${{ secrets.ANALYTICS_SITE_ID }}
+          GTM_ID: ${{ secrets.GTM_ID }}
+          DONATE_URL: ${{ secrets.DONATE_URL }}
+          DONATE_URL_PT: ${{ secrets.DONATE_URL_PT }}
+          DONATE_URL_ES: ${{ secrets.DONATE_URL_ES }}
+          API_DEPLOY_WEBHOOK: ${{ secrets.API_DEPLOY_WEBHOOK }}
+          SITE_DEPLOY_WEBHOOK: ${{ secrets.SITE_DEPLOY_WEBHOOK }}
+          # optional: telling a newly built city's donors, through a key that may only do that
+          ANNOUNCE_HOST: ${{ secrets.ANNOUNCE_HOST }}
+        run: deploy/deploy.sh release ${{ inputs.everything && '--everything' || '' }}
