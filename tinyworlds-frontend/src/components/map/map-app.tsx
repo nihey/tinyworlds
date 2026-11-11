@@ -7,7 +7,12 @@ import { ExploreBanner } from "@/components/map/explore-banner";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePrefs } from "@/hooks/use-prefs";
-import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
+import {
+  useDocumentLanguage,
+  useDonationReturn,
+  useFunnelVisit,
+  usePresence,
+} from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { prefsStore } from "@/lib/prefs";
@@ -85,6 +90,7 @@ export function MapApp() {
   useDocumentLanguage(locale, copy.title);
   useDonationReturn();
   useFunnelVisit();
+  usePresence();
   // donations are taken when the build names an API or a checkout for this language
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, WORLD.id) !== null;
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");

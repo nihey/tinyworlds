@@ -15,11 +15,13 @@ import { useMilestones } from "@/hooks/use-milestones";
 import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
+import { useWorldVisits } from "@/hooks/use-world-visits";
 import type { Locale, Strings } from "@/i18n";
 import { defaultGoal, RANKING_LIMIT, rankCities, withGoal } from "@/lib/city-picker";
 import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { cn } from "@/lib/utils";
+import { byVisits, visitsLine, type WorldCount, type WorldCounts } from "@/lib/visits";
 import {
   ADMIN_PATH,
   CONTACT_EMAIL,
@@ -69,6 +71,37 @@ function CardPicture({ world, alt }: { world: World; alt: string }) {
   );
 }
 
+/** Every world the front page lists, for the count of their visits. */
+const WORLD_IDS = Object.keys(WORLDS);
+
+/**
+ * Under a card: every visit its map has had, and how many are exploring it now once that is
+ * more than ten. With an API the line's height is there from the start, so the cards do not
+ * grow when the counts arrive; until then (or if they never do) it says nothing.
+ */
+function VisitsLine({
+  count,
+  locale,
+  t,
+}: {
+  count: WorldCount | undefined;
+  locale: Locale;
+  t: Strings;
+}) {
+  const line = visitsLine(count, locale, t.home);
+  return (
+    <p className="flex min-h-4 flex-wrap items-center gap-x-2.5 pt-2 text-xs leading-4 font-semibold text-paper-dim tabular-nums">
+      {line.visits && <span>{line.visits}</span>}
+      {line.live && (
+        <span className="inline-flex items-center gap-1.5 text-paper">
+          <span aria-hidden className="size-1.5 rounded-full bg-taxi motion-safe:animate-pulse" />
+          {line.live}
+        </span>
+      )}
+    </p>
+  );
+}
+
 /** One group of worlds as cards: the cities, or the places that only exist in stories. */
 function WorldGrid({
   id,
@@ -79,6 +112,7 @@ function WorldGrid({
   t,
   onBenefactors,
   benefactorWorlds,
+  visits,
 }: {
   id: string;
   heading: string;
@@ -90,6 +124,8 @@ function WorldGrid({
   onBenefactors: (world: string) => void;
   /** the worlds the API knows a city for: only their cards offer the benefactors */
   benefactorWorlds: ReadonlySet<string>;
+  /** each world's visits; undefined when the build has no API, and the cards say none */
+  visits?: WorldCounts | null;
 }) {
   return (
     <section aria-labelledby={id}>
@@ -117,6 +153,9 @@ function WorldGrid({
                   <div className="min-w-0 flex-1">
                     <h3 className="text-lg leading-tight font-semibold text-paper">{copy.city}</h3>
                     <p className="pt-1 text-sm leading-snug text-paper-dim">{copy.card}</p>
+                    {visits !== undefined && (
+                      <VisitsLine count={visits?.get(world.id)} locale={locale} t={t} />
+                    )}
                   </div>
                   <ArrowUpRight
                     aria-hidden
@@ -235,9 +274,18 @@ export function Landing() {
   // what a city needs to be built, as the list says (the API's goal)
   const goalCents = defaultGoal(milestones.cities);
   const shown = showAll ? ranked : ranked.slice(0, RANKING_LIMIT);
-  // the real cities first, then the places that only exist in stories
-  const cities = Object.values(WORLDS).filter((world) => !world.fictional);
-  const imagined = Object.values(WORLDS).filter((world) => world.fictional);
+  // the real cities first, then the places that only exist in stories; each group most visited
+  // first, by the first counts that came (the registry's order until then)
+  const visits = useWorldVisits(WORLD_IDS);
+  const shownVisits = API_URL !== "" ? visits.counts : undefined;
+  const cities = byVisits(
+    Object.values(WORLDS).filter((world) => !world.fictional),
+    visits.ranked,
+  );
+  const imagined = byVisits(
+    Object.values(WORLDS).filter((world) => world.fictional),
+    visits.ranked,
+  );
   const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
   // the benefactors need the API; a world's card offers them once the list says it has a city for it
@@ -303,6 +351,7 @@ export function Landing() {
         t={t}
         onBenefactors={(world) => openBenefactors({ world })}
         benefactorWorlds={benefactorWorlds}
+        visits={shownVisits}
       />
       {imagined.length > 0 && (
         <WorldGrid
@@ -314,6 +363,7 @@ export function Landing() {
           t={t}
           onBenefactors={(world) => openBenefactors({ world })}
           benefactorWorlds={benefactorWorlds}
+          visits={shownVisits}
         />
       )}
 

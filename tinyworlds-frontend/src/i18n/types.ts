@@ -108,6 +108,10 @@ export interface Strings {
     donateTo: string;
     /** names the flag beside a row: opens the city's benefactors; "{city}" is the city */
     benefactorsOf: string;
+    /** under a card: every visit its map has had; "{n}" is the number, written the visitor's way */
+    visits: { one: string; other: string };
+    /** beside it, once more than ten have that map open now; "{n}" is how many */
+    exploringNow: string;
     /** the link in the header to the donor's own page */
     yourCities: string;
     /** why donate, when there is no list of cities to show */

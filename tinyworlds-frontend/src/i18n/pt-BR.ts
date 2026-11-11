@@ -68,6 +68,8 @@ export const ptBR: Strings = {
     rankingEmpty: "Ainda não há doações: a primeira coloca a cidade no topo.",
     donateTo: "Doar para {city}",
     benefactorsOf: "Benfeitores de {city}",
+    visits: { one: "{n} visita", other: "{n} visitas" },
+    exploringNow: "{n} explorando agora",
     yourCities: "Suas cidades",
     nextPitch:
       "As doações pagam os servidores e as horas de trabalho para construir cada cidade. Quer ver a sua? Escreva o nome dela na doação.",

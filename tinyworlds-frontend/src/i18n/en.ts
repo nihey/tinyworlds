@@ -67,6 +67,8 @@ export const en: Strings = {
     rankingEmpty: "No donations yet: the first one puts its city at the top.",
     donateTo: "Donate to {city}",
     benefactorsOf: "Benefactors of {city}",
+    visits: { one: "{n} visit", other: "{n} visits" },
+    exploringNow: "{n} exploring now",
     yourCities: "Your cities",
     nextPitch:
       "Donations pay for the servers and the hours it takes to build each city. Want yours next? Name it in the donation.",

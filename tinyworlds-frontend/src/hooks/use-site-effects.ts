@@ -6,6 +6,7 @@ import { activeLocale, activeStrings, type Locale } from "@/i18n";
 import { API_URL, readDonated } from "@/lib/donate";
 import { trackStep } from "@/lib/funnel";
 import { sessionStore, siteEvent, takeCheckout } from "@/lib/site-events";
+import { documentPage, everyWhileShown, PRESENCE_EVERY_MS, trackPresence } from "@/lib/visits";
 import { replaceUrl } from "@/map/hash";
 import { ME_URL, SITE_ID } from "@/site";
 
@@ -82,5 +83,21 @@ export function useDonationReturn(): void {
 export function useFunnelVisit(): void {
   useEffect(() => {
     trackStep("VISIT", SITE_ID, activeLocale());
+  }, []);
+}
+
+/**
+ * A map is open: every half minute while it is in view, it tells the API its visit is still
+ * there, which is what "exploring now" on the front page's cards counts. The VISIT step has
+ * already said so as the page opened.
+ */
+export function usePresence(): void {
+  useEffect(() => {
+    if (!API_URL) return;
+    return everyWhileShown(
+      () => trackPresence(SITE_ID, activeLocale()),
+      PRESENCE_EVERY_MS,
+      documentPage(),
+    );
   }, []);
 }

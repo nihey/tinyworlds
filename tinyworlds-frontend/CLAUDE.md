@@ -126,14 +126,16 @@ src/
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
-│                        # useFunnelVisit, useAdminSession, …
+│                        # useFunnelVisit, usePresence, useWorldVisits, useAdminSession, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
                          # city-catalogue.ts (well-known cities to pick from), donate-api.ts
                          # (Apollo Client; imported lazily), funnel.ts (the visit and the
-                         # steps it reports), admin.ts (pure: the session, the funnel's
-                         # arithmetic), sign-in-api.ts (REST sign-in: link, code; lazy),
+                         # steps it reports), visits.ts (each world's visits: the cards'
+                         # words and order, the map's "still here"), admin.ts (pure: the
+                         # session, the funnel's arithmetic), sign-in-api.ts (REST sign-in:
+                         # link, code; lazy),
                          # admin-api.ts (the report; lazy), site-events.ts (what the page
                          # analytics hear), consent.ts (who is asked before Google's tags
                          # load, and loading them)
@@ -165,6 +167,16 @@ src/
   `prefers-reduced-motion` or `Save-Data`; if it is missing or cannot play, the still stays.
   The loops are the front page's own files (`LOOPS_BASE` in `site.ts`), unlike the share cards:
   `deploy/deploy.sh home` is all they need, and a world's folder does not carry them.
+- **Each card says how visited its world is** (with an API): "41,203 visits" under the card's
+  text, and "● 23 exploring now" beside it once more than ten (`LIVE_SHOWN_ABOVE`) have that
+  map open (`visitsLine` in `lib/visits.ts`, numbers in the visitor's way of writing them).
+  `useWorldVisits` asks `worldVisits` for every world in the registry with a plain `fetch`
+  (5 s timeout), at once and then every 30 s while the page is in view; a failed answer leaves
+  the last numbers. Each group of cards comes **most visited first** (`byVisits`; ties and
+  worlds with no count keep the registry's order), ordered by the **first** answer only: later
+  ones change the numbers, never the order, so nothing moves under the pointer. Before that
+  answer, and for good without one, the cards keep the registry's order and say nothing; the
+  line's height is there from the start, so the cards do not grow when the numbers come.
 - **The front page's share card** is its own picture, `public/og/tinyworlds.jpg`
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
@@ -312,6 +324,11 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
 - **It never costs a visitor anything.** A plain `fetch` with `keepalive` (not Apollo: the map
   does not download Apollo to say it was opened), never awaited, every failure swallowed, each
   step said once per page.
+- **An open map says it is still there** (`usePresence`, in the map only): `trackPresence`
+  every 30 s while the page is in view (`everyWhileShown` in `lib/visits.ts`: nothing while it
+  is hidden, once on coming back if a beat was missed), for the same visit and with the same
+  exceptions as the steps. That keeps the visit's `last_seen_at` fresh: what "exploring now"
+  counts, and how long a visit stayed.
 - **Not counted:** a browser where an admin is signed in (their own visits would only blur the
   numbers) and one driven by a program (`navigator.webdriver`).
 - **The admin pages** are `src/app/admin/page.home.tsx`: a route of the front page's build
