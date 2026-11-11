@@ -274,7 +274,13 @@ thing everywhere).
 ```ts
 // { questions: {
 //   id: string;                          // the sight asked about (sights.json)
-//   decoys: [string, string, string];    // three other sights' ids: the wrong names
+//   decoys: [string, string, string];    // three other sights' ids: hard's wrong names, any borough or kind
+//   sets: {                              // per difficulty it is in ("easy" | "medium" | "hard"),
+//     [level]: { all: […3]; area?: […3]; group?: […3]; both?: […3] }   // per scope: wrong names from the
+//   };                                   // answer's borough, kind, or both; absent = all's
+//   level: 1 | 2 | 3;                    // the easiest difficulty it is in (by its article's page views)
+//   group: "buildings" | "museums" | "landmarks" | "stations";
+//   area?: string;                       // its borough ("Bronx"), as the data names it
 //   parts: string[];                     // the text in pieces; the odd ones (1, 3, …) are blanked.
 //                                        // parts.join("") is the text as sights.<locale>.json has it
 //   lang: string;                        // the text's own language ("en" where the visitor's has none)
@@ -305,7 +311,8 @@ type DonationCheckout { url: String! }
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
 input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
-input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  locale: String }
+enum QuizLevel { EASY MEDIUM HARD }
+input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  level: QuizLevel  locale: String }
 type QuizPick { choice: String!  count: Int! }
 type QuizTally { answers: Int!  picks: [QuizPick!]! }       # picks: most picked first
 type Mutation {
@@ -330,7 +337,8 @@ or `"home"`. In `answerQuiz`, `sightId` is the building asked about and `choice`
 picked (right when they are equal); a visit's answer to a building is kept once, and without
 `visitId` none is kept but the tally is still answered. `choices` are the names the page offered
 (up to four, the building and the pick among them): `picks` then counts only those, else the 20
-most picked; `answers` is everyone who answered the building. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
+most picked; `answers` is everyone who answered the building. `level` is the game's difficulty
+(each offers other wrong answers): answers are kept and tallied per level, `HARD` when absent. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
 city's benefactors for this gift; without it the gift is counted and not listed. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
 `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
 `POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered

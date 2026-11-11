@@ -37,12 +37,12 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(out, { recursive: true, force: true }));
 
 describe("writeQuiz", () => {
-  it("writes a question file per language and stamps the indexes", () => {
+  it("writes a question file per language and stamps the indexes", async () => {
     put("sights.json", { sights });
     put("sights.en-US.json", texts("en"));
     put("sights.pt-BR.json", texts("pt"));
     put("sights.es-ES.json", texts("es"));
-    writeQuiz({ out, placeWords: [], log: quiet });
+    await writeQuiz({ out, placeWords: [], views: {}, log: quiet });
 
     for (const locale of ["en-US", "pt-BR", "es-ES"]) {
       const { questions } = read(`quiz.${locale}.json`) as { questions: QuizQuestion[] };
@@ -55,18 +55,18 @@ describe("writeQuiz", () => {
     expect((read("manifest.json") as { indexes: string }).indexes).not.toBe("old");
   });
 
-  it("writes nothing for a world without sights", () => {
-    expect(() => writeQuiz({ out, placeWords: [], log: quiet })).not.toThrow();
+  it("writes nothing for a world without sights", async () => {
+    await expect(writeQuiz({ out, placeWords: [], views: {}, log: quiet })).resolves.toBeUndefined();
     expect(fs.existsSync(path.join(out, "quiz.en-US.json"))).toBe(false);
   });
 
-  it("lists every blanked text when asked", () => {
+  it("lists every blanked text when asked", async () => {
     put("sights.json", { sights });
     put("sights.en-US.json", texts("en"));
     const lines: string[] = [];
-    writeQuiz({ out, placeWords: [], list: true, log: (m) => lines.push(m) });
+    await writeQuiz({ out, placeWords: [], views: {}, list: true, log: (m) => lines.push(m) });
     expect(lines).toContain(
-      "en-US  Alpha Tower → ▇ is a tall office building in Manhattan, finished long ago by its builders.",
+      "en-US  Alpha Tower [1 buildings, 0 views] → ▇ is a tall office building in Manhattan, finished long ago by its builders.",
     );
   });
 });

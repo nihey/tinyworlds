@@ -1,6 +1,7 @@
 import type { Locale } from "@/i18n/locale";
 import { API_URL } from "./donate";
 import { currentVisit } from "./funnel";
+import type { QuizLevelName } from "@/map/quiz";
 import type { QuizTally } from "./quiz";
 
 /**
@@ -19,6 +20,8 @@ export interface AnswerInput {
   choice: string;
   /** the four names offered: the API counts only these, so what comes back stays small */
   choices: string[];
+  /** the game's difficulty: answers are tallied per difficulty */
+  level: QuizLevelName;
   locale: Locale;
 }
 
@@ -27,8 +30,9 @@ export function answerRequest(input: AnswerInput & { visitId: string | null }): 
   query: string;
   variables: { input: Record<string, string | string[]> };
 } {
-  const { visitId, ...rest } = input;
-  return { query: ANSWER, variables: { input: visitId ? { ...rest, visitId } : { ...rest } } };
+  const { visitId, level, ...rest } = input;
+  const sent = { ...rest, level: level.toUpperCase() };
+  return { query: ANSWER, variables: { input: visitId ? { ...sent, visitId } : sent } };
 }
 
 /** The tally in an answer, or null for errors or anything shaped otherwise. */

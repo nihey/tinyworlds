@@ -120,8 +120,9 @@ program
   .description("Write the questions of Guess the building from the sights' articles: quiz.<locale>.json")
   .option("--out <dir>", "the data folder holding sights.json (default: the frontend's public/data)")
   .option("--list", "print every question's text, its name blanked", false)
-  .action((opts: { out?: string; list: boolean }) => {
-    writeQuiz(opts);
+  .option("--force-views", "ask for page views again, over the last twelve months as of today", false)
+  .action(async (opts: { out?: string; list: boolean; forceViews: boolean }) => {
+    await writeQuiz(opts);
   });
 
 program
@@ -153,7 +154,7 @@ program
     await buildIndex();
     if (CITY.sights) {
       await buildWiki();
-      writeQuiz();
+      await writeQuiz();
     }
   });
 

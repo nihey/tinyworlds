@@ -169,10 +169,18 @@ model QuizAnswer {
   sightId   String   @map("sight_id")
   /// The sight id the visitor picked; right when it equals sightId.
   choice    String
+  /// The game's difficulty: each offers other wrong answers. Answers from before it existed are HARD.
+  level     QuizLevel @default(HARD)
   locale    String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@unique([visitId, world, sightId])
-  @@index([world, sightId])
+  @@unique([visitId, world, sightId, level])
+  @@index([world, sightId, level])
   @@map("quiz_answers")
+}
+
+enum QuizLevel {
+  EASY
+  MEDIUM
+  HARD
 }

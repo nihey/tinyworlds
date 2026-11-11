@@ -114,7 +114,8 @@ input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  lo
 input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
 input WorldVisitsInput { worlds: [String!]! }                 # 1 to 50 world ids
 type WorldVisits { world: String!  visits: Int!  live: Int! }
-input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  locale: String }
+enum QuizLevel { EASY MEDIUM HARD }
+input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  level: QuizLevel  locale: String }
 type QuizPick { choice: String!  count: Int! }
 type QuizTally { answers: Int!  picks: [QuizPick!]! }
 
@@ -300,8 +301,11 @@ The site's quiz on the map's famous buildings: the questions are the site's own 
 (`quiz.<locale>.json`, made by the pipeline), and the right name of a building is the building
 itself, so this API keeps no copy of them. It keeps the answers and tallies them.
 
-- `quiz_answers`: one row per answer, unique on `(visit_id, world, sight_id)`: a visit (the
-  funnel's tab id) answers a building once; answering again keeps the first. `choice` is the
+- `quiz_answers`: one row per answer, unique on `(visit_id, world, sight_id, level)`: a visit
+  (the funnel's tab id) answers a building once per difficulty (`QuizLevel`: `EASY`, `MEDIUM`,
+  `HARD`; each offers other wrong answers); answering again keeps the first. Answers sent
+  without a level, and all those from before levels (migration `20261111230000_quiz_level`),
+  are `HARD`. Tallies are per level. `choice` is the
   sight id picked; `locale` the interface language.
 - `answerQuiz` (public, 30 a minute per address: `ANSWERS_PER_MINUTE`) records the answer and
   answers the building's tally, that answer included: `answers` (everyone who answered it) and
@@ -311,8 +315,8 @@ itself, so this API keeps no copy of them. It keeps the answers and tallies them
   `choices` (older pages) it gives the `MAX_PICKS` (20) most picked. Without `visitId` (a visit that is not counted: storage
   blocked, an admin's browser) nothing is recorded and the tally is answered all the same.
 - Validation: `visitId` a UUID, `world` the funnel's pattern, `sightId` and `choice`
-  `SIGHT_ID_PATTERN` (`b19j7udl`, `bridge:brooklyn bridge`, `statue:0`), `locale` one of the
-  three. The API cannot tell a real choice from an invented one; the throttle bounds the harm.
+  `SIGHT_ID_PATTERN` (`b19j7udl`, `bridge:brooklyn bridge`, `statue:0`), `level` a `QuizLevel`
+  (an unknown one is refused by GraphQL itself), `locale` one of the three. The API cannot tell a real choice from an invented one; the throttle bounds the harm.
 - The site shows shares over the four names it offered, so picks of a name a later pipeline run
   stopped offering simply drop out of its card.
 

@@ -1623,6 +1623,35 @@ describe('the API over HTTP', () => {
       });
     });
 
+    it('tallies each difficulty apart, and takes a missing one as hard', async () => {
+      await answerQuiz({
+        ...good,
+        visitId: visit(1),
+        choice: 'b19j7udl',
+      }).expect(200);
+      const easy = await answerQuiz({
+        ...good,
+        visitId: visit(1),
+        choice: 'b1abc',
+        level: 'EASY',
+      }).expect(200);
+      expect(answer(easy).data.answerQuiz).toEqual({
+        answers: 1,
+        picks: [{ choice: 'b1abc', count: 1 }],
+      });
+      const rows = await prisma.quizAnswer.findMany({
+        orderBy: { level: 'asc' },
+      });
+      expect(rows.map((row) => row.level)).toEqual(['EASY', 'HARD']);
+      // a difficulty the schema does not know never reaches the resolver
+      await answerQuiz({
+        ...good,
+        visitId: visit(2),
+        choice: 'b1',
+        level: 'IMPOSSIBLE',
+      }).expect(400);
+    });
+
     it('refuses names offered that are too many, or leave out the pick', async () => {
       const input = { ...good, visitId: visit(1), choice: 'b19j7udl' };
       for (const choices of [

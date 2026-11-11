@@ -221,6 +221,8 @@ export function MapApp() {
     compact: quizSheet,
   });
   const quizOn = quiz.state.phase !== "off";
+  // a round holds its building lit: the map's own sign for it waits until it is answered
+  const quizRound = ["loading", "asking", "answered"].includes(quiz.state.phase);
   const quizArticle = quiz.sight && litSight?.id === quiz.sight.id ? litText : undefined;
   // the keys read the game as it is now, without the key handler being made again each round
   const quizRef = useRef(quiz);
@@ -306,6 +308,8 @@ export function MapApp() {
       if (action) {
         if (action === "stop") game.stop();
         else if (action === "next") game.next();
+        else if (action === "start") game.start();
+        else if (action === "again") game.again();
         else if (game.state.phase === "asking") game.pick(game.state.choices[action.pick]);
         e.preventDefault();
         return;
@@ -389,7 +393,7 @@ export function MapApp() {
 
       {session && engine && (
         <>
-          {lit && litSight && !quizOn && (
+          {lit && litSight && !quizRound && (
             <SightSign
               engine={engine}
               sight={litSight}
@@ -413,8 +417,16 @@ export function MapApp() {
               state={quiz.state}
               sights={sightById}
               article={quizArticle}
+              questions={quiz.questions}
+              has={quiz.has}
+              choice={quiz.choice}
+              areaLabel={copy.borough}
+              onChoice={quiz.setChoice}
+              onStart={quiz.start}
               onPick={quiz.pick}
               onNext={quiz.next}
+              onAgain={quiz.again}
+              onChange={quiz.change}
               onStop={quiz.stop}
             />
           )}
@@ -435,7 +447,7 @@ export function MapApp() {
           <div className="fixed top-[calc(var(--edge-t)+3.9375rem)] left-(--edge-l) z-[5] flex max-w-[calc(100vw-var(--edge-l)-var(--edge-r)-3.5rem)] flex-col items-start gap-2 sm:max-w-[25rem]">
             <ExploreBanner className="sign-in" style={delay(100)} />
             {WORLD.quiz && sights.length > 0 && !quizOn && (
-              <QuizBanner onStart={quiz.start} className="sign-in" style={delay(0)} />
+              <QuizBanner onStart={quiz.open} className="sign-in" style={delay(0)} />
             )}
           </div>
           <ToolColumn

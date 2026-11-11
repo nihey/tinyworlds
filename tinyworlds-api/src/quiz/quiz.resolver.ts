@@ -19,7 +19,7 @@ export class QuizResolver {
   @Throttle({ default: { limit: ANSWERS_PER_MINUTE, ttl: 60_000 } })
   @Mutation(() => QuizTally, {
     description:
-      'Records which name a visit picked for a building in "Guess the building" (once per visit and building) and answers how everyone has answered it.',
+      'Records which name a visit picked for a building in "Guess the building" (once per visit, building and difficulty) and answers how everyone has answered it at that difficulty.',
   })
   answerQuiz(@Args('input') input: AnswerQuizInput): Promise<QuizTally> {
     return this.quiz.answer(input);

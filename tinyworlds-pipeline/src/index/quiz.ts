@@ -18,7 +18,29 @@ export interface QuizSight {
   lat: number;
   /** what it is, for its decoys (kindOf with its opening); worked out from the name when absent */
   kind?: string;
+  /** what a player picks it by */
+  group?: Group;
+  /** its borough, when its context line is one of the city's */
+  area?: string;
+  /** its article's page views over a year: how famous it is */
+  views?: number;
+  /** the easiest difficulty it is asked in: 1 easy, 2 medium, 3 hard */
+  level?: 1 | 2 | 3;
 }
+
+export type QuizLevelName = "easy" | "medium" | "hard";
+/** How a player's choice narrows a round's wrong answers: from the answer's borough, kind, both. */
+export type Scope = "all" | "area" | "group" | "both";
+export type Group = "buildings" | "museums" | "landmarks" | "stations";
+type Three = [string, string, string];
+export type QuizSets = Partial<Record<QuizLevelName, Partial<Record<Scope, Three>>>>;
+
+const LEVELS: [QuizLevelName, 1 | 2 | 3][] = [
+  ["easy", 1],
+  ["medium", 2],
+  ["hard", 3],
+];
+const SCOPES: Scope[] = ["all", "area", "group", "both"];
 
 /** A sight's article in one language, as sights.<locale>.json has it. */
 export interface QuizText {
@@ -32,7 +54,13 @@ export interface QuizText {
 /** One question: the sight, the three wrong names, and its text cut into pieces (odd ones blanked). */
 export interface QuizQuestion {
   id: string;
+  /** hard's wrong answers for a game of all boroughs and kinds (what older pages read) */
   decoys: [string, string, string];
+  /** per difficulty it is in, per scope; a scope's set is left out when it is `all`'s */
+  sets: QuizSets;
+  level: 1 | 2 | 3;
+  group: Group;
+  area?: string;
   parts: string[];
   lang: string;
 }
@@ -44,6 +72,10 @@ export interface QuizReport {
   noDecoys: string[];
   /** per language, names of the sights whose text was too short once blanked */
   short: Record<QuizLocale, string[]>;
+  /** per difficulty, how many narrowed sets had to borrow from outside their borough or kind */
+  borrowed: Record<QuizLevelName, number>;
+  /** how many questions each level has */
+  levels: [number, number, number];
 }
 
 /** Characters left to read once the name is blanked, below which a question is not fair. */
@@ -135,6 +167,13 @@ const KIND_IN_TEXT: Record<string, string> = {
   stadium: "stadium",
   arena: "stadium",
   ballpark: "stadium",
+  statue: "monument",
+  sculpture: "monument",
+  monument: "monument",
+  memorial: "monument",
+  obelisk: "monument",
+  arch: "monument",
+  fountain: "monument",
 };
 const KIND_PHRASES = Object.keys(KIND_IN_TEXT).sort((a, b) => b.length - a.length);
 
@@ -342,6 +381,110 @@ function streetOf(name: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+/** What a player picks a place by, from what it is. */
+export function groupOf(kind: string): Group {
+  if (kind === "station") return "stations";
+  if (kind === "museum" || kind === "library") return "museums";
+  if (["bridge", "stadium", "venue", "worship", "monument"].includes(kind)) return "landmarks";
+  return "buildings";
+}
+
+/** Levels by how much each is read: the top quarter easy, up to three fifths medium, the rest hard. */
+export function levelsOf(views: number[]): (1 | 2 | 3)[] {
+  const n = views.length;
+  const easy = Math.ceil(n * 0.25);
+  const medium = Math.ceil(n * 0.6);
+  const out: (1 | 2 | 3)[] = new Array<1 | 2 | 3>(n).fill(3);
+  views
+    .map((v, i) => ({ v, i }))
+    .sort((a, b) => b.v - a.v || a.i - b.i)
+    .forEach(({ i }, rank) => {
+      out[i] = rank < easy ? 1 : rank < medium ? 2 : 3;
+    });
+  return out;
+}
+
+/**
+ * Whether a place may be offered beside the answer at all: never one sharing a distinctive word
+ * with it, one the question's visible text names (one string per language), or an address the
+ * text's own address rules out. Names alike are checked as the three are taken.
+ */
+function decoyRule(
+  answer: QuizSight,
+  visible: string[],
+  placeWords: ReadonlySet<string>,
+): (c: QuizSight) => boolean {
+  const answerWords = new Set(distinctiveWords(answer.n, placeWords));
+  const texts = visible.map(fold);
+  const streets = visible.map(streetForm);
+  return (c) => {
+    if (c.id === answer.id) return false;
+    const words = distinctiveWords(c.n, placeWords);
+    if (words.some((w) => answerWords.has(w))) return false;
+    if (words.length > 0 && texts.some((t) => words.every((w) => holdsWord(t, w)))) return false;
+    // an address the question's own address rules out: "712 Fifth Avenue" beside "at 721 Fifth Avenue"
+    const street = streetOf(c.n);
+    return !(
+      street &&
+      streets.some((t) =>
+        new RegExp(
+          EDGE_BEFORE + "\\d[\\p{L}\\p{N}]*(?:\\s*[-–]\\s*\\d+)?\\s+" + escape(street) + EDGE_AFTER,
+          "u",
+        ).test(t),
+      )
+    );
+  };
+}
+
+/** A group with fewer candidates than this is not given a place of its own in an easy set. */
+const SPREAD_GROUP = 8;
+
+/**
+ * Three from the lists in turn (a later list is borrowing), allowed by the rule, no two named
+ * alike nor like the answer; with `onePerGroup`, each list is first taken one per group.
+ */
+function takeThree(
+  answer: QuizSight,
+  lists: QuizSight[][],
+  allowed: (c: QuizSight) => boolean,
+  onePerGroup = false,
+): { ids: string[]; borrowed: boolean } {
+  const names = new Set([sameName(answer.n)]);
+  const ids: string[] = [];
+  const groups = new Set<string | undefined>();
+  let borrowed = false;
+  for (const [li, list] of lists.entries()) {
+    // one per group only among groups with enough members to take turns: a kind with two famous
+    // stations would otherwise put one of them in every round
+    const sizes = new Map<string | undefined, number>();
+    for (const c of list) sizes.set(c.group, (sizes.get(c.group) ?? 0) + 1);
+    for (const pass of onePerGroup ? [true, false] : [false])
+      for (const c of list) {
+        if (ids.length === 3) return { ids, borrowed };
+        if (ids.includes(c.id) || !allowed(c)) continue;
+        if (pass && (groups.has(c.group) || (sizes.get(c.group) ?? 0) < SPREAD_GROUP)) continue;
+        const name = sameName(c.n);
+        if (names.has(name)) continue;
+        names.add(name);
+        groups.add(c.group);
+        ids.push(c.id);
+        if (li > 0) borrowed = true;
+      }
+  }
+  return { ids, borrowed };
+}
+
+/** A list in the order of its keys (compared one after another), ties as they came. */
+function orderBy(list: QuizSight[], key: (s: QuizSight) => number[]): QuizSight[] {
+  return list
+    .map((s, i) => ({ s, k: key(s), i }))
+    .sort((a, b) => {
+      for (let j = 0; j < a.k.length; j++) if (a.k[j] !== b.k[j]) return a.k[j] - b.k[j];
+      return a.i - b.i;
+    })
+    .map(({ s }) => s);
+}
+
 /**
  * Three other places to offer beside the answer: of its kind, nearest first (then the nearest
  * general places, when its kind has fewer than four), never one sharing a distinctive word with
@@ -356,45 +499,74 @@ export function pickDecoys(
 ): [string, string, string] | null {
   const kindOfSight = (s: QuizSight) => s.kind ?? kindOf(s);
   const kind = kindOfSight(answer);
-  const nearest = (list: QuizSight[]) =>
-    list
-      .map((s) => ({ s, d: groundDistance(answer, s) }))
-      .sort((a, b) => a.d - b.d)
-      .map(({ s }) => s);
+  const near = (list: QuizSight[]) => orderBy(list, (s) => [groundDistance(answer, s)]);
   const others = pool.filter((s) => s.id !== answer.id);
   const ofKind = others.filter((s) => kindOfSight(s) === kind);
-  let candidates = nearest(ofKind);
+  const lists = [near(ofKind)];
   if (ofKind.length + 1 < 4 && kind !== "general")
-    candidates = candidates.concat(nearest(others.filter((s) => kindOfSight(s) === "general")));
+    lists.push(near(others.filter((s) => kindOfSight(s) === "general")));
+  const { ids } = takeThree(answer, lists, decoyRule(answer, visible, placeWords));
+  return ids.length === 3 ? (ids as Three) : null;
+}
 
-  const answerWords = new Set(distinctiveWords(answer.n, placeWords));
-  const texts = visible.map(fold);
-  const streets = visible.map(streetForm);
-  const names = new Set([sameName(answer.n)]);
-  const chosen: string[] = [];
-  for (const c of candidates) {
-    const words = distinctiveWords(c.n, placeWords);
-    if (words.some((w) => answerWords.has(w))) continue;
-    if (words.length > 0 && texts.some((t) => words.every((w) => holdsWord(t, w)))) continue;
-    const name = sameName(c.n);
-    if (names.has(name)) continue;
-    // an address the question's own address rules out: "712 Fifth Avenue" beside "at 721 Fifth Avenue"
-    const street = streetOf(c.n);
-    if (
-      street &&
-      streets.some((t) =>
-        new RegExp(
-          EDGE_BEFORE + "\\d[\\p{L}\\p{N}]*(?:\\s*[-–]\\s*\\d+)?\\s+" + escape(street) + EDGE_AFTER,
-          "u",
-        ).test(t),
-      )
-    )
+/**
+ * The wrong answers of one difficulty, for each scope. `inLevel` are the questions of that
+ * difficulty, `everyone` all of them; the scopes borrow from the difficulty, then from anyone.
+ */
+function setsFor(
+  answer: QuizSight,
+  level: QuizLevelName,
+  inLevel: QuizSight[],
+  everyone: QuizSight[],
+  allowed: (c: QuizSight) => boolean,
+): { sets: Partial<Record<Scope, Three>>; borrowed: number } | null {
+  const log = (s: QuizSight) => Math.log10(1 + (s.views ?? 0));
+  const fameGap = (s: QuizSight) => Math.abs(log(s) - log(answer));
+  const near = (s: QuizSight) => groundDistance(answer, s);
+  // hard: look-alike neighbours; medium: alike in fame; easy: plainly different, alike in fame
+  const keys: Record<"free" | "fixed", (s: QuizSight) => number[]> =
+    level === "hard"
+      ? {
+          free: (s) => [s.kind === answer.kind ? 0 : s.kind === "general" ? 1 : 2, near(s)],
+          fixed: (s) => [s.kind === answer.kind ? 0 : s.kind === "general" ? 1 : 2, near(s)],
+        }
+      : level === "medium"
+        ? {
+            free: (s) => [s.kind === answer.kind ? 0 : 1, fameGap(s)],
+            fixed: (s) => [s.kind === answer.kind ? 0 : 1, fameGap(s)],
+          }
+        : {
+            free: (s) => [s.group === answer.group ? 1 : 0, fameGap(s)],
+            // the kind fixed: the famous ones closest in fame, so a kind's few odd members (two
+            // hotels among the towers) are not offered in every round
+            fixed: (s) => [fameGap(s)],
+          };
+  const inArea = (s: QuizSight) => answer.area !== undefined && s.area === answer.area;
+  const inGroup = (s: QuizSight) => s.group === answer.group;
+  const sets: Partial<Record<Scope, Three>> = {};
+  let borrowed = 0;
+  for (const scope of SCOPES) {
+    const fixed = scope === "group" || scope === "both";
+    const ordered = orderBy(inLevel, keys[fixed ? "fixed" : "free"]);
+    const anyone = orderBy(everyone, keys[fixed ? "fixed" : "free"]);
+    const lists =
+      scope === "all"
+        ? [ordered, anyone]
+        : scope === "area"
+          ? [ordered.filter(inArea), ordered, anyone]
+          : scope === "group"
+            ? [ordered.filter(inGroup), ordered, anyone]
+            : [ordered.filter((s) => inArea(s) && inGroup(s)), ordered.filter(inGroup), ordered, anyone];
+    const taken = takeThree(answer, lists, allowed, level === "easy" && !fixed);
+    if (taken.ids.length < 3) {
+      if (scope === "all") return null;
       continue;
-    names.add(name);
-    chosen.push(c.id);
-    if (chosen.length === 3) return chosen as [string, string, string];
+    }
+    if (scope !== "all" && taken.borrowed) borrowed++;
+    if (scope !== "all" && taken.ids.join() === sets.all!.join()) continue;
+    sets[scope] = taken.ids as Three;
   }
-  return null;
+  return { sets, borrowed };
 }
 
 /** What is left to read of a blanked text: its even pieces. */
@@ -402,19 +574,24 @@ const visibleOf = (parts: string[]): string => parts.filter((_, i) => i % 2 === 
 
 /**
  * Every question, per language. The questions are the sights with an English text (every
- * language falls back to it), in the sights' order; decoys are chosen once, against all three
- * languages' texts, so a building's tallies mean the same thing everywhere.
+ * language falls back to it), one per article, in the sights' order. Each gets a level by how
+ * much its article is read (`views`), a group by what it is, an area when its context line is
+ * one of `areas`, and wrong answers for every difficulty it is in and every way a player's
+ * choice narrows them; chosen once, against all three languages' texts, so a building's tallies
+ * mean the same thing everywhere.
  */
 export function buildQuiz(
   sights: QuizSight[],
   texts: Record<QuizLocale, Record<string, QuizText>>,
   placeWords: string[],
   aliases: Record<string, string[]> = {},
+  opts: { views?: Record<string, number>; areas?: string[] } = {},
 ): { files: Record<QuizLocale, { questions: QuizQuestion[] }>; report: QuizReport } {
   const places = new Set<string>();
   for (const words of [...placeWords, ...sights.map((s) => s.b ?? "")])
     for (const w of wordsOf(words)) places.add(w);
   const aliasesOf = new Map(Object.entries(aliases).map(([name, list]) => [name.toLowerCase(), list]));
+  const areas = new Set(opts.areas ?? []);
 
   // one question per article: two sights on one article ("Avenue J", "Avenue J station") are one
   const articles = new Set<string>();
@@ -425,8 +602,19 @@ export function buildQuiz(
     const article = en.url ?? en.title;
     if (articles.has(article)) continue;
     articles.add(article);
-    pool.push({ ...sight, kind: kindOf(sight, en.text) });
+    const kind = kindOf(sight, en.text);
+    pool.push({
+      ...sight,
+      kind,
+      group: groupOf(kind),
+      area: sight.b && areas.has(sight.b) ? sight.b : undefined,
+      views: opts.views?.[sight.id] ?? 0,
+    });
   }
+  levelsOf(pool.map((s) => s.views ?? 0)).forEach((level, i) => (pool[i].level = level));
+  const inLevel = (n: number) => pool.filter((s) => (s.level ?? 3) <= n);
+  const levelPools = new Map(LEVELS.map(([name, n]) => [name, inLevel(n)]));
+
   const files: Record<QuizLocale, { questions: QuizQuestion[] }> = {
     "en-US": { questions: [] },
     "pt-BR": { questions: [] },
@@ -436,6 +624,8 @@ export function buildQuiz(
     questions: 0,
     noDecoys: [],
     short: { "en-US": [], "pt-BR": [], "es-ES": [] },
+    borrowed: { easy: 0, medium: 0, hard: 0 },
+    levels: [0, 0, 0],
   };
 
   for (const sight of pool) {
@@ -452,12 +642,22 @@ export function buildQuiz(
       blanked.set(locale, { parts: blankName(text.text, names, placesHere), lang: text.lang });
     }
     const visible = [...blanked.values()].map((b) => visibleOf(b.parts));
-    const decoys = pickDecoys(sight, pool, visible, places);
-    if (!decoys) {
+    const allowed = decoyRule(sight, visible, places);
+    const level = sight.level ?? 3;
+    const sets: QuizSets = {};
+    for (const [name, n] of LEVELS) {
+      if (n < level) continue;
+      const got = setsFor(sight, name, levelPools.get(name)!, pool, allowed);
+      if (!got) continue;
+      sets[name] = got.sets;
+      report.borrowed[name] += got.borrowed;
+    }
+    if (!sets.hard?.all) {
       report.noDecoys.push(sight.n);
       continue;
     }
     report.questions++;
+    report.levels[level - 1]++;
     for (const [locale, { parts, lang }] of blanked) {
       const left = parts
         .filter((_, i) => i % 2 === 0)
@@ -465,7 +665,17 @@ export function buildQuiz(
         .replace(/\s+/g, " ")
         .trim().length;
       if (left < MIN_LEFT) report.short[locale].push(sight.n);
-      else files[locale].questions.push({ id: sight.id, decoys, parts, lang });
+      else
+        files[locale].questions.push({
+          id: sight.id,
+          decoys: sets.hard.all,
+          sets,
+          level,
+          group: sight.group ?? "buildings",
+          ...(sight.area ? { area: sight.area } : {}),
+          parts,
+          lang,
+        });
     }
   }
   return { files, report };

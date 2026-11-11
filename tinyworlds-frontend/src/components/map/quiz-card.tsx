@@ -1,41 +1,71 @@
 "use client";
 
-import { ArrowRight, ArrowUpRight, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Settings2, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import { questionKind, quizScore, tallyShares, type QuizState } from "@/lib/quiz";
+import {
+  areasOf,
+  chipCounts,
+  countFor,
+  questionKind,
+  quizScore,
+  tallyShares,
+  type QuizChoice,
+  type QuizState,
+} from "@/lib/quiz";
 import { cn } from "@/lib/utils";
+import { QUIZ_GROUPS, QUIZ_LEVELS, type QuizQuestion } from "@/map/quiz";
 import type { Sight, SightText } from "@/map/sights";
 
 const KEYS = ["A", "B", "C", "D"];
 /** The visitor's own wrong pick: a red that reads on the black sign. */
 const WRONG = "#e0614a";
+/** At most this many buildings is "only a handful": the count says so. */
+const FEW = 10;
 
 interface QuizCardProps {
   state: Exclude<QuizState, { phase: "off" }>;
   sights: Map<string, Sight>;
   /** the building's article, for the link once it is named; undefined while unknown */
   article: SightText | undefined;
+  /** this language's questions, null while they load */
+  questions: QuizQuestion[] | null;
+  has: (id: string) => boolean;
+  choice: QuizChoice;
+  /** what the world calls its boroughs, for the borough row */
+  areaLabel: string;
+  onChoice: (c: QuizChoice) => void;
+  onStart: () => void;
   onPick: (id: string) => void;
   onNext: () => void;
+  onAgain: () => void;
+  onChange: () => void;
   onStop: () => void;
 }
 
 /**
- * The card a round of Guess the building is played on: the building's Wikipedia opening with
- * its name blanked and four names to pick from; then the verdict, the text whole and how
- * everyone else answered. On the right of a wide screen, a sheet at the foot of a phone's. A
- * labelled group, not a dialog: the map's keys keep working (A–D, 1–4, Enter, Esc).
+ * The card Guess the building is played on: first the choosing step (difficulty, borough, what,
+ * and how many buildings that makes), then each round (the building's Wikipedia opening with its
+ * name blanked and four names; then the verdict, the text whole and how everyone else
+ * answered), then the end. On the right of a wide screen, a sheet at the foot of a narrower one.
+ * A labelled group, not a dialog: the map's keys keep working (A–D, 1–4, Enter, Esc).
  */
-export function QuizCard({ state, sights, article, onPick, onNext, onStop }: QuizCardProps) {
+export function QuizCard(props: QuizCardProps) {
+  const { state, sights, article, onPick, onNext, onStop } = props;
   const { t, locale } = useI18n();
   const nextRef = useRef<HTMLButtonElement>(null);
+  const againRef = useRef<HTMLButtonElement>(null);
   const answered = state.phase === "answered";
+  const finished = state.phase === "finished";
   useEffect(() => {
     if (answered) nextRef.current?.focus();
   }, [answered]);
+  useEffect(() => {
+    if (finished) againRef.current?.focus();
+  }, [finished]);
 
   const playing = state.phase === "asking" || state.phase === "answered";
+  const game = "game" in state ? state.game : null;
   const name = (id: string) => sights.get(id)?.n ?? "";
 
   return (
@@ -53,25 +83,56 @@ export function QuizCard({ state, sights, article, onPick, onNext, onStop }: Qui
         <span className="font-pixel text-[15px] leading-none tracking-[0.03em] text-taxi uppercase">
           {t.quiz.title}
         </span>
-        {playing && (
-          <span className="ml-auto text-[12px] text-paper-dim tabular-nums">
-            {quizScore(t.quiz.score, state.round, state.right)}
-          </span>
+        <span className="ml-auto text-[12px] text-paper-dim tabular-nums">
+          {playing &&
+            game &&
+            quizScore(t.quiz.score, game.index + 1, game.right, game.queue.length)}
+        </span>
+        {game && (
+          <button
+            type="button"
+            onClick={props.onChange}
+            aria-label={t.quiz.change}
+            className="bullet size-7 text-paper-dim hover:text-paper"
+          >
+            <Settings2 className="size-3.5" strokeWidth={2.25} />
+          </button>
         )}
         <button
           type="button"
           onClick={onStop}
           aria-label={t.quiz.close}
-          className={cn("bullet size-7 text-paper-dim hover:text-paper", !playing && "ml-auto")}
+          className="bullet size-7 text-paper-dim hover:text-paper"
         >
           <X className="size-3.5" strokeWidth={2.25} />
         </button>
       </div>
 
       <div className="p-3">
-        {state.phase === "loading" && (
+        {game && state.phase !== "finished" && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {[
+              t.quiz.levels[game.choice.level].name,
+              game.choice.area ?? `${props.areaLabel}: ${t.quiz.allAreas}`,
+              game.choice.group
+                ? t.quiz.groups[game.choice.group]
+                : `${t.quiz.what}: ${t.quiz.groups.all}`,
+            ].map((tag) => (
+              <span
+                key={tag}
+                className="border border-sign-line px-1.5 py-px text-[11px] leading-snug text-paper-dim"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {(state.phase === "loading" || (state.phase === "choosing" && !props.questions)) && (
           <p className="text-[14px] text-paper-dim">{t.quiz.loading}</p>
         )}
+
+        {state.phase === "choosing" && props.questions && <Choosing {...props} />}
 
         {state.phase === "empty" && (
           <>
@@ -101,8 +162,168 @@ export function QuizCard({ state, sights, article, onPick, onNext, onStop }: Qui
             locale={locale}
           />
         )}
+
+        {state.phase === "finished" && (
+          <>
+            <p className="text-[15px] leading-snug font-bold">
+              {t.quiz.end
+                .replace("{right}", String(state.game.right))
+                .replace("{total}", String(state.game.queue.length))}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                ref={againRef}
+                type="button"
+                onClick={props.onAgain}
+                className="flex items-center gap-1.5 bg-taxi px-3 py-2 text-[14px] font-bold text-taxi-ink outline-none focus-visible:shadow-[0_0_0_2px_var(--paper)]"
+              >
+                {t.quiz.again}
+                <ArrowRight aria-hidden className="size-4" strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={props.onChange}
+                className="px-3 py-2 text-[14px] font-semibold text-paper hover:underline"
+              >
+                {t.quiz.changeChoice}
+              </button>
+              <button
+                type="button"
+                onClick={onStop}
+                className="px-3 py-2 text-[14px] font-semibold text-paper-dim hover:text-paper"
+              >
+                {t.quiz.stop}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+/** A choice on the choosing step: pressed when chosen, struck out when it would leave nothing. */
+function Chip({
+  on,
+  empty,
+  onClick,
+  children,
+  className,
+}: {
+  on: boolean;
+  empty: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={empty && !on}
+      onClick={onClick}
+      className={cn(
+        "px-2.5 py-1.5 text-[13px] leading-tight font-semibold outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--taxi)]",
+        on ? "bg-taxi text-taxi-ink" : "bg-sign-raised hover:bg-white/12",
+        empty && !on && "line-through opacity-35 hover:bg-sign-raised",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** The choosing step: difficulty, borough, what, how many buildings that makes, and Start. */
+function Choosing({ questions, has, choice, areaLabel, onChoice, onStart }: QuizCardProps) {
+  const { t } = useI18n();
+  const list = questions ?? [];
+  const counts = chipCounts(list, choice, has);
+  const n = countFor(list, choice, has);
+  const words = n <= FEW ? t.quiz.few : t.quiz.count;
+  const label = "mb-1.5 text-[11px] font-semibold tracking-[0.08em] text-paper-dim uppercase";
+  return (
+    <>
+      <p className={label}>{t.quiz.difficulty}</p>
+      <div className="grid grid-cols-3 gap-1">
+        {QUIZ_LEVELS.map((level) => (
+          <Chip
+            key={level}
+            on={choice.level === level}
+            empty={counts.levels[level] === 0}
+            onClick={() => onChoice({ ...choice, level })}
+            className="py-2 text-center"
+          >
+            {t.quiz.levels[level].name}
+            <span
+              className={cn(
+                "mt-0.5 block text-[11px] font-normal",
+                choice.level === level ? "text-taxi-ink/75" : "text-paper-dim",
+              )}
+            >
+              {t.quiz.levels[level].line}
+            </span>
+          </Chip>
+        ))}
+      </div>
+
+      <p className={cn(label, "mt-3")}>{areaLabel}</p>
+      <div className="flex flex-wrap gap-1">
+        <Chip
+          on={choice.area === null}
+          empty={false}
+          onClick={() => onChoice({ ...choice, area: null })}
+        >
+          {t.quiz.allAreas}
+        </Chip>
+        {areasOf(list).map((area) => (
+          <Chip
+            key={area}
+            on={choice.area === area}
+            empty={(counts.areas.get(area) ?? 0) === 0}
+            onClick={() => onChoice({ ...choice, area })}
+          >
+            {area}
+          </Chip>
+        ))}
+      </div>
+
+      <p className={cn(label, "mt-3")}>{t.quiz.what}</p>
+      <div className="flex flex-wrap gap-1">
+        <Chip
+          on={choice.group === null}
+          empty={false}
+          onClick={() => onChoice({ ...choice, group: null })}
+        >
+          {t.quiz.groups.all}
+        </Chip>
+        {QUIZ_GROUPS.map((group) => (
+          <Chip
+            key={group}
+            on={choice.group === group}
+            empty={(counts.groups.get(group) ?? 0) === 0}
+            onClick={() => onChoice({ ...choice, group })}
+          >
+            {t.quiz.groups[group]}
+          </Chip>
+        ))}
+      </div>
+
+      <p className="mt-3.5 text-[14px]" aria-live="polite">
+        {(n === 1 ? words.one : words.other).replace("{n}", String(n))}
+      </p>
+      <div className="mt-3 flex">
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={n === 0}
+          className="flex items-center gap-1.5 bg-taxi px-3 py-2 text-[14px] font-bold text-taxi-ink outline-none focus-visible:shadow-[0_0_0_2px_var(--paper)] disabled:opacity-40"
+        >
+          {t.quiz.start}
+          <ArrowRight aria-hidden className="size-4" strokeWidth={2.5} />
+        </button>
+      </div>
+    </>
   );
 }
 

@@ -1,9 +1,11 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
+import { QuizLevel } from '../../generated/prisma/enums.js';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsEnum,
   IsIn,
   IsOptional,
   IsUUID,
@@ -53,6 +55,15 @@ export class AnswerQuizInput {
   @ArrayUnique()
   @Matches(SIGHT_ID_PATTERN, { each: true })
   choices?: string[] | null;
+
+  @Field(() => QuizLevel, {
+    nullable: true,
+    description:
+      "The game's difficulty; HARD when left out (pages from before difficulties)",
+  })
+  @IsOptional()
+  @IsEnum(QuizLevel)
+  level?: QuizLevel | null;
 
   @Field(() => String, {
     nullable: true,

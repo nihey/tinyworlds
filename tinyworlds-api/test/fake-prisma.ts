@@ -64,6 +64,7 @@ export interface QuizAnswerRow {
   world: string;
   sightId: string;
   choice: string;
+  level: 'EASY' | 'MEDIUM' | 'HARD';
   locale: string | null;
 }
 
@@ -424,10 +425,11 @@ export class FakePrisma {
           (a) =>
             a.visitId === row.visitId &&
             a.world === row.world &&
-            a.sightId === row.sightId,
+            a.sightId === row.sightId &&
+            a.level === row.level,
         );
         if (there && !args.skipDuplicates)
-          throw unique('visit_id, world, sight_id');
+          throw unique('visit_id, world, sight_id, level');
         if (there) continue;
         this.quizAnswers.push({ ...row });
         count++;
@@ -435,18 +437,25 @@ export class FakePrisma {
       return Promise.resolve({ count });
     },
     count: (args: {
-      where: { world: string; sightId: string };
+      where: { world: string; sightId: string; level: string };
     }): Promise<number> =>
       Promise.resolve(
         this.quizAnswers.filter(
           (a) =>
-            a.world === args.where.world && a.sightId === args.where.sightId,
+            a.world === args.where.world &&
+            a.sightId === args.where.sightId &&
+            a.level === args.where.level,
         ).length,
       ),
     /** Only the shapes the quiz asks for: by choice, counted, within one building; the most picked first when taking some. */
     groupBy: (args: {
       by: ['choice'];
-      where: { world: string; sightId: string; choice?: { in: string[] } };
+      where: {
+        world: string;
+        sightId: string;
+        level: string;
+        choice?: { in: string[] };
+      };
       _count: { _all: true };
       take?: number;
     }): Promise<{ choice: string; _count: { _all: number } }[]> => {
@@ -455,6 +464,7 @@ export class FakePrisma {
         if (
           a.world === args.where.world &&
           a.sightId === args.where.sightId &&
+          a.level === args.where.level &&
           (!args.where.choice || args.where.choice.in.includes(a.choice))
         )
           counts.set(a.choice, (counts.get(a.choice) ?? 0) + 1);
