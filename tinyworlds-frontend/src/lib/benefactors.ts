@@ -122,9 +122,12 @@ export function stonePreview(
 ): { from: number; to: number; firstStone: boolean; keystone: boolean } | null {
   if (raisedCents >= goalCents) return null;
   const from = Math.floor(raisedCents / STONE_CENTS) + 1;
-  const to = Math.floor(Math.min(raisedCents + amountCents, goalCents) / STONE_CENTS);
+  // The API's rule: the last, possibly partial, stone belongs to the gift that reaches the goal.
+  const total = raisedCents + amountCents;
+  const last = Math.ceil(goalCents / STONE_CENTS);
+  const to = total >= goalCents ? last : Math.floor(total / STONE_CENTS);
   if (from > to) return null;
-  return { from, to, firstStone: from === 1, keystone: to === Math.ceil(goalCents / STONE_CENTS) };
+  return { from, to, firstStone: from === 1, keystone: to === last };
 }
 
 export type StoneLook = "gold" | "gold-alt" | "anon" | "empty";
