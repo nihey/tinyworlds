@@ -35,6 +35,7 @@ npm test             # vitest
 | `NEXT_PUBLIC_DATA_BASE`                                       | `<base path>/data/<world>` | URL prefix of the world's data folder (`/tinyrao/data`)                                   |
 | `NEXT_PUBLIC_SITE_URL`                                        | unset                      | site origin, for share cards; unset = text-only card                                      |
 | `NEXT_PUBLIC_ANALYTICS_SRC` / `NEXT_PUBLIC_ANALYTICS_SITE_ID` | unset                      | tracker script URL and site id; unset = no analytics                                      |
+| `NEXT_PUBLIC_GTM_ID`                                          | unset                      | Google Tag Manager container id (`GTM-XXXXXXX`); unset = nothing from Google is loaded    |
 | `NEXT_PUBLIC_DONATE_URL`                                      | unset                      | payment link (hosted checkout) in English, and the fallback for the other languages       |
 | `NEXT_PUBLIC_DONATE_URL_PT` / `NEXT_PUBLIC_DONATE_URL_ES`     | unset                      | the same checkout in Portuguese / Spanish                                                 |
 | `NEXT_PUBLIC_API_URL`                                         | unset                      | GraphQL endpoint of `tinyworlds-api`: a URL or a same-origin path (`/api/graphql`)        |
@@ -52,11 +53,18 @@ NEXT_PUBLIC_DONATE_URL=https://donate.stripe.com/test_example npm run build
 NEXT_PUBLIC_WORLD=home NEXT_PUBLIC_SITE_URL=https://example.com npm run build   # → the site root
 ```
 
-Analytics (`src/components/analytics.tsx`) is optional and env-driven: no tracker URL or site id
-lives in the source. The map rewrites the URL hash whenever a pan settles; it does so through
-`writeHash()` (`src/map/hash.ts`), which calls `History.prototype.replaceState` so trackers that
-wrap `history.replaceState` do not log each pan as a page view. Never call
-`history.replaceState` directly for the hash.
+Analytics (`src/components/analytics.tsx`) is optional and env-driven: no tracker URL, site id
+or container id lives in the source. There are two kinds, each loaded only when its variables
+are set: a cookieless tracker that takes a `data-site-id` (Rybbit), and a Google Tag Manager
+container (Google's snippet: the `dataLayer` and `gtag()` queue, then `gtm.js`, both
+`afterInteractive`). Google Analytics is a tag set up inside the container, not in this code,
+and unlike the rest of the site it sets cookies.
+
+The map rewrites the URL hash whenever a pan settles; it does so through `writeHash()`
+(`src/map/hash.ts`), which calls `History.prototype.replaceState` so trackers that wrap
+`history.replaceState` (Tag Manager's history-change trigger and Google Analytics' page-change
+measurement among them) do not log each pan as a page view. Never call `history.replaceState`
+directly for the hash.
 
 Every data URL goes through `dataUrl()` in `src/map/data.ts`, which prefixes the data base and
 appends `?v=<manifest.build>`. `public/data/` is generated and gitignored: move it out of the way

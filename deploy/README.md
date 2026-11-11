@@ -21,6 +21,7 @@ it from `deploy/.env` (gitignored; see `.env.example`):
 | `DEPLOY_URL` | public origin of the site, no trailing slash; baked into the build as `NEXT_PUBLIC_SITE_URL` so share-card URLs are absolute |
 | `API_URL` | where the viewer finds the API's GraphQL endpoint (`/api/graphql` when the proxy routes it on the same origin); empty = no milestones |
 | `ANALYTICS_SRC`, `ANALYTICS_SITE_ID` | optional page analytics: tracker script URL and site id, baked into the build |
+| `GTM_ID` | optional Google Tag Manager container id (`GTM-XXXXXXX`), baked into the build as `NEXT_PUBLIC_GTM_ID`; Google Analytics is a tag inside the container |
 | `DONATE_URL`, `DONATE_URL_PT`, `DONATE_URL_ES` | optional donation links (hosted payment pages) by interface language; `DONATE_URL` is English and the fallback when the API is unreachable |
 
 ## Server setup (once)
