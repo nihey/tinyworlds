@@ -22,6 +22,7 @@ import { loadHeights } from "./heights.js";
 import { buildSyntheticScene } from "./synthetic.js";
 import { cantileverTruss, type Truss } from "./truss.js";
 import { F_FLOATING, F_NO_OUTLINE, G, Pattern, Roof } from "./kinds.js";
+import { nearestBridge, type Owners } from "./owners.js";
 import { LineSink, PolySink } from "./sinks.js";
 import { f32, u32, u8, writeScene } from "./store.js";
 import { R } from "../render/palette.js";
@@ -713,12 +714,12 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   ]);
   const cut: number[] = [];
   let bridges = 0;
-  const bridgePieces: { pts: number[]; kind: number; width: number }[] = [];
+  const bridgePieces: { pts: number[]; kind: number; width: number; name: string }[] = [];
   await each(
     conn,
     `SELECT subtype, class, subclass,
             CAST(to_json(road_flags) AS VARCHAR), CAST(to_json(rail_flags) AS VARCHAR), CAST(to_json(level_rules) AS VARCHAR),
-            width_rules[1]."value", ST_AsWKB(geometry)
+            width_rules[1]."value", ST_AsWKB(geometry), names."primary"
      FROM '${raw("segment.parquet")}' WHERE subtype IN ('road', 'rail')`,
     (row) => {
       const rail = str(row[0]) === "rail";
@@ -767,7 +768,8 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         const bridge = covers(flags, mid, (r) => !!r.values?.includes("is_bridge"));
         if (bridge) bridges++;
         const m = slicePath(n, a, b, k, cut);
-        if (bridge && m >= 2) bridgePieces.push({ pts: cut.slice(0, m * 2), kind: spec.kind, width });
+        if (bridge && m >= 2)
+          bridgePieces.push({ pts: cut.slice(0, m * 2), kind: spec.kind, width, name: str(row[8]) ?? "" });
         else lines.add(cut, m, spec.kind, width, 0);
       }
     },
@@ -1298,15 +1300,48 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     cantilevers.push(cantilever);
     for (const t of row) cantileverOf.set(t.support, cantilever);
   }
+  // who owns what: a bridge's decks, piers, towers and steel go under its roads' name, so the
+  // index can light the bridge up as one thing (owners.json)
+  const owners: Owners = { bridges: [], statues: [] };
+  const byBridge = new Map<string, number[]>();
+  const own = (name: string, from: number): void => {
+    if (!name || volumes.count === from) return;
+    let vols = byBridge.get(name);
+    if (!vols) {
+      vols = [];
+      byBridge.set(name, vols);
+      owners.bridges.push({ name, vols });
+    }
+    for (let v = from; v < volumes.count; v++) vols.push(v);
+  };
+  const deckPaths = bridgePieces
+    .filter((piece) => piece.name)
+    .map((piece) => ({ name: piece.name, xy: piece.pts }));
+  /** What stands by a deck belongs to the bridge whose deck passes within 40 m. */
+  const ownNear = (x: number, y: number, from: number): void => {
+    const name = nearestBridge(x, y, deckPaths, 40 * proj.pxPerMetre);
+    if (name) own(name, from);
+  };
+
   for (let i = 0; i < supports.length; i++) {
     const parts = supportParts[i];
     if (!parts) continue;
     // a cantilever's tower is a masonry pier up to the deck: its steel comes with the trusses
     const pier = cantileverOf.get(i);
+    const from = volumes.count;
     for (const rings of parts)
       addVolume(rings, mix(i, 777), pier ? pier.deck - DECK : supports[i].height, 0, {
         cls: "bridge_support",
       });
+    const ring = parts[0][0];
+    let lon = 0;
+    let lat = 0;
+    for (let j = 0; j < ring.length; j += 2) {
+      lon += ring[j] / (ring.length / 2);
+      lat += ring[j + 1] / (ring.length / 2);
+    }
+    const [x, y] = proj.toMap(lon, lat);
+    ownNear(x, y, from);
   }
 
   /** One step of a deck: the stretch [a, z] of the leg that starts at (p0, q0) and runs along (up, uq). */
@@ -1472,6 +1507,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       flush();
       const np = -uq * half;
       const nq = up * half;
+      const from = volumes.count;
       addShape(
         [
           p0 + up * a + np,
@@ -1496,6 +1532,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         sincePier = 0;
         addShape(disc(mp, mq, 2, 6), mix(b, leg + 9000), h - DECK, 0, "pier_column", F_NO_OUTLINE);
       }
+      own(bridgePieces[b].name, from);
     }
     flush();
   }
@@ -1597,6 +1634,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     stations.forEach((s, t) => {
       for (const side of [-1, 1]) {
         const [p, q] = at(s, side, 0);
+        const from = volumes.count;
         addShape(
           [
             p - up * POST - uq * POST,
@@ -1615,6 +1653,8 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
           0,
           { roofShape: Roof.Pyramid, roofH: 9 },
         );
+        const [x, y] = proj.gridToMap(p, q);
+        ownNear(x, y, from);
       }
       // across the roadway: a portal clear of the traffic, crossed braces, a strut at the top
       const clear = deck + 12;
@@ -1637,6 +1677,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   // ---- statues: what is not a building, so is not in the data
   for (const statue of CITY.statues) {
     const [p, q] = proj.toGrid(statue.lon, statue.lat);
+    const from = volumes.count;
     statue.pieces.forEach((piece, i) => {
       addShape(
         disc(p + piece.dp, q + piece.dq, piece.r, 8),
@@ -1646,6 +1687,9 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         piece.ramp === "gold" ? "statue_gold" : "statue",
       );
     });
+    const vols: number[] = [];
+    for (let v = from; v < volumes.count; v++) vols.push(v);
+    owners.statues.push({ lon: statue.lon, lat: statue.lat, vols });
   }
 
   // ---- street trees from a census, where the city has one
@@ -1740,6 +1784,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       counts: { ground: ground.count, lines: lines.count, volumes: volumes.count, trees: treeKind.length },
     },
   );
+  fs.writeFileSync(path.join(DIRS.scene, "owners.json"), JSON.stringify(owners));
   conn.closeSync();
   lap(
     `written to ${path.relative(process.cwd(), DIRS.scene)} — map is ${bounds.maxX - bounds.minX} × ${bounds.maxY - bounds.minY} px`,
