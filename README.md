@@ -51,9 +51,9 @@ the Wall to Asshai as one toy-scale diorama (unofficial; places from *A Song of 
 |------|------|
 | `tinyworlds-pipeline/` | TypeScript CLI: downloads the data, builds the scene, renders the tiles and indexes |
 | `tinyworlds-frontend/` | Next.js 16 static site: the map viewer (one build per city) and the front page |
-| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, each world's visits, and the donation funnel for admins |
+| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, each world's visits, the donation funnel for admins, and the mails to donors |
 | `tinyworlds-videos/` | HyperFrames: the front page's loops, city flyovers, the showcase film and a tour of tinywesteros, all from the real tiles and viewer |
-| `deploy/` | nginx config and the deploy script |
+| `deploy/` | nginx config and the deploy script (which also tells a newly built city's donors) |
 
 ## Setup
 
@@ -90,6 +90,13 @@ address that has a recorded donation; their page is `/me/` of the front page ("Y
 In production the API always needs `JWT_SECRET`,
 `SMTP_HOST` and `MAIL_FROM`, admins or not, because donors sign in too.
 
+Donors also get two mails from the API: a thank-you once Stripe confirms their gift, and, once a
+city they gave to is built, word that it is on the map (sent when `deploy/deploy.sh` deploys
+the world, once per city: set `API_SERVICE` in `deploy/.env`). Their links and pictures point at
+`SITE_URL` (default: the first of `ALLOWED_ORIGINS`); the pictures are the front page's own
+files in `tinyworlds-frontend/public/email/`, so deploy the front page with them. Locally, with
+no mail server, the mails are written to the API's log.
+
 Deploying the benefactors feature, in this order: check the production env (`JWT_SECRET` of at
 least 32 characters, `SMTP_HOST`, `MAIL_FROM`), deploy the API, run `npm run donors:backfill` once
 in the API container (it runs `node dist/benefactors/backfill-cli.js`: it gives past donations
@@ -113,7 +120,9 @@ variables:
 | `NEXT_PUBLIC_API_URL` | frontend | unset | the API's GraphQL endpoint; unset = no milestones |
 | `DATABASE_URL`, `STRIPE_*` | api | — | see `tinyworlds-api/.env.example` |
 | `ADMIN_EMAILS` | api | empty | who may sign in to the admin pages |
-| `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | the sessions' secret and the mail server that sends sign-in links (admins' and donors'); `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM` are required in production |
+| `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | the sessions' secret and the mail server that sends the mails (sign-in links, thank-yous, a city is built); `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM` are required in production |
+| `SITE_URL` | api | first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail |
+| `API_SERVICE` | deploy | empty | the API's container (or Swarm service) on the server, where `deploy.sh` announces a built city |
 
 ## Adding a city
 

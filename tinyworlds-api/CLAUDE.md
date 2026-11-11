@@ -6,9 +6,10 @@ Stripe, records the ones Stripe says were paid, and serves every city's progress
 It also keeps the **donation funnel** (which steps towards a donation each visit reached, and
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
 by email; each world's **visits**, and how many are there now, are public, for the front page's
-cards. **Donors** sign in the same way, to see the cities they helped build. And it keeps the
-answers of **Guess the building**, the map's quiz on its famous buildings. Other visitors
-have no accounts: what they call is public. ESM throughout (`.js` in import paths).
+cards. **Donors** sign in the same way, to see the cities they helped build; they are thanked by
+mail once Stripe confirms a gift, and told by mail once a city they gave to is built. And it
+keeps the answers of **Guess the building**, the map's quiz on its famous buildings. Other
+visitors have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
 ## Commands
 
@@ -28,6 +29,8 @@ npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, wi
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
 npm run donors:backfill   # in the built image (node dist/benefactors/backfill-cli.js): past donations get their donors from Stripe; run once after deploying (safe to repeat: sessions without an email, or whose lookup failed, are asked again)
 npm run donors:backfill:dev   # the same from a checkout, through tsx
+npm run cities:announce -- tinysp   # in the built image (node dist/benefactors/announce-cli.js): mails the donors of a world's city that it is built, once (deploy/deploy.sh runs it)
+npm run cities:announce:dev -- tinysp   # the same from a checkout, through tsx (without SMTP_HOST, the mails go to the log)
 ```
 
 ## Structure
@@ -39,13 +42,18 @@ src/
 ├── prisma/                         # PrismaService (pg driver adapter)
 ├── health/                         # { health }
 ├── common/                         # rate limit module, GraphQL throttler guard, enum registration
+├── mail/
+│   ├── mailer.ts mail.module.ts    # MAILER: SMTP (nodemailer), or the log in development; createMailer
+│   ├── layout.ts                   # the mails' look: shell (band, card, footer), button, badge, stones,
+│   │                               # bar, facts, impact box (a pixel number), code box
+│   ├── html.ts format.ts badges.ts # escaping and {placeholders}; dollars and counts per language; badge words
 ├── auth/
 │   ├── auth.service.ts             # sendLink, verify, verifyCode, identityOf: link or code, admins and donors
 │   ├── auth.controller.ts dto/     # POST /api/auth/magic-link, /api/auth/verify (REST)
 │   ├── jwt.strategy.ts jwt-auth.guard.ts   # the global guard: admins' unless @Public() / @ForDonors()
 │   ├── public.decorator.ts for-donors.decorator.ts   # the marks the guard reads
 │   ├── current-admin.decorator.ts current-donor.decorator.ts session-secret.ts
-│   ├── mailer.ts sign-in-mail.ts   # SMTP (nodemailer), or the log in development; the mail's words
+│   ├── sign-in-mail.ts             # the sign-in mail (code first, then the button), in three languages
 │   └── admin.resolver.ts models/   # { me }
 ├── quiz/                           # Guess the building: quiz.service.ts (answer, tally), resolver, dto/, models/
 ├── funnel/
@@ -53,19 +61,24 @@ src/
 │   ├── funnel-report.ts            # pure: days of a period in a time zone, rows → report
 │   └── funnel.resolver.ts dto/ models/
 ├── visits/
-│   ├── visits.service.ts           # stillHere (a map is open), ofWorlds (visits and live, cached)
+│   ├── visits.service.ts           # stillHere (a map is open), ofWorlds (visits and live, cached), totalOf
 │   └── visits.resolver.ts dto/ models/   # worldVisits, trackPresence: both public
 ├── benefactors/
 │   ├── standing.ts                 # pure: a city's gifts → stones, founders, benefactors
 │   ├── display-name.ts             # cleanDisplayName: what a listed name may be
 │   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors
+│   ├── announce.service.ts built-mail.ts   # a built city's donors told, once; the mail
+│   ├── announce-cli.ts backfill-cli.ts     # the commands compiled into the image
 │   └── benefactors.resolver.ts my-giving.resolver.ts dto/ models/   # the public query; the donor's own
 ├── cities/
 │   ├── city-name.ts                # cleanCityName, citySlug: what makes two spellings one city
 │   ├── cities.service.ts           # the public list and its order
 │   └── cities.resolver.ts models/
 └── donations/
-    ├── donations.service.ts        # createCheckout, handleWebhook, record
+    ├── donations.service.ts        # createCheckout, handleWebhook, record (then the thank-you)
+    ├── thanks.service.ts           # the thank-you: who, and what to tell them
+    ├── thanks-facts.ts thanks-mail.ts   # pure: a gift's place in its city; the mail
+    ├── currency.ts                 # COUNTED_CURRENCY (usd)
     ├── donation-facts.ts           # a Checkout session → what it says about a donation
     ├── return-url.ts               # where a checkout may send the donor back to
     ├── locales.ts                  # en-US / pt-BR / es-ES → Stripe locale, price, wording
@@ -74,7 +87,7 @@ src/
     └── stripe-webhook.controller.ts
 prisma/     schema.prisma, migrations/, seed.ts (the script), seed-cities.ts (what it does), seed-data.ts,
             import-funnel.ts (the script), funnel-rows.ts (what a line of its input is)
-test/       fake-prisma.ts, fake-stripe.ts, fake-mailer.ts, app.e2e-spec.ts, global-setup.ts
+test/       fake-prisma.ts, fake-stripe.ts, fake-mailer.ts, app.e2e-spec.ts, migrations.e2e-spec.ts, global-setup.ts
 scripts/    send-webhook.mjs, rybbit-funnel.sql
 ```
 
@@ -269,7 +282,8 @@ the payload into a `SessionIdentity { kind, id, email }` through `identityOf` on
 `UNAUTHENTICATED`.
 
 The mail is sent through SMTP (`SMTP_*`, `MAIL_FROM`; nodemailer), in the language it was asked
-in, with words for an admin or for a donor (`sign-in-mail.ts`). With no mail server configured
+in, with words for an admin or for a donor (`sign-in-mail.ts`, in the look of the other mails:
+the code first, then the button). With no mail server configured
 the message is written to the log instead, which is how signing in works in development; in
 production that never happens (a link is a key), and the environment check refuses to start
 without `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM`, admins or not, because donors sign in
@@ -301,6 +315,62 @@ itself, so this API keeps no copy of them. It keeps the answers and tallies them
   three. The API cannot tell a real choice from an invented one; the throttle bounds the harm.
 - The site shows shares over the four names it offered, so picks of a name a later pipeline run
   stopped offering simply drop out of its card.
+
+## Mails (`mail/`)
+
+Three mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
+a white card on paper, yellow pill buttons, the pixel badges, a footer saying why the person got
+it), each in en-US, pt-BR and es-ES, each with a plain-text part. `MailModule` provides `MAILER`
+(`createMailer`: SMTP, or the log without `SMTP_HOST`/`MAIL_FROM`) to auth, donations and
+benefactors. `layout.ts` is the look, as pure functions of tables and inline styles, readable from
+320 to 600 px: `shell`, `button(s)`, `badge`, `stonesGrid`, `progressBar`, `facts`, `impactBox`
+(a number drawn in Tiny5's pixels out of table cells, so it shows without pictures or fonts) and
+`codeBox`. **Every text is escaped** (`html.ts`: `fillHtml` escapes a template and each value
+that is not already markup): city names and display names are typed by donors. Each mail is a
+pure builder from typed facts to `{ subject, text, html }`: `signInMail`, `thanksMail`,
+`builtMail`.
+
+Links and pictures are made from `SITE_URL` (an origin; default: the first of
+`ALLOWED_ORIGINS`): `/me/`, `/`, `/<world>/`, the pictures at `/email/wordmark.png`,
+`founding.png`, `first-stone.png`, `keystone.png` (the front page's own files,
+`tinyworlds-frontend/public/email/`, made by its `npm run email-images`) and a built world's
+real share card, `/<world>/og/<world>.jpg`. Every picture has alt text, and the badges' words
+are text beside their pictures, so a mail with pictures blocked still reads.
+
+A mail never fails, holds up or undoes a donation, a deploy or a sign-in; it goes only to the
+person's own address and names nobody else's; logs name a donation or a donor by id, never by
+address.
+
+- **Thank you** (`donations/thanks.service.ts`). After `record()` commits a new donation that
+  has a donor, `setImmediate` hands its id to `ThanksService.send`, so the webhook is answered
+  first; a replay records nothing and thanks nobody, and a donation whose donor step failed (no
+  donor) is not thanked. It goes to the donor's address, in the donation's locale (en-US
+  without one). `send` never throws: a failure is logged by the donation's id. What it says
+  comes from the same `cityStanding` as the public list (`placeOfGift`, `thanks-facts.ts`: the
+  gift's stones, the donor's founding number, badges and listing, and the city's stones and
+  bar as they stood once the gift was in) and from `VisitsService.totalOf` (the visits of every
+  city's world added up, without `home`: the front page's cards together). Variants: a
+  founding gift ("São Paulo is 10 stones closer, because of you.", its stones lit on the grid,
+  the bar); the gift that lays the last stone; a gift beyond the goal ("…keeps it running"; for
+  a built city, "You keep New York running for its 15,194 explorers"); a gift to no city ("the
+  cities to come", no impact box); a gift in another currency (a plain thank-you, no amount, no
+  stones). Every variant with a city shows the impact box; listed gifts say under which name.
+- **A city is built** (`benefactors/announce.service.ts`, `announce-cli.ts`). `deploy/deploy.sh`
+  runs `node dist/benefactors/announce-cli.js <world>` in the container after uploading a world.
+  For an unknown world, a city not `BUILT` (the seed has not run) or one announced before
+  (`cities.built_announced_at`), it prints so and exits 0. Otherwise it claims the announcement
+  in one `UPDATE … WHERE built_announced_at IS NULL` (two runs cannot both send), then mails
+  each donor with an address once, whatever the number of their gifts, in the language of their
+  latest: the share card, "{city} is on the map, and you built it." (a founder) or "…you helped
+  keep it running." (a benefactor), their badges, what they gave and their stones, and who built
+  it (the public list's rows). It prints counts, lists failures by donor id and exits 1 if a
+  mail did not go out; the donors whose mail failed are not mailed again by a later run (to
+  send the whole announcement again: `UPDATE cities SET built_announced_at = NULL WHERE …`).
+  The migration that added the column marked every city already `BUILT` as announced. The
+  command builds its services by hand (no Nest container), so tsx can run it too.
+- **Sign-in** (`auth/sign-in-mail.ts`): see Signing in. The subject is unchanged ("Your
+  tinyworlds code: 482 913"); the mail says only the newest code works (an older mail's button
+  still works until it is used or expires, as before).
 
 ## The donation funnel (`funnel/`)
 
@@ -397,7 +467,7 @@ The admin pages read the funnel and hide or show donors' names (`setNameHidden`)
 
 ```sql
 UPDATE cities SET status = 'BUILDING' WHERE slug = 'sao-paulo';                     -- work has started
-UPDATE cities SET status = 'BUILT', world_id = 'tinysp' WHERE slug = 'sao-paulo';   -- it is on the map: the site links to /tinysp/
+UPDATE cities SET status = 'BUILT', world_id = 'tinysp' WHERE slug = 'sao-paulo';   -- it is on the map: the site links to /tinysp/ (deploying the world then mails its donors)
 UPDATE cities SET hidden = true WHERE slug = 'not-a-city';                          -- a name that should not be shown
 UPDATE cities SET name = 'São Paulo' WHERE slug = 'sao-paulo';                      -- fix the spelling the first donor used
 ```
@@ -428,8 +498,9 @@ Validated at startup (`config/env.ts`); the server does not start with anything 
 | `ALLOWED_ORIGINS` | required | comma-separated origins of the site: the CORS allow-list, where a checkout may return to and where a sign-in link may lead |
 | `ADMIN_EMAILS` | empty | comma-separated addresses that may sign in to the admin pages; empty = nobody |
 | `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions and keys the codes' HMAC; at least 32 characters |
-| `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the sign-in links (admins' and donors'), and the address they come from |
+| `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the mails (sign-in links, thank-yous, a city is built), and the address they come from |
 | `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | `587`, none, none | 465 means TLS from the start, anything else STARTTLS |
+| `SITE_URL` | the first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail |
 | `PORT` | `4000` | |
 | `NODE_ENV` | `development` | GraphiQL and introspection are off in `production` |
 
@@ -441,7 +512,8 @@ Secrets live in the host's environment, never in the repository. `.env` is gitig
 `Dockerfile` is a two-stage build on `node:22-bookworm-slim`. The container runs as the `node`
 user and starts with `npx prisma migrate deploy && node dist/main.js` (single replica: the
 migrations run before the server). `npm run seed` works inside the image
-(`docker exec <container> npm run seed`), and so does `npm run donors:backfill` (the image has
+(`docker exec <container> npm run seed`), and so do `npm run donors:backfill` and
+`npm run cities:announce -- <world>` (the image has
 `dist/` and `prisma/` only, so scripts that need `src/` code live in `src/`). Rolling back past the
 `sign_in_codes` migration breaks admin sign-in (old code inserts links without `code_hash`): roll
 the database back too, or roll forward. The image has a `HEALTHCHECK` that asks `{ health }`.
@@ -452,7 +524,9 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
 - Unit tests (`src/**/*.spec.ts`) build the service by hand over `test/fake-prisma.ts` (a few
   arrays with unique columns and rollback), `test/fake-mailer.ts` (keeps the mail, and reads the
   token out of a sign-in link) and `test/fake-stripe.ts` (records the sessions asked
-  for and the prices looked up; `price_en` belongs to `prod_en`). Webhook deliveries are
+  for and the prices looked up; `price_en` belongs to `prod_en`). The fake mailer keeps every
+  mail; `signIns()` are the ones with a sign-in link (`token()` and `code()` read the latest of
+  those), since thank-yous go out on their own after a donation. Webhook deliveries are
   signed for real with `stripe.webhooks.generateTestHeaderString` and a placeholder secret, so
   the signature check is the real one. No test talks to Stripe.
 - `npm run test:e2e` boots the whole app with the fake Stripe on its own database
@@ -463,7 +537,12 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
   only, past the counts kept in memory). The admin signs in once for the whole file, so `admins` is not emptied
   between tests; `magic_links` is (with `donors`), so a test may ask for a fresh link. The
   checkout limit is per address and the tests share a minute: a test that starts several
-  checkouts sets its own `x-forwarded-for`.
+  checkouts sets its own `x-forwarded-for`. The thank-you and the announcement are tested there
+  too (`AnnounceService` taken from the app); the visits' counts are kept in memory for 10 s and
+  the thank-yous count too, so the visits tests start their clock when they start.
+- `test/migrations.e2e-spec.ts` tests migrations that change rows: on a database of its own
+  (the e2e one's name + `_migrations`, made and dropped), it applies every migration before the
+  one under test, writes rows, applies that one and reads them.
 - By hand, without Stripe: `npm run webhook:send` posts a signed `checkout.session.completed` to
   the local API using `STRIPE_WEBHOOK_SECRET` from `.env`. `--id` fixes the session id (send it
   twice to see a replay change nothing), `--link` shapes it like a payment link's session,

@@ -32,7 +32,7 @@ such strings before every commit.
 tinyworlds/
 ├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
 ├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world), the front page, `/admin/` and `/me/`
-├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins), benefactors and donors' own page (`/me/`)
+├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins), benefactors and donors' own page (`/me/`), and the mails (sign-in, thank-you, a city is built)
 ├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film, a tour of tinywesteros
 ├── deploy/                # nginx config, deploy script, .env.example
 ├── dev.sh                 # tmux launcher
@@ -76,6 +76,15 @@ Each sub-project has its own `CLAUDE.md`.
   by amount, one stone per US$1) are shown on a sign from the front page and from About in a map; a built
   city, which the Donate sign does not offer, reaches Donate only through that sign. Names are the donor's choice, per city; admins can hide one on `/admin/`. Emails never
   appear in the API's answers, and no answer says whether an address has donated.
+- **Donors get two mails.** Once Stripe confirms a gift, the API thanks the donor by mail
+  (how much closer their city is, its stones with theirs lit, how many people explore the
+  cities, where they are listed); and once a city is built, `deploy/deploy.sh <world>` runs the
+  API's announce command, which tells each of its donors, once, that it is on the map. The
+  sign-in mail has the same look: the site's band and pixel wordmark, a white card on paper.
+  The mails' pictures (wordmark, badges) are the front page's own files
+  (`tinyworlds-frontend/public/email/`), the city's picture its real share card; `SITE_URL` is
+  where they are. A mail never holds up or undoes a donation, a deploy or a sign-in, and goes
+  only to the person's own address (`tinyworlds-api/CLAUDE.md`, Mails).
 - **The front page moves.** Its hero and each world's card play a short silent loop made by
   `tinyworlds-videos` from the world's own tiles, over a still; the loops are the front page's
   own files, so nothing but its build needs deploying for them.
@@ -104,12 +113,15 @@ Each sub-project has its own `CLAUDE.md`.
 1. Pipeline: `tinyworlds-pipeline/src/cities/<id>.ts` (see that project's `CLAUDE.md`), then
    `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
 2. Viewer: `tinyworlds-frontend/src/worlds/<id>.ts` and its registry entry.
-3. API: mark the city `BUILT` with its `worldId` (see `tinyworlds-api/CLAUDE.md`).
+3. API: mark the city `BUILT` with its `worldId` (a line in `seed-data.ts`, then deploy the API
+   and run the seed; see `tinyworlds-api/CLAUDE.md`).
 4. Videos: `npm run plates -- <id> && npm run loops -- <id>` in `tinyworlds-videos` gives the world its
    card loop on the front page (`tinyworlds-frontend/public/loops/<id>.mp4`); without one its
    card simply stays still.
 5. `deploy/deploy.sh check` (every world in the registry has its data, card, pipeline city and
-   docs, this one included), then `deploy/deploy.sh <id>` and `deploy/deploy.sh home`.
+   docs, this one included), then `deploy/deploy.sh <id>` and `deploy/deploy.sh home`. Deploying
+   the world also tells its city's donors that it is built (once; it needs `API_SERVICE` in
+   `deploy/.env` and the city marked `BUILT` by the seed first).
 
 The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
 `NEXT_PUBLIC_WORLD`, the data folder and the URL path.
@@ -332,13 +344,16 @@ it does not know, and the site then falls back to its payment link. Details in
 - `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the world's data) to the
   web server; `deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data]` checks and builds
   every world in the viewer's registry and the front page, and uploads only if all of them
-  built. The API is a container built from `tinyworlds-api/Dockerfile`. See `deploy/README.md`.
+  built. After uploading a world it runs the API's announce command in the API's container
+  (`API_SERVICE`), which mails a newly built city's donors once. The API is a container built
+  from `tinyworlds-api/Dockerfile`. See `deploy/README.md`.
 
 ## Conventions
 
 - npm, Node 22, TypeScript strict, ESLint + Prettier in every sub-project.
 - Raw downloads and generated tiles are never committed (`tinyworlds-pipeline/data/`,
-  `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/` and
+  `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/`, the
+  mails' pictures in `tinyworlds-frontend/public/email/` (`npm run email-images` makes them) and
   the front page's loops in `tinyworlds-frontend/public/loops/` are, and so is each film's music
   bed (`tinyworlds-videos/*/assets/music/`: a film is timed to it); the videos' plates, takes,
   sound effects and renders are not.
