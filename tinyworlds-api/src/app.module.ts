@@ -13,6 +13,7 @@ import { AppConfigModule } from './config/config.module.js';
 import { DonationsModule } from './donations/donations.module.js';
 import { FunnelModule } from './funnel/funnel.module.js';
 import { HealthResolver } from './health/health.resolver.js';
+import { LinksModule } from './links/links.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { VisitsModule } from './visits/visits.module.js';
 import { QuizModule } from './quiz/quiz.module.js';
@@ -41,6 +42,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     CitiesModule,
     DonationsModule,
     FunnelModule,
+    LinksModule,
     VisitsModule,
     QuizModule,
   ],
