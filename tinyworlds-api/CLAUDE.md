@@ -116,7 +116,7 @@ type Mutation {
 # donors only (a donor's session; an admin's is FORBIDDEN)
 type MyCity { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
   givenCents: Int!  founderNumber: Int  stones: [Int!]!  firstStone: Boolean!  keystone: Boolean!  listed: Boolean! }
-type MyGiving { displayName: String  cities: [MyCity!]!  projectCents: Int! }   # cities: latest gift first; hidden ones left out
+type MyGiving { displayName: String  cities: [MyCity!]!  projectCents: Int! }   # cities: latest gift first
 input SetListingInput { city: String!  listed: Boolean! }   # city by slug; every gift of the donor's there; true needs a name
 input SetDisplayNameInput { name: String! }                 # cleaned (cleanDisplayName), BAD_REQUEST if nothing is left; answers it
 ```
@@ -178,7 +178,8 @@ GraphQL types or logs.
 public query (`givenCents`, `founderNumber` = smallest of their gifts' numbers, `stones`,
 `firstStone`, `keystone`), so the two never disagree; it holds nothing about anyone else.
 `setListing` flips `listed` on every gift of the donor's to one city; `setDisplayName` saves the
-cleaned name. Both act only on the session's own donor.
+cleaned name. Both act only on the session's own donor. Hidden cities still appear on their own
+donors' pages (hiding only keeps a city off the public list).
 
 ## Signing in, for admins and donors (`auth/`)
 

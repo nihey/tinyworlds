@@ -1143,21 +1143,60 @@ describe('the API over HTTP', () => {
 
       it("listing acts only on the donor's own gifts, in a city they gave to", async () => {
         await seedLisbon();
-        await asAna(SET_LISTING, { input: { city: 'lisbon', listed: false } });
-        const bo = await prisma.donation.findMany({
+        const gifts = (email: string) =>
+          prisma.donation.findMany({ where: { donor: { email } } });
+        // Bo is listed for his gift, so there is something for a stray update to undo
+        await prisma.donation.updateMany({
           where: { donor: { email: 'bo@example.com' } },
+          data: { listed: true },
         });
-        expect(bo.map((d) => d.listed)).toEqual([false]);
-        await prisma.donation.updateMany({ data: { listed: true } });
+        await asAna(SET_LISTING, { input: { city: 'lisbon', listed: false } });
+        expect((await gifts('ana@example.com')).map((d) => d.listed)).toEqual([
+          false,
+          false,
+        ]);
+        expect((await gifts('bo@example.com')).map((d) => d.listed)).toEqual([
+          true,
+        ]);
+        // and listing hers does not list the gift of someone who never asked
+        await prisma.donation.updateMany({
+          where: { donor: { email: 'bo@example.com' } },
+          data: { listed: false },
+        });
+        await asAna(SET_LISTING, { input: { city: 'lisbon', listed: true } });
+        expect((await gifts('ana@example.com')).map((d) => d.listed)).toEqual([
+          true,
+          true,
+        ]);
+        expect((await gifts('bo@example.com')).map((d) => d.listed)).toEqual([
+          false,
+        ]);
         const res = await asAna(SET_LISTING, {
           input: { city: 'nowhere', listed: false },
         });
         expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
-        // Bo's gift stays as it was
-        const after = await prisma.donation.findMany({
-          where: { donor: { email: 'bo@example.com' } },
+      });
+
+      it('a city an admin hid still shows on its own donor page, and can be listed', async () => {
+        await seedLisbon();
+        await prisma.city.update({
+          where: { slug: 'lisbon' },
+          data: { hidden: true },
         });
-        expect(after.map((d) => d.listed)).toEqual([true]);
+        const cities = (await mine()).cities;
+        expect(cities.map((c) => c.slug)).toEqual(['lisbon']);
+        const res = await graphql(BENEFACTORS, {
+          input: { slug: 'lisbon' },
+        }).expect(200);
+        expect(
+          (res.body as { data: { cityBenefactors: unknown } }).data
+            .cityBenefactors,
+        ).toBeNull();
+        const set = await asAna(SET_LISTING, {
+          input: { city: 'lisbon', listed: false },
+        });
+        expect(answer(set).errors).toBeUndefined();
+        expect((await mine()).cities[0].listed).toBe(false);
       });
 
       it('a name is cleaned and used everywhere', async () => {
