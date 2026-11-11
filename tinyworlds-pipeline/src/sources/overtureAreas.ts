@@ -14,6 +14,11 @@ export interface OvertureAreasOptions {
   skip?: RegExp;
   /** Areas larger than this (square degrees) are left out, so no county counts as a town (default 0.05; Dallas is 0.1). */
   maxArea?: number;
+  /**
+   * Land use areas, by name, that are places of their own though no division says so (Colorado
+   * Springs' Air Force Academy, a town in all but name): written as districts like the localities.
+   */
+  landUse?: string[];
 }
 
 /**
@@ -83,6 +88,27 @@ export function overtureAreas(opts: OvertureAreasOptions = {}): DataSource {
           properties: { kind, name: named(name), ...(district ? { district: named(district) } : {}) },
           geometry: JSON.parse(String(row[3])) as unknown,
         });
+      }
+      if (opts.landUse && opts.landUse.length > 0) {
+        const landUse = path.join(ctx.rawDir, "land_use.parquet").replaceAll("'", "''");
+        const wanted = opts.landUse.map((n) => `'${n.replaceAll("'", "''")}'`).join(", ");
+        const found = await conn.runAndReadAll(
+          `SELECT names."primary", ST_AsGeoJSON(geometry) FROM '${landUse}'
+           WHERE names."primary" IN (${wanted}) ORDER BY ST_Area(geometry) DESC`,
+        );
+        const seen = new Set<string>();
+        for (const [name, geometry] of found.getRows()) {
+          // the largest area of a name: a campus is mapped again as its parts
+          if (seen.has(String(name))) continue;
+          seen.add(String(name));
+          features.push({
+            type: "Feature",
+            properties: { kind: "locality", name: named(String(name)) },
+            geometry: JSON.parse(String(geometry)) as unknown,
+          });
+        }
+        for (const name of opts.landUse)
+          if (!seen.has(name)) ctx.log(`overture-areas: no land use area named "${name}"`);
       }
       conn.closeSync();
       if (features.length === 0)

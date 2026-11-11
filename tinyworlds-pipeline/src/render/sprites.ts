@@ -64,12 +64,13 @@ export function treeSprite(setting: number, seed: number): Sprite {
   return set[seed % set.length];
 }
 
-export type Flora = "temperate" | "tropical" | "subtropical" | "boreal";
+export type Flora = "temperate" | "tropical" | "subtropical" | "boreal" | "montane";
 
 /**
  * Mostly green. In a temperate city now and then one has already turned; in a tropical one it is
  * in flower instead: a yellow or pink ipê, a red flamboyant; in a subtropical one it is all green;
- * in the far north it is dark evergreens, some of them white with snow.
+ * in the far north it is dark evergreens, some of them white with snow; in the mountains of the
+ * west it is dark pines and firs with the lighter green of aspens and willows here and there.
  */
 export function treeRamp(seed: number, flora: Flora = "temperate"): number {
   const r = seed % 200;
@@ -77,6 +78,12 @@ export function treeRamp(seed: number, flora: Flora = "temperate"): number {
     if (r < 104) return R.pine;
     if (r < 168) return R.leafDark;
     return R.snow;
+  }
+  if (flora === "montane") {
+    if (r < 100) return R.pine;
+    if (r < 160) return R.leafDark;
+    if (r < 188) return R.leaf;
+    return R.leafLight;
   }
   if (flora === "subtropical") {
     // evergreen: live oaks and palms, nothing turning and nothing in flower

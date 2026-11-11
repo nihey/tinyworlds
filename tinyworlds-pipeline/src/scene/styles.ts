@@ -645,6 +645,74 @@ export const OHIO_RIVER: StyleProfile = {
   superTall: 0.6,
 };
 
+/**
+ * A Sierra Nevada mountain town: houses and cabins in stained and painted wood (browns, greys,
+ * cream, barn red, a sage or a blue) under steep metal roofs in dark green, brown, charcoal and
+ * red, pitched for the snow; an old main street of brick and clapboard; low wooden lodges and
+ * shops, most of them pitched too. Nothing tall.
+ */
+export const SIERRA: StyleProfile = {
+  rowWalls: [
+    R.brickRed,
+    R.brickDark,
+    R.timber,
+    R.brownstone,
+    R.cream,
+    R.tan,
+    R.greyStone,
+    R.sidingYellow,
+    R.whiteBrick,
+  ],
+  midWalls: [R.timber, R.brownstone, R.tan, R.cream, R.greyStone, R.brickRed, R.sidingSage, R.whiteBrick],
+  slabWalls: [R.cream, R.tan, R.greyStone, R.whiteBrick, R.brownstone],
+  houseWalls: [
+    R.timber,
+    R.timber,
+    R.brownstone,
+    R.brownstone,
+    R.tan,
+    R.tan,
+    R.greyStone,
+    R.greyStone,
+    R.cream,
+    R.darkStone,
+    R.brickRed,
+    R.sidingSage,
+    R.sidingBlue,
+    R.whiteBrick,
+  ],
+  houseRoofs: [
+    R.roofGreen,
+    R.roofGreen,
+    R.roofBrown,
+    R.roofBrown,
+    R.roofSlate,
+    R.roofSlate,
+    R.roofTar,
+    R.roofTar,
+    R.roofRed,
+    R.roofSilver,
+  ],
+  houseMaxArea: 450,
+  flatRoofs: [R.roofTar, R.roofGravel, R.roofSilver, R.roofSlate, R.roofBrown],
+  lowRoofs: [R.roofGreen, R.roofBrown, R.roofSlate, R.roofTar, R.roofSilver, R.roofRed],
+  lowPitched: 0.7,
+  towerRoofs: [R.roofGravel, R.roofSlate, R.roofTar],
+  glass: [R.glassDark, R.glassBlue, R.glassSilver, R.glassBronze],
+  stoneTowers: [R.cream, R.tan, R.greyStone, R.brownstone],
+  industrialWalls: [R.steel, R.greyStone, R.tan, R.brownstone, R.concrete, R.cream],
+  industrialRoofs: [R.roofSilver, R.roofSilver, R.roofGravel, R.roofGreen, R.roofBrown],
+  civicWalls: [R.cream, R.tan, R.greyStone, R.brownstone, R.timber, R.brickRed],
+  sacredWalls: [R.whiteBrick, R.cream, R.timber, R.greyStone, R.tan],
+  sacredRoofs: [R.roofGreen, R.roofBrown, R.roofSlate, R.roofRed],
+  outbuildingWalls: [R.timber, R.brownstone, R.greyStone, R.tan, R.brickRed],
+  outbuildingRoofs: [R.roofSilver, R.roofGreen, R.roofBrown, R.roofTar, R.roofRed],
+  windows: [R.glassDark, R.glassDark, R.glassBlack, R.glassBlue],
+  mid: [0.8, 0.15],
+  high: [0.2, 0.6],
+  superTall: 0.3,
+};
+
 const ALL_WALLS = [
   R.brickRed,
   R.brickDark,

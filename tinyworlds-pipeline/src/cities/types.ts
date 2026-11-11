@@ -128,6 +128,11 @@ export interface City {
     storey: number;
     /** Estimate the rest from the satellite height raster (the open-buildings source). */
     raster: boolean;
+    /**
+     * The mapped heights are a model's estimates that read tall buildings low (Colorado Springs':
+     * twelve floors at 22 m): where the floors are mapped too and say taller, they decide.
+     */
+    floorsFirst?: boolean;
   };
   style: StyleProfile;
   landmarks: Record<string, LandmarkStyle>;
@@ -195,11 +200,13 @@ export interface City {
     /** No census: line the streets by rule, one candidate spot every `spacing` metres on each side, kept with this chance. */
     street?: { spacing: number; chance: number };
   };
-  flora: "temperate" | "tropical" | "subtropical" | "boreal";
+  flora: "temperate" | "tropical" | "subtropical" | "boreal" | "montane";
   /** Local reading of the data's land classes: Overture subtype/class → ground kind (see scene/kinds.ts). */
   ground: {
     landCover?: Record<string, number>;
     landUse?: Record<string, number>;
+    /** Land classes of the rock polygons, read locally: Colorado Springs' bare rock is red sandstone. */
+    land?: Record<string, number>;
     /** Farm tracks are bare earth, not paved paths. */
     dirtTracks?: boolean;
     /** Water areas, by name, that are dry land most of the time (the Trinity's floodway, between its levees): left out. */
@@ -237,7 +244,12 @@ export interface City {
      * `minHeight` metres tall (default 110, New York's towers), and those of these classes besides
      * the stadiums, museums, stations and cathedrals that always are. A smaller city lists more.
      */
-    namedBuildings?: { minHeight?: number; classes?: string[] };
+    namedBuildings?: {
+      minHeight?: number;
+      classes?: string[];
+      /** Names that say nothing of the building ("Building 4", "Chapel"): not listed, never lit. */
+      skip?: RegExp;
+    };
     /**
      * Names of neighbourhoods and points of interest in the data that are not what they say:
      * improvement districts and a zoo's exhibits filed as neighbourhoods, a Fort Worth museum

@@ -1,3 +1,4 @@
+import { tinycos } from "./tinycos";
 import { tinycvg } from "./tinycvg";
 import { tinydal } from "./tinydal";
 import { tinyfte } from "./tinyfte";
@@ -9,6 +10,7 @@ import { tinyphl } from "./tinyphl";
 import { tinypit } from "./tinypit";
 import { tinyorl } from "./tinyorl";
 import { tinyrao } from "./tinyrao";
+import { tinytkf } from "./tinytkf";
 import { tinyvlc } from "./tinyvlc";
 import { tinywesteros } from "./tinywesteros";
 import { tinywinterfell } from "./tinywinterfell";
@@ -32,6 +34,8 @@ export const WORLDS: Record<string, World> = {
   tinycvg,
   tinypit,
   tinyphl,
+  tinycos,
+  tinytkf,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,
