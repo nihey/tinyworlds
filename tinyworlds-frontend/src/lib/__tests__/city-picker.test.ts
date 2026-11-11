@@ -9,6 +9,8 @@ import {
   previewBar,
   withGoal,
   rankCities,
+  leading,
+  BUILT_LIMIT,
   RANKING_LIMIT,
   regionNames,
   tidyCity,
@@ -319,7 +321,41 @@ describe("rankCities", () => {
     city({ name: "Buenos Aires", raisedCents: 3500 }),
     city({ name: "London", raisedCents: 0 }),
     city({ name: "New York", raisedCents: 0, status: "BUILT", worldId: "tinynyc" }),
+    city({
+      name: "Cincinnati",
+      raisedCents: 3000,
+      goalCents: 3000,
+      status: "BUILT",
+      worldId: "tinycvg",
+    }),
+    city({
+      name: "Dallas",
+      raisedCents: 3500,
+      goalCents: 3000,
+      status: "BUILT",
+      worldId: "tinydal",
+    }),
+    city({
+      name: "Orlando",
+      raisedCents: 2000,
+      goalCents: 3000,
+      status: "BUILT",
+      worldId: "tinyorl",
+    }),
   ];
+
+  it("keeps the built cities that were funded in full, the most raised first", () => {
+    expect(rankCities(cities).built.map((c) => c.name)).toEqual(["Dallas", "Cincinnati"]);
+  });
+
+  it("leads with the funded, then the best funded, and never a built city", () => {
+    expect(leading(rankCities(cities), 3).map((c) => c.name)).toEqual([
+      "Tokyo",
+      "Lisbon",
+      "São Paulo",
+    ]);
+    expect(leading(rankCities(cities), 0)).toEqual([]);
+  });
 
   it("sets apart the cities that reached their goal, the most funded first", () => {
     expect(rankCities(cities).funded.map((c) => c.name)).toEqual(["Tokyo", "Lisbon"]);
@@ -334,19 +370,26 @@ describe("rankCities", () => {
     ]);
   });
 
-  it("leaves built cities out altogether", () => {
+  it("keeps built cities out of the funded and the ranked", () => {
     const { funded, ranked } = rankCities(cities);
-    expect([...funded, ...ranked].some((c) => c.name === "New York")).toBe(false);
+    const built = ["New York", "Cincinnati", "Dallas", "Orlando"];
+    expect([...funded, ...ranked].some((c) => built.includes(c.name))).toBe(false);
   });
 
   it("knows when nobody has given anything yet", () => {
     expect(rankCities(cities).anyRaised).toBe(true);
     const zero = [city({ name: "Paris" }), city({ name: "London" })];
-    expect(rankCities(zero)).toEqual({ funded: [], ranked: [zero[1], zero[0]], anyRaised: false });
-    expect(rankCities([])).toEqual({ funded: [], ranked: [], anyRaised: false });
+    expect(rankCities(zero)).toEqual({
+      built: [],
+      funded: [],
+      ranked: [zero[1], zero[0]],
+      anyRaised: false,
+    });
+    expect(rankCities([])).toEqual({ built: [], funded: [], ranked: [], anyRaised: false });
   });
 
-  it("shows ten before asking to show all", () => {
-    expect(RANKING_LIMIT).toBe(10);
+  it("shows eight before asking to show all, and six of the built", () => {
+    expect(RANKING_LIMIT).toBe(8);
+    expect(BUILT_LIMIT).toBe(6);
   });
 });
