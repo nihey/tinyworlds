@@ -7,7 +7,13 @@ import { MilestoneBar } from "@/components/donate/milestone-bar";
 import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/hooks/use-i18n";
 import type { AdminSession } from "@/lib/admin";
-import { givingSummary, stoneRanges, type MyCity, type MyGiving } from "@/lib/benefactors";
+import {
+  givingSummary,
+  stoneRanges,
+  summaryLine,
+  type MyCity,
+  type MyGiving,
+} from "@/lib/benefactors";
 import { formatUsd, type CityMilestone } from "@/lib/donate";
 import { worldUrl } from "@/site";
 import { NameEditor } from "./name-editor";
@@ -237,10 +243,15 @@ export function YourCities({
         {giving && summary && (
           <>
             <p className="pt-1.5 text-sm text-paper-dim">
-              {t.me.summary
-                .replace("{cities}", String(summary.cities))
-                .replace("{stones}", String(summary.stones))
-                .replace("{given}", formatUsd(summary.givenCents, locale))}
+              {summaryLine(
+                summary,
+                {
+                  cities: t.me.summaryCities,
+                  stones: t.me.summaryStones,
+                  given: t.me.summaryGiven,
+                },
+                formatUsd(summary.givenCents, locale),
+              )}
             </p>
 
             {giving.cities.length === 0 && giving.projectCents === 0 && (
