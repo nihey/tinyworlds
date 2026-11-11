@@ -50,11 +50,13 @@ describe('the migrations', () => {
     await onServer(`DROP DATABASE IF EXISTS "${name}"`);
   });
 
-  it('counts the cities already built as announced, and no other', async () => {
+  it('counts the cities already on the map as announced, and no other', async () => {
     const migration = '20261111220000_built_announced';
     await upTo(migration);
     await db.query(`INSERT INTO cities (id, slug, name, status, goal_cents, world_id, updated_at) VALUES
       (gen_random_uuid(), 'new-york', 'New York', 'BUILT', 3000, 'tinynyc', now()),
+      (gen_random_uuid(), 'orlando', 'Orlando', 'BUILT', 3000, NULL, now()),
+      (gen_random_uuid(), 'las-vegas', 'Las Vegas', 'BUILDING', 3000, 'tinylas', now()),
       (gen_random_uuid(), 'lisbon', 'Lisbon', 'BUILDING', 3000, NULL, now()),
       (gen_random_uuid(), 'sao-paulo', 'São Paulo', 'FUNDED', 3000, NULL, now())`);
     await db.query(sqlOf(migration));
@@ -65,8 +67,10 @@ describe('the migrations', () => {
     expect(
       rows.map((row) => [row.slug, row.built_announced_at !== null]),
     ).toEqual([
+      ['las-vegas', true],
       ['lisbon', false],
       ['new-york', true],
+      ['orlando', true],
       ['sao-paulo', false],
     ]);
   });
