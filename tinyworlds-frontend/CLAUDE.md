@@ -260,6 +260,10 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   - `funding-preview.tsx`: the chosen city's bar with the donation about to be made added to
     it in stripes (`previewBar`), and what that means: it fills the bar, or lands above the
     goal. With no city chosen there is no bar, only a line.
+  - `join-block.tsx`: "Put my name on {city}", under the amount chips (API mode, a city chosen
+    only). The switch starts off; on, a name field (40 code points, counter) appears and Donate
+    stays disabled until `cleanName` finds something. The checkout sends
+    `benefactorName: on ? cleanName(name) : null`.
   - It says, in every language: cities with the most funding are built first, and what is given
     beyond a city's goal pays for the servers and keeps the project improving.
 - **The front page's ranking** (`rankCities`): the cities that reached their goal ("Funded":

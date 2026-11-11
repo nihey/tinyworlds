@@ -117,6 +117,13 @@ export const ptBR: Strings = {
       other:
         "Você assentaria as pedras {from}–{to} das {count} de {city} e seria um dos Benfeitores Fundadores.",
     },
+    join: {
+      label: "Pôr meu nome em {city}",
+      name: "Nome a mostrar",
+      namePlaceholder: "Ana do Recife",
+      counter: "{n}/{max}",
+      note: "Desligado: você conta do mesmo jeito, como “anônimo”. Entre depois com o e-mail que der ao Stripe para mudar seu nome ou tirá-lo.",
+    },
     donations: { none: "Ainda sem doações", one: "{n} doação", other: "{n} doações" },
     status: { funded: "Meta batida, na fila", building: "Em construção", built: "No ar" },
     showAll: "Ver todas as cidades",

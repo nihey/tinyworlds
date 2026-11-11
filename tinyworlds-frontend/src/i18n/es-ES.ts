@@ -117,6 +117,13 @@ export const esES: Strings = {
       other:
         "Pondrías las piedras {from}–{to} de las {count} de {city} y serías uno de sus Benefactores Fundadores.",
     },
+    join: {
+      label: "Poner mi nombre en {city}",
+      name: "Nombre a mostrar",
+      namePlaceholder: "Ana de Sevilla",
+      counter: "{n}/{max}",
+      note: "Desactivado: cuentas igual, como “anónimo”. Inicia sesión después con el correo que des a Stripe para cambiar tu nombre o quitarlo.",
+    },
     donations: { none: "Aún sin donaciones", one: "{n} donación", other: "{n} donaciones" },
     status: { funded: "Meta alcanzada, en cola", building: "En construcción", built: "Construida" },
     showAll: "Ver todas las ciudades",

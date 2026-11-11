@@ -12,6 +12,7 @@ import {
 import { useI18n } from "@/hooks/use-i18n";
 import { activeLocale } from "@/i18n";
 import { useMilestones } from "@/hooks/use-milestones";
+import { cleanName } from "@/lib/benefactors";
 import { defaultGoal, findMilestone, previewBar } from "@/lib/city-picker";
 import {
   AMOUNT_DEFAULT,
@@ -31,6 +32,7 @@ import { BUILT_CITIES, SITE_ID, SITE_NAME } from "@/site";
 import { AmountPicker } from "./amount-picker";
 import { CityPicker } from "./city-picker";
 import { FundingPreview } from "./funding-preview";
+import { JoinBlock } from "./join-block";
 
 interface DonateDialogProps {
   open: boolean;
@@ -72,6 +74,8 @@ function DonateBody({ city: opening }: { city: string | null }) {
   );
   const [preset, setPreset] = useState<number>(AMOUNT_DEFAULT);
   const [custom, setCustom] = useState("");
+  const [joinOn, setJoinOn] = useState(false);
+  const [joinName, setJoinName] = useState("");
   const [pending, setPending] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
 
@@ -96,6 +100,10 @@ function DonateBody({ city: opening }: { city: string | null }) {
   // the line about giving beyond the goal is said once: by the bar when this donation does so
   const overGoal = standing !== null && previewBar(standing, amountCents).overCents > 0;
 
+  // the name to list, only when asked for and only if it has something to show
+  const benefactorName = joinOn ? cleanName(joinName) : null;
+  const needsName = joinOn && benefactorName === null;
+
   const checkout = async () => {
     setPending(true);
     setCheckoutFailed(false);
@@ -111,6 +119,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
         locale,
         returnUrlOf(window.location),
         currentVisit(),
+        benefactorName,
       );
       const url = await api.createCheckout(input);
       // for the page the donor comes back to, which says whether they gave, and what
@@ -205,10 +214,22 @@ function DonateBody({ city: opening }: { city: string | null }) {
               />
             </div>
 
+            {name && (
+              <JoinBlock
+                city={name}
+                on={joinOn}
+                name={joinName}
+                onOn={setJoinOn}
+                onName={setJoinName}
+                disabled={pending}
+                t={t}
+              />
+            )}
+
             <button
               type="button"
               onClick={checkout}
-              disabled={pending}
+              disabled={pending || needsName}
               aria-busy={pending}
               data-rybbit-event="donate_checkout"
               data-rybbit-prop-world={SITE_ID}

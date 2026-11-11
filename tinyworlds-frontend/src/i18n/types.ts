@@ -170,6 +170,8 @@ export interface Strings {
     builtUpkeep: string;
     /** the stones a gift would lay: "{from}", "{to}", "{count}" and "{city}"; `one` when it is a single stone */
     stones: { one: string; other: string };
+    /** joining the city's benefactors: "{city}" is its name, "{n}" and "{max}" the counter */
+    join: { label: string; name: string; namePlaceholder: string; counter: string; note: string };
     donations: { none: string; one: string; other: string };
     status: { funded: string; building: string; built: string };
     showAll: string;
