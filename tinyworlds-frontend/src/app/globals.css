@@ -332,6 +332,20 @@
   --sign-from: 8px;
 }
 
+/* the front page's hero: one world's picture coming in over the one before it (the duration
+   is set where it is used: FADE_MS) */
+@keyframes hero-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.hero-in {
+  animation: hero-in ease both;
+}
+
 /* the first arrival: signs go up one after another */
 @keyframes sign-in {
   from {
@@ -375,6 +389,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sign-in,
+  .hero-in,
   .skyline i {
     animation: none;
   }

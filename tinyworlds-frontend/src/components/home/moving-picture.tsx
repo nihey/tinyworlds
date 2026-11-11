@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
@@ -17,14 +17,21 @@ interface MovingPictureProps {
   fallback?: ReactNode;
   /** load the still at once: it is at the top of the page */
   eager?: boolean;
+  /**
+   * Whether this is the picture being shown (the hero's current slide). One that is not keeps
+   * its still, or the frame it stopped on, and fetches and plays nothing.
+   */
+  active?: boolean;
   /** sizes the frame: the picture fills it */
   className?: string;
+  style?: CSSProperties;
 }
 
 /**
- * A still that comes alive. The loop is fetched only once the picture is on screen, plays while
- * it stays there and stops when it leaves; it is never fetched under `prefers-reduced-motion`
- * or a data-saving connection, and if it cannot play the still simply stays.
+ * A still that comes alive. The loop is fetched only once the picture is on screen (and is the
+ * one being shown), plays while it stays there and stops when it leaves; it is never fetched
+ * under `prefers-reduced-motion` or a data-saving connection, and if it cannot play the still
+ * simply stays.
  */
 export function MovingPicture({
   still,
@@ -32,7 +39,9 @@ export function MovingPicture({
   alt,
   fallback,
   eager,
+  active = true,
   className,
+  style,
 }: MovingPictureProps) {
   const frame = useRef<HTMLDivElement>(null);
   const picture = useRef<HTMLImageElement>(null);
@@ -50,7 +59,7 @@ export function MovingPicture({
   useEffect(() => {
     const box = frame.current;
     const video = film.current;
-    if (!box || !video || calm) return;
+    if (!box || !video || calm || !active) return;
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } })
       .connection;
     if (connection?.saveData) return;
@@ -70,10 +79,14 @@ export function MovingPicture({
       watcher.disconnect();
       video.pause();
     };
-  }, [calm]);
+  }, [calm, active]);
 
   return (
-    <div ref={frame} className={cn("relative overflow-hidden bg-sign-raised", className)}>
+    <div
+      ref={frame}
+      className={cn("relative overflow-hidden bg-sign-raised", className)}
+      style={style}
+    >
       {!missing ? (
         // eslint-disable-next-line @next/next/no-img-element -- a plain file, no optimizer in a static export
         <img
