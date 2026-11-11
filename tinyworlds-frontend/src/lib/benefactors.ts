@@ -322,3 +322,18 @@ export function summaryLine(
     .filter((part): part is string => part !== null)
     .join(" · ");
 }
+
+/** The words of the collapsed-founders line: "{n}" in both. */
+export interface MoreWords {
+  more: { one: string; other: string };
+  anonymous: { one: string; other: string };
+}
+
+/** "4 more, 1 anonymous"; the anonymous part is left out when none of them are. */
+export function moreLine(count: number, anonymous: number, words: MoreWords): string {
+  const part = (n: number, form: { one: string; other: string }) =>
+    (n === 1 ? form.one : form.other).replace("{n}", String(n));
+  return anonymous > 0
+    ? `${part(count, words.more)}, ${part(anonymous, words.anonymous)}`
+    : part(count, words.more);
+}

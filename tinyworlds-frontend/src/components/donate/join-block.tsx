@@ -13,11 +13,13 @@ interface JoinBlockProps {
   onOn: (on: boolean) => void;
   onName: (name: string) => void;
   disabled?: boolean;
+  /** the name is empty or unusable: say why Donate waits, under the field with this id */
+  hint?: { id: string };
   t: Strings;
 }
 
 /** "Put my name on {city}": off by default, and a name to show once it is on. */
-export function JoinBlock({ city, on, name, onOn, onName, disabled, t }: JoinBlockProps) {
+export function JoinBlock({ city, on, name, onOn, onName, disabled, hint, t }: JoinBlockProps) {
   const labelId = useId();
   const count = Array.from(name).length;
   return (
@@ -44,6 +46,7 @@ export function JoinBlock({ city, on, name, onOn, onName, disabled, t }: JoinBlo
             value={name}
             maxLength={NAME_MAX}
             aria-label={t.donate.join.name}
+            aria-describedby={hint?.id}
             placeholder={t.donate.join.namePlaceholder}
             disabled={disabled}
             onChange={(e) => onName(e.target.value)}
@@ -54,6 +57,11 @@ export function JoinBlock({ city, on, name, onOn, onName, disabled, t }: JoinBlo
             {t.donate.join.counter.replace("{n}", String(count)).replace("{max}", String(NAME_MAX))}
           </span>
         </label>
+      )}
+      {on && hint && (
+        <p id={hint.id} className="pt-1.5 text-xs leading-relaxed text-taxi">
+          {t.donate.join.needsName}
+        </p>
       )}
       <p className="pt-2 text-xs leading-relaxed text-paper-dim">{t.donate.join.note}</p>
     </div>

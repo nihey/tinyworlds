@@ -344,7 +344,7 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   Donate with the city chosen (one sign at a time).
 - **The join block** (`components/donate/join-block.tsx`) is "Put my name on {city}": off by
   default, a name field (40 code points, `cleanName`) when on, and Donate disabled until a name
-  is left. The checkout carries `benefactorName`, null when off. The email's existing name is kept.
+  is left, saying why in a hint under the field (`donate.join.needsName`, tied to the field and the button with `aria-describedby`). The checkout carries `benefactorName`, null when off. The email's existing name is kept.
 - **Badges are SVG pixel maps** (`benefactors/pixel-art.ts`: one character per pixel, a palette
   with fixed colours; `pixel-badge.tsx` draws one `<rect>` per pixel at a whole-number scale), so
   they stay crisp at any size and need no image files. Founding, first stone and keystone.

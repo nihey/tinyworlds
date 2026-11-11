@@ -7,6 +7,7 @@ import {
   givingSummary,
   parseGiving,
   summaryLine,
+  moreLine,
   parseCityBenefactors,
   stoneLooks,
   stonePreview,
@@ -262,5 +263,24 @@ describe("summaryLine", () => {
   });
   it("leaves the stones out when none were laid", () => {
     expect(summaryLine({ cities: 1, stones: 0 }, words, "$15")).toBe("1 city · $15 given");
+  });
+});
+
+describe("moreLine", () => {
+  const words = {
+    more: { one: "{n} more", other: "{n} more" },
+    anonymous: { one: "{n} anonymous", other: "{n} anonymous" },
+  };
+  it("names the anonymous ones only when there are some", () => {
+    expect(moreLine(4, 0, words)).toBe("4 more");
+    expect(moreLine(4, 3, words)).toBe("4 more, 3 anonymous");
+  });
+  it("uses each count's own plural form", () => {
+    const pt = {
+      more: { one: "e mais {n}", other: "e mais {n}" },
+      anonymous: { one: "{n} anônimo", other: "{n} anônimos" },
+    };
+    expect(moreLine(3, 1, pt)).toBe("e mais 3, 1 anônimo");
+    expect(moreLine(5, 2, pt)).toBe("e mais 5, 2 anônimos");
   });
 });
