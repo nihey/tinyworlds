@@ -282,7 +282,7 @@ export function parseGiving(value: unknown): MyGiving | null {
   return { displayName: value.displayName, cities, projectCents: value.projectCents };
 }
 
-/** The line at the top of the page: how many cities, how many stones, how much given to them. */
+/** The figures at the top of the page: how many cities, how many stones, how much given to them. */
 export function givingSummary(giving: MyGiving): {
   cities: number;
   stones: number;
@@ -323,34 +323,6 @@ export function earnedWhere(
   if (names.length === 0) return null;
   if (names.length <= 2) return names.join(", ");
   return cities.other.replace("{n}", String(names.length));
-}
-
-/** The words of the summary line: two plural pairs and the amount. */
-export interface SummaryWords {
-  cities: { one: string; other: string };
-  stones: { one: string; other: string };
-  /** "{amount}" */
-  given: string;
-}
-
-/**
- * "3 cities · 32 stones laid · US$47 given". The stones part is left out when none were laid;
- * `amount` is the money already written in the reader's language.
- */
-export function summaryLine(
-  summary: { cities: number; stones: number },
-  words: SummaryWords,
-  amount: string,
-): string {
-  const count = (n: number, form: { one: string; other: string }) =>
-    (n === 1 ? form.one : form.other).replace("{n}", String(n));
-  return [
-    count(summary.cities, words.cities),
-    summary.stones > 0 ? count(summary.stones, words.stones) : null,
-    words.given.replace("{amount}", amount),
-  ]
-    .filter((part): part is string => part !== null)
-    .join(" · ");
 }
 
 /** The words of the collapsed-founders line: "{n}" in both. */

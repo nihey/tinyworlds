@@ -278,9 +278,6 @@ export const en: Strings = {
       tooMany: "Too many tries. Wait a minute, then try again.",
       unavailable: "This build of the site has no API, so there is nothing to sign in to.",
     },
-    summaryCities: { one: "{n} city", other: "{n} cities" },
-    summaryStones: { one: "{n} stone laid", other: "{n} stones laid" },
-    summaryGiven: "{amount} given",
     founderNo: "FOUNDER NO. {n}",
     firstStone: "First Stone",
     keystone: "Keystone",
@@ -305,7 +302,6 @@ export const en: Strings = {
     loading: "Loading your cities…",
     failed: "Couldn't load your cities, or save the change. Try again.",
     retry: "Try again",
-    empty: "Nothing here yet. Gifts made with this email show up here.",
     noStones: "No stones laid yet.",
     noStonesBody:
       "Give to a city and it shows up here: what you gave, the stones you laid and the badges you earned.",

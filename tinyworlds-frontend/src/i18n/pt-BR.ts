@@ -283,9 +283,6 @@ export const ptBR: Strings = {
       tooMany: "Muitas tentativas. Espere um minuto e tente de novo.",
       unavailable: "Esta versão do site não tem API, então não há onde entrar.",
     },
-    summaryCities: { one: "{n} cidade", other: "{n} cidades" },
-    summaryStones: { one: "{n} pedra assentada", other: "{n} pedras assentadas" },
-    summaryGiven: "{amount} em doações",
     founderNo: "FUNDADOR Nº {n}",
     firstStone: "Pedra Fundamental",
     keystone: "Pedra-Chave",
@@ -310,7 +307,6 @@ export const ptBR: Strings = {
     loading: "Carregando suas cidades…",
     failed: "Não foi possível carregar suas cidades nem salvar a mudança. Tente de novo.",
     retry: "Tentar de novo",
-    empty: "Nada por aqui ainda. As doações feitas com este e-mail aparecem aqui.",
     noStones: "Nenhuma pedra assentada ainda.",
     noStonesBody:
       "Doe para uma cidade e ela aparece aqui: o que você doou, as pedras que assentou e as medalhas que ganhou.",
