@@ -43,6 +43,21 @@ const AREA_CATEGORIES = new Set(["college_university", "airport", "zoo", "amusem
 
 const round5 = (v: number): number => Math.round(v * 1e5) / 1e5;
 
+/**
+ * The index's order: best-ranked first, then by name, and to the end (context, position) so the
+ * same data always comes out the same way, whatever order the queries returned it in.
+ */
+export function comparePlaces(a: Place, b: Place): number {
+  return (
+    b.r - a.r ||
+    a.n.localeCompare(b.n) ||
+    (a.b ?? "").localeCompare(b.b ?? "") ||
+    a.lon - b.lon ||
+    a.lat - b.lat ||
+    a.t.localeCompare(b.t)
+  );
+}
+
 /** Area-weighted centroid and area of a lon/lat ring (planar; fine at city scale). */
 function ringCentroid(ring: number[][]): { lon: number; lat: number; area: number } {
   let a = 0;
@@ -521,7 +536,7 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
   }
   conn.closeSync();
 
-  places.sort((a, b) => b.r - a.r || a.n.localeCompare(b.n));
+  places.sort(comparePlaces);
   if (CITY.sights) await writeSights({ places, proj, out, log });
   fs.writeFileSync(
     path.join(out, "places.json"),

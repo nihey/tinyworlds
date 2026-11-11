@@ -106,7 +106,9 @@ data/<world>/
 ├── overview.webp            # whole map, small: the minimap
 ├── places.json              # search index
 ├── hoods.json               # outlines of the city's areas (may be empty)
-└── life.json                # ferry routes and flights for the animated layer
+├── life.json                # ferry routes and flights for the animated layer
+├── sights.json              # buildings that light up under the pointer (worlds with sights)
+└── sights.<locale>.json     # their Wikipedia openings: en-US, pt-BR, es-ES
 ```
 
 ### Map space and projection
@@ -193,6 +195,29 @@ sub-sectors in Ribeirão Preto); the viewer labels the types per world.
 ```
 
 Optional for the viewer: without it the map is simply still.
+
+### sights.json, `sights.<locale>.json`
+
+The structures found in the search (buildings, stadiums, the Statue of Liberty, bridges), each
+outlined as the map draws it, and what Wikipedia says of them. Only for a world that has them
+(the pipeline's `sights` city field, the viewer's `World.sights`).
+
+```ts
+// sights.json: { sights: {
+//   id: string;            // "b<seed>", "bridge:<name>", "statue:<i>"
+//   n: string; t: PlaceType | "building"; b?: string;   // name, type, context line
+//   lon: number; lat: number;                           // where its article is looked up
+//   rings: number[][];     // the outline, flat MAP PX rings, even-odd: it includes height, so
+//                          // it is screen geometry, not geodata (the one exception to lon/lat)
+//   front: number;         // largest ground y of its footprints: the nearer the viewer, the larger
+//   anchor: [number, number];  // where its sign hangs (the outline's top), map px
+// }[] }
+// sights.<locale>.json: { [id]: { title: string; url: string; text: string; lang: string } }
+//   text: the article's opening (≤ 220 characters); lang: the article's own language, "en" where
+//   the visitor's has none
+```
+
+Optional for the viewer: without them nothing lights up.
 
 ## API contract (viewer ↔ API)
 
