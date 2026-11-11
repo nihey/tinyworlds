@@ -16,7 +16,7 @@ import { buildSyntheticIndex } from "../scene/synthetic.js";
  * lon/lat; the viewer projects.
  */
 
-type PlaceType =
+export type PlaceType =
   "borough" | "hood" | "landmark" | "park" | "bridge" | "museum" | "station" | "street" | "place";
 
 interface Place {
