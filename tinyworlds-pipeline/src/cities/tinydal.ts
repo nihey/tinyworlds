@@ -108,6 +108,8 @@ export const tinydal: City = {
   statues: [REUNION_BALL, huntHillArch(BETA)],
   sights: {
     placeWords: ["Dallas", "Texas", "Big D", "DFW", "North Texas"],
+    // the context lines say "Downtown" or "Arts District": a question's area is its town
+    areaByDistrict: true,
     // the other names their openings give, which would give them away
     aliases: {
       "texas school book depository": [

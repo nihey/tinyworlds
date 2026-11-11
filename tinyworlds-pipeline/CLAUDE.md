@@ -384,7 +384,10 @@ change to the rules below.
   the borough sets of questions with no borough, which are never played). On easy no wrong
   name is in more than about a fifth of a choice's rounds (`--list`, and a count over
   `quiz.en-US.json`, show it).
-- Cincinnati: CVG_QUIZ. Dallas: DAL_QUIZ.
+- Cincinnati: 67 questions (easy 17, medium 24, hard 26), Dallas: 63 (easy 16, medium 22, hard
+  25). Their context lines are neighbourhoods ("Downtown", "Over-the-Rhine"), so a question's
+  area is the district it stands in (`sights.areaByDistrict`), among all the city's districts
+  (Covington's middle is off the map, so it is no `borough` place).
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
 

@@ -411,6 +411,8 @@ export const CURATED: Curated[] = [
     s: 1.5,
     sight: true,
   },
+  // the city reaches far south off the map, so its district is no destination in the search
+  { n: "Covington", t: "place", lon: -84.5095, lat: 39.0855, b: "Kentucky", r: 92, s: 0.75 },
   { n: "MainStrasse Village", t: "place", lon: -84.51733, lat: 39.08353, b: "Covington", r: 84, s: 1 },
   { n: "Goebel Park", t: "park", lon: -84.52173, lat: 39.08269, b: "Covington", r: 64, s: 1 },
   { n: "Roebling Point", t: "place", lon: -84.50851, lat: 39.08802, b: "Covington", r: 72, s: 1.5 },
