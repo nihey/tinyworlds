@@ -273,6 +273,33 @@ upload_all() {
   return 0
 }
 
+# ---- announcing ------------------------------------------------------------------------------
+
+# Tells the donors of a world's city, by mail, that it is built: the API's announce command, in
+# its container on DEPLOY_HOST. API_SERVICE names the container, or the Swarm service whose task
+# runs it (<service>.1.<task>). The command sends once per city, so it is safe on every deploy.
+# It never fails the deploy: a problem is a warning.
+announce_built() {
+  local world="$1" status=0
+  if [[ -z "${API_SERVICE:-}" ]]; then
+    echo "Not telling $world's donors that it is built: set API_SERVICE in deploy/.env (see deploy/README.md)."
+    return 0
+  fi
+  ssh "$DEPLOY_HOST" sh -s -- "$API_SERVICE" "$world" <<'REMOTE' || status=$?
+service="$1" world="$2"
+container="$(docker ps --format '{{.Names}}' | grep -E "^${service}([.]|\$)" | head -n 1)"
+if [ -z "$container" ]; then
+  echo "No running container is named $service, nor runs a service of that name." >&2
+  exit 3
+fi
+exec docker exec "$container" node dist/benefactors/announce-cli.js "$world"
+REMOTE
+  if ((status)); then
+    echo "Warning: telling $world's donors that it is built did not fully work (exit $status, see above). The deploy itself is done." >&2
+  fi
+  return 0
+}
+
 sync_nginx() {
   # in place: the container bind-mounts this one file, and a renamed copy would leave it reading the old one
   rsync -az --inplace "$ROOT/deploy/nginx.conf" "$DEPLOY_HOST:$DEPLOY_DIR/nginx.conf"
@@ -344,6 +371,13 @@ else
   upload "$TARGET" "$WORK/$TARGET/out" "$MODE"
 fi
 [[ "$MODE" != "--data" ]] && sync_nginx
+
+# the worlds are up: the donors of a city that has just been built hear of it
+if [[ "$TARGET" == "all" ]]; then
+  for world in "${WORLDS[@]}"; do announce_built "$world"; done
+elif [[ "$TARGET" != "home" ]]; then
+  announce_built "$TARGET"
+fi
 
 if [[ "$TARGET" == "all" ]]; then
   echo "Deployed ${#TARGETS[@]} targets: ${TARGETS[*]}"

@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
+import { AnnounceService } from '../src/benefactors/announce.service.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
@@ -1643,6 +1644,155 @@ describe('the API over HTTP', () => {
         expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
       }
       expect(await prisma.quizAnswer.count()).toBe(0);
+    });
+  });
+
+  describe('announcing a built city', () => {
+    const gift = (
+      id: string,
+      amount: number,
+      email: string | null,
+      locale: string,
+      name?: string,
+    ) =>
+      webhook({
+        id,
+        amount,
+        email,
+        metadata: {
+          app: 'tinyworlds',
+          city: 'Lisbon',
+          world: 'tinynyc',
+          locale,
+          ...(name ? { benefactor_name: name } : {}),
+        },
+      }).expect(200);
+    /** The mails of this test so far. */
+    let start = 0;
+    beforeEach(() => {
+      start = mailer.sent.length;
+    });
+    /** The announcements this test sent: the mails that carry the world's share card. */
+    const announcements = () =>
+      mailer.sent
+        .slice(start)
+        .filter((mail) => mail.html.includes('/tinylis/og/tinylis.jpg'));
+    const announce = (world: string) =>
+      app.get(AnnounceService).announce(world);
+
+    /** Lisbon's gifts (a goal of US$100 here), and their thank-yous gone out. */
+    const giveToLisbon = async () => {
+      const before = mailer.sent.length;
+      await gift('cs_a1', 1200, 'ana@example.com', 'en-US', 'Ana');
+      await gift('cs_b', 8800, 'bo@example.com', 'pt-BR');
+      await gift('cs_a2', 3000, 'ana@example.com', 'es-ES', 'Ana');
+      await gift('cs_c', 500, 'cy@example.com', 'en-US');
+      await gift('cs_n', 700, null, 'en-US');
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 4));
+    };
+    const build = () =>
+      prisma.city.update({
+        where: { slug: 'lisbon' },
+        data: { status: 'BUILT', worldId: 'tinylis' },
+      });
+
+    it('mails each donor of a built city once, in the language of their latest gift', async () => {
+      await giveToLisbon();
+      await build();
+      expect(await announce('tinylis')).toEqual({
+        kind: 'sent',
+        world: 'tinylis',
+        city: 'Lisbon',
+        mailed: 3,
+        failed: [],
+      });
+      const sent = announcements();
+      expect(sent.map((mail) => mail.to).sort()).toEqual([
+        'ana@example.com',
+        'bo@example.com',
+        'cy@example.com',
+      ]);
+      const to = (address: string) => sent.find((mail) => mail.to === address);
+      expect(to('ana@example.com')).toMatchObject({
+        subject: 'Lisbon ya está en el mapa. Ven a verla',
+      });
+      expect(to('ana@example.com')?.text).toContain(
+        'Diste: 42\u00a0US$ · piedras 1–12',
+      );
+      expect(to('ana@example.com')?.text).toContain(
+        'La construyeron: 2 fundadores y 2 benefactores',
+      );
+      expect(to('bo@example.com')?.subject).toBe(
+        'Lisbon já está no mapa. Venha ver',
+      );
+      expect(to('bo@example.com')?.text).toContain(
+        'Fundador Nº 2 · Pedra-Chave',
+      );
+      expect(to('cy@example.com')?.text).toContain(
+        'Lisbon is on the map, and you helped keep it running.',
+      );
+      expect(to('cy@example.com')?.html).toContain(
+        'href="https://example.com/tinylis/"',
+      );
+      // nobody's mail names anyone else
+      for (const mail of sent)
+        for (const other of ['ana@', 'bo@', 'cy@'])
+          if (!mail.to.startsWith(other))
+            expect(mail.html + mail.text).not.toContain(other);
+      const lisbon = await prisma.city.findUniqueOrThrow({
+        where: { slug: 'lisbon' },
+      });
+      expect(lisbon.builtAnnouncedAt).toBeInstanceOf(Date);
+
+      // the second time, nothing
+      expect(await announce('tinylis')).toEqual({
+        kind: 'announced-before',
+        world: 'tinylis',
+        city: 'Lisbon',
+        at: lisbon.builtAnnouncedAt,
+      });
+      expect(announcements()).toHaveLength(3);
+    });
+
+    it('sends nothing for a city not built yet, nor for a world no city has', async () => {
+      await giveToLisbon();
+      await prisma.city.update({
+        where: { slug: 'lisbon' },
+        data: { worldId: 'tinylis' },
+      });
+      expect(await announce('tinylis')).toEqual({
+        kind: 'not-built',
+        world: 'tinylis',
+        city: 'Lisbon',
+        status: 'FUNDED',
+      });
+      expect(await announce('tinynowhere')).toEqual({
+        kind: 'unknown',
+        world: 'tinynowhere',
+      });
+      expect(announcements()).toHaveLength(0);
+      const lisbon = await prisma.city.findUniqueOrThrow({
+        where: { slug: 'lisbon' },
+      });
+      expect(lisbon.builtAnnouncedAt).toBeNull();
+    });
+
+    it('names the donors whose mail did not go out, and does not send again', async () => {
+      await giveToLisbon();
+      await build();
+      mailer.failWith = new Error('the mail server is away');
+      try {
+        const done = await announce('tinylis');
+        const donors = await prisma.donor.findMany({ select: { id: true } });
+        expect(done).toMatchObject({ kind: 'sent', mailed: 0 });
+        expect(done.kind === 'sent' && [...done.failed].sort()).toEqual(
+          donors.map((d) => d.id).sort(),
+        );
+      } finally {
+        mailer.failWith = null;
+      }
+      expect((await announce('tinylis')).kind).toBe('announced-before');
+      expect(announcements()).toHaveLength(0);
     });
   });
 });
