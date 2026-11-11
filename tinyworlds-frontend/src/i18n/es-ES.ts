@@ -344,7 +344,32 @@ export const esES: Strings = {
   quiz: {
     invite: "Adivina el edificio: ¿sabes el nombre de lo que ves?",
     title: "Adivina el edificio",
-    score: { one: "ronda {round} · {right} acierto", other: "ronda {round} · {right} aciertos" },
+    score: {
+      one: "ronda {round} de {total} · {right} acierto",
+      other: "ronda {round} de {total} · {right} aciertos",
+    },
+    difficulty: "Dificultad",
+    what: "Qué",
+    levels: {
+      easy: { name: "Fácil", line: "famosos, opciones claras" },
+      medium: { name: "Media", line: "conocidos, opciones parecidas" },
+      hard: { name: "Difícil", line: "cualquiera, casi iguales" },
+    },
+    groups: {
+      all: "Todo",
+      buildings: "Edificios",
+      museums: "Museos",
+      landmarks: "Monumentos",
+      stations: "Estaciones",
+    },
+    allAreas: "Todos",
+    count: { one: "{n} edificio en esta partida", other: "{n} edificios en esta partida" },
+    few: { one: "Solo {n} edificio en esta partida", other: "Solo {n} edificios en esta partida" },
+    start: "Empezar",
+    change: "Cambiar a qué jugar",
+    end: "Acertaste {right} de {total}.",
+    again: "Jugar otra vez",
+    changeChoice: "Cambiar",
     close: "Dejar de jugar",
     ask: {
       building: "¿Qué edificio es este?",

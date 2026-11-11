@@ -342,7 +342,32 @@ export const en: Strings = {
   quiz: {
     invite: "Guess the building: can you name what you see?",
     title: "Guess the building",
-    score: { one: "round {round} · {right} right", other: "round {round} · {right} right" },
+    score: {
+      one: "round {round} of {total} · {right} right",
+      other: "round {round} of {total} · {right} right",
+    },
+    difficulty: "Difficulty",
+    what: "What",
+    levels: {
+      easy: { name: "Easy", line: "famous, clear choices" },
+      medium: { name: "Medium", line: "known, closer choices" },
+      hard: { name: "Hard", line: "anything, look-alikes" },
+    },
+    groups: {
+      all: "All",
+      buildings: "Buildings",
+      museums: "Museums",
+      landmarks: "Landmarks",
+      stations: "Stations",
+    },
+    allAreas: "All",
+    count: { one: "{n} building in this game", other: "{n} buildings in this game" },
+    few: { one: "Only {n} building in this game", other: "Only {n} buildings in this game" },
+    start: "Start",
+    change: "Change what you play",
+    end: "You named {right} of {total}.",
+    again: "Play again",
+    changeChoice: "Change",
     close: "Stop playing",
     ask: {
       building: "Which building is this?",

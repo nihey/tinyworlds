@@ -1,9 +1,18 @@
-import type { QuizQuestion } from "@/map/quiz";
+import {
+  QUIZ_GROUPS,
+  QUIZ_LEVELS,
+  type QuizGroup,
+  type QuizLevelName,
+  type QuizQuestion,
+  type QuizScope,
+  type Three,
+} from "@/map/quiz";
 import type { SightType } from "@/map/sights";
 
 /**
- * Guess the building, without React: which building comes next, the order of the four names,
- * the shares of everyone's answers, the view a round flies to, and the round's states.
+ * Guess the building, without React: what a choice of difficulty, borough and kind plays, the
+ * order of a game, the four names, the shares of everyone's answers, the view a round flies to,
+ * and the game's states.
  */
 
 /** How everyone has answered one building (the API's `answerQuiz`). */
@@ -19,33 +28,150 @@ export function questionKind(t: SightType): QuestionKind {
   return t === "station" || t === "bridge" || t === "museum" ? t : "building";
 }
 
+/** What a player chooses before a game: a difficulty, a borough or all (null), a kind or all. */
+export interface QuizChoice {
+  level: QuizLevelName;
+  area: string | null;
+  group: QuizGroup | null;
+}
+
+/** The first game's choice: easy, all boroughs, all kinds. */
+export const DEFAULT_CHOICE: QuizChoice = { level: "easy", area: null, group: null };
+
+const LEVEL_NUMBER: Record<QuizLevelName, number> = { easy: 1, medium: 2, hard: 3 };
+
+/** How the choice narrows a round's wrong answers. */
+export function scopeOf(c: QuizChoice): QuizScope {
+  if (c.area !== null && c.group !== null) return "both";
+  return c.area !== null ? "area" : c.group !== null ? "group" : "all";
+}
+
+/** A round's three wrong names: the set for the game's difficulty and scope, else `all`'s, else `decoys`. */
+export function setFor(q: QuizQuestion, c: QuizChoice): Three {
+  const sets = q.sets[c.level];
+  return sets?.[scopeOf(c)] ?? sets?.all ?? q.decoys;
+}
+
 /**
- * The next building, at random among those this browser has not played; once all have been,
- * the list starts over. A question whose building or any wrong name is not on the map (`has`)
- * is never asked. Null when there is nothing to ask. `played` comes back with the pick in it.
+ * Whether a choice plays this question: in its difficulty (levels are cumulative; an older file
+ * without sets is in every one), of its borough and kind, and on the map with its wrong names.
  */
-export function nextQuestion(
+export function inChoice(
+  q: QuizQuestion,
+  c: QuizChoice,
+  has: (id: string) => boolean = () => true,
+): boolean {
+  const inLevel =
+    q.level <= LEVEL_NUMBER[c.level] && (Object.keys(q.sets).length === 0 || !!q.sets[c.level]);
+  return (
+    inLevel &&
+    (c.area === null || q.area === c.area) &&
+    (c.group === null || q.group === c.group) &&
+    has(q.id) &&
+    setFor(q, c).every(has)
+  );
+}
+
+export function countFor(
   questions: QuizQuestion[],
+  c: QuizChoice,
+  has?: (id: string) => boolean,
+): number {
+  return questions.filter((q) => inChoice(q, c, has)).length;
+}
+
+/** What each chip would leave, with the other two rows as they are: an empty one is struck out. */
+export function chipCounts(
+  questions: QuizQuestion[],
+  c: QuizChoice,
+  has?: (id: string) => boolean,
+): {
+  levels: Record<QuizLevelName, number>;
+  areas: Map<string, number>;
+  groups: Map<QuizGroup, number>;
+} {
+  const levels = Object.fromEntries(
+    QUIZ_LEVELS.map((level) => [level, countFor(questions, { ...c, level }, has)]),
+  ) as Record<QuizLevelName, number>;
+  const areas = new Map(
+    areasOf(questions).map((area) => [area, countFor(questions, { ...c, area }, has)]),
+  );
+  const groups = new Map(
+    QUIZ_GROUPS.map((group) => [group, countFor(questions, { ...c, group }, has)]),
+  );
+  return { levels, areas, groups };
+}
+
+/** The boroughs the questions have, most questions first (ties by name). */
+export function areasOf(questions: QuizQuestion[]): string[] {
+  const counts = new Map<string, number>();
+  for (const q of questions) if (q.area) counts.set(q.area, (counts.get(q.area) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([area]) => area);
+}
+
+/** A choice that plays something: the kind, then the borough, let go while it plays nothing. */
+export function fixChoice(
+  questions: QuizQuestion[],
+  c: QuizChoice,
+  has?: (id: string) => boolean,
+): QuizChoice {
+  if (countFor(questions, c, has) > 0) return c;
+  const withoutGroup = { ...c, group: null };
+  if (countFor(questions, withoutGroup, has) > 0) return withoutGroup;
+  return { ...withoutGroup, area: null };
+}
+
+/** A game's buildings: every one the choice plays, shuffled, those this browser has played last. */
+export function gameOrder(
+  questions: QuizQuestion[],
+  c: QuizChoice,
   played: ReadonlySet<string>,
   has: (id: string) => boolean,
   random: () => number,
-): { question: QuizQuestion; played: Set<string> } | null {
-  const usable = questions.filter((q) => has(q.id) && q.decoys.every(has));
-  if (usable.length === 0) return null;
-  let fresh = usable.filter((q) => !played.has(q.id));
-  let kept = new Set(played);
-  if (fresh.length === 0) {
-    fresh = usable;
-    kept = new Set();
+): string[] {
+  const shuffled = questions.filter((q) => inChoice(q, c, has)).map((q) => q.id);
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.min(i, Math.floor(random() * (i + 1)));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const question = fresh[Math.min(fresh.length - 1, Math.floor(random() * fresh.length))];
-  kept.add(question.id);
-  return { question, played: kept };
+  return [...shuffled.filter((id) => !played.has(id)), ...shuffled.filter((id) => played.has(id))];
 }
 
-/** The building and its three wrong names, shuffled. */
-export function choicesFor(question: QuizQuestion, random: () => number): string[] {
-  const out = [question.id, ...question.decoys];
+/** Where a world's last choice is kept (localStorage). */
+export const choiceKey = (world: string): string => `${world}.quiz.choice`;
+
+/** The last choice this browser made in a world; the default when none, garbled or blocked. */
+export function loadChoice(store: Pick<Storage, "getItem">, world: string): QuizChoice {
+  try {
+    const kept = JSON.parse(
+      store.getItem(choiceKey(world)) ?? "null",
+    ) as Partial<QuizChoice> | null;
+    if (!kept || !QUIZ_LEVELS.includes(kept.level as QuizLevelName)) return DEFAULT_CHOICE;
+    return {
+      level: kept.level as QuizLevelName,
+      area: typeof kept.area === "string" ? kept.area : null,
+      group: QUIZ_GROUPS.includes(kept.group as QuizGroup) ? (kept.group as QuizGroup) : null,
+    };
+  } catch {
+    return DEFAULT_CHOICE;
+  }
+}
+
+export function saveChoice(store: Pick<Storage, "setItem">, world: string, c: QuizChoice): void {
+  try {
+    store.setItem(choiceKey(world), JSON.stringify(c));
+  } catch {
+    // storage blocked: the choice lasts as long as the page
+  }
+}
+
+/** The building and its three wrong names (by default hard's for any borough and kind), shuffled. */
+export function choicesFor(
+  question: QuizQuestion,
+  random: () => number,
+  decoys: Three = question.decoys,
+): string[] {
+  const out = [question.id, ...decoys];
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.min(i, Math.floor(random() * (i + 1)));
     [out[i], out[j]] = [out[j], out[i]];
@@ -137,47 +263,63 @@ export function roundView(
   };
 }
 
+/** A game: what was chosen, its buildings in order, where it is, how many were right. */
+export interface QuizGame {
+  choice: QuizChoice;
+  queue: string[];
+  /** the building being asked: queue[index]; the round is index + 1 */
+  index: number;
+  right: number;
+}
+
 export type QuizState =
   | { phase: "off" }
+  | { phase: "choosing" }
   | { phase: "empty" }
-  | { phase: "loading"; round: number; right: number }
-  | { phase: "asking"; round: number; right: number; question: QuizQuestion; choices: string[] }
+  | { phase: "loading"; game: QuizGame }
+  | { phase: "asking"; game: QuizGame; question: QuizQuestion; choices: string[] }
   | {
       phase: "answered";
-      round: number;
-      right: number;
+      game: QuizGame;
       question: QuizQuestion;
       choices: string[];
       pick: string;
       /** "waiting" while the API is asked; null when it did not answer */
       tally: QuizTally | null | "waiting";
-    };
+    }
+  | { phase: "finished"; game: QuizGame };
 
 export type QuizAction =
-  | { type: "start" }
+  | { type: "open" }
+  | { type: "start"; choice: QuizChoice; queue: string[] }
   | { type: "ask"; question: QuizQuestion; choices: string[] }
   | { type: "pick"; choice: string }
   | { type: "tally"; sightId: string; tally: QuizTally | null }
   | { type: "next" }
+  | { type: "again"; queue: string[] }
+  | { type: "change" }
   | { type: "fail" }
   | { type: "stop" };
+
+const inGame = (state: QuizState): state is Extract<QuizState, { game: QuizGame }> =>
+  "game" in state;
 
 /** The game's states; an action that does not apply where the game is changes nothing. */
 export function quizReducer(state: QuizState, action: QuizAction): QuizState {
   switch (action.type) {
+    case "open":
+      return state.phase === "off" || state.phase === "empty" ? { phase: "choosing" } : state;
     case "start":
-      return state.phase === "off" || state.phase === "empty"
-        ? { phase: "loading", round: 0, right: 0 }
-        : state;
+      if (state.phase !== "choosing") return state;
+      return action.queue.length === 0
+        ? { phase: "empty" }
+        : {
+            phase: "loading",
+            game: { choice: action.choice, queue: action.queue, index: 0, right: 0 },
+          };
     case "ask":
       return state.phase === "loading"
-        ? {
-            phase: "asking",
-            round: state.round + 1,
-            right: state.right,
-            question: action.question,
-            choices: action.choices,
-          }
+        ? { phase: "asking", game: state.game, question: action.question, choices: action.choices }
         : state;
     case "pick":
       if (state.phase !== "asking" || !state.choices.includes(action.choice)) return state;
@@ -185,7 +327,10 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
         ...state,
         phase: "answered",
         pick: action.choice,
-        right: state.right + (action.choice === state.question.id ? 1 : 0),
+        game: {
+          ...state.game,
+          right: state.game.right + (action.choice === state.question.id ? 1 : 0),
+        },
         tally: "waiting",
       };
     case "tally":
@@ -193,9 +338,20 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
         ? { ...state, tally: action.tally }
         : state;
     case "next":
-      return state.phase === "answered"
-        ? { phase: "loading", round: state.round, right: state.right }
-        : state;
+      if (state.phase !== "answered") return state;
+      return state.game.index + 1 < state.game.queue.length
+        ? { phase: "loading", game: { ...state.game, index: state.game.index + 1 } }
+        : { phase: "finished", game: state.game };
+    case "again":
+      if (state.phase !== "finished") return state;
+      return action.queue.length === 0
+        ? { phase: "empty" }
+        : {
+            phase: "loading",
+            game: { choice: state.game.choice, queue: action.queue, index: 0, right: 0 },
+          };
+    case "change":
+      return inGame(state) ? { phase: "choosing" } : state;
     case "fail":
       return { phase: "empty" };
     case "stop":
@@ -203,8 +359,8 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
   }
 }
 
-/** What a key does to a game: a pick (0–3), going on, stopping, or nothing. */
-export type QuizKey = { pick: number } | "next" | "stop" | null;
+/** What a key does to a game: a pick (0–3), going on, starting, playing again, stopping, or nothing. */
+export type QuizKey = { pick: number } | "next" | "start" | "again" | "stop" | null;
 
 /**
  * The game's keys, taken before the map's own: A–D or 1–4 pick while asking; Enter or N go on
@@ -223,16 +379,22 @@ export function quizKey(
     return i >= 0 ? { pick: i } : null;
   }
   if (phase === "answered" && (key === "n" || (e.key === "Enter" && !e.onControl))) return "next";
+  if (e.key === "Enter" && !e.onControl) {
+    if (phase === "choosing") return "start";
+    if (phase === "finished") return "again";
+  }
   return null;
 }
 
-/** The running score, "round 3 · 2 right", in the singular for one right answer. */
+/** The running score, "round 3 of 96 · 2 right", in the singular for one right answer. */
 export function quizScore(
   words: { one: string; other: string },
   round: number,
   right: number,
+  total = 0,
 ): string {
   return (right === 1 ? words.one : words.other)
     .replace("{round}", String(round))
+    .replace("{total}", String(total))
     .replace("{right}", String(right));
 }

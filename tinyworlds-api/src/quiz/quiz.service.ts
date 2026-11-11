@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import type { QuizLevel } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { QuizTally } from './models/quiz-tally.model.js';
 
@@ -11,6 +12,8 @@ export interface QuizAnswerFacts {
   locale?: string | null;
   /** the names the page offered (sight ids): the tally counts only these */
   choices?: string[] | null;
+  /** the game's difficulty; HARD when left out */
+  level?: QuizLevel | null;
 }
 
 /** The most picked names a tally gives when the page does not say which it offered. */
@@ -25,7 +28,7 @@ export const MAX_PICKS = 20;
 export class QuizService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Records the answer (once per visit and building; none without a visit) and tallies the building. */
+  /** Records the answer (once per visit, building and difficulty; none without a visit) and tallies the building at that difficulty. */
   async answer(facts: QuizAnswerFacts): Promise<QuizTally> {
     const offered = facts.choices ?? null;
     if (
@@ -43,12 +46,18 @@ export class QuizService {
             world: facts.world,
             sightId: facts.sightId,
             choice: facts.choice,
+            level: facts.level ?? 'HARD',
             locale: facts.locale ?? null,
           },
         ],
         skipDuplicates: true,
       });
-    return this.tally(facts.world, facts.sightId, offered);
+    return this.tally(
+      facts.world,
+      facts.sightId,
+      offered,
+      facts.level ?? 'HARD',
+    );
   }
 
   /**
@@ -60,8 +69,9 @@ export class QuizService {
     world: string,
     sightId: string,
     choices?: string[] | null,
+    level: QuizLevel = 'HARD',
   ): Promise<QuizTally> {
-    const where = { world, sightId };
+    const where = { world, sightId, level };
     const [answers, rows] = await Promise.all([
       this.prisma.quizAnswer.count({ where }),
       choices

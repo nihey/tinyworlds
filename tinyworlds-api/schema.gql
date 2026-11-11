@@ -17,6 +17,11 @@ input AnswerQuizInput {
   """
   choices: [String!]
 
+  """
+  The game's difficulty; HARD when left out (pages from before difficulties)
+  """
+  level: QuizLevel
+
   """The interface language: en-US, pt-BR or es-ES"""
   locale: String
 
@@ -306,7 +311,7 @@ type FunnelWorld {
 
 type Mutation {
   """
-  Records which name a visit picked for a building in "Guess the building" (once per visit and building) and answers how everyone has answered it.
+  Records which name a visit picked for a building in "Guess the building" (once per visit, building and difficulty) and answers how everyone has answered it at that difficulty.
   """
   answerQuiz(input: AnswerQuizInput!): QuizTally!
 
@@ -404,6 +409,15 @@ type Query {
   Each world asked for, in that order: how many visits it has had, and how many are there now
   """
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!
+}
+
+"""
+Guess the building's difficulty: each offers other wrong answers, so each is tallied apart
+"""
+enum QuizLevel {
+  EASY
+  HARD
+  MEDIUM
 }
 
 """How many answers picked one name for a building"""

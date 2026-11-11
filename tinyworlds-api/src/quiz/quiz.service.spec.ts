@@ -28,6 +28,7 @@ describe('QuizService.answer', () => {
         world: 'tinynyc',
         sightId: FLATIRON,
         choice: ONE_MADISON,
+        level: 'HARD',
         locale: 'pt-BR',
       },
     ]);
@@ -173,5 +174,45 @@ describe('the tally, bounded', () => {
     expect(tally.answers).toBe(MAX_PICKS + 5);
     expect(tally.picks).toHaveLength(MAX_PICKS);
     expect(tally.picks[0]).toEqual({ choice: FLATIRON, count: 3 });
+  });
+});
+
+describe('answers per difficulty', () => {
+  const easy = { world: 'tinynyc', sightId: FLATIRON, level: 'EASY' as const };
+
+  it("keeps a visit's answer to a building once per difficulty, and tallies each apart", async () => {
+    const { service, prisma } = setup();
+    await service.answer({ ...easy, visitId: VISIT, choice: FLATIRON });
+    await service.answer({ ...easy, visitId: VISIT, choice: ONE_MADISON });
+    const hard = await service.answer({
+      visitId: VISIT,
+      world: 'tinynyc',
+      sightId: FLATIRON,
+      choice: ONE_MADISON,
+      level: 'HARD',
+    });
+    expect(prisma.quizAnswers.map((a) => [a.level, a.choice])).toEqual([
+      ['EASY', FLATIRON],
+      ['HARD', ONE_MADISON],
+    ]);
+    expect(hard).toEqual({
+      answers: 1,
+      picks: [{ choice: ONE_MADISON, count: 1 }],
+    });
+    expect(await service.tally('tinynyc', FLATIRON, null, 'EASY')).toEqual({
+      answers: 1,
+      picks: [{ choice: FLATIRON, count: 1 }],
+    });
+  });
+
+  it('takes an answer that names no difficulty as hard, as older pages send them', async () => {
+    const { service, prisma } = setup();
+    await service.answer({
+      visitId: VISIT,
+      world: 'tinynyc',
+      sightId: FLATIRON,
+      choice: FLATIRON,
+    });
+    expect(prisma.quizAnswers[0].level).toBe('HARD');
   });
 });

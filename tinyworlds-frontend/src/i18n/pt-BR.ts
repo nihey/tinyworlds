@@ -344,7 +344,32 @@ export const ptBR: Strings = {
   quiz: {
     invite: "Adivinhe o prédio: você sabe o nome do que está vendo?",
     title: "Adivinhe o prédio",
-    score: { one: "rodada {round} · {right} certa", other: "rodada {round} · {right} certas" },
+    score: {
+      one: "rodada {round} de {total} · {right} certa",
+      other: "rodada {round} de {total} · {right} certas",
+    },
+    difficulty: "Dificuldade",
+    what: "O quê",
+    levels: {
+      easy: { name: "Fácil", line: "famosos, opções claras" },
+      medium: { name: "Médio", line: "conhecidos, opções próximas" },
+      hard: { name: "Difícil", line: "qualquer um, parecidos" },
+    },
+    groups: {
+      all: "Tudo",
+      buildings: "Prédios",
+      museums: "Museus",
+      landmarks: "Marcos",
+      stations: "Estações",
+    },
+    allAreas: "Todos",
+    count: { one: "{n} prédio neste jogo", other: "{n} prédios neste jogo" },
+    few: { one: "Só {n} prédio neste jogo", other: "Só {n} prédios neste jogo" },
+    start: "Começar",
+    change: "Mudar o que jogar",
+    end: "Você acertou {right} de {total}.",
+    again: "Jogar de novo",
+    changeChoice: "Mudar",
     close: "Parar de jogar",
     ask: {
       building: "Que prédio é este?",

@@ -486,17 +486,30 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 ### Guess the building (`hooks/use-quiz.ts`, `components/map/quiz-*.tsx`, `lib/quiz*.ts`)
 
 In a world with `quiz: true` (New York; it needs `sights`), a sign under "more cities and
-worlds" (`QuizBanner`, class `quiz-invite`) starts a game once the buildings are in: a building
-is lit, its Wikipedia opening is shown with the name blanked, the visitor picks its name out of
-four, and sees how everyone else answered. As many rounds as they like; Stop, the card's close
-button or Esc ends it with the map where it was.
+worlds" (`QuizBanner`, class `quiz-invite`) opens the game once the buildings are in. The card
+first asks what to play (`choosing`): a difficulty (easy, medium, hard), a borough or all
+(the areas the questions have, most first; the row is named by the world's `borough` word) and
+a kind or all (buildings, museums, landmarks, stations), and says how many buildings that makes
+("Only N" from 10 down). A chip that would leave none is struck out (`chipCounts`); a choice
+emptied by another change lets go of the kind, then the borough (`fixChoice`). The choice is
+remembered (`<world>.quiz.choice`; easy, all, all the first time). A game is every matching
+building once, in a random order, those played before last (`gameOrder`): a building is lit,
+its Wikipedia opening shown with the name blanked, the visitor picks its name out of four, and
+sees how everyone else answered on that difficulty. The header shows the choice and "round r
+of N · k right", with a gear back to choosing; after the last building the card says how many
+were right (`finished`) and offers Play again, Change and Stop. Stop, the close button or Esc
+end it with the map where it was.
 
-- **Data.** `quiz.<locale>.json` (`loadQuiz`, `parseQuiz` in `map/quiz.ts`) is fetched the first
-  time the game starts, and again per language; nothing of the game loads before. A question
-  whose building or any wrong name is not in `sights.json` is never asked.
-- **The round** (`useQuiz`): `nextQuestion` picks at random among the buildings this browser has
-  not played (`localStorage` `<world>.quiz.played`, behind try/catch; the list starts over once
-  all are played), `choicesFor` shuffles the four names, and the engine holds the building lit
+- **Data.** `quiz.<locale>.json` (`loadQuiz`, `parseQuiz` in `map/quiz.ts`) is fetched when the
+  game opens, and again per language; nothing of the game loads before. A question carries its
+  `level` (cumulative: easy's are also medium's and hard's), `group`, `area` and its wrong
+  answers per difficulty and scope (`sets`); a round takes `setFor(question, choice)`: the set
+  for the game's difficulty and how the choice narrows it (`area`, `group`, `both`), else that
+  difficulty's `all`, else `decoys` (an older file without sets plays every difficulty with
+  those). A question whose building or any wrong name is not in `sights.json` is never asked.
+- **The round** (`useQuiz`): the game's queue gives the building (the played list,
+  `localStorage` `<world>.quiz.played` behind try/catch, only orders the next game), `choicesFor`
+  shuffles the four names, and the engine holds the building lit
   (`engine.holdSight(id)`: the spotlight of a pinned sight, no other lights up, Esc and the view
   moving do not let it go; `hold` in `sight-state.ts`) and flies to it (`roundView`: the
   building in the part of the screen the card leaves free, landing on scale 1 when near). Its
@@ -514,10 +527,12 @@ button or Esc ends it with the map where it was.
   shown (`tallyShares`); "Next building", "Stop" and the article's link.
 - **Keys** (`quizKey` in `lib/quiz.ts`, taken in `map-app.tsx` before the map's own): A–D or
   1–4 pick, Enter or N go on (Enter only when no button or link has the focus: Stop, the close
-  button and the article's link keep theirs), Esc stops; a key held down repeats nothing.
+  button and the article's link keep theirs), Enter starts from the choosing step and plays
+  again at the end (the same rule), Esc stops; a key held down repeats nothing. Outside a
+  round (choosing, the end) the map's buildings light up under the pointer as usual.
 - **The answer** goes out with plain `fetch` (`sendAnswer` in `lib/quiz-api.ts`: the visit from
-  `currentVisit()`, so admins and programs are not counted, and the four names offered, which
-  are all the API counts), never Apollo. No API, an error or
+  `currentVisit()`, so admins and programs are not counted, the four names offered, which are
+  all the API counts, and the game's `level`, which the API tallies apart), never Apollo. No API, an error or
   no answer within 5 s is no tally: the round ends without the shares (`quizReducer` keeps a
   tally only for the building it was asked for). Analytics hook: `quiz_start`.
 

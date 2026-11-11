@@ -30,7 +30,7 @@ npm run cli -- render --pyramid-only                    # rebuild the coarse lev
 npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json (+ sights.json, sights/)
                                                 # and the indexes' version in manifest.json (`indexes`)
 npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
-npm run cli -- --city tinynyc quiz [--list]     # quiz.<locale>.json: Guess the building's questions
+npm run cli -- --city tinynyc quiz [--list] [--force-views]   # quiz.<locale>.json: Guess the building's questions
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
@@ -100,7 +100,8 @@ src/
     ├── sprites.ts     # each sight drawn on its own (sights/<hash>.webp)
     ├── stamp.ts       # the indexes' version (a hash of them), written into the manifest
     ├── wiki.ts        # the `wiki` step: each sight's Wikipedia article, cached
-    ├── quiz.ts        # Guess the building: blanking a name out of its text, choosing decoys
+    ├── quiz.ts        # Guess the building: blanking a name out of its text, levels, decoy sets
+    ├── fame.ts        # how famous a sight is: its article's page views over a year (cached)
     └── write-quiz.ts  # the `quiz` step: quiz.<locale>.json
 ```
 
@@ -350,7 +351,29 @@ change to the rules below.
   question's text names, two names that differ only by common words ("Carnegie Hall", "Carnegie
   Hall Tower"), or an address the text's own address rules out ("712 Fifth Avenue" beside "at
   721 Fifth Avenue"; ordinals and numbers read alike). Chosen once for all languages.
-- New York: 393 questions; 389 asked in English and Portuguese, 384 in Spanish.
+- **Difficulty, borough and kind.** A player chooses a difficulty, a borough and a kind
+  (`2026-11-11-quiz-choices-design.md`), so each question also carries:
+  - `level` (1 easy, 2 medium, 3 hard: the easiest difficulty it is in), by how much its English
+    article is read over the last twelve complete months (`fame.ts`, Wikimedia's pageviews API
+    through the `wiki` cache; the window is kept in `raw/wikipedia/pageviews-window.json`, so a
+    rerun asks nothing; `--force-views` asks again as of today): the most read quarter easy, up
+    to three fifths medium (levels are cumulative: hard asks everything);
+  - `group` (`buildings`, `museums`, `landmarks`, `stations`, from the kind; statues and
+    memorials are a `monument` kind, a landmark) and `area` (its borough, when its context line is
+    one of the `borough` places in `places.json`);
+  - `sets`: per difficulty it is in, wrong answers for each **scope** a choice narrows them to
+    (`all`, `area`: the answer's borough, `group`: its kind, `both`), a scope left out when equal
+    to `all`. Candidates are that difficulty's questions; hard orders them by kind then distance,
+    medium by kind then closeness in fame, easy by closeness in fame (with the kind free, other
+    groups first, one per group among the groups with at least `SPREAD_GROUP` (8) candidates, so
+    two famous stations are not in every round). A scope too small borrows from the difficulty
+    (keeping the kind before the borough), then from anyone. `decoys` stays hard's `all` set,
+    for older pages; `pickDecoys` is the older single-set rule, kept for its tests.
+- New York: 393 questions (easy 99, medium 137, hard 157); 389 asked in English and
+  Portuguese, 384 in Spanish; about 35 narrowed sets per difficulty borrow (the count includes
+  the borough sets of questions with no borough, which are never played). On easy no wrong
+  name is in more than about a fifth of a choice's rounds (`--list`, and a count over
+  `quiz.en-US.json`, show it).
 
 ## How a tile is drawn (`render/chunk.ts`)
 

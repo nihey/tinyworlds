@@ -4,7 +4,9 @@ import {
   buildQuiz,
   distinctiveWords,
   fold,
+  groupOf,
   kindOf,
+  levelsOf,
   pickDecoys,
   type QuizLocale,
   type QuizSight,
@@ -447,5 +449,205 @@ describe("questions that must not answer themselves (review)", () => {
     ).toBe("museum");
     expect(kindOf({ n: "Masonic Hall", t: "building" })).toBe("general");
     expect(kindOf({ n: "Times Square", t: "station" }, "It is a museum of trains.")).toBe("station");
+  });
+});
+
+describe("choices: levels, groups, areas and decoy sets", () => {
+  it("groups what a place is into the four kinds a player can pick", () => {
+    expect(groupOf("general")).toBe("buildings");
+    expect(groupOf("hotel")).toBe("buildings");
+    expect(groupOf("library")).toBe("museums");
+    expect(groupOf("venue")).toBe("landmarks");
+    expect(groupOf("monument")).toBe("landmarks");
+    expect(groupOf("station")).toBe("stations");
+    expect(
+      kindOf({ n: "Statue of Liberty", t: "landmark" }, "It is a colossal sculpture on an island."),
+    ).toBe("monument");
+  });
+
+  it("puts the most read quarter in easy, up to three fifths in medium, the rest in hard", () => {
+    expect(levelsOf([9, 1, 5, 3, 7, 2, 8, 4])).toEqual([1, 3, 2, 3, 2, 3, 1, 2]);
+  });
+
+  // a small city: Manhattan with towers, museums, bridges and stations; the Bronx; one lone tower
+  const rows: [string, string, string, string, number, number][] = [
+    // id, name, type, area, metres east, views
+    ["t1", "Alpha Tower", "building", "Manhattan", 0, 1_000_000],
+    ["m1", "Cobalt Museum", "museum", "Manhattan", 300, 900_000],
+    ["l1", "Echo Bridge", "bridge", "Manhattan", 600, 800_000],
+    ["s1", "Dune Street", "station", "Manhattan", 900, 700_000],
+    ["bt1", "Bronze Tower", "building", "Bronx", 20_000, 600_000],
+    ["bm1", "Birch Museum", "museum", "Bronx", 20_300, 500_000],
+    ["t2", "Bravo Tower", "building", "Manhattan", 100, 90_000],
+    ["t3", "Charlie Tower", "building", "Manhattan", 200, 80_000],
+    ["m2", "Coral Museum", "museum", "Manhattan", 400, 70_000],
+    ["m3", "Crimson Museum", "museum", "Manhattan", 500, 60_000],
+    ["l2", "Ember Bridge", "bridge", "Manhattan", 700, 50_000],
+    ["s2", "Delta Street", "station", "Manhattan", 1000, 40_000],
+    ["bt2", "Basalt Tower", "building", "Bronx", 20_100, 30_000],
+    ["bs1", "Bay Avenue", "station", "Bronx", 20_500, 20_000],
+    ["t4", "Delta Tower", "building", "Manhattan", 150, 900],
+    ["t5", "Echo Tower", "building", "Manhattan", 250, 800],
+    ["m4", "Cyan Museum", "museum", "Manhattan", 450, 700],
+    ["l3", "Elm Bridge", "bridge", "Manhattan", 750, 600],
+    ["s3", "Dove Street", "station", "Manhattan", 1100, 500],
+    ["bt3", "Beryl Tower", "building", "Bronx", 20_200, 400],
+    ["bs2", "Bluff Avenue", "station", "Bronx", 20_600, 300],
+    ["x", "Lone Tower", "building", "Staten Island", 40_000, 200],
+    ["t6", "Foxtrot Tower", "building", "Manhattan", 350, 100],
+  ];
+  const sights: QuizSight[] = rows.map(([id, n, t, b, east]) => ({ ...at(id, n, east, t), b }));
+  const views = Object.fromEntries(rows.map(([id, , , , , v]) => [id, v]));
+  const opening = (n: string, t: string) =>
+    t === "museum"
+      ? `The ${n} is an art museum with a long history and many visitors who come every single year.`
+      : `The ${n} is a ${t === "station" ? "station" : t === "bridge" ? "bridge" : "skyscraper"} with a long history and many visitors who come every single year.`;
+  const en = Object.fromEntries(
+    sights.map((x) => [
+      x.id,
+      { title: x.n, text: opening(x.n, x.t), lang: "en", url: `https://en.wikipedia.org/wiki/${x.id}` },
+    ]),
+  );
+  const built = buildQuiz(
+    sights,
+    { "en-US": en, "pt-BR": {}, "es-ES": {} },
+    [],
+    {},
+    {
+      views,
+      areas: ["Manhattan", "Bronx", "Staten Island"],
+    },
+  );
+  const qs = built.files["en-US"].questions;
+  const byId = new Map(sights.map((x) => [x.id, x]));
+  const q = (id: string) => qs.find((x) => x.id === id)!;
+  const setOf = (id: string, level: "easy" | "medium" | "hard", scope: "all" | "area" | "group" | "both") => {
+    const sets = q(id).sets[level]!;
+    return sets[scope] ?? sets.all!;
+  };
+  const groupOfId = (id: string) => q(id).group;
+
+  it("gives each question its level, group and area", () => {
+    expect(q("t1")).toMatchObject({ level: 1, group: "buildings", area: "Manhattan" });
+    expect(q("m1")).toMatchObject({ level: 1, group: "museums" });
+    expect(q("l1").group).toBe("landmarks");
+    expect(q("s1").group).toBe("stations");
+    expect(q("t6").level).toBe(3);
+  });
+
+  it("gives a famous question every difficulty's sets, an obscure one only hard's", () => {
+    expect(Object.keys(q("t1").sets).sort()).toEqual(["easy", "hard", "medium"]);
+    expect(Object.keys(q("t6").sets)).toEqual(["hard"]);
+  });
+
+  it("keeps hard's set for all as the decoys an older page reads", () => {
+    for (const x of qs) expect(x.decoys).toEqual(x.sets.hard!.all);
+  });
+
+  it("takes a borough game's wrong answers from that borough", () => {
+    for (const x of qs.filter((x) => x.area === "Manhattan"))
+      for (const level of Object.keys(x.sets) as ("easy" | "medium" | "hard")[])
+        for (const d of setOf(x.id, level, "area"))
+          expect(byId.get(d)!.b, `${x.id} ${level}`).toBe("Manhattan");
+  });
+
+  it("takes a kind game's wrong answers of that kind", () => {
+    for (const id of ["t2", "m2", "t4", "m4", "s2"])
+      for (const d of setOf(id, "hard", "group")) expect(groupOfId(d), id).toBe(groupOfId(id));
+    for (const d of setOf("m2", "hard", "both")) {
+      expect(groupOfId(d)).toBe("museums");
+      expect(byId.get(d)!.b).toBe("Manhattan");
+    }
+  });
+
+  it("makes easy's wrong answers plainly other kinds of place, each a different one", () => {
+    const groups = setOf("t1", "easy", "all").map(groupOfId);
+    expect(groups).not.toContain("buildings");
+    expect(new Set(groups).size).toBe(3);
+  });
+
+  it("spreads easy's wrong answers over the famous ones instead of the same three", () => {
+    const names = new Set(qs.filter((x) => x.level === 1).flatMap((x) => setOf(x.id, "easy", "all")));
+    expect(names.size).toBeGreaterThan(3);
+  });
+
+  it("borrows from outside a borough too small to give three, and says so", () => {
+    const lone = setOf("x", "hard", "area");
+    expect(lone).toHaveLength(3);
+    expect(built.report.borrowed.hard).toBeGreaterThan(0);
+  });
+});
+
+describe("easy's wrong answers do not repeat round after round (review)", () => {
+  // 44 famous places (towers, three hotels, nine museums, two stations), interleaved in fame,
+  // and 132 obscure towers elsewhere so that the famous ones are the easy quarter
+  const famous: [string, string, string][] = [];
+  for (let i = 0; i < 44; i++) {
+    const kind = i % 15 === 7 ? "hotel" : i % 5 === 2 ? "museum" : i === 20 || i === 40 ? "station" : "tower";
+    famous.push([
+      `f${i}`,
+      `${["Zeta", "Kappa", "Sigma", "Omega"][i % 4]}${i} ${kind === "hotel" ? "Hotel" : kind === "museum" ? "Museum" : kind === "station" ? "Street" : "Tower"}`,
+      kind,
+    ]);
+  }
+  const sights: QuizSight[] = [
+    ...famous.map(([id, n, kind], i) => ({
+      ...at(id, n, i * 50, kind === "museum" ? "museum" : kind === "station" ? "station" : "building"),
+      b: "Manhattan",
+    })),
+    ...Array.from({ length: 132 }, (_, i) => ({
+      ...at(`o${i}`, `Obscure${i} Tower`, 50_000 + i * 50, "building"),
+      b: "Brooklyn",
+    })),
+  ];
+  const kindOfRow = new Map(famous.map(([id, , kind]) => [id, kind]));
+  const views = Object.fromEntries(
+    sights.map((s, i) => [s.id, s.id.startsWith("f") ? 1_000_000 - i * 1000 : 100 - (i % 90)]),
+  );
+  const text = (s: QuizSight) => {
+    const k = kindOfRow.get(s.id) ?? "tower";
+    const is =
+      k === "hotel"
+        ? "a hotel"
+        : k === "museum"
+          ? "an art museum"
+          : k === "station"
+            ? "a station"
+            : "a skyscraper";
+    return `The ${s.n} is ${is} with a long history and many visitors who come every single year.`;
+  };
+  const en = Object.fromEntries(
+    sights.map((s) => [
+      s.id,
+      { title: s.n, text: text(s), lang: "en", url: `https://en.wikipedia.org/wiki/${s.id}` },
+    ]),
+  );
+  const { files } = buildQuiz(
+    sights,
+    { "en-US": en, "pt-BR": {}, "es-ES": {} },
+    [],
+    {},
+    { views, areas: ["Manhattan", "Brooklyn"] },
+  );
+  const easy = files["en-US"].questions.filter((q) => q.level === 1);
+  /** The share of these questions' sets the most used name appears in. */
+  const mostUsed = (qs: typeof easy, scope: "all" | "group") => {
+    const uses = new Map<string, number>();
+    for (const q of qs)
+      for (const d of q.sets.easy![scope] ?? q.sets.easy!.all!) uses.set(d, (uses.get(d) ?? 0) + 1);
+    return Math.max(...uses.values()) / qs.length;
+  };
+
+  it("are the famous quarter", () => {
+    expect(easy).toHaveLength(44);
+  });
+
+  it("spread over the kind's famous places when the kind is chosen", () => {
+    const buildings = easy.filter((q) => q.group === "buildings");
+    expect(mostUsed(buildings, "group")).toBeLessThanOrEqual(0.4);
+  });
+
+  it("do not force a kind with only a couple of famous places into every round", () => {
+    expect(mostUsed(easy, "all")).toBeLessThanOrEqual(0.5);
   });
 });

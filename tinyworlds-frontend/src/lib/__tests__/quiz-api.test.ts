@@ -7,6 +7,7 @@ const input = {
   sightId: "b1",
   choice: "b2",
   choices: ["b3", "b1", "b2", "b4"],
+  level: "medium" as const,
   locale: "pt-BR" as const,
 };
 const tally = { answers: 2, picks: [{ choice: "b2", count: 2 }] };
@@ -27,7 +28,7 @@ describe("answerRequest", () => {
   it("sends the answer with the visit", () => {
     expect(answerRequest({ ...input, visitId: VISIT })).toEqual({
       query: ANSWER,
-      variables: { input: { ...input, visitId: VISIT } },
+      variables: { input: { ...input, level: "MEDIUM", visitId: VISIT } },
     });
   });
 

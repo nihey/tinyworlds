@@ -420,8 +420,39 @@ export interface Strings {
     invite: string;
     /** the card's header, in the pixel face */
     title: string;
-    /** "round {round} · {right} right": `one` for one right answer, `other` for none or several */
+    /** "round {round} of {total} · {right} right": `one` for one right answer, `other` for none or several */
     score: { one: string; other: string };
+    /** the choosing step's rows: difficulty and what (the borough row takes the world's `borough` word) */
+    difficulty: string;
+    what: string;
+    /** each difficulty's name and the line under it */
+    levels: {
+      easy: { name: string; line: string };
+      medium: { name: string; line: string };
+      hard: { name: string; line: string };
+    };
+    /** the "What" row's chips ("Stations" for the stations) */
+    groups: {
+      all: string;
+      buildings: string;
+      museums: string;
+      landmarks: string;
+      stations: string;
+    };
+    /** the "all boroughs" chip */
+    allAreas: string;
+    /** "{n} buildings in this game" */
+    count: { one: string; other: string };
+    /** "Only {n} buildings in this game", for a handful */
+    few: { one: string; other: string };
+    start: string;
+    /** aria-label of the header's gear: back to choosing */
+    change: string;
+    /** the end of a game: "You named {right} of {total}." */
+    end: string;
+    again: string;
+    /** the end's way back to choosing */
+    changeChoice: string;
     /** aria-label of the card's close button */
     close: string;
     /** the question, by what the building is */
