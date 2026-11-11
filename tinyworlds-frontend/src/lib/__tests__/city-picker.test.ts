@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { CITY_CATALOGUE, type CatalogueCity } from "../city-catalogue";
 import {
   defaultGoal,
+  GOAL_FALLBACK_CENTS,
   findMilestone,
   fold,
   pickerOptions,
   previewBar,
+  withGoal,
   rankCities,
   RANKING_LIMIT,
   regionNames,
@@ -220,8 +222,9 @@ describe("findMilestone", () => {
 });
 
 describe("defaultGoal", () => {
-  it("is what the other cities have to reach, or a hundred dollars", () => {
-    expect(defaultGoal([])).toBe(10000);
+  it("is what the other cities have to reach, or thirty dollars", () => {
+    expect(GOAL_FALLBACK_CENTS).toBe(3000);
+    expect(defaultGoal([])).toBe(3000);
     expect(defaultGoal([city({ name: "A", goalCents: 20000 })])).toBe(20000);
     expect(
       defaultGoal([
@@ -231,6 +234,15 @@ describe("defaultGoal", () => {
         city({ name: "D", goalCents: 0 }),
       ]),
     ).toBe(10000);
+  });
+});
+
+describe("withGoal", () => {
+  it("writes the goal as money in the visitor's language", () => {
+    expect(withGoal("about {goal} each", 3000, "en-US")).toBe("about $30 each");
+    expect(withGoal("cerca de {goal}", 3000, "pt-BR")).toMatch(/^cerca de US\$\s30$/);
+    expect(withGoal("unos {goal}", 3000, "es-ES")).toMatch(/^unos 30\sUS\$$/);
+    expect(withGoal("no goal here", 3000, "en-US")).toBe("no goal here");
   });
 });
 

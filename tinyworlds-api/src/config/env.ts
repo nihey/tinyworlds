@@ -86,7 +86,7 @@ const baseSchema = z.object({
   STRIPE_PRICE_PT: required,
   STRIPE_PRICE_ES: required,
   /** What a city needs before it is built, in US cents. */
-  CITY_GOAL_CENTS: z.coerce.number().int().positive().default(10_000),
+  CITY_GOAL_CENTS: z.coerce.number().int().positive().default(3_000),
   /**
    * Where the site is served from: the CORS allow-list, where a checkout may return to, and
    * where a sign-in link may lead.

@@ -16,7 +16,7 @@ import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import type { Locale, Strings } from "@/i18n";
-import { RANKING_LIMIT, rankCities } from "@/lib/city-picker";
+import { defaultGoal, RANKING_LIMIT, rankCities, withGoal } from "@/lib/city-picker";
 import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { cn } from "@/lib/utils";
@@ -232,6 +232,8 @@ export function Landing() {
   const withList = API_URL !== "" && milestones.state !== "failed";
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
   const { funded, ranked, anyRaised } = rankCities(milestones.cities);
+  // what a city needs to be built, as the list says (the API's goal)
+  const goalCents = defaultGoal(milestones.cities);
   const shown = showAll ? ranked : ranked.slice(0, RANKING_LIMIT);
   // the real cities first, then the places that only exist in stories
   const cities = Object.values(WORLDS).filter((world) => !world.fictional);
@@ -322,11 +324,13 @@ export function Landing() {
           </h2>
           <div className="sign px-5 py-5 sm:px-6">
             <p className="max-w-2xl text-[15px] leading-relaxed text-paper">
-              {withList ? `${t.donate.goal} ${t.donate.priority}` : t.home.nextPitch}
+              {withList
+                ? `${withGoal(t.donate.goal, goalCents, locale)} ${t.donate.priority}`
+                : t.home.nextPitch}
             </p>
             {withList && (
               <p className="max-w-2xl pt-1.5 text-sm leading-relaxed text-paper-dim">
-                {t.donate.over}
+                {withGoal(t.donate.over, goalCents, locale)}
               </p>
             )}
             {withList && milestones.state === "loading" && (

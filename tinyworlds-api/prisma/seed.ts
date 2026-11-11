@@ -14,7 +14,7 @@ config({ path: '.env', quiet: true });
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set');
-const goalCents = Number(process.env.CITY_GOAL_CENTS ?? 10_000);
+const goalCents = Number(process.env.CITY_GOAL_CENTS ?? 3_000);
 if (!Number.isInteger(goalCents) || goalCents <= 0)
   throw new Error('CITY_GOAL_CENTS must be a positive whole number of cents');
 

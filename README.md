@@ -121,7 +121,7 @@ A city is one definition file in the pipeline (`src/cities/<id>.ts`: where it is
 street grid runs, what counts as its limits, what its buildings look like) and one in the viewer
 (`src/worlds/<id>.ts`: its name and words). See the `CLAUDE.md` in each sub-project.
 
-Cities get built as donations reach US$100 for them, the most funded first; you can also open a
+Cities get built as donations reach US$30 for them, the most funded first; you can also open a
 pull request with one.
 
 ## Deploy

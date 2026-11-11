@@ -15,7 +15,7 @@ describe('validateEnv', () => {
     const env = validateEnv(base);
     expect(env.PORT).toBe(4000);
     expect(env.NODE_ENV).toBe('development');
-    expect(env.CITY_GOAL_CENTS).toBe(10_000);
+    expect(env.CITY_GOAL_CENTS).toBe(3_000);
   });
 
   it('reduces every allowed origin to scheme, host and port', () => {

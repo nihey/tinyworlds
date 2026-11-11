@@ -129,10 +129,11 @@ export interface Strings {
     body: string;
     /** without the list of cities: a donor can ask for one in the checkout */
     wish: string;
-    /** with the list: what a full bar means */
+    /** with the list: what a full bar means; "{goal}" is a city's goal, as money */
     goal: string;
     /** cities with the most funding come first; what is given beyond a city's goal is not lost */
     priority: string;
+    /** "{goal}": a city's goal, as money */
     over: string;
     /** the button that opens the checkout, and what it says while that is on its way */
     action: string;

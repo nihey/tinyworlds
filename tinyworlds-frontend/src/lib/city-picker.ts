@@ -1,5 +1,6 @@
 import type { CatalogueCity } from "./city-catalogue";
-import { chosenCity, selectable, type CityMilestone } from "./donate";
+import type { Locale } from "@/i18n/locale";
+import { chosenCity, formatUsd, selectable, type CityMilestone } from "./donate";
 
 /**
  * The city picker's rules, without the picker: what a donor may choose from, what a search
@@ -111,12 +112,19 @@ export function findMilestone(milestones: CityMilestone[], name: string): CityMi
   return milestones.find((city) => fold(city.name) === key) ?? null;
 }
 
-/** What a city nobody has given to yet has to reach: what the others have to, or US$100. */
+/** What a city needs when the list cannot say: the API's default goal (`CITY_GOAL_CENTS`), US$30. */
+export const GOAL_FALLBACK_CENTS = 3_000;
+
+/** A sentence about the goal with its "{goal}" written as money in the visitor's language. */
+export const withGoal = (text: string, goalCents: number, locale: Locale): string =>
+  text.replaceAll("{goal}", formatUsd(goalCents, locale));
+
+/** What a city nobody has given to yet has to reach: what the others have to, or the fallback. */
 export function defaultGoal(milestones: CityMilestone[]): number {
   const counts = new Map<number, number>();
   for (const city of milestones)
     if (city.goalCents > 0) counts.set(city.goalCents, (counts.get(city.goalCents) ?? 0) + 1);
-  let best = 10000;
+  let best = GOAL_FALLBACK_CENTS;
   let most = 0;
   for (const [goal, count] of counts)
     if (count > most) {
