@@ -35,6 +35,21 @@ const attr = escapeHtml;
 const table = (inner: string, style = '', extra = ''): string =>
   `<table role="presentation" cellpadding="0" cellspacing="0" border="0"${extra} style="border-collapse:collapse;${style}">${inner}</table>`;
 
+/**
+ * Outlook on Windows draws with Word, which knows no max-width: a table of a fixed width that
+ * only it reads ("ghost table") keeps the card at 560 px there instead of the window's width.
+ */
+const OUTLOOK_OPEN =
+  '<!--[if mso]><table role="presentation" width="560" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->';
+const OUTLOOK_CLOSE = '<!--[if mso]></td></tr></table><![endif]-->';
+
+/**
+ * An empty cell of a given height, in every client: Outlook makes an empty cell at least a line
+ * tall, so its line is set to the cell's height exactly, in a font of one pixel.
+ */
+const emptyCell = (px: number): string =>
+  `font-size:1px;mso-line-height-rule:exactly;line-height:${px}px;`;
+
 export interface ShellOptions {
   locale: Locale;
   /** The mail's subject, as its document title. */
@@ -86,13 +101,13 @@ export function shell(options: ShellOptions): string {
     `<body style="margin:0;padding:0;background:${COLORS.paper};-webkit-text-size-adjust:100%;">`,
     `<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${COLORS.paper};">${escapeHtml(options.preheader)}${filler}</div>`,
     table(
-      `<tr><td align="center" style="padding:24px 10px 28px;">${table(
+      `<tr><td align="center" style="padding:24px 10px 28px;">${OUTLOOK_OPEN}${table(
         // the card's corners clip the band and its yellow bar, where the client allows it
         `<tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:12px;overflow:hidden;">${card}</td></tr>` +
           `<tr><td align="center" style="padding:14px 8px 0;font:12px/1.5 ${FONT};color:${COLORS.dim};">${footer}</td></tr>`,
         'width:100%;max-width:560px;',
         ' width="100%"',
-      )}</td></tr>`,
+      )}${OUTLOOK_CLOSE}</td></tr>`,
       `background:${COLORS.paper};`,
       ` width="100%" bgcolor="${COLORS.paper}"`,
     ),
@@ -174,7 +189,7 @@ export function stonesGrid(stones: StoneState[]): string {
           : COLORS.empty;
     const lit =
       state === 'mine' ? 'box-shadow:inset 0 -2px 0 rgba(0,0,0,.18);' : '';
-    return `<td width="${STONE_PX}" height="${STONE_PX}" bgcolor="${color}" style="width:${STONE_PX}px;height:${STONE_PX}px;background:${color};border-radius:2px;${lit}font-size:0;line-height:0;">&nbsp;</td>`;
+    return `<td width="${STONE_PX}" height="${STONE_PX}" bgcolor="${color}" style="width:${STONE_PX}px;height:${STONE_PX}px;background:${color};border-radius:2px;${lit}${emptyCell(STONE_PX)}">&nbsp;</td>`;
   };
   const rows: string[] = [];
   for (let i = 0; i < stones.length; i += STONES_PER_ROW)
@@ -191,7 +206,7 @@ export function stonesGrid(stones: StoneState[]): string {
 export function progressBar(fraction: number): string {
   const share = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
   const bar = (width: number, color: string, radius: string) =>
-    `<td width="${width}%" height="8" bgcolor="${color}" style="width:${width}%;height:8px;background:${color};border-radius:${radius};font-size:0;line-height:0;">&nbsp;</td>`;
+    `<td width="${width}%" height="8" bgcolor="${color}" style="width:${width}%;height:8px;background:${color};border-radius:${radius};${emptyCell(8)}">&nbsp;</td>`;
   const cells =
     share >= 100
       ? bar(100, COLORS.taxi, '99px')

@@ -24,8 +24,7 @@ const WORDS: Record<Locale, Words> = {
     codeLine: 'Type this code on the page you came from:',
     orButton: 'Or skip the typing:',
     orLink: 'Or open this link:',
-    // only the newest code: an older mail's button still works until it expires or is used
-    once: 'The code and the button work once, for {minutes} minutes. Asked for another? Only the newest code works.',
+    once: 'The code and the button work once, for {minutes} minutes. Asked more than once? Use the newest mail.',
     ignore:
       "Didn't ask for this? Ignore it: nothing happens without the code or the button.",
   },
@@ -34,7 +33,7 @@ const WORDS: Record<Locale, Words> = {
     codeLine: 'Digite este código na página de onde você veio:',
     orButton: 'Ou pule a digitação:',
     orLink: 'Ou abra este link:',
-    once: 'O código e o botão funcionam uma única vez, por {minutes} minutos. Pediu outro? Só o código mais novo funciona.',
+    once: 'O código e o botão funcionam uma única vez, por {minutes} minutos. Pediu mais de uma vez? Use o e-mail mais recente.',
     ignore: 'Não pediu isto? Ignore: nada acontece sem o código ou o botão.',
   },
   'es-ES': {
@@ -42,7 +41,7 @@ const WORDS: Record<Locale, Words> = {
     codeLine: 'Escribe este código en la página de la que vienes:',
     orButton: 'O sáltate el tecleo:',
     orLink: 'O abre este enlace:',
-    once: 'El código y el botón funcionan una sola vez, durante {minutes} minutos. ¿Pediste otro? Solo funciona el código más reciente.',
+    once: 'El código y el botón funcionan una sola vez, durante {minutes} minutos. ¿Lo pediste más de una vez? Usa el correo más reciente.',
     ignore:
       '¿No lo has pedido? Ignóralo: sin el código o el botón no pasa nada.',
   },

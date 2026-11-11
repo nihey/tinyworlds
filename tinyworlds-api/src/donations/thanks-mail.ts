@@ -35,7 +35,15 @@ export interface ThanksFacts {
   } | null;
   /** Visits to every world so far, the front page's cards added up. */
   totalVisits: number;
+  /** The gift asked to be listed under the donor's name, and an admin hid that name. */
+  nameHidden: boolean;
 }
+
+/**
+ * Above this many stones the grid is left out and the bar stays: each stone is a table cell,
+ * and a mail must stay well under the size Gmail cuts a mail at (about 102 kB).
+ */
+export const STONES_DRAWN_MAX = 100;
 
 interface Words {
   label: string;
@@ -77,6 +85,7 @@ interface Words {
   founders: string;
   benefactors: string;
   anonymous: string;
+  hidden: string;
   seeCities: string;
   tellFriend: string;
   friendSubject: string;
@@ -136,6 +145,7 @@ const WORDS: Record<Locale, Words> = {
     founders: 'Founding Benefactors',
     benefactors: 'Benefactors',
     anonymous: "You're anonymous here. Add your name on Your cities.",
+    hidden: "Your name is hidden from {city}'s public list.",
     seeCities: 'See your cities',
     tellFriend: 'Tell a friend',
     friendSubject: 'Whole cities in pixel art, free to explore',
@@ -201,6 +211,7 @@ const WORDS: Record<Locale, Words> = {
     benefactors: 'Benfeitores',
     anonymous:
       'Aqui você aparece como anônimo. Adicione seu nome em Suas cidades.',
+    hidden: 'Seu nome está oculto na lista pública de {city}.',
     seeCities: 'Ver suas cidades',
     tellFriend: 'Contar a um amigo',
     friendSubject: 'Cidades inteiras em pixel art, para explorar de graça',
@@ -264,6 +275,7 @@ const WORDS: Record<Locale, Words> = {
     founders: 'Benefactores Fundadores',
     benefactors: 'Benefactores',
     anonymous: 'Aquí apareces como anónimo. Añade tu nombre en Tus ciudades.',
+    hidden: 'Tu nombre está oculto en la lista pública de {city}.',
     seeCities: 'Ver tus ciudades',
     tellFriend: 'Contárselo a un amigo',
     friendSubject: 'Ciudades enteras en pixel art, para explorar gratis',
@@ -366,8 +378,9 @@ export function thanksMail(facts: ThanksFacts): Omit<Mail, 'to'> {
         left,
       },
     );
+    if (place.stoneCount <= STONES_DRAWN_MAX)
+      body.push(stonesGrid(place.stones));
     body.push(
-      stonesGrid(place.stones),
       progressBar(place.raisedCents / place.goalCents),
       paragraph(markup(fillHtml(progress)), true),
     );
@@ -399,8 +412,10 @@ export function thanksMail(facts: ThanksFacts): Omit<Mail, 'to'> {
         fill(w.listed, { city: city.name, list, name: place.listedAs }),
       );
     } else {
-      body.push(paragraph(markup(fillHtml(w.anonymous))));
-      text.push(w.anonymous);
+      // a name an admin hid is not the donor's to add again
+      const line = facts.nameHidden ? w.hidden : w.anonymous;
+      body.push(paragraph(markup(fillHtml(line, values))));
+      text.push(fill(line, values));
     }
   }
 

@@ -1,5 +1,5 @@
 // The pictures the API's mails show, as files of the site (public/email/), drawn pixel by pixel:
-//   wordmark.png      "tiny" in white and "worlds" in taxi yellow, in Tiny5, on nothing: 2×
+//   wordmark.png      "tiny" in white and "worlds" in taxi yellow, in Tiny5, on the band's dark: 2×
 //   founding.png      the badges' pixel art, from the same maps as the site's own badges
 //   first-stone.png   (src/components/benefactors/pixel-art.ts): 3×, nearest neighbour
 //   keystone.png
@@ -31,12 +31,17 @@ const TINY5 = {
   s: ["....", "....", ".##.", "##..", "..#.", "##..", "...."],
 };
 
-/** The wordmark's two colours: the site's paper white, and its taxi yellow. */
-const WORD_COLORS = { tiny: "#f4f2ec", worlds: "#f7c21b" };
+/**
+ * The wordmark's colours: the site's paper white and its taxi yellow, on the mail's band. The
+ * band's dark is in the picture itself, not left clear: a mail client that turns a light mail
+ * dark (or a dark band light) recolours the band but not the picture, which would leave white
+ * letters on white.
+ */
+const WORD_COLORS = { tiny: "#f4f2ec", worlds: "#f7c21b", band: "#15171a" };
 
 /** The wordmark as pixel art: "tiny" in one colour, "worlds" in the other, the last space cut. */
 function wordmark() {
-  const palette = { a: WORD_COLORS.tiny, b: WORD_COLORS.worlds };
+  const palette = { a: WORD_COLORS.tiny, b: WORD_COLORS.worlds, ".": WORD_COLORS.band };
   const part = (word, key) =>
     TINY5.t.map((_, row) => [...word].map((ch) => TINY5[ch][row].replaceAll("#", key)).join(""));
   const tiny = part("tiny", "a");
