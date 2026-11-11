@@ -127,8 +127,9 @@ src/
 │                        # "Build the next city" (build-next.tsx), a city's card and its
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
 ├── components/styles.ts # the buttons the front page and "Your cities" share, as class lists
-├── components/home/     # the front page: landing.tsx, and moving-picture.tsx (a still that
-│                        # comes alive: the hero and the cards)
+├── components/home/     # the front page: landing.tsx and its pieces (section-head,
+│                        # world-card, site-numbers, next-city-tile), and moving-picture.tsx
+│                        # (a still that comes alive: the hero and the cards)
 ├── components/benefactors/ # a city's benefactors (panel, sign, stone grid) and the badges' pixel art
 ├── components/me/       # "Your cities" (/me/): your-cities.tsx, name-editor.tsx, me-app.tsx
 ├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
@@ -164,9 +165,32 @@ src/
 - **`src/site.ts`** answers "what is this build" for code that is not about a map (settings,
   language, analytics, donations): `SITE_ID` is the world id or `"home"`. On the front page
   `WORLD` is only a stand-in (the default world) that nothing shows: use `site.ts` there.
-- The front page's cards are plain `<a href="/<id>/">` (another build) with the world's share
-  card as picture, served from the world's own folder: `/<id>/og/<id>.jpg`. A world whose card
-  is not there yet shows its wordmark on a plain plate instead.
+- **The front page, top to bottom** (`components/home/landing.tsx`): links to its own sections
+  (`#cities`, `#imagined`, `#ranking`, `#open-source`; hidden below `sm`) and "Your cities" as a
+  button; the hero; a strip of figures; the cities, then the imagined places, as cards; "Build
+  the next city" (Donations, below); open source as one strip; the footer. Each section's title
+  (`section-head.tsx`) sits on the fog with a line saying what the section is, and carries the
+  section's id.
+- **A world's card** (`world-card.tsx`) is one link to the world, another build (`/<id>/`): the
+  link is the card's name, stretched over the whole card, and the Benefactors button lies over
+  it as its sibling, never inside it. Its picture is the world's share card, served from the
+  world's own folder: `/<id>/og/<id>.jpg` (a world whose card is not there yet shows its
+  wordmark on a plain plate). Its foot says in words what can be done: "Explore", and
+  "Benefactors" for a world the API knows a city for. Under the pointer the card lifts and is
+  ringed in the world's own colour. `SmallWorldCard` is the same in a few words (picture, name,
+  visits), for "Your cities".
+- **The figures under the hero** (`site-numbers.tsx`, with an API): how many worlds (the
+  registry's count, at once), every visit they have had and how many are exploring now
+  (`siteTotals` over `worldVisits`; the latter only above `LIVE_SHOWN_ABOVE`), and how many
+  cities can still be given to (the funded and the ranked of `rankCities`). A figure takes its
+  place when its number arrives and is left out if it never does; the strip is as tall from the
+  first paint as it will be with all four, so nothing below it moves.
+- **"Which city should I build next?"** (`next-city-tile.tsx`, where donations are taken): a
+  tile after the cities' cards, in what is left of their last row or in a row of its own
+  (`tileSpan` in `lib/home.ts`, at each breakpoint), with the three cities nearest to being
+  built (`leading`), a button that opens the donate sign and a link to the ranking. Most
+  visitors look at the worlds and never reach the ranking otherwise. While the list is on its
+  way three empty bars hold their place.
 - **The front page's pictures move** (`components/home/moving-picture.tsx`). Each card plays
   its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
   the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
@@ -188,7 +212,8 @@ src/
   worlds with no count keep the registry's order), ordered by the **first** answer only: later
   ones change the numbers, never the order, so nothing moves under the pointer. Before that
   answer, and for good without one, the cards keep the registry's order and say nothing; the
-  line's height is there from the start, so the cards do not grow when the numbers come.
+  line's height is there from the start (`box-content`: a `min-h` would otherwise swallow the
+  line's padding), so the cards do not grow when the numbers come.
 - **The front page's share card** is its own picture, `public/og/tinyworlds.jpg`
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
