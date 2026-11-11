@@ -9,8 +9,13 @@
  */
 
 export const ADMIN_KEY = "tinyworlds.admin";
+/** Where a donor's session is kept: the same shape, a different key, so the two never mix. */
+export const DONOR_KEY = "tinyworlds.donor";
 
-/** A signed-in admin, as this browser remembers them. */
+/** Who signs in: an admin (the funnel) or a donor (their own cities). */
+export type Purpose = "admin" | "donor";
+
+/** A signed-in admin or donor, as this browser remembers them. */
 export interface AdminSession {
   accessToken: string;
   /** ISO 8601 */
@@ -35,28 +40,32 @@ export function parseSession(raw: string | null, now: number): AdminSession | nu
   }
 }
 
-/** What the API answers when a sign-in link is accepted → the session to keep, or null. */
-export function sessionOf(answer: unknown): AdminSession | null {
+/**
+ * What the API answers when a sign-in link or code is accepted → the session to keep, or null.
+ * The answer names who signed in under `admin` or `donor`: the other kind is not a session.
+ */
+export function sessionOf(answer: unknown, purpose: Purpose = "admin"): AdminSession | null {
   if (!answer || typeof answer !== "object") return null;
-  const { accessToken, expiresAt, admin } = answer as Record<string, unknown>;
-  const email = (admin as { email?: unknown } | null)?.email;
+  const record = answer as Record<string, unknown>;
+  const { accessToken, expiresAt } = record;
+  const email = (record[purpose] as { email?: unknown } | null | undefined)?.email;
   if (typeof accessToken !== "string" || accessToken === "") return null;
   if (typeof expiresAt !== "string" || typeof email !== "string") return null;
   return { accessToken, expiresAt, email };
 }
 
-export function readSession(): AdminSession | null {
+export function readSession(key: string): AdminSession | null {
   try {
-    return parseSession(window.localStorage.getItem(ADMIN_KEY), Date.now());
+    return parseSession(window.localStorage.getItem(key), Date.now());
   } catch {
     return null; // private window, or storage blocked
   }
 }
 
-export function writeSession(session: AdminSession | null): void {
+export function writeSession(key: string, session: AdminSession | null): void {
   try {
-    if (session) window.localStorage.setItem(ADMIN_KEY, JSON.stringify(session));
-    else window.localStorage.removeItem(ADMIN_KEY);
+    if (session) window.localStorage.setItem(key, JSON.stringify(session));
+    else window.localStorage.removeItem(key);
   } catch {
     // nowhere to keep it: the session lasts as long as the page
   }
@@ -64,7 +73,7 @@ export function writeSession(session: AdminSession | null): void {
 
 /** Whether an admin is signed in on this browser: their own visits are not counted. */
 export function hasAdminSession(): boolean {
-  return typeof window !== "undefined" && readSession() !== null;
+  return typeof window !== "undefined" && readSession(ADMIN_KEY) !== null;
 }
 
 /**
@@ -74,6 +83,15 @@ export function hasAdminSession(): boolean {
 export function tokenFromHash(hash: string): string | null {
   const token = new URLSearchParams(hash.replace(/^#/, "")).get("token");
   return token && /^[\w-]{20,200}$/.test(token) ? token : null;
+}
+
+/**
+ * The six digits of a sign-in code, however they were typed or pasted ("482 913", "482-913",
+ * " 482913 "): the API's rule. Null when what is left is not exactly six digits.
+ */
+export function normalizeCode(text: string): string | null {
+  const digits = text.replace(/[\s\u00a0-]+/g, "");
+  return /^\d{6}$/.test(digits) ? digits : null;
 }
 
 /**

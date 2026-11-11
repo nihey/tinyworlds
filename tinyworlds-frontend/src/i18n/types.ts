@@ -1,5 +1,27 @@
 import type { PlaceType } from "@/map/manifest";
 
+/** The words of one sign-in sheet: the admin's and, later, the donor's. */
+export interface SignInWords {
+  heading: string;
+  body: string;
+  email: string;
+  placeholder: string;
+  action: string;
+  sending: string;
+  /** after asking: said whoever the address belongs to */
+  sent: string;
+  again: string;
+  verifying: string;
+  /** the link was used already, or is too old */
+  expired: string;
+  /** the session ran out, or the address is no longer an admin's */
+  ended: string;
+  failed: string;
+  tooMany: string;
+  /** this build names no API */
+  unavailable: string;
+}
+
 /**
  * Every word the interface shows or speaks, in one language. Every dictionary implements this,
  * so a string missing from one is a type error. Text that belongs to a city (its name, its
@@ -201,6 +223,18 @@ export interface Strings {
     /** the link (About, the front page's footer) that puts the question up again */
     settings: string;
   };
+  /** what every sign-in shares: the code, the spam warning, waiting to send again */
+  signIn: {
+    code: string;
+    codePlaceholder: string;
+    submit: string;
+    spam: string;
+    changeAddress: string;
+    sendAgain: string;
+    /** "{seconds}": the countdown to sending again */
+    sendAgainIn: string;
+    wrongCode: string;
+  };
   /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
    * and the donation funnel. "{email}" is an address, "{minutes}" a number of minutes,
@@ -208,26 +242,7 @@ export interface Strings {
    */
   admin: {
     title: string;
-    signIn: {
-      heading: string;
-      body: string;
-      email: string;
-      placeholder: string;
-      action: string;
-      sending: string;
-      /** after asking: said whoever the address belongs to */
-      sent: string;
-      again: string;
-      verifying: string;
-      /** the link was used already, or is too old */
-      expired: string;
-      /** the session ran out, or the address is no longer an admin's */
-      ended: string;
-      failed: string;
-      tooMany: string;
-      /** this build names no API */
-      unavailable: string;
-    };
+    signIn: SignInWords;
     signedInAs: string;
     signOut: string;
     frontPage: string;

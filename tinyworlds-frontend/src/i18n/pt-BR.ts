@@ -160,6 +160,16 @@ export const ptBR: Strings = {
     deny: "Não, obrigado",
     settings: "Configurações de cookies",
   },
+  signIn: {
+    code: "Código",
+    codePlaceholder: "6 dígitos",
+    submit: "Entrar",
+    spam: "Não chegou? Procure também na pasta de spam ou lixo eletrônico: o e-mail vem de tinyworlds, e o primeiro às vezes vai parar lá.",
+    changeAddress: "E-mail errado? Troque",
+    sendAgain: "Enviar de novo",
+    sendAgainIn: "Enviar de novo em {seconds}",
+    wrongCode: "Esse código está errado ou expirou. Confira o e-mail ou peça outro.",
+  },
   admin: {
     title: "administração do tinyworlds",
     signIn: {
@@ -169,7 +179,7 @@ export const ptBR: Strings = {
       placeholder: "voce@example.com",
       action: "Enviar link de acesso",
       sending: "Enviando…",
-      sent: "Se {email} for o e-mail de um administrador, um link de acesso está a caminho. O link funciona uma única vez, por {minutes} minutos.",
+      sent: "Se {email} for o e-mail de um administrador, um link e um código estão a caminho. Abra o link ou digite o código aqui. Os dois funcionam uma única vez, por {minutes} minutos.",
       again: "Usar outro e-mail",
       verifying: "Entrando…",
       expired: "Esse link expirou ou já foi usado. Peça um novo.",

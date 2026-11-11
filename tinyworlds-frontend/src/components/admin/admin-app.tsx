@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { replaceUrl } from "@/map/hash";
 import { HOME_URL } from "@/site";
 import { FunnelReport } from "./funnel-report";
-import { SignIn, type SignInNotice } from "./sign-in";
+import { SignIn, type SignInNotice } from "@/components/sign-in/sign-in";
 
 /** The token of a sign-in link in the address, when the page was opened from one. */
 const linkToken = (): string | null =>
@@ -189,8 +189,8 @@ export function AdminApp() {
     started.current = true;
     // the token leaves the address before anything else happens: it is a key
     replaceUrl(window.location.pathname + window.location.search);
-    import("@/lib/admin-api")
-      .then((api) => api.verifyLink(token))
+    import("@/lib/sign-in-api")
+      .then((api) => api.verifyLink(token, "admin"))
       .then(
         (fresh) => adminStore.set(fresh),
         (error: unknown) => {
@@ -213,5 +213,13 @@ export function AdminApp() {
   if (!hydrated) return <main className="min-h-dvh" />;
   // a link that fails changes nothing for an admin who is signed in already
   if (session && !verifying) return <Report session={session} onEnded={end} />;
-  return <SignIn notice={notice} verifying={verifying} />;
+  return (
+    <SignIn
+      purpose="admin"
+      words={t.admin.signIn}
+      notice={notice}
+      verifying={verifying}
+      onSession={(fresh) => adminStore.set(fresh)}
+    />
+  );
 }
