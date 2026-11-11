@@ -128,6 +128,11 @@ export function AboutDialog({
                     <Linked text={line} />
                   </li>
                 ))}
+                {WORLD.sights && (
+                  <li>
+                    <Linked text={t.about.descriptions} />
+                  </li>
+                )}
               </ul>
             </section>
           )}

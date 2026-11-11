@@ -18,6 +18,11 @@ export function press(s: SightState, id: string | null): SightState {
   return pinned === s.pinned ? s : { ...s, pinned };
 }
 
+/** A finger's tap: a press, and the end of any hover a mouse left behind (a finger has none). */
+export function tap(s: SightState, id: string | null): SightState {
+  return press(hover(s, null), id);
+}
+
 /** Esc or the sign's close button. */
 export function release(s: SightState): SightState {
   return s.pinned === null ? s : { ...s, pinned: null };

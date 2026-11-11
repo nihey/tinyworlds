@@ -43,6 +43,8 @@ export const en: Strings = {
     keysTogglesNoHoods: "{D} switches the miniature blur, {M} the minimap.",
     link: "The link button copies a link to exactly what you are looking at.",
     mapData: "Map data",
+    descriptions:
+      "Building descriptions from Wikipedia, under CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/",
     allCities: "All cities",
     openSource: "Open source on GitHub",
     contact: "Contact",
@@ -227,6 +229,7 @@ export const en: Strings = {
     },
     footerLink: "Admin",
   },
+  sight: { building: "Building", readOn: "Read on Wikipedia" },
   placeTypes: {
     hood: "Neighbourhood",
     landmark: "Landmark",

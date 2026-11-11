@@ -44,6 +44,8 @@ export const ptBR: Strings = {
     keysTogglesNoHoods: "{D} liga e desliga o desfoque de miniatura; {M}, o minimapa.",
     link: "O botão de link copia um endereço que abre o mapa exatamente onde você está.",
     mapData: "Dados do mapa",
+    descriptions:
+      "Descrições dos edifícios da Wikipédia, sob CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/",
     allCities: "Todas as cidades",
     openSource: "Código aberto no GitHub",
     contact: "Contato",
@@ -229,6 +231,7 @@ export const ptBR: Strings = {
     },
     footerLink: "Administração",
   },
+  sight: { building: "Edifício", readOn: "Ler na Wikipédia" },
   placeTypes: {
     hood: "Bairro",
     landmark: "Ponto turístico",

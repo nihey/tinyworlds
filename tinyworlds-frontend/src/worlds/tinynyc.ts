@@ -77,6 +77,7 @@ export const tinynyc: World = {
   credit: "© OpenStreetMap · Overture Maps · NYC Open Data",
   // taxi yellow
   accent: { color: "#f7c21b", ink: "#1a1503" },
+  sights: true,
   search: {
     ...EN_RULES,
     abbreviations: {

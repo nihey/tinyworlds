@@ -3,7 +3,7 @@ import { WORLD } from "@/worlds";
 import { buildHoodShapes, hoodAt, type HoodShape } from "./hoods";
 import type { Hood, Manifest } from "./manifest";
 import { createProjection, type GeoPoint, type MapPoint, type Projection } from "./projection";
-import { hover, press, release, shown, type SightState } from "./sight-state";
+import { hover, press, release, shown, tap, type SightState } from "./sight-state";
 import { buildSightShapes, sightAt, type Sight, type SightShape } from "./sights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
 
@@ -1261,7 +1261,7 @@ export class MapEngine {
       // a finger has no hover: a tap pins the building under it, or picks the neighbourhood;
       // a tap elsewhere lets either go
       const sight = this.sightUnder(x, y);
-      this.setSightState(press(this.sightState, sight));
+      this.setSightState(tap(this.sightState, sight));
       if (sight) {
         this.setHoveredHood(-1);
         return;
@@ -1276,12 +1276,11 @@ export class MapEngine {
     }
   }
 
-  private readonly onPointerLeave = (): void => {
+  private readonly onPointerLeave = (e: PointerEvent): void => {
     this.hoverPoint = null;
-    if (this.lastPointerType === "mouse") {
-      this.setHoveredHood(-1);
-      this.setSightState(hover(this.sightState, null));
-    }
+    if (this.lastPointerType === "mouse") this.setHoveredHood(-1);
+    // the mouse is gone, whatever pressed last (a touch-screen laptop has both)
+    if (e.pointerType === "mouse") this.setSightState(hover(this.sightState, null));
   };
 
   private readonly onWheel = (e: WheelEvent): void => {

@@ -43,6 +43,8 @@ export const esES: Strings = {
     keysTogglesNoHoods: "{D} activa o desactiva el efecto maqueta; {M}, el minimapa.",
     link: "El botón del enlace copia una dirección que abre el mapa justo donde estás.",
     mapData: "Datos del mapa",
+    descriptions:
+      "Descripciones de los edificios de Wikipedia, bajo CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/",
     allCities: "Todas las ciudades",
     openSource: "Código abierto en GitHub",
     contact: "Contacto",
@@ -229,6 +231,7 @@ export const esES: Strings = {
     },
     footerLink: "Administración",
   },
+  sight: { building: "Edificio", readOn: "Leer en Wikipedia" },
   placeTypes: {
     hood: "Barrio",
     landmark: "Lugar de interés",
