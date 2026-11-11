@@ -277,10 +277,50 @@ type Mutation {
   """
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
 
+  """Saves the cleaned name and answers it"""
+  setDisplayName(input: SetDisplayNameInput!): String!
+
+  """Name the donor (or not) for all their gifts to a city"""
+  setListing(input: SetListingInput!): Boolean!
+
   """
   Reports that a visit reached a step towards a donation. Says true; saying a step twice changes nothing.
   """
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
+}
+
+"""One city a donor gave to, and the donor's place in it"""
+type MyCity {
+  firstStone: Boolean!
+
+  """The founding number; null when none of the gifts is a founding one"""
+  founderNumber: Int
+
+  """All the donor's gifts to this city, in US cents"""
+  givenCents: Int!
+  goalCents: Int!
+  keystone: Boolean!
+
+  """Named for any gift to this city"""
+  listed: Boolean!
+  name: String!
+  raisedCents: Int!
+  slug: String!
+  status: CityStatus!
+
+  """The stones the donor laid, 1-based, sorted"""
+  stones: [Int!]!
+  worldId: String
+}
+
+"""What the signed-in donor has given"""
+type MyGiving {
+  """By latest gift, newest first"""
+  cities: [MyCity!]!
+  displayName: String
+
+  """Gifts to no city in particular, in US cents"""
+  projectCents: Int!
 }
 
 type Query {
@@ -304,6 +344,21 @@ type Query {
 
   """The admin this session belongs to"""
   me: Admin!
+
+  """The signed-in donor's own giving"""
+  myGiving: MyGiving!
+}
+
+input SetDisplayNameInput {
+  name: String!
+}
+
+input SetListingInput {
+  """The city, by its slug"""
+  city: String!
+
+  """Whether the donor is named for their gifts to this city"""
+  listed: Boolean!
 }
 
 input TrackFunnelStepInput {
