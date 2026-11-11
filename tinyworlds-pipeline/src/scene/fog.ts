@@ -89,6 +89,25 @@ interface Raster extends Omit<FogGrid, "d"> {
   mask: Uint8Array;
 }
 
+/** Marks the cells of a fog grid that lon/lat polygons cover. */
+function paint(polygons: Polygons, proj: Projection, grid: Omit<FogGrid, "d">, mask: Uint8Array): void {
+  const { p0, q0, cell, cols, rows } = grid;
+  for (const rings of polygons) {
+    const xy: number[] = [];
+    const starts = [0];
+    for (const ring of rings) {
+      for (const [lon, lat] of ring) {
+        const [p, q] = proj.toGrid(lon, lat);
+        xy.push((p - p0) / cell, (q - q0) / cell);
+      }
+      starts.push(xy.length / 2);
+    }
+    fillPolygon(xy, starts, 0, rings.length, 0, 0, cols, rows, (y, x0, x1) =>
+      mask.fill(1, y * cols + x0, y * cols + x1),
+    );
+  }
+}
+
 /** Lon/lat polygons → a 0/1 raster on a fog grid sized to hold them. */
 export function rasterize(polygons: Polygons, proj: Projection): Raster {
   let pMin = Infinity;
@@ -163,6 +182,7 @@ export function buildFogBuiltUp(
   limits: Polygons,
   footprints: Iterable<Footprint>,
   proj: Projection,
+  parks: Polygons = [],
 ): FogGrid {
   const raster = rasterize(limits, proj);
   const { p0, q0, cell, cols, rows, mask } = raster;
@@ -195,6 +215,13 @@ export function buildFogBuiltUp(
         for (let x = bx * BLOCK; x < Math.min(cols, (bx + 1) * BLOCK); x++)
           city[y * cols + x] = mask[y * cols + x];
     }
+  }
+
+  // a park too big to have buildings near its middle is still city, not a hole in the map
+  if (parks.length > 0) {
+    const park = new Uint8Array(cols * rows);
+    paint(parks, proj, raster, park);
+    for (let i = 0; i < city.length; i++) if (park[i]) city[i] = mask[i];
   }
 
   const fog = fogFromMask({ p0, q0, cell, cols, rows, mask: city });

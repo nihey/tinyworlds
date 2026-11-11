@@ -246,6 +246,81 @@ export const MOJAVE: StyleProfile = {
 };
 
 /**
+ * Southern California: stucco bungalows and Spanish revival houses in white, cream and pastels
+ * under grey shingle and red clay tile; two-storey apartments and strip malls under flat white
+ * and gravel roofs; downtown and Century City in blue and silver glass and polished granite.
+ */
+export const SOCAL: StyleProfile = {
+  rowWalls: [
+    R.whiteBrick,
+    R.cream,
+    R.cream,
+    R.tan,
+    R.salmon,
+    R.sidingYellow,
+    R.limestone,
+    R.rose,
+    R.greyStone,
+  ],
+  midWalls: [R.whiteBrick, R.cream, R.tan, R.tan, R.limestone, R.salmon, R.greyStone, R.rose, R.brickRed],
+  slabWalls: [R.whiteBrick, R.whiteBrick, R.cream, R.limestone, R.greyStone, R.tan],
+  houseWalls: [
+    R.whiteBrick,
+    R.whiteBrick,
+    R.cream,
+    R.cream,
+    R.tan,
+    R.salmon,
+    R.sidingYellow,
+    R.sidingBlue,
+    R.sidingSage,
+    R.mint,
+    R.rose,
+    R.greyStone,
+  ],
+  houseRoofs: [
+    R.roofSlate,
+    R.roofSlate,
+    R.roofSlate,
+    R.roofGravel,
+    R.roofGravel,
+    R.roofGravel,
+    R.roofBrown,
+    R.roofTar,
+    R.roofWhite,
+    R.roofTerracotta,
+    R.roofClay,
+  ],
+  houseMaxArea: 380,
+  flatRoofs: [R.roofWhite, R.roofWhite, R.roofGravel, R.roofGravel, R.roofSilver, R.roofTar],
+  lowRoofs: [R.roofWhite, R.roofWhite, R.roofGravel, R.roofSilver, R.roofTar, R.roofClay],
+  lowPitched: 0.12,
+  towerRoofs: [R.roofGravel, R.roofWhite, R.roofSilver, R.roofTar],
+  glass: [
+    R.glassBlue,
+    R.glassBlue,
+    R.glassSilver,
+    R.glassSilver,
+    R.glassDark,
+    R.glassTeal,
+    R.glassBlack,
+    R.glassBronze,
+  ],
+  stoneTowers: [R.limestone, R.cream, R.greyStone, R.rose, R.darkStone, R.whiteBrick, R.tan],
+  industrialWalls: [R.whiteBrick, R.greyStone, R.cream, R.concrete, R.tan, R.steel, R.brickRed],
+  industrialRoofs: [R.roofWhite, R.roofWhite, R.roofSilver, R.roofGravel, R.roofTar],
+  civicWalls: [R.limestone, R.cream, R.whiteBrick, R.tan, R.greyStone, R.brickRed],
+  sacredWalls: [R.whiteBrick, R.cream, R.tan, R.limestone, R.brickRed],
+  sacredRoofs: [R.roofTerracotta, R.roofClay, R.roofSlate, R.roofCopper],
+  outbuildingWalls: [R.whiteBrick, R.greyStone, R.cream, R.tan],
+  outbuildingRoofs: [R.roofGravel, R.roofSlate, R.roofWhite, R.roofClay],
+  windows: [R.glassDark, R.glassDark, R.glassBlack, R.glassBlue],
+  mid: [0.4, 0.32],
+  high: [0.55, 0.3],
+  superTall: 0.7,
+};
+
+/**
  * The Spanish Mediterranean: apartment blocks of five to eight floors in render, ochre and bare
  * brick with tiled terraces on top, low houses under clay tile, church domes in glazed blue.
  */
@@ -557,16 +632,24 @@ export function chooseStyle(input: StyleInput, p: StyleProfile = NEW_YORK): Styl
     // the Brooklyn Bridge's towers are granite; the rest are steel
     const wall = Math.abs(h - 82.9) < 0.2 ? R.tan : h > 60 ? R.steel : R.greyStone;
     style = { wall, roof: wall, glass: R.glassDark, pattern: Pattern.None, roofShape: Roof.Flat, roofH: 0 };
-  } else if (cls === "statue" || cls === "statue_gold" || cls === "pier_column" || cls === "truss_post") {
+  } else if (
+    cls === "statue" ||
+    cls === "statue_gold" ||
+    cls === "statue_white" ||
+    cls === "pier_column" ||
+    cls === "truss_post"
+  ) {
     // a cantilever bridge's posts are painted like its trusses (the renderer's truss colour)
     const wall =
       cls === "statue"
         ? R.libertyGreen
         : cls === "statue_gold"
           ? R.gold
-          : cls === "truss_post"
-            ? R.tan
-            : R.concrete;
+          : cls === "statue_white"
+            ? R.whiteBrick
+            : cls === "truss_post"
+              ? R.tan
+              : R.concrete;
     style = { wall, roof: wall, glass: R.glassDark, pattern: Pattern.None, roofShape: Roof.Flat, roofH: 0 };
   } else if (cls !== null && cls.startsWith("deck")) {
     // a bridge deck: steel underneath, the roadway on top

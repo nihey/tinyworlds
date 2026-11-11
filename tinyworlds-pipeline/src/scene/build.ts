@@ -403,7 +403,21 @@ export async function cityFog(conn: DuckDBConnection, proj: Projection): Promise
     `SELECT ST_X(ST_Centroid(geometry)), ST_Y(ST_Centroid(geometry)), ST_Area(geometry) FROM '${quote("building.parquet")}'`,
     (r) => footprints.push({ lon: Number(r[0]), lat: Number(r[1]), area: Number(r[2]) * m2 }),
   );
-  return buildFogBuiltUp(polygons, footprints, proj);
+  const parks: Polygons = [];
+  if (limits.parks && limits.parks.length > 0) {
+    const names = limits.parks.map((name) => `'${name.replaceAll("'", "''")}'`).join(", ");
+    await each(
+      conn,
+      `SELECT ST_AsGeoJSON(geometry) FROM '${quote("land_use.parquet")}' WHERE names."primary" IN (${names})`,
+      (r) => {
+        const geometry = JSON.parse(String(r[0])) as { type: string; coordinates: unknown };
+        if (geometry.type === "Polygon") parks.push(geometry.coordinates as number[][][]);
+        else if (geometry.type === "MultiPolygon") parks.push(...(geometry.coordinates as Polygons));
+      },
+    );
+    if (parks.length === 0) throw new Error(`none of the parks ${names} is in the land use data`);
+  }
+  return buildFogBuiltUp(polygons, footprints, proj, parks);
 }
 
 export async function buildScene(opts: BuildOptions = {}): Promise<void> {
@@ -791,6 +805,11 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     roofColor?: string | null;
     isPart?: boolean;
     name?: string | null;
+    /**
+     * A part that only borrows its name from the stadium grounds it stands in keeps the height
+     * mapped for it: the grounds' height fix is meant for the stands (Dodger Stadium's pavilions).
+     */
+    keepHeight?: boolean;
     flags?: number;
     /** Skip the guessing: use exactly this look. */
     force?: Partial<Style>;
@@ -808,7 +827,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     ridgeY: number,
     attrs: VolumeAttrs,
   ): { h: number; style: Style } | null => {
-    const fixed = attrs.name ? CITY.heightFixes?.[attrs.name.toLowerCase()] : undefined;
+    const fixed = attrs.name && !attrs.keepHeight ? CITY.heightFixes?.[attrs.name.toLowerCase()] : undefined;
     const h =
       fixed ?? (height && height > 0 ? height : fallbackHeight(attrs.cls, attrs.floors ?? null, area, seed));
     if (h - base < 0.4) return null;
@@ -1088,9 +1107,11 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   let withParts = 0;
   // a city with no building parts gets an empty file whose geometry column has lost its type
   const partRows = Number((await conn.runAndReadAll(`SELECT count(*) FROM '${part}'`)).getRows()[0][0]);
-  // A building with parts is drawn as its parts alone: they tile it. Not so a grandstand whose
-  // parts cover little of it (Citi Field's bowl, where only the Home Run Apple is a part): there
-  // the parts are things standing on the stands, and the stands are drawn too.
+  // A building with parts is drawn as its parts alone: they tile it. Not so a grandstand or a
+  // stadium whose parts cover little of it (Citi Field's bowl, where only the Home Run Apple is a
+  // part; Dodger Stadium, where only the outfield pavilions are): there the parts are things
+  // standing on the stands, and the stands are drawn too: all but the pieces of their outline
+  // that the parts do cover (Dodger Stadium's pavilions are both).
   const stands =
     partRows === 0
       ? []
@@ -1099,12 +1120,27 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
             `SELECT b.id
              FROM '${building}' b
              JOIN (SELECT building_id, sum(ST_Area(geometry)) a FROM '${part}' GROUP BY 1) c ON c.building_id = b.id
-             WHERE b.class = 'grandstand' AND c.a < 0.5 * ST_Area(b.geometry)`,
+             WHERE b.class IN ('grandstand', 'stadium') AND c.a < 0.5 * ST_Area(b.geometry)`,
           )
         )
           .getRows()
           .map((r) => `'${String(r[0]).replace(/'/g, "''")}'`);
   const keepStands = stands.length > 0 ? `AND id NOT IN (${stands.join(", ")})` : "";
+  /** "<building id>:<piece index>" of the stands' outline pieces their parts cover. */
+  const coveredPieces = new Set<string>();
+  if (stands.length > 0)
+    for (const [id, piece] of (
+      await conn.runAndReadAll(
+        `WITH piece AS (
+           SELECT id, unnest(ST_Dump(geometry)) AS d FROM '${building}' WHERE id IN (${stands.join(", ")})
+         )
+         SELECT piece.id, coalesce(d.path[1], 1) - 1
+         FROM piece JOIN '${part}' p ON p.building_id = piece.id
+         GROUP BY piece.id, d.path, d.geom
+         HAVING sum(ST_Area(ST_Intersection(d.geom, p.geometry))) > 0.5 * ST_Area(d.geom)`,
+      )
+    ).getRows())
+      coveredPieces.add(`${String(id)}:${Number(piece)}`);
   // A stadium's stands often carry no name of their own; the grounds they stand in do. They take
   // that name, so the city's `landmarks` and `heightFixes` can find them (Citi Field, Yankee Stadium).
   const grounds = new Map<string, string>();
@@ -1133,7 +1169,8 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       if (!g || g.kind !== GeomKind.Polygon) return;
       const seed = hashString(row[0] as string);
       const floors = num(row[2]);
-      for (const rings of g.parts) {
+      for (const [piece, rings] of g.parts.entries()) {
+        if (coveredPieces.size > 0 && coveredPieces.has(`${row[0] as string}:${piece}`)) continue;
         let height = num(row[1]);
         if (sampler && !(height && height > 0) && !(floors && floors > 0)) {
           // only worth reading for a building that will be drawn
@@ -1167,7 +1204,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       conn,
       `SELECT p.building_id, coalesce(p.height, b.height), p.num_floors, coalesce(p.min_height, p.min_floor * 3.4, 0), b.subtype, b.class,
             p.roof_shape, p.roof_height, coalesce(p.facade_color, b.facade_color), coalesce(p.facade_material, b.facade_material),
-            coalesce(p.roof_color, b.roof_color), ST_AsWKB(p.geometry), b.names."primary"
+            coalesce(p.roof_color, b.roof_color), ST_AsWKB(p.geometry), b.names."primary", p.height IS NOT NULL
      FROM '${part}' p LEFT JOIN '${building}' b ON p.building_id = b.id
      WHERE NOT coalesce(p.is_underground, false)`,
       (row) => {
@@ -1189,6 +1226,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
             roofColor: str(row[10]),
             isPart: true,
             name: str(row[12]) ?? grounds.get(row[0] as string),
+            keepHeight: str(row[12]) === null && grounds.has(row[0] as string) && row[13] === true,
           });
         }
       },
@@ -1679,12 +1717,25 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     const [p, q] = proj.toGrid(statue.lon, statue.lat);
     const from = volumes.count;
     statue.pieces.forEach((piece, i) => {
+      const pc = p + piece.dp;
+      const qc = q + piece.dq;
       addShape(
-        disc(p + piece.dp, q + piece.dq, piece.r, 8),
+        "r" in piece
+          ? disc(pc, qc, piece.r, 8)
+          : [
+              pc - piece.hp,
+              qc - piece.hq,
+              pc + piece.hp,
+              qc - piece.hq,
+              pc + piece.hp,
+              qc + piece.hq,
+              pc - piece.hp,
+              qc + piece.hq,
+            ],
         mix(i, 1886),
         statue.base + piece.to,
         statue.base + piece.from,
-        piece.ramp === "gold" ? "statue_gold" : "statue",
+        piece.ramp === "gold" ? "statue_gold" : piece.ramp === "white" ? "statue_white" : "statue",
       );
     });
     const vols: number[] = [];

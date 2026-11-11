@@ -18,15 +18,27 @@ export interface LandmarkStyle {
   pyramid?: number;
 }
 
-/** Something that is not a building, so it is not in the data: a stack of prisms on a spot. */
+/**
+ * Something that is not a building, so it is not in the data: pieces stacked on a spot. A piece
+ * is a prism round a point (`r`: the Statue of Liberty) or a box (`hp`, `hq`: half its size
+ * uptown and crosstown: the letters of the Hollywood Sign). `body` is a statue's patina.
+ */
 export interface Statue {
   lon: number;
   lat: number;
   /** What it stands on, metres above ground. */
   base: number;
-  /** Offsets are metres uptown / crosstown from the spot; radii and heights in metres. */
-  pieces: readonly { dp: number; dq: number; r: number; from: number; to: number; ramp: "body" | "gold" }[];
+  /** Offsets are metres uptown / crosstown from the spot; radii, sizes and heights in metres. */
+  pieces: readonly StatuePiece[];
 }
+
+export type StatuePiece = {
+  dp: number;
+  dq: number;
+  from: number;
+  to: number;
+  ramp: "body" | "gold" | "white";
+} & ({ r: number } | { hp: number; hq: number });
 
 /**
  * The places people type first. Hand-picked so they rank above everything derived from data and
@@ -101,9 +113,11 @@ export interface City {
    * What counts as "the city": the fog is measured from it. Either polygons in a raw GeoJSON
    * file, or the built-up part of an Overture division area (for a municipality that is mostly
    * farmland, where the legal limits would make a map of fields) or, with no division named, of
-   * the whole bounding box (for a metropolis that ignores its municipal limits).
+   * the whole bounding box (for a metropolis that ignores its municipal limits). `parks` are
+   * land use areas, by name, that count as built up: a park too big to have a building near its
+   * middle (Griffith Park) would otherwise dissolve into a hole in the map.
    */
-  limits: { kind: "geojson"; file: string } | { kind: "built-up"; division?: string };
+  limits: { kind: "geojson"; file: string } | { kind: "built-up"; division?: string; parks?: string[] };
   /** Metres from the city at which the map starts to dissolve, and where it is gone. */
   fog: { start: number; end: number };
   areas(rawDir: string): Areas;

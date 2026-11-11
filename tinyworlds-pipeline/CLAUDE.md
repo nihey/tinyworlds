@@ -13,6 +13,7 @@ chosen with `--city` (default `tinynyc`).
 | `tinyfte`          | seconds             | a few MB             |
 | `tinyvlc`          | ≈ 1 min             | 0.2 GB               |
 | `tinylas`          | ≈ 1 min             | 0.2 GB               |
+| `tinylax`          | ≈ 4 min             | 0.7 GB, 23,000 files |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 | `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
@@ -54,6 +55,7 @@ src/
 │   ├── tinyfte.ts (+ .places.ts)   # El Calafate (the id is its airport code)
 │   ├── tinyvlc.ts (+ .places.ts)   # Valencia
 │   ├── tinylas.ts (+ .places.ts)   # Las Vegas
+│   ├── tinylax.ts (+ .places.ts, .areas.ts, .landmarks.ts)   # Los Angeles: County areas, the Hollywood Sign
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
 │   ├── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 │   └── tinywesteros.ts (+ .land.ts, .places.ts)  # a whole imagined world as a toy-scale diorama
@@ -62,7 +64,8 @@ src/
 ├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
 ├── sources/           # DataSource providers: overture.ts (DuckDB over public S3), nycOpenData.ts,
 │                      # ibge.ts (census areas), openBuildings.ts (satellite height raster),
-│                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions)
+│                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions),
+│                      # laCounty.ts (Los Angeles County's cities and communities)
 ├── geom/              # wkb.ts (WKB reader), geojson.ts, utm.ts
 ├── scene/
 │   ├── build.ts       # raw → scene: ground polygons, lines, volumes, trees, cables, fog
@@ -108,11 +111,13 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
    - `origin`, `betaDeg` (the street grid's bearing: measure it, don't guess) and `bbox`;
    - `limits`: polygons that are "the city" (`geojson`), or the built-up part of an Overture
      division (`built-up`) for a municipality that is mostly farmland, or of the whole bounding
-     box (`built-up` with no division) for a metropolis that ignores its municipal limits;
+     box (`built-up` with no division) for a metropolis that ignores its municipal limits. A park
+     too big to have buildings near its middle fades into a hole in the map: name it in
+     `parks` (Los Angeles' Griffith Park);
    - `heights.raster`: `true` where buildings have no mapped heights (add `openBuildings` to
      `sources`, after `overture`);
    - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`,
-     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, or a new one);
+     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, `SOCAL`, or a new one);
    - `ground`: how the data's land classes read locally (cane fields, dry steppe, market gardens);
    - `heightFixes` / `heightCaps`: the few places where the mapped heights are plainly wrong
      (look at the tallest buildings in a preview before trusting them);
@@ -329,8 +334,8 @@ whose shadows reach it, and margins for both.
 - Light comes from the upper left (sun bearing 254°): left walls lit, right walls shaded, shadows
   fall straight to the right.
 - The view is aligned to the city's street grid (`betaDeg`: Manhattan's avenues at 28.9°,
-  Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°) so its streets are
-  exact 2:1 lines.
+  Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°, the Los Angeles
+  basin's at −0.1°, measured over 3,000 km of streets) so its streets are exact 2:1 lines.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
@@ -350,11 +355,19 @@ whose shadows reach it, and margins for both.
   and a suspender, bare steel a pixel across; 2 and 3 are a truss chord and a lesser member,
   painted and two pixels across, so a truss still reads from afar.
 - A building with parts is drawn as its parts alone, since they normally tile it. The exception
-  is a **grandstand whose parts cover less than half of it**: the parts stand on the stands, so
-  both are drawn (Citi Field's bowl, where only the Home Run Apple is a part).
+  is a **grandstand or stadium whose parts cover less than half of it**: the parts stand on the
+  stands, so both are drawn (Citi Field's bowl, where only the Home Run Apple is a part; Las
+  Vegas' Thomas & Mack Center; Valencia's Roig Arena). Pieces of its outline that the parts do
+  cover are left to the parts: Dodger Stadium's outline is the grandstand and the two outfield
+  pavilions, and only the pavilions have parts.
 - **Unnamed stands take the name of the stadium grounds** they stand in (`class = stadium` land
   use), so `landmarks` and `heightFixes` can reach them: that is how Citi Field gets its brick
-  and green seats and Yankee Stadium its limestone.
+  and green seats and Yankee Stadium its limestone. A part that only borrows that name keeps a
+  height of its own: Dodger Stadium's height fix is for its stands (mapped two metres tall), not
+  its pavilions.
+- **Statues** (`City.statues`) are what is not a building and so not in the data: stacked
+  prisms (`r`: the Statue of Liberty) or boxes (`hp`, `hq`: the letters of the Hollywood Sign,
+  set from a pixel face in `tinylax.landmarks.ts`), in patina, gold or white.
 - New ground kinds go at the **end** of `G` too and get their place in the paint order from
   `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
   already on disk keep their meaning.
@@ -377,6 +390,7 @@ raster is read as the median inside the footprint and corrected with a curve fit
 | NYC Open Data                       | borough boundaries, 2020 NTAs, 2015 street tree census                        | public domain                                       |
 | Google Open Buildings 2.5D Temporal | building heights estimated from satellite imagery (4 m raster), for `tinyrao` | CC BY 4.0                                           |
 | IBGE, Censo 2022                    | Ribeirão Preto's planning sub-sectors ("bairros" layer)                       | open, attribution                                   |
+| Los Angeles County Enterprise GIS   | Countywide Statistical Areas: cities, LA's communities, unincorporated areas  | open, attribution                                   |
 | Wikipedia (en, pt, es)              | the openings of the sights' articles, and their links (`wiki`)                | CC BY-SA 4.0                                        |
 
 `data/` (raw downloads and scenes, per city) is gitignored and reproducible.
