@@ -16,6 +16,8 @@ chosen with `--city` (default `tinynyc`).
 | `tinylax`          | ≈ 4 min             | 0.7 GB, 23,000 files |
 | `tinydal`          | ≈ 1.5 min (+ wiki)  | 0.3 GB, 10,500 files |
 | `tinycvg`          | ≈ 1 min (+ wiki)    | 0.2 GB, 6,300 files  |
+| `tinypit`          | ≈ 1 min (+ wiki)    | 0.2 GB, 5,200 files  |
+| `tinyphl`          | ≈ 1.5 min (+ wiki)  | 0.1 GB, 5,300 files  |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 | `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
@@ -61,6 +63,9 @@ src/
 │   ├── tinylax.ts (+ .places.ts, .areas.ts, .landmarks.ts)   # Los Angeles: County areas, the Hollywood Sign
 │   ├── tinydal.ts (+ .places.ts, .landmarks.ts)   # Dallas: Reunion Tower's ball, the Margaret Hunt Hill arch
 │   ├── tinycvg.ts (+ .places.ts)   # Cincinnati: the Roebling Bridge's cables, a riverboat on the Ohio
+│   ├── tinypit.ts (+ .places.ts)   # Pittsburgh: the Point, three rivers, the city's 90 neighbourhoods
+│   ├── tinyphl.ts (+ .places.ts)   # Philadelphia: Penn's grid, the Parkway, the city's neighbourhoods
+│   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
 │   ├── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 │   └── tinywesteros.ts (+ .land.ts, .places.ts)  # a whole imagined world as a toy-scale diorama
@@ -70,7 +75,8 @@ src/
 ├── sources/           # DataSource providers: overture.ts (DuckDB over public S3), nycOpenData.ts,
 │                      # ibge.ts (census areas), openBuildings.ts (satellite height raster),
 │                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions),
-│                      # laCounty.ts (Los Angeles County's cities and communities)
+│                      # laCounty.ts (Los Angeles County's cities and communities),
+│                      # publishedAreas.ts (a GeoJSON of areas a city publishes: Pittsburgh's, Philadelphia's)
 ├── geom/              # wkb.ts (WKB reader), geojson.ts, utm.ts
 ├── scene/
 │   ├── build.ts       # raw → scene: ground polygons, lines, volumes, trees, cables, fog
@@ -136,7 +142,12 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
    - `heightFixes` / `heightCaps`: the few places where the mapped heights are plainly wrong
      (look at the tallest buildings in a preview before trusting them);
    - `areas()`: the districts (context lines) and the outlined areas, from whatever the city
-     publishes;
+     publishes. Where Overture's neighbourhoods are thin or wrong, download the city's own
+     (`publishedAreas`) and let `sectioned()` (`sections.ts`) file them under the parts of town
+     locals name (Pittsburgh's Downtown, North Side, Oakland; Philadelphia's Center City,
+     University City): those become the districts, so a context line says "Downtown", not
+     "Pittsburgh", and the quiz's areas are a dozen, not one. The towns beside the city stay
+     districts of their own;
    - `curated`: take coordinates from the data, not from memory.
 2. `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
 3. The viewer's side: see `tinyworlds-frontend/CLAUDE.md` ("Worlds").
@@ -276,7 +287,7 @@ river, an islet, the Wall).
 
 ## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
 
-A city with `sights` (New York, Dallas, Cincinnati) gets `sights.json` from `index` and `sights.<locale>.json` from
+A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia) gets `sights.json` from `index` and `sights.<locale>.json` from
 `wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
 one or more search entries point at.
 
@@ -289,7 +300,9 @@ one or more search entries point at.
   `owners.json`; a name inside "Ed Koch Queensboro Bridge Upper Level" counts), plus the pieces
   filed under the other roads' names the city lists for it (`sights.bridges`: the Manhattan
   Bridge's towers stand under "Canal Street (lower level)", the Williamsburg's under "BMT Jamaica
-  Line") that lie within 40 m of its own pieces' extent; the statue within
+  Line") that lie within 40 m of its own pieces' extent (a bridge with no piece under its own
+  name, Pittsburgh's Smithfield Street Bridge filed under "Smithfield Street", is those pieces
+  within 220 m of its point); the statue within
   30 m, a stadium's stands from a point anywhere in its grounds (`land_use` class `stadium`), a
   building entry's own building by its seed, else the building whose footprint holds the point,
   within 4 m. A building is all the volumes with its seed (`hashString` of its id, which its parts
@@ -387,7 +400,10 @@ change to the rules below.
 - Cincinnati: 67 questions (easy 17, medium 24, hard 26), Dallas: 63 (easy 16, medium 22, hard
   25). Their context lines are neighbourhoods ("Downtown", "Over-the-Rhine"), so a question's
   area is the district it stands in (`sights.areaByDistrict`), among all the city's districts
-  (Covington's middle is off the map, so it is no `borough` place).
+  (Covington's middle is off the map, so it is no `borough` place). Pittsburgh: 104 questions
+  (easy 26, medium 37, hard 41), Philadelphia: 105 (easy 27, medium 36, hard 42); their
+  districts are the parts of town (`sectioned`), so a question's area is Downtown or Oakland,
+  Center City or University City.
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
 
@@ -417,7 +433,10 @@ whose shadows reach it, and margins for both.
   basin's at −0.1°, measured over 3,000 km of streets; Dallas' compass grid at 0.2°, a quarter
   of its 3,200 km of streets, rather than Uptown's at 45.3°, which would stand every freeway on
   end; Cincinnati's downtown, Over-the-Rhine and Covington at −11.1°, so the view looks across
-  the river at the skyline) so its streets are exact 2:1 lines. Measure it as the peak of the
+  the river at the skyline; Pittsburgh at 61°, the Golden Triangle's second grid and the whole
+  box's strongest bearing, so the view looks from Mount Washington across the Monongahela at
+  the Point; Philadelphia's grid at −8.1°, so City Hall stands at the hub and the Parkway leads
+  the eye up to the Art Museum) so its streets are exact 2:1 lines. Measure it as the peak of the
   streets' bearings modulo 90°, weighted by length.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
@@ -485,6 +504,8 @@ raster is read as the median inside the footprint and corrected with a curve fit
 | Google Open Buildings 2.5D Temporal | building heights estimated from satellite imagery (4 m raster), for `tinyrao` | CC BY 4.0                                           |
 | IBGE, Censo 2022                    | Ribeirão Preto's planning sub-sectors ("bairros" layer)                       | open, attribution                                   |
 | Los Angeles County Enterprise GIS   | Countywide Statistical Areas: cities, LA's communities, unincorporated areas  | open, attribution                                   |
+| City of Pittsburgh (WPRDC)          | Pittsburgh's 90 neighbourhoods                                                | CC BY                                               |
+| Abaca Labs (OpenDataPhilly)         | Philadelphia's 159 neighbourhoods                                             | CC BY 4.0                                           |
 | Wikipedia (en, pt, es)              | the openings of the sights' articles, and their links (`wiki`)                | CC BY-SA 4.0                                        |
 
 `data/` (raw downloads and scenes, per city) is gitignored and reproducible.
@@ -508,6 +529,10 @@ raster is read as the median inside the footprint and corrected with a curve fit
   `maxArea` (0.05 square degrees, so no county counts as a town) needs it raised (Dallas). In
   Dallas the "neighbourhoods" are mostly improvement districts and the zoo's exhibits: its
   `areas()` renames or drops them, and `search.skip` keeps them (and points of interest that are not what they say) out of the search.
+- Overture's land comes in one-degree tiles, fetched when they meet the box. A city that runs
+  past its box keeps its fog's margin (up to `fog.end`, 1.9 km) outside it: if that margin
+  crosses a degree line the box does not, the next tile is missing and the margin is drawn as
+  water. Philadelphia's box reaches past 40° north for this.
 - A city with no building parts gets an empty `building_part.parquet` whose geometry column has
   lost its type: the scene builder skips the parts pass when the file has no rows.
 - Never insert a ground kind in the middle of `G`: it renumbers the ones after it and every

@@ -163,7 +163,9 @@ export interface City {
     /**
      * A bridge (lower-case name) → the other names some of its pieces are filed under: other roads'
      * (its towers, its lower deck, its subway), or a building's (the Roebling Bridge's towers,
-     * mapped as one): those pieces within the bridge's extent light up too.
+     * mapped as one): those pieces within the bridge's extent light up too. A bridge with no piece
+     * under its own name (Pittsburgh's Smithfield Street Bridge, filed under "Smithfield Street")
+     * is made of those pieces within 220 m of its entry's point.
      */
     bridges?: Record<string, string[]>;
     /**

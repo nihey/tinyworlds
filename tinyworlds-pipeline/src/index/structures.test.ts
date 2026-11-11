@@ -139,6 +139,25 @@ describe("makeFinder", () => {
     expect(findBridge(at(0, -100, { t: "bridge", n: "Manhattan Bridge" }))?.vols).toEqual([0, 1]);
   });
 
+  it("makes a bridge with no piece of its own name of its listed roads' pieces near its point", () => {
+    const bridgeScene = fakeScene([
+      { ring: square(0, 0, 10), seed: 1 }, // 0: "Smithfield Street", on the bridge
+      { ring: square(100, 0, 10), seed: 2 }, // 1: "Smithfield Street", the bridge's far end
+      { ring: square(3000, 0, 10), seed: 3 }, // 2: "Smithfield Street" over a railway, far off
+    ]);
+    const bridgeOwners: Owners = {
+      bridges: [{ name: "Smithfield Street", vols: [0, 1, 2] }],
+      statues: [],
+    };
+    const findBridge = makeFinder(bridgeScene, bridgeOwners, proj, [], {
+      "smithfield street bridge": ["Smithfield Street"],
+    });
+    const bridge = at(50, 5, { t: "bridge", n: "Smithfield Street Bridge" });
+    expect(findBridge(bridge)).toEqual({ key: "bridge:smithfield street bridge", vols: [0, 1] });
+    // without the city listing the road, it is no sight, as before
+    expect(makeFinder(bridgeScene, bridgeOwners, proj, [], {})(bridge)).toBeNull();
+  });
+
   it("finds the statue from a point beside it", () => {
     expect(find(at(-380, 2))?.key).toBe("statue:0");
   });
