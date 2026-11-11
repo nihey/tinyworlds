@@ -27,6 +27,8 @@
     "seed": "tsx prisma/seed.ts",
     "donors:backfill": "node dist/benefactors/backfill-cli.js",
     "donors:backfill:dev": "tsx src/benefactors/backfill-cli.ts",
+    "cities:announce": "node dist/benefactors/announce-cli.js",
+    "cities:announce:dev": "tsx src/benefactors/announce-cli.ts",
     "funnel:import": "tsx prisma/import-funnel.ts",
     "webhook:send": "node scripts/send-webhook.mjs"
   },

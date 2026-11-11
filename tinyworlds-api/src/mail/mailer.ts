@@ -43,34 +43,52 @@ export class LogMailer implements Mailer {
   }
 }
 
+/** What the mailer is made from. */
+export type MailEnv = Pick<
+  Env,
+  | 'NODE_ENV'
+  | 'SMTP_HOST'
+  | 'SMTP_PORT'
+  | 'SMTP_USER'
+  | 'SMTP_PASSWORD'
+  | 'MAIL_FROM'
+>;
+
+/**
+ * The mail server the environment names, or the log when it names none. Used by the app (as
+ * MAILER) and by the commands that send mail outside it (announce-cli.ts).
+ */
+export function createMailer(env: MailEnv): Mailer {
+  const { SMTP_HOST: host, MAIL_FROM: from, SMTP_PORT: port } = env;
+  if (!host || !from) return new LogMailer(env.NODE_ENV === 'production');
+  const user = env.SMTP_USER;
+  const transport = createTransport({
+    host,
+    port,
+    // 465 speaks TLS from the first byte; the others start plain and upgrade (STARTTLS)
+    secure: port === 465,
+    auth: user ? { user, pass: env.SMTP_PASSWORD ?? '' } : undefined,
+    connectionTimeout: SMTP_TIMEOUT_MS,
+    greetingTimeout: SMTP_TIMEOUT_MS,
+    socketTimeout: SMTP_TIMEOUT_MS,
+  });
+  return {
+    send: async (mail) => {
+      await transport.sendMail({ from, ...mail });
+    },
+  };
+}
+
 export const mailerProvider: Provider = {
   provide: MAILER,
   inject: [ConfigService],
-  useFactory: (config: ConfigService<Env, true>): Mailer => {
-    const host = config.get('SMTP_HOST', { infer: true });
-    const from = config.get('MAIL_FROM', { infer: true });
-    if (!host || !from)
-      return new LogMailer(
-        config.get('NODE_ENV', { infer: true }) === 'production',
-      );
-    const port = config.get('SMTP_PORT', { infer: true });
-    const user = config.get('SMTP_USER', { infer: true });
-    const transport = createTransport({
-      host,
-      port,
-      // 465 speaks TLS from the first byte; the others start plain and upgrade (STARTTLS)
-      secure: port === 465,
-      auth: user
-        ? { user, pass: config.get('SMTP_PASSWORD', { infer: true }) ?? '' }
-        : undefined,
-      connectionTimeout: SMTP_TIMEOUT_MS,
-      greetingTimeout: SMTP_TIMEOUT_MS,
-      socketTimeout: SMTP_TIMEOUT_MS,
-    });
-    return {
-      send: async (mail) => {
-        await transport.sendMail({ from, ...mail });
-      },
-    };
-  },
+  useFactory: (config: ConfigService<Env, true>): Mailer =>
+    createMailer({
+      NODE_ENV: config.get('NODE_ENV', { infer: true }),
+      SMTP_HOST: config.get('SMTP_HOST', { infer: true }),
+      SMTP_PORT: config.get('SMTP_PORT', { infer: true }),
+      SMTP_USER: config.get('SMTP_USER', { infer: true }),
+      SMTP_PASSWORD: config.get('SMTP_PASSWORD', { infer: true }),
+      MAIL_FROM: config.get('MAIL_FROM', { infer: true }),
+    }),
 };

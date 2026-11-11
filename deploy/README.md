@@ -23,6 +23,7 @@ it from `deploy/.env` (gitignored; see `.env.example`):
 | `ANALYTICS_SRC`, `ANALYTICS_SITE_ID` | optional page analytics: tracker script URL and site id, baked into the build |
 | `GTM_ID` | optional Google Tag Manager container id (`GTM-XXXXXXX`), baked into the build as `NEXT_PUBLIC_GTM_ID`; Google Analytics is a tag inside the container |
 | `DONATE_URL`, `DONATE_URL_PT`, `DONATE_URL_ES` | optional donation links (hosted payment pages) by interface language; `DONATE_URL` is English and the fallback when the API is unreachable |
+| `API_SERVICE` | optional: the API's container on `DEPLOY_HOST`, by its name or by the name of the Swarm service whose task runs it; after a world is deployed, its city's donors are told it is built (see below). Empty = no announcement |
 
 ## Server setup (once)
 
@@ -96,6 +97,19 @@ manifest also describes the tiles, it refuses (before sending anything) when the
 manifest is from another render than the local one: deploy the data first.
 `deploy.sh` also copies `nginx.conf` (in place, because it is a single-file bind mount); after
 changing it, reload nginx in the container (`nginx -s reload`).
+
+**Announcing a built city.** After uploading a world (`deploy.sh <world>`, and every world of
+`all`), the script runs the API's announce command in its container:
+`ssh $DEPLOY_HOST docker exec <container> node dist/benefactors/announce-cli.js <world>`, the
+container being the one named `API_SERVICE` (or running the service of that name). It mails each
+donor of the world's city that the city is on the map, once per city however often it runs:
+it does nothing for a city announced before, for a world no city has, or for a city the seed has
+not marked `BUILT` yet (it says so: run `npm run seed` in the container, then deploy the world
+again, or run the command by hand). It prints counts, never addresses. A non-zero exit (a mail
+that did not go out, no such container, ssh failing) is a warning: the deploy itself is done.
+The ssh user needs to be able to run `docker`. Without `API_SERVICE` the step is skipped with a
+note. So, for a new world: deploy the API with the world in its seed, run the seed, then deploy
+the world.
 
 The API is redeployed by rebuilding its image from the repository; its migrations run when the
 container starts. When a change touches both, **deploy the API first**, then the viewers: a

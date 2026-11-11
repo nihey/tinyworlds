@@ -1,10 +1,8 @@
 import type { CityStatus } from '../generated/prisma/enums.js';
 import { formatCount, formatUsd } from '../mail/format.js';
 import { bold, fill, fillHtml, markup } from '../mail/html.js';
+import { heldBadges } from '../mail/badges.js';
 import {
-  badge,
-  type BadgeArt,
-  badges,
   buttons,
   heading,
   impactBox,
@@ -79,10 +77,6 @@ interface Words {
   founders: string;
   benefactors: string;
   anonymous: string;
-  founderNo: string;
-  firstStone: string;
-  keystone: string;
-  benefactor: string;
   seeCities: string;
   tellFriend: string;
   friendSubject: string;
@@ -142,10 +136,6 @@ const WORDS: Record<Locale, Words> = {
     founders: 'Founding Benefactors',
     benefactors: 'Benefactors',
     anonymous: "You're anonymous here. Add your name on Your cities.",
-    founderNo: 'Founder No. {n}',
-    firstStone: 'First Stone',
-    keystone: 'Keystone',
-    benefactor: 'Benefactor',
     seeCities: 'See your cities',
     tellFriend: 'Tell a friend',
     friendSubject: 'Whole cities in pixel art, free to explore',
@@ -211,10 +201,6 @@ const WORDS: Record<Locale, Words> = {
     benefactors: 'Benfeitores',
     anonymous:
       'Aqui você aparece como anônimo. Adicione seu nome em Suas cidades.',
-    founderNo: 'Fundador Nº {n}',
-    firstStone: 'Pedra Fundamental',
-    keystone: 'Pedra-Chave',
-    benefactor: 'Benfeitor',
     seeCities: 'Ver suas cidades',
     tellFriend: 'Contar a um amigo',
     friendSubject: 'Cidades inteiras em pixel art, para explorar de graça',
@@ -278,10 +264,6 @@ const WORDS: Record<Locale, Words> = {
     founders: 'Benefactores Fundadores',
     benefactors: 'Benefactores',
     anonymous: 'Aquí apareces como anónimo. Añade tu nombre en Tus ciudades.',
-    founderNo: 'Fundador N.º {n}',
-    firstStone: 'Primera Piedra',
-    keystone: 'Piedra Clave',
-    benefactor: 'Benefactor',
     seeCities: 'Ver tus ciudades',
     tellFriend: 'Contárselo a un amigo',
     friendSubject: 'Ciudades enteras en pixel art, para explorar gratis',
@@ -305,17 +287,6 @@ function kindOf(city: ThanksFacts['city']): Kind {
   if (city.status === 'BUILT') return 'beyond';
   if (place.founding) return place.laid.length ? 'founding' : 'plain';
   return 'beyond';
-}
-
-/** The badges the donor holds in the city: their words, and their pictures. */
-function held(place: GiftPlace, w: Words): [string, BadgeArt?][] {
-  if (place.founderNumber === null) return [[w.benefactor]];
-  const list: [string, BadgeArt?][] = [
-    [fill(w.founderNo, { n: place.founderNumber }), 'founding'],
-  ];
-  if (place.firstStone) list.push([w.firstStone, 'first-stone']);
-  if (place.keystone) list.push([w.keystone, 'keystone']);
-  return list;
 }
 
 /**
@@ -380,9 +351,9 @@ export function thanksMail(facts: ThanksFacts): Omit<Mail, 'to'> {
   const text = [title, fill(lead, values)];
 
   if (place && (kind === 'founding' || kind === 'beyond')) {
-    const list = held(place, w);
-    body.push(badges(list.map(([label, art]) => badge(site, label, art))));
-    text.push(list.map(([label]) => label).join(' · '));
+    const held = heldBadges(site, locale, place);
+    body.push(held.html);
+    text.push(held.text);
   }
 
   if (place && kind === 'founding') {

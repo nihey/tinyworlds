@@ -19,23 +19,26 @@ enum CityStatus {
 
 /// A city people can fund, or one that is already on the map.
 model City {
-  id            String     @id @default(uuid()) @db.Uuid
+  id               String     @id @default(uuid()) @db.Uuid
   /// The name without accents, case or punctuation: what makes "São Paulo" and "sao paulo" one city.
-  slug          String     @unique
+  slug             String     @unique
   /// As first typed by a donor (or seeded).
-  name          String
-  status        CityStatus @default(PROPOSED)
-  goalCents     Int        @map("goal_cents")
+  name             String
+  status           CityStatus @default(PROPOSED)
+  goalCents        Int        @map("goal_cents")
   /// US dollars only, in cents. Kept in step with the donations inside one transaction.
-  raisedCents   Int        @default(0) @map("raised_cents")
-  donationCount Int        @default(0) @map("donation_count")
+  raisedCents      Int        @default(0) @map("raised_cents")
+  donationCount    Int        @default(0) @map("donation_count")
   /// The world's id once it is built: "tinynyc".
-  worldId       String?    @map("world_id")
+  worldId          String?    @map("world_id")
   /// Kept out of the public list (a name that should not be shown).
-  hidden        Boolean    @default(false)
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
-  donations     Donation[]
+  hidden           Boolean    @default(false)
+  /// When its donors were mailed that it is built (src/benefactors/announce-cli.ts); null until
+  /// then. Set once, by the run that sends: a second run sends nothing.
+  builtAnnouncedAt DateTime?  @map("built_announced_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  donations        Donation[]
 
   @@map("cities")
 }

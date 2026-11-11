@@ -63,7 +63,7 @@ export function shell(options: ShellOptions): string {
     ' width="100%"',
   )}</td></tr>`;
   const picture = hero
-    ? `<tr><td style="padding:0;font-size:0;line-height:0;"><img src="${attr(hero.src)}" width="${hero.width}" alt="${attr(hero.alt)}" style="display:block;width:100%;max-width:${hero.width}px;height:auto;border:0;outline:none;color:${COLORS.dim};font:14px/1.4 ${FONT};"></td></tr>`
+    ? `<tr><td style="padding:0;font-size:0;line-height:0;"><img src="${attr(hero.src)}" width="${hero.width}" height="${hero.height}" alt="${attr(hero.alt)}" style="display:block;width:100%;max-width:${hero.width}px;height:auto;border:0;outline:none;color:${COLORS.dim};font:14px/1.4 ${FONT};"></td></tr>`
     : '';
   const card = table(
     band +
