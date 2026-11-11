@@ -51,7 +51,7 @@ src/
 │   ├── standing.ts                 # pure: a city's gifts → stones, founders, benefactors
 │   ├── display-name.ts             # cleanDisplayName: what a listed name may be
 │   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors
-│   └── benefactors.resolver.ts dto/ models/
+│   └── benefactors.resolver.ts my-giving.resolver.ts dto/ models/   # the public query; the donor's own
 ├── cities/
 │   ├── city-name.ts                # cleanCityName, citySlug: what makes two spellings one city
 │   ├── cities.service.ts           # the public list and its order
@@ -104,11 +104,21 @@ type Query {
   health: String!  cityMilestones: [CityMilestone!]!                    # public
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors        # public; null: unknown or hidden city
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
+  myGiving: MyGiving!                                                   # donors
 }
 type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!   # public
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!                          # public
+  setListing(input: SetListingInput!): Boolean!                                    # donors
+  setDisplayName(input: SetDisplayNameInput!): String!                             # donors
 }
+
+# donors only (a donor's session; an admin's is FORBIDDEN)
+type MyCity { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
+  givenCents: Int!  founderNumber: Int  stones: [Int!]!  firstStone: Boolean!  keystone: Boolean!  listed: Boolean! }
+type MyGiving { displayName: String  cities: [MyCity!]!  projectCents: Int! }   # cities: latest gift first; hidden ones left out
+input SetListingInput { city: String!  listed: Boolean! }   # city by slug; every gift of the donor's there; true needs a name
+input SetDisplayNameInput { name: String! }                 # cleaned (cleanDisplayName), BAD_REQUEST if nothing is left; answers it
 ```
 
 **Admins' unless marked.** `JwtAuthGuard` is global (`AuthModule`): every resolver and route
@@ -163,6 +173,12 @@ benefactors.
 gift is listed, the donor has a name, and `name_hidden` is false; hiding it (SQL:
 `UPDATE donors SET name_hidden = true WHERE …`) changes no stones or numbers. Emails never reach
 GraphQL types or logs.
+
+`myGiving` (`@ForDonors()`) reads the signed-in donor's places from the same `cityStanding` as the
+public query (`givenCents`, `founderNumber` = smallest of their gifts' numbers, `stones`,
+`firstStone`, `keystone`), so the two never disagree; it holds nothing about anyone else.
+`setListing` flips `listed` on every gift of the donor's to one city; `setDisplayName` saves the
+cleaned name. Both act only on the session's own donor.
 
 ## Signing in, for admins and donors (`auth/`)
 

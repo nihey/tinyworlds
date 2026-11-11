@@ -1034,6 +1034,155 @@ describe('the API over HTTP', () => {
       }
     });
 
+    describe("a donor's own giving", () => {
+      const MINE = `{ myGiving { displayName projectCents
+        cities { slug name givenCents founderNumber stones firstStone keystone listed } } }`;
+      const SET_LISTING =
+        'mutation ($input: SetListingInput!) { setListing(input: $input) }';
+      const SET_NAME =
+        'mutation ($input: SetDisplayNameInput!) { setDisplayName(input: $input) }';
+      let ip = 60;
+      /** Her session within a test: a link is sent once a minute, so it is asked for once. */
+      let token: string | null = null;
+      beforeEach(() => {
+        token = null;
+      });
+      /** Ana's session, signed in the way a person does: ask for a link, open it. */
+      const signInAna = async () => {
+        const from = `203.0.113.${ip++}`;
+        const before = mailer.sent.length;
+        await post('/api/auth/magic-link', {
+          email: 'ana@example.com',
+          returnUrl: 'https://example.com/',
+          purpose: 'donor',
+        })
+          .set('x-forwarded-for', from)
+          .expect(202);
+        await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+        const res = await post('/api/auth/verify', { token: mailer.token() })
+          .set('x-forwarded-for', from)
+          .expect(200);
+        return (res.body as { accessToken: string }).accessToken;
+      };
+      const asAna = async (
+        query: string,
+        variables?: Record<string, unknown>,
+      ) => {
+        token ??= await signInAna();
+        return graphql(query, variables)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+      };
+      const mine = async () =>
+        (
+          (await asAna(MINE)).body as {
+            data: {
+              myGiving: {
+                displayName: string | null;
+                projectCents: number;
+                cities: Record<string, unknown>[];
+              };
+            };
+          }
+        ).data.myGiving;
+      const publicRow1 = async () => {
+        const res = await graphql(BENEFACTORS, {
+          input: { slug: 'lisbon' },
+        }).expect(200);
+        return (
+          res.body as {
+            data: { cityBenefactors: { founders: { name: string | null }[] } };
+          }
+        ).data.cityBenefactors.founders[0];
+      };
+
+      it('a donor sees their cities, titles and stones', async () => {
+        await seedLisbon();
+        await gift('cs_4', 700, 'ana@example.com', undefined, 'Porto');
+        await gift('cs_5', 300, 'ana@example.com', undefined, '');
+        const giving = await mine();
+        expect(giving.displayName).toBe('Ana');
+        expect(giving.projectCents).toBe(300);
+        expect(giving.cities.map((c) => c.slug)).toEqual(['porto', 'lisbon']);
+        expect(giving.cities[1]).toEqual({
+          slug: 'lisbon',
+          name: 'Lisbon',
+          givenCents: 4200,
+          founderNumber: 1,
+          stones: Array.from({ length: 12 }, (_, i) => i + 1),
+          firstStone: true,
+          keystone: false,
+          listed: true,
+        });
+        expect(JSON.stringify(giving)).not.toContain('example.com');
+      });
+
+      it("switching a city's listing changes every gift there", async () => {
+        await seedLisbon();
+        expect((await publicRow1()).name).toBe('Ana');
+        const res = await asAna(SET_LISTING, {
+          input: { city: 'lisbon', listed: false },
+        });
+        expect(answer(res).errors).toBeUndefined();
+        expect((await publicRow1()).name).toBeNull();
+        const gifts = await prisma.donation.findMany({
+          where: { donor: { email: 'ana@example.com' } },
+        });
+        expect(gifts).toHaveLength(2);
+        expect(gifts.every((d) => !d.listed)).toBe(true);
+        expect((await mine()).cities[0].listed).toBe(false);
+      });
+
+      it('listing needs a name first', async () => {
+        await gift('cs_1', 1200, 'ana@example.com');
+        const res = await asAna(SET_LISTING, {
+          input: { city: 'lisbon', listed: true },
+        });
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      });
+
+      it("listing acts only on the donor's own gifts, in a city they gave to", async () => {
+        await seedLisbon();
+        await asAna(SET_LISTING, { input: { city: 'lisbon', listed: false } });
+        const bo = await prisma.donation.findMany({
+          where: { donor: { email: 'bo@example.com' } },
+        });
+        expect(bo.map((d) => d.listed)).toEqual([false]);
+        await prisma.donation.updateMany({ data: { listed: true } });
+        const res = await asAna(SET_LISTING, {
+          input: { city: 'nowhere', listed: false },
+        });
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+        // Bo's gift stays as it was
+        const after = await prisma.donation.findMany({
+          where: { donor: { email: 'bo@example.com' } },
+        });
+        expect(after.map((d) => d.listed)).toEqual([true]);
+      });
+
+      it('a name is cleaned and used everywhere', async () => {
+        await seedLisbon();
+        const res = await asAna(SET_NAME, { input: { name: '  Ana  B ' } });
+        expect((res.body as { data: { setDisplayName: string } }).data).toEqual(
+          { setDisplayName: 'Ana B' },
+        );
+        expect((await publicRow1()).name).toBe('Ana B');
+        expect((await mine()).displayName).toBe('Ana B');
+        const bad = await asAna(SET_NAME, { input: { name: ' ​ ' } });
+        expect(answer(bad).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      });
+
+      it('an admin session is refused by a donor query', async () => {
+        for (const query of [
+          MINE,
+          'mutation { setDisplayName(input: { name: "x" }) }',
+        ]) {
+          const res = await asAdmin(query);
+          expect(answer(res).errors?.[0].extensions.code).toBe('FORBIDDEN');
+        }
+      });
+    });
+
     it('hides a name an admin hid', async () => {
       await seedLisbon();
       await prisma.donor.update({
