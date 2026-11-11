@@ -80,13 +80,60 @@ model Donor {
   /// How the donor is named on the lists; null until a gift came with a name.
   displayName String?     @map("display_name")
   nameHidden  Boolean     @default(false) @map("name_hidden")
+  /// An admin took the donor's links off every list; the name stays.
+  linksHidden Boolean     @default(false) @map("links_hidden")
   lastLoginAt DateTime?   @map("last_login_at")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
   donations   Donation[]
   magicLinks  MagicLink[]
+  links       DonorLink[]
 
   @@map("donors")
+}
+
+/// A page a donor points to beside their name: up to three (LINKS_MAX). What the page says of
+/// itself (title, description, picture, icon) is read once, when the link is saved, and again
+/// only when the donor asks.
+model DonorLink {
+  id          String      @id @default(uuid()) @db.Uuid
+  donorId     String      @map("donor_id") @db.Uuid
+  donor       Donor       @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  /// As cleaned (cleanLinkUrl): https, a public host name, no credentials, port or fragment.
+  url         String
+  /// The page's own title, cleaned; its host name when it gave none.
+  title       String
+  description String?
+  /// When the page was last read.
+  readAt      DateTime    @map("read_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  images      LinkImage[]
+
+  @@unique([donorId, url])
+  @@map("donor_links")
+}
+
+/// What a link's image is of: the site's icon, or the page's picture (its og:image).
+enum LinkImageKind {
+  ICON
+  PICTURE
+}
+
+/// A small copy of a link's icon or picture, drawn again here as WebP: the site shows these, so
+/// a visitor's browser never asks the linked page's server for anything. A new reading of the
+/// page makes new rows (new ids), so an id's bytes never change.
+model LinkImage {
+  id        String        @id @default(uuid()) @db.Uuid
+  linkId    String        @map("link_id") @db.Uuid
+  link      DonorLink     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  kind      LinkImageKind
+  bytes     Bytes
+  width     Int
+  height    Int
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@unique([linkId, kind])
+  @@map("link_images")
 }
 
 /// The steps of a visit towards a donation, in order. The last one, a paid donation, is not an
