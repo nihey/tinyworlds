@@ -5,6 +5,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { AnnounceService } from '../src/benefactors/announce.service.js';
+import { BenefactorsService } from '../src/benefactors/benefactors.service.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
@@ -1705,6 +1706,7 @@ describe('the API over HTTP', () => {
         city: 'Lisbon',
         mailed: 3,
         failed: [],
+        unsent: [],
       });
       const sent = announcements();
       expect(sent.map((mail) => mail.to).sort()).toEqual([
@@ -1777,22 +1779,127 @@ describe('the API over HTTP', () => {
       expect(lisbon.builtAnnouncedAt).toBeNull();
     });
 
-    it('names the donors whose mail did not go out, and does not send again', async () => {
+    /** The donors' ids, in the order the announcement mails them (oldest gift first). */
+    const donorIds = async () => {
+      const ids = [];
+      for (const email of [
+        'ana@example.com',
+        'bo@example.com',
+        'cy@example.com',
+      ])
+        ids.push(
+          (await prisma.donor.findUniqueOrThrow({ where: { email } })).id,
+        );
+      return ids;
+    };
+    const announcedAt = async () =>
+      (await prisma.city.findUniqueOrThrow({ where: { slug: 'lisbon' } }))
+        .builtAnnouncedAt;
+    /** A mail server that does not answer, as nodemailer reports it. */
+    const away = () =>
+      Object.assign(new Error('Connection timeout'), { code: 'ECONNECTION' });
+
+    it('leaves the announcement open when no mail goes out, and the next run sends it', async () => {
       await giveToLisbon();
       await build();
-      mailer.failWith = new Error('the mail server is away');
+      const [ana, bo, cy] = await donorIds();
+      mailer.failWith = new Error('550 mailbox unavailable');
       try {
-        const done = await announce('tinylis');
-        const donors = await prisma.donor.findMany({ select: { id: true } });
-        expect(done).toMatchObject({ kind: 'sent', mailed: 0 });
-        expect(done.kind === 'sent' && [...done.failed].sort()).toEqual(
-          donors.map((d) => d.id).sort(),
+        expect(await announce('tinylis')).toEqual({
+          kind: 'not-sent',
+          world: 'tinylis',
+          city: 'Lisbon',
+          failed: [ana, bo, cy],
+          unsent: [],
+        });
+      } finally {
+        mailer.failWith = null;
+      }
+      expect(await announcedAt()).toBeNull();
+      expect(await announce('tinylis')).toMatchObject({
+        kind: 'sent',
+        mailed: 3,
+      });
+      expect(announcements()).toHaveLength(3);
+    });
+
+    it('stops at a mail server that is away, instead of waiting on it for every donor', async () => {
+      await giveToLisbon();
+      await build();
+      const [ana, bo, cy] = await donorIds();
+      const before = mailer.attempts;
+      mailer.failWith = away();
+      try {
+        expect(await announce('tinylis')).toEqual({
+          kind: 'not-sent',
+          world: 'tinylis',
+          city: 'Lisbon',
+          failed: [ana],
+          unsent: [bo, cy],
+        });
+      } finally {
+        mailer.failWith = null;
+      }
+      expect(mailer.attempts - before).toBe(1);
+      expect(await announcedAt()).toBeNull();
+    });
+
+    it('keeps an announcement that went out in part, and names who missed it', async () => {
+      await giveToLisbon();
+      await build();
+      const [, bo, cy] = await donorIds();
+      const before = mailer.attempts;
+      mailer.failWith = (attempt) => (attempt === before + 2 ? away() : null);
+      try {
+        expect(await announce('tinylis')).toEqual({
+          kind: 'sent',
+          world: 'tinylis',
+          city: 'Lisbon',
+          mailed: 1,
+          failed: [bo],
+          unsent: [cy],
+        });
+      } finally {
+        mailer.failWith = null;
+      }
+      expect(await announcedAt()).toBeInstanceOf(Date);
+      expect((await announce('tinylis')).kind).toBe('announced-before');
+      expect(announcements().map((mail) => mail.to)).toEqual([
+        'ana@example.com',
+      ]);
+    });
+
+    it('reads everything before it claims the announcement', async () => {
+      await giveToLisbon();
+      await build();
+      const before = mailer.attempts;
+      vi.spyOn(app.get(BenefactorsService), 'giftsOf').mockRejectedValueOnce(
+        new Error('the database is away'),
+      );
+      await expect(announce('tinylis')).rejects.toThrow('the database is away');
+      expect(await announcedAt()).toBeNull();
+      expect(mailer.attempts).toBe(before);
+    });
+
+    it('gives the claim back when anything throws once it is made', async () => {
+      await giveToLisbon();
+      await build();
+      // an error that cannot even be described: logging it throws
+      mailer.failWith = () =>
+        new Proxy(new Error('odd'), {
+          get: () => {
+            throw new Error('an unreadable failure');
+          },
+        });
+      try {
+        await expect(announce('tinylis')).rejects.toThrow(
+          'an unreadable failure',
         );
       } finally {
         mailer.failWith = null;
       }
-      expect((await announce('tinylis')).kind).toBe('announced-before');
-      expect(announcements()).toHaveLength(0);
+      expect(await announcedAt()).toBeNull();
+      expect((await announce('tinylis')).kind).toBe('sent');
     });
   });
 });

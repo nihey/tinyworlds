@@ -275,27 +275,41 @@ upload_all() {
 
 # ---- announcing ------------------------------------------------------------------------------
 
-# Tells the donors of a world's city, by mail, that it is built: the API's announce command, in
-# its container on DEPLOY_HOST. API_SERVICE names the container, or the Swarm service whose task
-# runs it (<service>.1.<task>). The command sends once per city, so it is safe on every deploy.
-# It never fails the deploy: a problem is a warning.
+# Tells the donors of the given worlds' cities, by mail, that they are built: the API's announce
+# command, run once for all of them in its container on DEPLOY_HOST. API_SERVICE names the
+# container, or the Swarm service whose task runs it (<service>.1.<task>). The command sends
+# once per city, so it is safe on every deploy. It never fails the deploy: a problem is a warning.
 announce_built() {
-  local world="$1" status=0
+  local world worlds=() status=0
+  for world in "$@"; do
+    if [[ "$world" =~ ^[a-z0-9]{3,20}$ ]]; then
+      worlds+=("$world")
+    else
+      echo "Not announcing '$world': not a world id." >&2
+    fi
+  done
+  ((${#worlds[@]})) || return 0
   if [[ -z "${API_SERVICE:-}" ]]; then
-    echo "Not telling $world's donors that it is built: set API_SERVICE in deploy/.env (see deploy/README.md)."
+    echo "Not telling the donors of ${worlds[*]} that their city is built: set API_SERVICE in deploy/.env (see deploy/README.md)."
     return 0
   fi
-  ssh "$DEPLOY_HOST" sh -s -- "$API_SERVICE" "$world" <<'REMOTE' || status=$?
-service="$1" world="$2"
-container="$(docker ps --format '{{.Names}}' | grep -E "^${service}([.]|\$)" | head -n 1)"
+  if [[ ! "$API_SERVICE" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+    echo "Warning: API_SERVICE is not a container or service name; nobody was told a city is built." >&2
+    return 0
+  fi
+  # the remote command, each word quoted for the remote shell; the script comes on stdin
+  ssh "$DEPLOY_HOST" "$(printf '%q ' sh -s -- "$API_SERVICE" "${worlds[@]}")" <<'REMOTE' || status=$?
+service="$1"
+shift
+container="$(docker ps --format '{{.Names}}' | awk -v s="$service" '$0 == s || index($0, s ".") == 1' | head -n 1)"
 if [ -z "$container" ]; then
   echo "No running container is named $service, nor runs a service of that name." >&2
   exit 3
 fi
-exec docker exec "$container" node dist/benefactors/announce-cli.js "$world"
+exec docker exec "$container" node dist/benefactors/announce-cli.js "$@"
 REMOTE
   if ((status)); then
-    echo "Warning: telling $world's donors that it is built did not fully work (exit $status, see above). The deploy itself is done." >&2
+    echo "Warning: telling the donors of ${worlds[*]} that their city is built did not fully work (exit $status, see above). The deploy itself is done." >&2
   fi
   return 0
 }
@@ -374,7 +388,7 @@ fi
 
 # the worlds are up: the donors of a city that has just been built hear of it
 if [[ "$TARGET" == "all" ]]; then
-  for world in "${WORLDS[@]}"; do announce_built "$world"; done
+  announce_built "${WORLDS[@]}"
 elif [[ "$TARGET" != "home" ]]; then
   announce_built "$TARGET"
 fi
