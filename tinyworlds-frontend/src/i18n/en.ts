@@ -116,6 +116,13 @@ export const en: Strings = {
       other:
         "You’d lay stones {from}–{to} of {city}’s {count} and be one of its Founding Benefactors.",
     },
+    join: {
+      label: "Put my name on {city}",
+      name: "Name to show",
+      namePlaceholder: "Ana from Recife",
+      counter: "{n}/{max}",
+      note: "Off: you still count, as “anonymous”. Sign in later with the email you give Stripe to change your name or take it off.",
+    },
     donations: { none: "No donations yet", one: "{n} donation", other: "{n} donations" },
     status: { funded: "Funded, in the queue", building: "Being built", built: "Built" },
     showAll: "Show all cities",

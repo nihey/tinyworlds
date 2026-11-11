@@ -186,6 +186,8 @@ export interface CheckoutInput {
   returnUrl: string;
   /** this tab's visit (lib/funnel.ts), so the donation can be told apart in the funnel; null when visits are not counted */
   visitId: string | null;
+  /** the name to list among the city's benefactors (already cleaned); null to give anonymously */
+  benefactorName: string | null;
 }
 
 /** The name of the chosen city as it is sent: tidied, at most 60 characters, null for none. */
@@ -203,6 +205,7 @@ export function checkoutInput(
   locale: Locale,
   returnUrl: string,
   visitId: string | null = null,
+  benefactorName: string | null = null,
 ): CheckoutInput {
   return {
     city: chosenCity(choice),
@@ -211,6 +214,7 @@ export function checkoutInput(
     locale,
     returnUrl,
     visitId,
+    benefactorName,
   };
 }
 
