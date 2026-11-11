@@ -24,6 +24,34 @@ describe('signInMail', () => {
     }
   });
 
+  it('speaks to a donor of their cities, and to an admin of the admin pages', () => {
+    const words = {
+      'en-US': [
+        'See your cities',
+        "Here's how to see the cities you helped build.",
+      ],
+      'pt-BR': [
+        'Ver suas cidades',
+        'Veja aqui as cidades que você ajudou a construir.',
+      ],
+      'es-ES': [
+        'Ver tus ciudades',
+        'Así puedes ver las ciudades que ayudaste a construir.',
+      ],
+    } as const;
+    for (const locale of LOCALES) {
+      const [button, intro] = words[locale];
+      const donor = signInMail(locale, link, '482913', 15, 'donor');
+      expect(donor.text.startsWith(`${intro}\n\n${link}`)).toBe(true);
+      expect(donor.html).toContain(`<p>${intro}</p>`);
+      expect(donor.html).toContain(`>${button}</a>`);
+      expect(donor.subject.endsWith('482 913')).toBe(true);
+      const admin = signInMail(locale, link, '482913', 15, 'admin');
+      expect(admin.text).not.toContain(intro);
+      expect(admin.html).not.toContain(button);
+    }
+  });
+
   it('never lets a link break out of its markup', () => {
     const mail = signInMail(
       'en-US',

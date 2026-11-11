@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { randomUUID } from 'node:crypto';
 import { FakeMailer } from '../../test/fake-mailer.js';
 import { FakePrisma } from '../../test/fake-prisma.js';
 import type { Env } from '../config/env.js';
@@ -12,6 +13,7 @@ import {
   AuthService,
   CODE_TRIES,
   CODE_TRIES_PER_DAY,
+  failureOf,
   hashCode,
   hashToken,
   LINK_EVERY_MS,
@@ -21,8 +23,32 @@ import {
 } from './auth.service.js';
 
 const ADMIN = 'admin@example.com';
+const DONOR = 'ana@example.com';
 const PAGE = 'https://example.com/admin/';
+const HOME = 'https://example.com/';
 const SECRET = 'a-secret-for-the-tests-and-nothing-else';
+
+/** A donor row, with one gift unless told otherwise. */
+function seedDonor(prisma: FakePrisma, email = DONOR, given = true) {
+  const donor = { id: randomUUID(), email, displayName: null };
+  prisma.donors.push(donor);
+  if (given)
+    prisma.donations.push({
+      id: randomUUID(),
+      stripeSessionId: `cs_${donor.id}`,
+      stripePaymentIntentId: null,
+      amountCents: 500,
+      currency: 'usd',
+      cityId: null,
+      cityText: null,
+      world: null,
+      locale: null,
+      visitId: null,
+      donorId: donor.id,
+      listed: false,
+    });
+  return donor;
+}
 
 beforeAll(() => Logger.overrideLogger(false));
 afterEach(() => vi.useRealTimers());
@@ -66,7 +92,7 @@ describe('AuthService.linkTarget', () => {
 describe('AuthService.sendLink', () => {
   it("mails an admin a link to the page asked for, and keeps only the token's hash", async () => {
     const { service, mailer, prisma } = setup();
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(true);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(true);
 
     expect(mailer.sent).toHaveLength(1);
     expect(mailer.sent[0].to).toBe(ADMIN);
@@ -82,7 +108,7 @@ describe('AuthService.sendLink', () => {
 
   it('writes the mail in the language asked for', async () => {
     const { service, mailer } = setup();
-    await service.sendLink(ADMIN, PAGE, 'pt-BR');
+    await service.sendLink(ADMIN, PAGE, 'pt-BR', 'admin');
     expect(mailer.sent[0].subject).toMatch(
       /^Seu código do tinyworlds: \d{3} \d{3}$/,
     );
@@ -92,18 +118,18 @@ describe('AuthService.sendLink', () => {
   it('takes the address however it is typed, and makes one account of it', async () => {
     vi.useFakeTimers();
     const { service, mailer, prisma } = setup();
-    await service.sendLink('  Admin@Example.COM ', PAGE, 'en-US');
+    await service.sendLink('  Admin@Example.COM ', PAGE, 'en-US', 'admin');
     vi.advanceTimersByTime(LINK_EVERY_MS + 1);
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     expect(mailer.sent.map((mail) => mail.to)).toEqual([ADMIN, ADMIN]);
     expect(prisma.admins).toHaveLength(1);
   });
 
   it('does nothing for an address that is not an admin', async () => {
     const { service, mailer, prisma } = setup();
-    expect(await service.sendLink('someone@example.com', PAGE, 'en-US')).toBe(
-      false,
-    );
+    expect(
+      await service.sendLink('someone@example.com', PAGE, 'en-US', 'admin'),
+    ).toBe(false);
     expect(mailer.sent).toEqual([]);
     expect(prisma.admins).toEqual([]);
     expect(prisma.links).toEqual([]);
@@ -111,37 +137,37 @@ describe('AuthService.sendLink', () => {
 
   it('does nothing for anyone when there are no admins', async () => {
     const { service, mailer } = setup([]);
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(false);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(false);
     expect(mailer.sent).toEqual([]);
   });
 
   it('sends an admin one link a minute, however often it is asked', async () => {
     vi.useFakeTimers();
     const { service, mailer } = setup();
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(true);
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(false);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(true);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(false);
     vi.advanceTimersByTime(LINK_EVERY_MS - 1000);
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(false);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(false);
     vi.advanceTimersByTime(2000);
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(true);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(true);
     expect(mailer.sent).toHaveLength(2);
   });
 
   it('forgets a link that could not be mailed, so the next try is not kept waiting', async () => {
     const { service, mailer, prisma } = setup();
     mailer.failWith = new Error('the mail server is away');
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(false);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(false);
     expect(prisma.links).toEqual([]);
     mailer.failWith = null;
-    expect(await service.sendLink(ADMIN, PAGE, 'en-US')).toBe(true);
+    expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(true);
   });
 
   it('clears away the links that have expired', async () => {
     vi.useFakeTimers();
     const { service, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     vi.advanceTimersByTime(LINK_MINUTES * 60_000 + 1000);
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     expect(prisma.links).toHaveLength(1);
   });
 });
@@ -149,23 +175,29 @@ describe('AuthService.sendLink', () => {
 describe('AuthService.verify', () => {
   it('trades a fresh link for a session that names the admin', async () => {
     const { service, mailer, jwt, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const session = await service.verify(mailer.token());
 
-    expect(session.admin).toEqual({ id: prisma.admins[0].id, email: ADMIN });
+    expect(session.identity).toEqual({
+      kind: 'admin',
+      id: prisma.admins[0].id,
+      email: ADMIN,
+    });
     const payload = await jwt.verifyAsync<{
       sub: string;
+      kind: string;
       exp: number;
       iat: number;
     }>(session.accessToken);
     expect(payload.sub).toBe(prisma.admins[0].id);
+    expect(payload.kind).toBe('admin');
     expect(payload.exp - payload.iat).toBe(SESSION_DAYS * 24 * 60 * 60);
     expect(prisma.admins[0].lastLoginAt).toBeInstanceOf(Date);
   });
 
   it('works once', async () => {
     const { service, mailer } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const token = mailer.token();
     await service.verify(token);
     await expect(service.verify(token)).rejects.toBeInstanceOf(
@@ -175,7 +207,7 @@ describe('AuthService.verify', () => {
 
   it('gives one session when the same link is opened twice at once', async () => {
     const { service, mailer } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const token = mailer.token();
     const results = await Promise.allSettled([
       service.verify(token),
@@ -190,7 +222,7 @@ describe('AuthService.verify', () => {
   it('refuses a link past its time', async () => {
     vi.useFakeTimers();
     const { service, mailer } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     vi.advanceTimersByTime(LINK_MINUTES * 60_000 + 1);
     await expect(service.verify(mailer.token())).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -206,11 +238,23 @@ describe('AuthService.verify', () => {
 
   it('refuses the link of someone who is no longer an admin', async () => {
     const { service, mailer, env } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     env.ADMIN_EMAILS = [];
     await expect(service.verify(mailer.token())).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+});
+
+describe('failureOf', () => {
+  it("says what failed without the message, which may quote someone's address", () => {
+    const refused = Object.assign(
+      new Error('550 5.1.1 <ana@example.com>: Recipient address rejected'),
+      { code: 'EENVELOPE', responseCode: 550 },
+    );
+    expect(failureOf(refused)).toBe('Error EENVELOPE 550');
+    expect(failureOf(new Error('ana@example.com'))).toBe('Error');
+    expect(failureOf(undefined)).toBe('unknown error');
   });
 });
 
@@ -229,7 +273,7 @@ describe('AuthService.verifyCode', () => {
 
   it('mails a code with the link, and keeps only its HMAC', async () => {
     const { service, mailer, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     expect(mailer.sent[0].subject).toMatch(/\d{3} \d{3}/);
     const code = codeOf(mailer);
     expect(prisma.links[0].codeHash).not.toBe(code);
@@ -241,27 +285,35 @@ describe('AuthService.verifyCode', () => {
 
   it('trades the right code for a session, once', async () => {
     const { service, mailer, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const code = codeOf(mailer);
-    const session = await service.verifyCode('Admin@Example.com', code);
-    expect(session.admin).toEqual({ id: prisma.admins[0].id, email: ADMIN });
-    await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
-      UnauthorizedException,
+    const session = await service.verifyCode(
+      'Admin@Example.com',
+      code,
+      'admin',
     );
+    expect(session.identity).toEqual({
+      kind: 'admin',
+      id: prisma.admins[0].id,
+      email: ADMIN,
+    });
+    await expect(
+      service.verifyCode(ADMIN, code, 'admin'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('spends the link after five wrong codes, even for the right one after', async () => {
     const { service, mailer, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const code = codeOf(mailer);
     for (let i = 0; i < CODE_TRIES; i++)
       await expect(
-        service.verifyCode(ADMIN, wrongOf(code)),
+        service.verifyCode(ADMIN, wrongOf(code), 'admin'),
       ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(prisma.links[0].usedAt).toBeInstanceOf(Date);
-    await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(
+      service.verifyCode(ADMIN, code, 'admin'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
     await expect(service.verify(mailer.token())).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
@@ -269,29 +321,29 @@ describe('AuthService.verifyCode', () => {
 
   it('a code spends the link, and the link spends the code', async () => {
     const first = setup();
-    await first.service.sendLink(ADMIN, PAGE, 'en-US');
-    await first.service.verifyCode(ADMIN, codeOf(first.mailer));
+    await first.service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
+    await first.service.verifyCode(ADMIN, codeOf(first.mailer), 'admin');
     await expect(
       first.service.verify(first.mailer.token()),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     const second = setup();
-    await second.service.sendLink(ADMIN, PAGE, 'en-US');
+    await second.service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     await second.service.verify(second.mailer.token());
     await expect(
-      second.service.verifyCode(ADMIN, codeOf(second.mailer)),
+      second.service.verifyCode(ADMIN, codeOf(second.mailer), 'admin'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('refuses a code for an address that is not an admin, the same way', async () => {
     const { service, mailer } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const code = codeOf(mailer);
     const error = await service
-      .verifyCode('someone@example.com', code)
+      .verifyCode('someone@example.com', code, 'admin')
       .catch((e: unknown) => e);
     const bad = await service
-      .verifyCode(ADMIN, wrongOf(code))
+      .verifyCode(ADMIN, wrongOf(code), 'admin')
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UnauthorizedException);
     expect((error as Error).message).toBe((bad as Error).message);
@@ -299,45 +351,49 @@ describe('AuthService.verifyCode', () => {
 
   it('signs in with the right code after four wrong ones, and the link is still unspent', async () => {
     const { service, mailer, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const code = codeOf(mailer);
     for (let i = 0; i < CODE_TRIES - 1; i++)
-      await service.verifyCode(ADMIN, wrongOf(code)).catch(() => undefined);
+      await service
+        .verifyCode(ADMIN, wrongOf(code), 'admin')
+        .catch(() => undefined);
     expect(prisma.links[0].usedAt).toBeNull();
     expect(prisma.links[0].attempts).toBe(CODE_TRIES - 1);
-    await expect(service.verifyCode(ADMIN, code)).resolves.toBeDefined();
+    await expect(
+      service.verifyCode(ADMIN, code, 'admin'),
+    ).resolves.toBeDefined();
   });
 
   it('compares no more than five codes however many arrive at once', async () => {
     const { service, mailer, prisma } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const code = codeOf(mailer);
     const results = await Promise.allSettled([
       ...Array.from({ length: 20 }, () =>
-        service.verifyCode(ADMIN, wrongOf(code)),
+        service.verifyCode(ADMIN, wrongOf(code), 'admin'),
       ),
-      service.verifyCode(ADMIN, code),
+      service.verifyCode(ADMIN, code, 'admin'),
     ]);
     expect(results.every((r) => r.status === 'rejected')).toBe(true);
     expect(prisma.links[0].attempts).toBeLessThanOrEqual(CODE_TRIES);
-    await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    await expect(
+      service.verifyCode(ADMIN, code, 'admin'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('never refuses sooner than the floor, for a stranger or an admin with a live link', async () => {
     const floor = 80;
     const { service, mailer } = setup([ADMIN], floor);
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const code = codeOf(mailer);
     for (const [address, tried] of [
       ['someone@example.com', code],
       [ADMIN, wrongOf(code)],
     ]) {
       const started = Date.now();
-      await expect(service.verifyCode(address, tried)).rejects.toBeInstanceOf(
-        UnauthorizedException,
-      );
+      await expect(
+        service.verifyCode(address, tried, 'admin'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
       expect(Date.now() - started).toBeGreaterThanOrEqual(floor - 5);
     }
   });
@@ -346,17 +402,19 @@ describe('AuthService.verifyCode', () => {
     vi.useFakeTimers();
     const { service, mailer, prisma } = setup();
     for (let i = 0; i < CODE_TRIES_PER_DAY / CODE_TRIES; i++) {
-      await service.sendLink(ADMIN, PAGE, 'en-US');
+      await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
       const code = codeOf(mailer);
       for (let t = 0; t < CODE_TRIES; t++)
-        await service.verifyCode(ADMIN, wrongOf(code)).catch(() => undefined);
+        await service
+          .verifyCode(ADMIN, wrongOf(code), 'admin')
+          .catch(() => undefined);
       vi.advanceTimersByTime(LINK_EVERY_MS + 1);
     }
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const fresh = prisma.links.at(-1);
     expect(fresh?.attempts).toBe(0);
     await expect(
-      service.verifyCode(ADMIN, codeOf(mailer)),
+      service.verifyCode(ADMIN, codeOf(mailer), 'admin'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(fresh?.attempts).toBe(0); // refused without claiming
     await expect(service.verify(mailer.token())).resolves.toBeDefined();
@@ -366,40 +424,224 @@ describe('AuthService.verifyCode', () => {
     vi.useFakeTimers();
     const { service, mailer } = setup();
     for (let i = 0; i < CODE_TRIES_PER_DAY / CODE_TRIES; i++) {
-      await service.sendLink(ADMIN, PAGE, 'en-US');
+      await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
       const code = codeOf(mailer);
       for (let t = 0; t < CODE_TRIES; t++)
-        await service.verifyCode(ADMIN, wrongOf(code)).catch(() => undefined);
+        await service
+          .verifyCode(ADMIN, wrongOf(code), 'admin')
+          .catch(() => undefined);
       vi.advanceTimersByTime(LINK_EVERY_MS + 1);
     }
     vi.advanceTimersByTime(24 * 60 * 60 * 1000);
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     await expect(
-      service.verifyCode(ADMIN, codeOf(mailer)),
+      service.verifyCode(ADMIN, codeOf(mailer), 'admin'),
     ).resolves.toBeDefined();
   });
 
   it('refuses a code past its time', async () => {
     vi.useFakeTimers();
     const { service, mailer } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     vi.advanceTimersByTime(LINK_MINUTES * 60_000 + 1);
     await expect(
-      service.verifyCode(ADMIN, codeOf(mailer)),
+      service.verifyCode(ADMIN, codeOf(mailer), 'admin'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
 
-describe('AuthService.adminOf', () => {
+describe('AuthService.identityOf', () => {
   it('knows an admin by id for as long as their address is on the list', async () => {
     const { service, prisma, env } = setup();
-    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     const { id } = prisma.admins[0];
-    expect(await service.adminOf(id)).toEqual({ id, email: ADMIN });
+    expect(await service.identityOf('admin', id)).toEqual({
+      kind: 'admin',
+      id,
+      email: ADMIN,
+    });
     expect(
-      await service.adminOf('7a0d7d0e-3a55-4b0e-8f2a-0c1d2e3f4a5b'),
+      await service.identityOf('admin', '7a0d7d0e-3a55-4b0e-8f2a-0c1d2e3f4a5b'),
     ).toBeNull();
     env.ADMIN_EMAILS = ['someone-else@example.com'];
-    expect(await service.adminOf(id)).toBeNull();
+    expect(await service.identityOf('admin', id)).toBeNull();
+  });
+
+  it('knows a donor by id, and never as an admin', async () => {
+    const { service, prisma } = setup([DONOR]);
+    const donor = seedDonor(prisma);
+    expect(await service.identityOf('donor', donor.id)).toEqual({
+      kind: 'donor',
+      id: donor.id,
+      email: DONOR,
+    });
+    // the same address on ADMIN_EMAILS makes the donor's id no admin's
+    expect(await service.identityOf('admin', donor.id)).toBeNull();
+    expect(
+      await service.identityOf('donor', '7a0d7d0e-3a55-4b0e-8f2a-0c1d2e3f4a5b'),
+    ).toBeNull();
+  });
+});
+
+describe('AuthService, for donors', () => {
+  const codeOf = (mailer: FakeMailer) => mailer.code();
+  const wrongOf = (code: string) => (code === '000000' ? '111111' : '000000');
+
+  it('mails a donor who has given', async () => {
+    const { service, mailer, prisma } = setup();
+    const donor = seedDonor(prisma);
+    expect(
+      await service.sendLink(' Ana@Example.com ', HOME, 'en-US', 'donor'),
+    ).toBe(true);
+    expect(mailer.sent.map((mail) => mail.to)).toEqual([DONOR]);
+    expect(mailer.sent[0].text).toContain(`${HOME}#token=${mailer.token()}`);
+    expect(mailer.sent[0].text).toContain(
+      "Here's how to see the cities you helped build.",
+    );
+    expect(mailer.sent[0].html).toContain('See your cities');
+    expect(prisma.links).toMatchObject([{ donorId: donor.id, adminId: null }]);
+    expect(prisma.admins).toEqual([]);
+  });
+
+  it('mails nobody for an address with no donations, or for a donor asked as an admin', async () => {
+    const { service, mailer, prisma } = setup();
+    seedDonor(prisma);
+    seedDonor(prisma, 'nogift@example.com', false);
+    expect(
+      await service.sendLink('nogift@example.com', HOME, 'en-US', 'donor'),
+    ).toBe(false);
+    expect(
+      await service.sendLink('someone@example.com', HOME, 'en-US', 'donor'),
+    ).toBe(false);
+    expect(await service.sendLink(DONOR, PAGE, 'en-US', 'admin')).toBe(false);
+    // and an admin who has never given is no donor
+    expect(await service.sendLink(ADMIN, HOME, 'en-US', 'donor')).toBe(false);
+    expect(mailer.sent).toEqual([]);
+    expect(prisma.links).toEqual([]);
+    expect(prisma.admins).toEqual([]);
+  });
+
+  it('sends a donor one link a minute, as it does an admin', async () => {
+    vi.useFakeTimers();
+    const { service, mailer, prisma } = setup();
+    seedDonor(prisma);
+    expect(await service.sendLink(DONOR, HOME, 'en-US', 'donor')).toBe(true);
+    expect(await service.sendLink(DONOR, HOME, 'en-US', 'donor')).toBe(false);
+    vi.advanceTimersByTime(LINK_EVERY_MS + 1);
+    expect(await service.sendLink(DONOR, HOME, 'en-US', 'donor')).toBe(true);
+    expect(mailer.sent).toHaveLength(2);
+  });
+
+  it("a donor's link gives a donor session", async () => {
+    const { service, mailer, prisma, jwt } = setup();
+    const donor = seedDonor(prisma);
+    await service.sendLink(DONOR, HOME, 'en-US', 'donor');
+    const session = await service.verify(mailer.token());
+    expect(session.identity).toEqual({
+      kind: 'donor',
+      id: donor.id,
+      email: DONOR,
+    });
+    const payload = await jwt.verifyAsync<{ sub: string; kind: string }>(
+      session.accessToken,
+    );
+    expect(payload).toMatchObject({ sub: donor.id, kind: 'donor' });
+    expect(prisma.donors[0].lastLoginAt).toBeInstanceOf(Date);
+    expect(prisma.admins).toEqual([]);
+  });
+
+  it("a donor's code gives a donor session, and only when asked as a donor", async () => {
+    const { service, mailer, prisma } = setup([DONOR]);
+    const donor = seedDonor(prisma);
+    await service.sendLink(DONOR, HOME, 'en-US', 'donor');
+    const code = codeOf(mailer);
+    // the address is an admin's too, but this code is the donor's
+    await expect(
+      service.verifyCode(DONOR, code, 'admin'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    const session = await service.verifyCode('ANA@example.com', code, 'donor');
+    expect(session.identity).toEqual({
+      kind: 'donor',
+      id: donor.id,
+      email: DONOR,
+    });
+    await expect(
+      service.verifyCode(DONOR, code, 'donor'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it("keeps an admin's and a donor's links apart when they share an address", async () => {
+    const { service, mailer, prisma } = setup([DONOR]);
+    seedDonor(prisma);
+    await service.sendLink(DONOR, PAGE, 'en-US', 'admin');
+    const adminCode = codeOf(mailer);
+    // a minute per account, not per address: the donor's link goes out at once
+    expect(await service.sendLink(DONOR, HOME, 'en-US', 'donor')).toBe(true);
+    const donorCode = codeOf(mailer);
+    expect(prisma.links).toHaveLength(2);
+    const asAdmin = await service.verifyCode(DONOR, adminCode, 'admin');
+    expect(asAdmin.identity.kind).toBe('admin');
+    const asDonor = await service.verifyCode(DONOR, donorCode, 'donor');
+    expect(asDonor.identity.kind).toBe('donor');
+  });
+
+  it("spends a donor's link after five wrong codes", async () => {
+    const { service, mailer, prisma } = setup();
+    seedDonor(prisma);
+    await service.sendLink(DONOR, HOME, 'en-US', 'donor');
+    const code = codeOf(mailer);
+    for (let i = 0; i < CODE_TRIES; i++)
+      await expect(
+        service.verifyCode(DONOR, wrongOf(code), 'donor'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.links[0].usedAt).toBeInstanceOf(Date);
+    await expect(
+      service.verifyCode(DONOR, code, 'donor'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it("counts a donor's code tries a day across the donor's links", async () => {
+    vi.useFakeTimers();
+    const { service, mailer, prisma } = setup();
+    seedDonor(prisma);
+    for (let i = 0; i < CODE_TRIES_PER_DAY / CODE_TRIES; i++) {
+      await service.sendLink(DONOR, HOME, 'en-US', 'donor');
+      const code = codeOf(mailer);
+      for (let t = 0; t < CODE_TRIES; t++)
+        await service
+          .verifyCode(DONOR, wrongOf(code), 'donor')
+          .catch(() => undefined);
+      vi.advanceTimersByTime(LINK_EVERY_MS + 1);
+    }
+    await service.sendLink(DONOR, HOME, 'en-US', 'donor');
+    await expect(
+      service.verifyCode(DONOR, codeOf(mailer), 'donor'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.links.at(-1)?.attempts).toBe(0);
+    await expect(service.verify(mailer.token())).resolves.toBeDefined();
+  });
+
+  it("refuses a donor's wrong code like a stranger's, and never sooner than the floor", async () => {
+    const floor = 80;
+    const { service, mailer, prisma } = setup([ADMIN], floor);
+    seedDonor(prisma);
+    await service.sendLink(DONOR, HOME, 'en-US', 'donor');
+    const code = codeOf(mailer);
+    const refusals: unknown[] = [];
+    for (const [address, tried] of [
+      ['someone@example.com', code],
+      [DONOR, wrongOf(code)],
+    ]) {
+      const started = Date.now();
+      refusals.push(
+        await service
+          .verifyCode(address, tried, 'donor')
+          .catch((e: unknown) => e),
+      );
+      expect(Date.now() - started).toBeGreaterThanOrEqual(floor - 5);
+    }
+    expect(refusals[0]).toBeInstanceOf(UnauthorizedException);
+    expect(refusals[1]).toBeInstanceOf(UnauthorizedException);
+    expect((refusals[0] as Error).message).toBe((refusals[1] as Error).message);
   });
 });

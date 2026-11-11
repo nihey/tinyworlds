@@ -17,8 +17,9 @@ import { mailerProvider } from './mailer.js';
 import { sessionSecret } from './session-secret.js';
 
 /**
- * Admins and their sessions. Importing this module puts JwtAuthGuard in front of every
- * resolver and route of the app: what the public may call is marked @Public().
+ * Signing in, for admins and donors, and their sessions. Importing this module puts JwtAuthGuard
+ * in front of every resolver and route of the app: they are for admins unless marked @Public()
+ * (anyone) or @ForDonors() (signed-in donors).
  */
 @Module({
   imports: [

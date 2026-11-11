@@ -1,12 +1,10 @@
 import type { Locale } from '../donations/locales.js';
-import { formatCode } from './auth.service.js';
+import { formatCode, type Purpose } from './auth.service.js';
 import type { Mail } from './mailer.js';
 
 interface Words {
   /** `{code}` is the code, as '482 913'. */
   subject: string;
-  intro: string;
-  button: string;
   /** The line above the code. */
   codeLine: string;
   /** `{minutes}` is how long the link is good for. */
@@ -17,8 +15,6 @@ interface Words {
 const WORDS: Record<Locale, Words> = {
   'en-US': {
     subject: 'Your tinyworlds code: {code}',
-    intro: 'Open this link to sign in to the tinyworlds admin pages:',
-    button: 'Sign in',
     codeLine: 'Or type this code on the page:',
     once: 'Both work once, for {minutes} minutes.',
     ignore:
@@ -26,8 +22,6 @@ const WORDS: Record<Locale, Words> = {
   },
   'pt-BR': {
     subject: 'Seu código do tinyworlds: {code}',
-    intro: 'Abra este link para entrar na administração do tinyworlds:',
-    button: 'Entrar',
     codeLine: 'Ou digite este código na página:',
     once: 'Os dois funcionam uma única vez, por {minutes} minutos.',
     ignore:
@@ -35,12 +29,45 @@ const WORDS: Record<Locale, Words> = {
   },
   'es-ES': {
     subject: 'Tu código de tinyworlds: {code}',
-    intro: 'Abre este enlace para entrar en la administración de tinyworlds:',
-    button: 'Entrar',
     codeLine: 'O escribe este código en la página:',
     once: 'Los dos funcionan una sola vez, durante {minutes} minutos.',
     ignore:
       'Si no lo has pedido, ignora este mensaje: sin el enlace no pasa nada.',
+  },
+};
+
+/** What the mail is for, and the words on its button: an admin signs in, a donor sees their cities. */
+const OPENINGS: Record<
+  Purpose,
+  Record<Locale, { intro: string; button: string }>
+> = {
+  admin: {
+    'en-US': {
+      intro: 'Open this link to sign in to the tinyworlds admin pages:',
+      button: 'Sign in',
+    },
+    'pt-BR': {
+      intro: 'Abra este link para entrar na administração do tinyworlds:',
+      button: 'Entrar',
+    },
+    'es-ES': {
+      intro: 'Abre este enlace para entrar en la administración de tinyworlds:',
+      button: 'Entrar',
+    },
+  },
+  donor: {
+    'en-US': {
+      intro: "Here's how to see the cities you helped build.",
+      button: 'See your cities',
+    },
+    'pt-BR': {
+      intro: 'Veja aqui as cidades que você ajudou a construir.',
+      button: 'Ver suas cidades',
+    },
+    'es-ES': {
+      intro: 'Así puedes ver las ciudades que ayudaste a construir.',
+      button: 'Ver tus ciudades',
+    },
   },
 };
 
@@ -51,16 +78,16 @@ const escapeHtml = (text: string): string =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-/** The message that carries a sign-in link, in the language the admin asked in. */
+/** The message that carries a sign-in link, in the language it was asked in. */
 export function signInMail(
   locale: Locale,
   link: string,
   code: string,
   minutes: number,
-  /** Who the mail is for; admins only for now. */
-  _purpose: 'admin',
+  /** Who the mail is for: an admin or a donor. */
+  purpose: Purpose,
 ): Omit<Mail, 'to'> {
-  const words = WORDS[locale];
+  const words = { ...WORDS[locale], ...OPENINGS[purpose][locale] };
   const once = words.once.replace('{minutes}', String(minutes));
   const href = escapeHtml(link);
   const shown = formatCode(code);

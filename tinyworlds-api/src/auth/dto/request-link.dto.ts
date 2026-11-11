@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsIn, IsOptional, IsUrl, MaxLength } from 'class-validator';
 import { LOCALES, type Locale } from '../../donations/locales.js';
+import { PURPOSES, type Purpose } from '../auth.service.js';
 
 /** The body of `POST /api/auth/magic-link`. */
 export class RequestLinkDto {
@@ -11,7 +12,7 @@ export class RequestLinkDto {
   @MaxLength(254)
   email: string;
 
-  /** The admin page the link should open: one of the site's own pages, without query or hash. */
+  /** The page the link should open: one of the site's own pages, without query or hash. */
   @IsUrl({
     protocols: ['http', 'https'],
     require_protocol: true,
@@ -24,4 +25,8 @@ export class RequestLinkDto {
   @IsOptional()
   @IsIn(LOCALES)
   locale?: Locale;
+
+  /** Who asks: an admin (when left out) or a donor. */
+  @IsIn(PURPOSES)
+  purpose: Purpose = 'admin';
 }

@@ -24,7 +24,7 @@ import { signInMail } from './sign-in-mail.js';
 
 /** How long a sign-in link is good for. */
 export const LINK_MINUTES = 15;
-/** One link a minute per admin, whoever asks: nobody fills a mailbox through this API. */
+/** One link a minute per account, whoever asks: nobody fills a mailbox through this API. */
 export const LINK_EVERY_MS = 60_000;
 /** A sign-in code is this many digits. */
 export const CODE_DIGITS = 6;
@@ -36,21 +36,54 @@ export const CODE_TRIES_PER_DAY = 20;
 export const REFUSAL_FLOOR_MS = 300;
 /** Injection token for the refusal floor, so tests can shorten it. */
 export const REFUSAL_FLOOR = Symbol('REFUSAL_FLOOR');
-/** How long a session lasts before the admin signs in again. */
+/** How long a session lasts before its owner signs in again. */
 export const SESSION_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Who a session belongs to. */
-export interface AdminIdentity {
+/**
+ * The two kinds of account that sign in: an admin (an address on ADMIN_EMAILS) and a donor (an
+ * address that has given). They share the links and codes, never the accounts: an address that
+ * is both has one of each.
+ */
+export const PURPOSES = ['admin', 'donor'] as const;
+export type Purpose = (typeof PURPOSES)[number];
+
+export const isPurpose = (value: unknown): value is Purpose =>
+  (PURPOSES as readonly unknown[]).includes(value);
+
+/** An account as a route sees it. */
+export interface Account {
   id: string;
   email: string;
+}
+
+/** Who a session belongs to: the kind of account, and which one. */
+export interface SessionIdentity extends Account {
+  kind: Purpose;
 }
 
 export interface Session {
   accessToken: string;
   expiresAt: Date;
-  admin: AdminIdentity;
+  identity: SessionIdentity;
+}
+
+/** The column of `magic_links` that names an account of this kind. */
+const linksOf = (kind: Purpose, id: string) =>
+  kind === 'admin' ? { adminId: id } : { donorId: id };
+
+/**
+ * What went wrong, for the log, without the error's message: a mail server's refusal quotes the
+ * address, and so may a database error quoting its query.
+ */
+export function failureOf(error: unknown): string {
+  const { name, code, responseCode } = (error ?? {}) as Record<string, unknown>;
+  return (
+    [name, code, responseCode]
+      .filter((part) => typeof part === 'string' || typeof part === 'number')
+      .join(' ') || 'unknown error'
+  );
 }
 
 /** What is kept of a link's token: enough to recognise it, not enough to use it. */
@@ -76,8 +109,10 @@ export const hashCode = (
   createHmac('sha256', secret).update(`${tokenHash}:${code}`).digest('hex');
 
 /**
- * Signing in, for admins only and without passwords: an address on ADMIN_EMAILS asks for a
- * link, the link arrives by email, and opening it trades its token for a session (a JWT).
+ * Signing in, without passwords, for admins and donors alike: an address asks for a link, the
+ * link (and a code) arrives by email, and either is traded for a session (a JWT). An admin is
+ * an address on ADMIN_EMAILS; a donor is an address that has given. Nobody else gets a mail,
+ * and nothing in an answer says who did.
  */
 @Injectable()
 export class AuthService {
@@ -97,7 +132,7 @@ export class AuthService {
 
   /**
    * Where a sign-in link may lead: a plain page of the site itself, like a checkout's return.
-   * Anything else would let the API mail an admin a link to somewhere else.
+   * Anything else would let the API mail someone a link to somewhere else.
    */
   linkTarget(returnUrl: string): string {
     const target = acceptReturnUrl(
@@ -110,33 +145,49 @@ export class AuthService {
   }
 
   /**
-   * Mails a sign-in link to the address if it is an admin's, and does nothing otherwise: the
-   * caller is told the same either way, so the API never says who the admins are. The account
-   * is made the first time its address asks. True when a mail went out.
+   * The account an address signs in to for a purpose, or null: an admin's (made the first time
+   * its address asks), or a donor's, only once it has given.
    */
-  async sendLink(
-    address: string,
-    target: string,
-    locale: Locale,
-  ): Promise<boolean> {
-    const email = address.trim().toLowerCase();
-    if (!this.isAdmin(email)) return false;
-
-    const admin = await this.prisma.admin.upsert({
+  private async accountFor(
+    email: string,
+    purpose: Purpose,
+  ): Promise<{ id: string } | null> {
+    if (purpose === 'donor')
+      return this.prisma.donor.findFirst({
+        where: { email, donations: { some: {} } },
+        select: { id: true },
+      });
+    if (!this.isAdmin(email)) return null;
+    return this.prisma.admin.upsert({
       where: { email },
       create: { email },
       update: {},
       select: { id: true },
     });
+  }
+
+  /**
+   * Mails a sign-in link to the address if it has an account of the kind asked for, and does
+   * nothing otherwise: the caller is told the same either way, so the API never says who the
+   * admins are, nor who has given. True when a mail went out.
+   */
+  async sendLink(
+    address: string,
+    target: string,
+    locale: Locale,
+    purpose: Purpose,
+  ): Promise<boolean> {
+    const email = address.trim().toLowerCase();
+    const account = await this.accountFor(email, purpose);
+    if (!account) return false;
+
+    const owner = linksOf(purpose, account.id);
     const now = Date.now();
     await this.prisma.magicLink.deleteMany({
-      where: { adminId: admin.id, expiresAt: { lt: new Date(now) } },
+      where: { ...owner, expiresAt: { lt: new Date(now) } },
     });
     const recent = await this.prisma.magicLink.findFirst({
-      where: {
-        adminId: admin.id,
-        createdAt: { gt: new Date(now - LINK_EVERY_MS) },
-      },
+      where: { ...owner, createdAt: { gt: new Date(now - LINK_EVERY_MS) } },
       select: { id: true },
     });
     if (recent) return false;
@@ -148,7 +199,7 @@ export class AuthService {
     const tokenHash = hashToken(token);
     const link = await this.prisma.magicLink.create({
       data: {
-        adminId: admin.id,
+        ...owner,
         tokenHash,
         codeHash: hashCode(sessionSecret(this.config), tokenHash, code),
         expiresAt: new Date(now + LINK_MINUTES * 60_000),
@@ -164,14 +215,15 @@ export class AuthService {
           `${target}#token=${token}`,
           code,
           LINK_MINUTES,
-          'admin',
+          purpose,
         ),
       });
     } catch (error) {
+      // the account's id, never its address
       this.logger.error(
-        `A sign-in link could not be mailed: ${(error as Error).message}`,
+        `A sign-in link for ${purpose} ${account.id} could not be mailed: ${failureOf(error)}`,
       );
-      // a link nobody received must not keep the admin waiting a minute for the next
+      // a link nobody received must not keep its owner waiting a minute for the next
       await this.prisma.magicLink.deleteMany({ where: { id: link.id } });
       return false;
     }
@@ -184,52 +236,81 @@ export class AuthService {
     );
   }
 
-  /** Spends a link, once, and answers with the session it opens. */
-  private async spend(link: {
-    id: string;
-    admin: AdminIdentity;
-  }): Promise<Session> {
+  /** Whose a link is, if that account may still sign in. */
+  private ownerOf(link: {
+    admin: Account | null;
+    donor: Account | null;
+  }): SessionIdentity | null {
+    if (link.admin)
+      return this.isAdmin(link.admin.email)
+        ? { kind: 'admin', id: link.admin.id, email: link.admin.email }
+        : null;
+    if (link.donor)
+      return { kind: 'donor', id: link.donor.id, email: link.donor.email };
+    return null;
+  }
+
+  /** Spends a link, once, and answers with the session it opens for its owner. */
+  private async spend(linkId: string, who: SessionIdentity): Promise<Session> {
     const now = new Date();
     // in one statement, so two openings of the same link cannot both get a session
     const spent = await this.prisma.magicLink.updateMany({
-      where: { id: link.id, usedAt: null, expiresAt: { gt: now } },
+      where: { id: linkId, usedAt: null, expiresAt: { gt: now } },
       data: { usedAt: now },
     });
     if (spent.count !== 1) throw this.refused();
 
-    await this.prisma.admin.update({
-      where: { id: link.admin.id },
-      data: { lastLoginAt: now },
-    });
+    if (who.kind === 'admin')
+      await this.prisma.admin.update({
+        where: { id: who.id },
+        data: { lastLoginAt: now },
+      });
+    else
+      await this.prisma.donor.update({
+        where: { id: who.id },
+        data: { lastLoginAt: now },
+      });
     return {
       accessToken: await this.jwt.signAsync(
-        { sub: link.admin.id },
+        { sub: who.id, kind: who.kind },
         { expiresIn: `${SESSION_DAYS}d` },
       ),
       expiresAt: new Date(now.getTime() + SESSION_DAYS * DAY_MS),
-      admin: { id: link.admin.id, email: link.admin.email },
+      identity: who,
     };
   }
 
-  /** Trades a link's token for a session. A link works once, and only while it is fresh. */
+  /**
+   * Trades a link's token for a session, an admin's or a donor's as the link is. A link works
+   * once, and only while it is fresh.
+   */
   async verify(token: string): Promise<Session> {
     const link = await this.prisma.magicLink.findUnique({
       where: { tokenHash: hashToken(token) },
-      select: { id: true, admin: { select: { id: true, email: true } } },
+      select: {
+        id: true,
+        admin: { select: { id: true, email: true } },
+        donor: { select: { id: true, email: true } },
+      },
     });
-    if (!link || !this.isAdmin(link.admin.email)) throw this.refused();
-    return this.spend(link);
+    const who = link && this.ownerOf(link);
+    if (!link || !who) throw this.refused();
+    return this.spend(link.id, who);
   }
 
   /**
-   * Trades the code from a mail for a session: the same link, the same single use. A wrong code
-   * counts against the link, which is spent at CODE_TRIES; an unknown address, a stale link and
-   * a wrong code all answer alike.
+   * Trades the code from a mail for a session of the kind asked for: the same link, the same
+   * single use. A wrong code counts against the link, which is spent at CODE_TRIES; an unknown
+   * address, a stale link and a wrong code all answer alike.
    */
-  async verifyCode(address: string, code: string): Promise<Session> {
+  async verifyCode(
+    address: string,
+    code: string,
+    purpose: Purpose,
+  ): Promise<Session> {
     const started = Date.now();
     try {
-      return await this.tryCode(address, code);
+      return await this.tryCode(address, code, purpose);
     } catch (error) {
       // every refusal takes the same least time, whatever it cost to reach
       if (error instanceof UnauthorizedException) {
@@ -240,19 +321,29 @@ export class AuthService {
     }
   }
 
-  private async tryCode(address: string, code: string): Promise<Session> {
+  private async tryCode(
+    address: string,
+    code: string,
+    purpose: Purpose,
+  ): Promise<Session> {
     const email = address.trim().toLowerCase();
-    // the same lookups whatever the address, so timing does not tell an admin's from a stranger's
+    // the same lookups whatever the address, so timing does not tell an account's from a
+    // stranger's (and the floor in verifyCode covers what is left)
     const digits = normalizeCode(code) ?? '000000';
     const now = new Date();
     const link = await this.prisma.magicLink.findFirst({
-      where: { admin: { email }, usedAt: null, expiresAt: { gt: now } },
+      where: {
+        ...(purpose === 'admin' ? { admin: { email } } : { donor: { email } }),
+        usedAt: null,
+        expiresAt: { gt: now },
+      },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         tokenHash: true,
         codeHash: true,
         admin: { select: { id: true, email: true } },
+        donor: { select: { id: true, email: true } },
       },
     });
     const given = Buffer.from(
@@ -260,13 +351,14 @@ export class AuthService {
       'hex',
     );
     const expected = Buffer.from(link?.codeHash ?? '', 'hex');
-    if (!link || normalizeCode(code) === null) throw this.refused();
+    const account = link && (purpose === 'admin' ? link.admin : link.donor);
+    if (!link || !account || normalizeCode(code) === null) throw this.refused();
 
     // an account's tries over a day, across its links. Parallel requests may overshoot this by
     // a few: the per-link claim below is the exact limit, this one only bounds the long run.
     const day = await this.prisma.magicLink.aggregate({
       where: {
-        adminId: link.admin.id,
+        ...linksOf(purpose, account.id),
         createdAt: { gt: new Date(now.getTime() - DAY_MS) },
       },
       _sum: { attempts: true },
@@ -288,7 +380,8 @@ export class AuthService {
 
     const right =
       expected.length === given.length && timingSafeEqual(expected, given);
-    if (!right || !this.isAdmin(link.admin.email)) {
+    const who = this.ownerOf(link);
+    if (!right || !who) {
       const after = await this.prisma.magicLink.findUnique({
         where: { id: link.id },
         select: { attempts: true },
@@ -300,17 +393,22 @@ export class AuthService {
         });
       throw this.refused();
     }
-    return this.spend({ id: link.id, admin: link.admin });
+    return this.spend(link.id, who);
   }
 
-  /** The admin a session names, if they still are one. */
-  async adminOf(id: string): Promise<AdminIdentity | null> {
-    const admin = await this.prisma.admin.findUnique({
-      where: { id },
-      select: { id: true, email: true },
-    });
+  /**
+   * The account a session names, if it may still sign in: an admin only while their address is
+   * on ADMIN_EMAILS, a donor for as long as the row is there.
+   */
+  async identityOf(kind: Purpose, id: string): Promise<SessionIdentity | null> {
+    const where = { where: { id }, select: { id: true, email: true } };
+    if (kind === 'donor') {
+      const donor = await this.prisma.donor.findUnique(where);
+      return donor ? { kind, id: donor.id, email: donor.email } : null;
+    }
+    const admin = await this.prisma.admin.findUnique(where);
     return admin && this.isAdmin(admin.email)
-      ? { id: admin.id, email: admin.email }
+      ? { kind, id: admin.id, email: admin.email }
       : null;
   }
 }

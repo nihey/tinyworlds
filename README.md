@@ -81,8 +81,10 @@ npm run start:dev                  # http://localhost:4000/api/graphql
 ```
 
 To sign in to the admin pages locally, put an address in `ADMIN_EMAILS` and a secret in
-`JWT_SECRET` (`.env`), ask for a link at `/admin/`, and copy it from the API's log: without a
-mail server that is where the mail goes.
+`JWT_SECRET` (`.env`), ask for a link at `/admin/`, and copy it (or its code) from the API's
+log: without a mail server that is where the mail goes. Donors sign in the same way, with an
+address that has a recorded donation. In production the API always needs `JWT_SECRET`,
+`SMTP_HOST` and `MAIL_FROM`, admins or not, because donors sign in too.
 
 Or `./dev.sh [world]` for all three in tmux.
 
@@ -99,7 +101,8 @@ variables:
 | `NEXT_PUBLIC_BASE_PATH` | frontend | empty | sub-path the build is served under (`/tinynyc`) |
 | `NEXT_PUBLIC_API_URL` | frontend | unset | the API's GraphQL endpoint; unset = no milestones |
 | `DATABASE_URL`, `STRIPE_*` | api | — | see `tinyworlds-api/.env.example` |
-| `ADMIN_EMAILS`, `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | who may sign in to the admin pages, and the mail server that sends their sign-in links |
+| `ADMIN_EMAILS` | api | empty | who may sign in to the admin pages |
+| `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | the sessions' secret and the mail server that sends sign-in links (admins' and donors'); `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM` are required in production |
 
 ## Adding a city
 
