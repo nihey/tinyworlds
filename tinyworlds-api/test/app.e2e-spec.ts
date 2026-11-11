@@ -706,4 +706,152 @@ describe('the API over HTTP', () => {
       }
     });
   });
+  describe('benefactors', () => {
+    const BENEFACTORS = `query ($input: CityBenefactorsInput!) { cityBenefactors(input: $input) {
+      slug name status worldId goalCents raisedCents stones
+      founders { number name amountCents stones firstStone keystone }
+      benefactors { rank name amountCents } } }`;
+    const gift = (
+      id: string,
+      amount: number,
+      email: string,
+      name?: string,
+      city = 'Lisbon',
+    ) =>
+      webhook({
+        id,
+        amount,
+        email,
+        metadata: {
+          app: 'tinyworlds',
+          city,
+          world: 'tinynyc',
+          locale: 'en-US',
+          ...(name ? { benefactor_name: name } : {}),
+        },
+      }).expect(200);
+    const seedLisbon = async () => {
+      await gift('cs_1', 1200, 'ana@example.com', 'Ana');
+      await gift('cs_2', 8800, 'bo@example.com');
+      await gift('cs_3', 3000, 'ana@example.com', 'Ana');
+    };
+
+    it("answers a city's stones, founders and benefactors, with names only for listed gifts", async () => {
+      await seedLisbon();
+      const res = await graphql(BENEFACTORS, {
+        input: { slug: 'lisbon' },
+      }).expect(200);
+      const body = res.body as {
+        data: {
+          cityBenefactors: {
+            slug: string;
+            founders: unknown[];
+            benefactors: unknown[];
+            stones: (number | null)[];
+          };
+        };
+      };
+      const city = body.data.cityBenefactors;
+      expect(city.slug).toBe('lisbon');
+      expect(city.founders).toEqual([
+        {
+          number: 1,
+          name: 'Ana',
+          amountCents: 1200,
+          stones: 12,
+          firstStone: true,
+          keystone: false,
+        },
+        {
+          number: 2,
+          name: null,
+          amountCents: 8800,
+          stones: 88,
+          firstStone: false,
+          keystone: true,
+        },
+      ]);
+      expect(city.benefactors).toEqual([]);
+      expect(city.stones).toHaveLength(100);
+      expect(city.stones[0]).toBe(1);
+      expect(city.stones[99]).toBe(2);
+      expect(JSON.stringify(res.body)).not.toContain('example.com');
+    });
+
+    it('finds a built city by its world', async () => {
+      await prisma.city.create({
+        data: {
+          slug: 'new-york',
+          name: 'New York',
+          status: 'BUILT',
+          worldId: 'tinynyc',
+          goalCents: 10_000,
+        },
+      });
+      const res = await graphql(BENEFACTORS, {
+        input: { world: 'tinynyc' },
+      }).expect(200);
+      const city = (
+        res.body as {
+          data: { cityBenefactors: { slug: string; founders: unknown[] } };
+        }
+      ).data.cityBenefactors;
+      expect(city.slug).toBe('new-york');
+      expect(city.founders).toEqual([]);
+    });
+
+    it('says null for a hidden city and for one that does not exist', async () => {
+      await prisma.city.create({
+        data: {
+          slug: 'hidden-one',
+          name: 'Hidden one',
+          hidden: true,
+          goalCents: 10_000,
+        },
+      });
+      for (const input of [{ slug: 'hidden-one' }, { slug: 'nowhere' }]) {
+        const res = await graphql(BENEFACTORS, { input }).expect(200);
+        const body = res.body as {
+          data: { cityBenefactors: unknown };
+          errors?: unknown;
+        };
+        expect(body.errors).toBeUndefined();
+        expect(body.data.cityBenefactors).toBeNull();
+      }
+    });
+
+    it('refuses both a slug and a world, and neither', async () => {
+      for (const input of [{ slug: 'lisbon', world: 'tinynyc' }, {}]) {
+        const res = await graphql(BENEFACTORS, { input }).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+    });
+
+    it('hides a name an admin hid', async () => {
+      await seedLisbon();
+      await prisma.donor.update({
+        where: { email: 'ana@example.com' },
+        data: { nameHidden: true },
+      });
+      const res = await graphql(BENEFACTORS, {
+        input: { slug: 'lisbon' },
+      }).expect(200);
+      const founders = (
+        res.body as {
+          data: {
+            cityBenefactors: {
+              founders: {
+                number: number;
+                name: string | null;
+                stones: number;
+              }[];
+            };
+          };
+        }
+      ).data.cityBenefactors.founders;
+      expect(founders[0]).toMatchObject({ number: 1, name: null, stones: 12 });
+      // her second gift is no longer folded into her row: it is a plain benefactor
+      expect(founders).toHaveLength(2);
+    });
+  });
 });

@@ -5,6 +5,7 @@ import { GraphQLModule } from '@nestjs/graphql';
 import type { Request } from 'express';
 import { join } from 'node:path';
 import { AuthModule } from './auth/auth.module.js';
+import { BenefactorsModule } from './benefactors/benefactors.module.js';
 import { CitiesModule } from './cities/cities.module.js';
 import './common/graphql-enums.js';
 import { RateLimitModule } from './common/rate-limit.module.js';
@@ -34,6 +35,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     }),
     PrismaModule,
     AuthModule,
+    BenefactorsModule,
     CitiesModule,
     DonationsModule,
     FunnelModule,

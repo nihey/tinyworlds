@@ -46,6 +46,11 @@ src/
 │   ├── funnel.service.ts           # track (a step), report (the funnel over a period)
 │   ├── funnel-report.ts            # pure: days of a period in a time zone, rows → report
 │   └── funnel.resolver.ts dto/ models/
+├── benefactors/
+│   ├── standing.ts                 # pure: a city's gifts → stones, founders, benefactors
+│   ├── display-name.ts             # cleanDisplayName: what a listed name may be
+│   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors
+│   └── benefactors.resolver.ts dto/ models/
 ├── cities/
 │   ├── city-name.ts                # cleanCityName, citySlug: what makes two spellings one city
 │   ├── cities.service.ts           # the public list and its order
@@ -76,6 +81,11 @@ enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String }
 input CreateDonationCheckoutInput { amountCents: Int  city: String  benefactorName: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
+input CityBenefactorsInput { slug: String  world: String }   # exactly one, else BAD_REQUEST
+type FounderRow { number: Int!  name: String  amountCents: Int!  stones: Int!  firstStone: Boolean!  keystone: Boolean! }
+type BenefactorRow { rank: Int!  name: String  amountCents: Int! }
+type CityBenefactors { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
+  stones: [Int]!  founders: [FounderRow!]!  benefactors: [BenefactorRow!]! }
 
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
@@ -91,6 +101,7 @@ type DonationFunnel { from: DateTime!  to: DateTime!  timeZone: String!  totals:
 
 type Query {
   health: String!  cityMilestones: [CityMilestone!]!                    # public
+  cityBenefactors(input: CityBenefactorsInput!): CityBenefactors        # public; null: unknown or hidden city
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
 }
 type Mutation {
@@ -128,6 +139,26 @@ operation is therefore closed until someone opens it; without a session the answ
   `checkout.session.completed` and `checkout.session.async_payment_succeeded` with
   `payment_status = paid` **and** `metadata.app = "tinyworlds"` are acted on; everything else is
   answered 200 and ignored, because the Stripe account is shared with other products.
+
+## Benefactors (`benefactors/`)
+
+A **stone** is US$1 (`STONE_CENTS`); a city has `ceil(goal / 100)` of them. Gifts in `usd` are laid
+end to end in the order given (`created_at`, then id); the stone at dollar i belongs to the gift
+that pays its last cent. A gift that starts before the goal is a **founding** gift and gets the
+next founding number (the one crossing the line keeps its whole amount); later gifts are
+**benefactors**, ranked by what each gave. `cityStanding` (pure) does this; `cityBenefactors`
+only reads the city (never a hidden one) and its gifts.
+
+Three guards on grouping: only a named gift joins others (an unnamed gift is always its own row);
+a donor's founding gifts share their first row; a named founder is not listed again among the
+benefactors.
+
+`donors` holds one row per lower-case email (`display_name`, `name_hidden`, `last_login_at`);
+`donations.donor_id` ties a gift to it (null when Stripe gave no usable address) and
+`donations.listed` says the donor asked to be named for that gift. A name is shown only when the
+gift is listed, the donor has a name, and `name_hidden` is false; hiding it (SQL:
+`UPDATE donors SET name_hidden = true WHERE …`) changes no stones or numbers. Emails never reach
+GraphQL types or logs.
 
 ## Admins and signing in (`auth/`)
 
