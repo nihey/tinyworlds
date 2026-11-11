@@ -29,7 +29,7 @@ npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, wi
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
 npm run donors:backfill   # in the built image (node dist/benefactors/backfill-cli.js): past donations get their donors from Stripe; run once after deploying (safe to repeat: sessions without an email, or whose lookup failed, are asked again)
 npm run donors:backfill:dev   # the same from a checkout, through tsx
-npm run cities:announce -- tinysp   # in the built image (node dist/benefactors/announce-cli.js): mails the donors of a world's city that it is built, once (deploy/deploy.sh runs it)
+npm run cities:announce -- tinysp [tinyrao …]   # in the built image (node dist/benefactors/announce-cli.js): mails the donors of each world's city that it is built, once (deploy/deploy.sh runs it)
 npm run cities:announce:dev -- tinysp   # the same from a checkout, through tsx (without SMTP_HOST, the mails go to the log)
 ```
 
@@ -354,23 +354,38 @@ address.
   the bar); the gift that lays the last stone; a gift beyond the goal ("…keeps it running"; for
   a built city, "You keep New York running for its 15,194 explorers"); a gift to no city ("the
   cities to come", no impact box); a gift in another currency (a plain thank-you, no amount, no
-  stones). Every variant with a city shows the impact box; listed gifts say under which name.
+  stones). Every variant with a city shows the impact box; listed gifts say under which name,
+  an unlisted one invites the donor to add a name on Your cities, and one whose name an admin
+  hid says the name is hidden from the city's public list. Above `STONES_DRAWN_MAX` (100)
+  stones the grid is left out and the bar stays: each stone is a table cell, and a mail must
+  stay well under the ~102 kB at which Gmail cuts it (a 100-stone thank-you is about 35 kB).
 - **A city is built** (`benefactors/announce.service.ts`, `announce-cli.ts`). `deploy/deploy.sh`
-  runs `node dist/benefactors/announce-cli.js <world>` in the container after uploading a world.
+  runs `node dist/benefactors/announce-cli.js <world>...` in the container after uploading the
+  worlds (all of them in one call for `deploy.sh all`); the command reports world by world.
   For an unknown world, a city not `BUILT` (the seed has not run) or one announced before
-  (`cities.built_announced_at`), it prints so and exits 0. Otherwise it claims the announcement
-  in one `UPDATE … WHERE built_announced_at IS NULL` (two runs cannot both send), then mails
-  each donor with an address once, whatever the number of their gifts, in the language of their
+  (`cities.built_announced_at`), it prints so. Otherwise it reads everything and writes every
+  mail first (the donors, their gifts, the standing), then claims the announcement in one
+  `UPDATE … WHERE built_announced_at IS NULL` (two runs cannot both send), then mails each
+  donor with an address once, whatever the number of their gifts, in the language of their
   latest: the share card, "{city} is on the map, and you built it." (a founder) or "…you helped
   keep it running." (a benefactor), their badges, what they gave and their stones, and who built
-  it (the public list's rows). It prints counts, lists failures by donor id and exits 1 if a
-  mail did not go out; the donors whose mail failed are not mailed again by a later run (to
-  send the whole announcement again: `UPDATE cities SET built_announced_at = NULL WHERE …`).
-  The migration that added the column marked every city already `BUILT` as announced. The
-  command builds its services by hand (no Nest container), so tsx can run it too.
+  it (the public list's rows). A donor with no gift in dollars is on no list, and the footer
+  does not say they are. **A failure never loses the announcement**: a read that fails comes
+  before the claim; if anything throws after it, or not one mail went out, the claim is
+  released (`UPDATE … WHERE built_announced_at = <its own time>`) and the next run tries again.
+  A mail server that is away (`isServerFailure`: `ECONNECTION`, `ETIMEDOUT`, `ESOCKET`, `EAUTH`
+  and the like) stops the sending at its first failure instead of waiting on it for every
+  donor. Once some mails have gone out the city counts as announced, and the output says it was
+  partial, naming the donors not mailed (failed, or not tried) by id; a later run does not mail
+  them (to send the whole announcement again: `UPDATE cities SET built_announced_at = NULL
+  WHERE …`). It exits 1 when any world fell short, 0 otherwise. The migration that added the
+  column counted every city already on the map (`BUILT`, or with a `world_id`) as announced.
+  The command builds its services by hand (no Nest container), so tsx can run it too.
 - **Sign-in** (`auth/sign-in-mail.ts`): see Signing in. The subject is unchanged ("Your
-  tinyworlds code: 482 913"); the mail says only the newest code works (an older mail's button
-  still works until it is used or expires, as before).
+  tinyworlds code: 482 913"). Its last line says "The code and the button work once, for 15
+  minutes. Asked more than once? Use the newest mail.": strictly true (an older mail's code
+  stops working once a newer link is asked for; its button keeps working until used or
+  expired), and the advice is right either way.
 
 ## The donation funnel (`funnel/`)
 
@@ -500,7 +515,7 @@ Validated at startup (`config/env.ts`); the server does not start with anything 
 | `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions and keys the codes' HMAC; at least 32 characters |
 | `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the mails (sign-in links, thank-yous, a city is built), and the address they come from |
 | `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | `587`, none, none | 465 means TLS from the start, anything else STARTTLS |
-| `SITE_URL` | the first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail |
+| `SITE_URL` | the first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail; in production it (or that first origin) must be https, or the API does not start |
 | `PORT` | `4000` | |
 | `NODE_ENV` | `development` | GraphiQL and introspection are off in `production` |
 
@@ -513,7 +528,7 @@ Secrets live in the host's environment, never in the repository. `.env` is gitig
 user and starts with `npx prisma migrate deploy && node dist/main.js` (single replica: the
 migrations run before the server). `npm run seed` works inside the image
 (`docker exec <container> npm run seed`), and so do `npm run donors:backfill` and
-`npm run cities:announce -- <world>` (the image has
+`npm run cities:announce -- <world>...` (the image has
 `dist/` and `prisma/` only, so scripts that need `src/` code live in `src/`). Rolling back past the
 `sign_in_codes` migration breaks admin sign-in (old code inserts links without `code_hash`): roll
 the database back too, or roll forward. The image has a `HEALTHCHECK` that asks `{ health }`.
@@ -526,7 +541,9 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
   token out of a sign-in link) and `test/fake-stripe.ts` (records the sessions asked
   for and the prices looked up; `price_en` belongs to `prod_en`). The fake mailer keeps every
   mail; `signIns()` are the ones with a sign-in link (`token()` and `code()` read the latest of
-  those), since thank-yous go out on their own after a donation. Webhook deliveries are
+  those), since thank-yous go out on their own after a donation. `failWith` fails every mail,
+  or the ones a function of the attempt's number picks (`attempts` counts them), which is how
+  the announce tests stage a mail server that goes away halfway. Webhook deliveries are
   signed for real with `stripe.webhooks.generateTestHeaderString` and a placeholder secret, so
   the signature check is the real one. No test talks to Stripe.
 - `npm run test:e2e` boots the whole app with the fake Stripe on its own database

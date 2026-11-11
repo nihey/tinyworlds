@@ -94,8 +94,13 @@ Donors also get two mails from the API: a thank-you once Stripe confirms their g
 city they gave to is built, word that it is on the map (sent when `deploy/deploy.sh` deploys
 the world, once per city: set `API_SERVICE` in `deploy/.env`). Their links and pictures point at
 `SITE_URL` (default: the first of `ALLOWED_ORIGINS`); the pictures are the front page's own
-files in `tinyworlds-frontend/public/email/`, so deploy the front page with them. Locally, with
-no mail server, the mails are written to the API's log.
+files in `tinyworlds-frontend/public/email/`. Locally, with no mail server, the mails are written
+to the API's log.
+
+Deploying the mails the first time, in this order: the front page (`deploy/deploy.sh home`), so
+`/email/*.png` are there before the first thank-you goes out; then the API (its migration counts
+every city already on the map as announced, so their donors are not mailed now); then the
+worlds, as usual.
 
 Deploying the benefactors feature, in this order: check the production env (`JWT_SECRET` of at
 least 32 characters, `SMTP_HOST`, `MAIL_FROM`), deploy the API, run `npm run donors:backfill` once
