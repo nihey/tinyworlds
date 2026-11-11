@@ -68,6 +68,11 @@ describe('the mail markup', () => {
     expect(html).toContain('<p>corpo</p>');
     expect(html).toContain('Uma linha.<br>Outra.');
     expect(html).toContain(`border-top:4px solid ${COLORS.taxi}`);
+    // Outlook, which reads no max-width, gets a table of its own at the card's width
+    expect(html).toContain(
+      '<!--[if mso]><table role="presentation" width="560" align="center"',
+    );
+    expect(html).toContain('<!--[if mso]></td></tr></table><![endif]-->');
   });
 
   it('draws a badge with its words beside its picture, or the words alone', () => {
@@ -93,11 +98,18 @@ describe('the mail markup', () => {
     expect(
       html.match(new RegExp(`bgcolor="${COLORS.laid}"`, 'g')),
     ).toHaveLength(2);
+    // an empty cell is as tall as it is drawn, in Outlook too
+    expect(html).toContain(
+      'font-size:1px;mso-line-height-rule:exactly;line-height:22px;',
+    );
   });
 
   it('fills a progress bar without ever overflowing it', () => {
     expect(progressBar(0.4)).toContain('width="40%"');
     expect(progressBar(0.4)).toContain('width="60%"');
+    expect(progressBar(0.4)).toContain(
+      'mso-line-height-rule:exactly;line-height:8px;',
+    );
     expect(progressBar(2).match(/<td /g)).toHaveLength(1);
     expect(progressBar(-1)).toContain(`bgcolor="${COLORS.empty}"`);
   });

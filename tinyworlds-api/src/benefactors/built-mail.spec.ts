@@ -94,6 +94,21 @@ describe('builtMail', () => {
     expect(text).not.toContain('Built by');
   });
 
+  it('does not tell a donor with no gift in dollars that they are on the list', () => {
+    const { text } = builtMail({
+      ...founder,
+      founderNumber: null,
+      givenCents: 0,
+      stones: [],
+      named: false,
+    });
+    expect(text).toContain(
+      "Los Angeles's benefactors are in About on its map.",
+    );
+    expect(text).not.toContain('anonymous');
+    expect(text).not.toContain('Your name');
+  });
+
   it('never lets a city or a name out of its text', () => {
     const { html } = builtMail({ ...founder, city: '<img src=x onerror=1>' });
     expect(html).not.toContain('<img src=x');

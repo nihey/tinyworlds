@@ -59,7 +59,10 @@ export class ThanksService {
         currency: true,
         locale: true,
         donorId: true,
-        donor: { select: { email: true } },
+        listed: true,
+        donor: {
+          select: { email: true, displayName: true, nameHidden: true },
+        },
         city: {
           select: {
             id: true,
@@ -108,6 +111,8 @@ export class ThanksService {
           place,
         },
         totalVisits,
+        nameHidden:
+          gift.listed && !!gift.donor.displayName && gift.donor.nameHidden,
       },
     };
   }

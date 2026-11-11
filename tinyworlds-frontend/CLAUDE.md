@@ -92,7 +92,8 @@ pipeline's `home-card`), `public/loops/` (the front page's moving pictures, made
 `tinyworlds-videos`: `<world>.mp4`, `hero.mp4`, `hero.jpg`) and `public/email/`: the pictures
 the API's mails show (`tinyworlds-api/CLAUDE.md`, Mails), loaded from the site's root, so the
 front page's build serves them. `wordmark.png` (Tiny5's letters, "tiny" paper white and
-"worlds" taxi yellow, transparent, 2×) and `founding.png`, `first-stone.png`, `keystone.png`
+"worlds" taxi yellow, on the mail band's dark, baked in so a client that recolours the band
+cannot leave white on white; 2×) and `founding.png`, `first-stone.png`, `keystone.png`
 (the badges' maps of `pixel-art.ts` at 3×, nearest neighbour) are made by
 `scripts/email-images.mjs` (`npm run email-images`, Node 22.18+: it imports the `.ts` maps);
 run it after changing the art, and commit what it writes.

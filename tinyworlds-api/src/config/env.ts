@@ -139,6 +139,14 @@ export const envSchema = baseSchema
           : `With ADMIN_EMAILS set, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters`,
       });
     if (!production) return;
+    // the mails link people to the site and show its pictures: never over plain http
+    const site = env.SITE_URL ?? env.ALLOWED_ORIGINS[0];
+    if (site && !site.startsWith('https://'))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SITE_URL'],
+        message: `In production, SITE_URL (or, without it, the first of ALLOWED_ORIGINS) must be https: the mails link to it, and "${site}" is not`,
+      });
     for (const name of ['SMTP_HOST', 'MAIL_FROM'] as const)
       if (!env[name])
         ctx.addIssue({

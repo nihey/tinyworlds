@@ -55,6 +55,34 @@ describe('validateEnv', () => {
     );
   });
 
+  it("refuses a mails' site that is not https in production", () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      JWT_SECRET: 'x'.repeat(32),
+      SMTP_HOST: 'smtp.example.com',
+      MAIL_FROM: 'tinyworlds <hello@example.com>',
+      ALLOWED_ORIGINS: 'https://example.com',
+    };
+    expect(validateEnv(production).SITE_URL).toBe('https://example.com');
+    expect(
+      validateEnv({ ...production, SITE_URL: 'https://www.example.com' })
+        .SITE_URL,
+    ).toBe('https://www.example.com');
+    expect(() =>
+      validateEnv({ ...production, SITE_URL: 'http://example.com' }),
+    ).toThrow(/SITE_URL.*must be https/s);
+    // without SITE_URL, the first allowed origin is the one that must be https
+    expect(() =>
+      validateEnv({
+        ...production,
+        ALLOWED_ORIGINS: 'http://localhost:3000,https://example.com',
+      }),
+    ).toThrow(/must be https/);
+    // elsewhere, plain http is fine
+    expect(validateEnv(base).SITE_URL).toBe('http://localhost:3000');
+  });
+
   it('refuses to start without the Stripe settings', () => {
     for (const key of [
       'STRIPE_SECRET_KEY',
@@ -112,6 +140,7 @@ describe('validateEnv', () => {
     const admins = {
       ...base,
       NODE_ENV: 'production',
+      ALLOWED_ORIGINS: 'https://example.com',
       ADMIN_EMAILS: 'admin@example.com',
       JWT_SECRET: 'x'.repeat(32),
     };
@@ -129,7 +158,11 @@ describe('validateEnv', () => {
   });
 
   it('production needs a session secret and a mail server even without admins', () => {
-    const production = { ...base, NODE_ENV: 'production' };
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      ALLOWED_ORIGINS: 'https://example.com',
+    };
     expect(() => validateEnv(production)).toThrow(/JWT_SECRET/);
     expect(() => validateEnv({ ...production, JWT_SECRET: 'short' })).toThrow(
       /at least 32 characters/,

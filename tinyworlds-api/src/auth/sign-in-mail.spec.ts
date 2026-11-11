@@ -80,7 +80,7 @@ describe('signInMail', () => {
   it('says the code works once, and what to do with a mail nobody asked for', () => {
     const { text, html } = mail({ purpose: 'donor' });
     for (const line of [
-      'The code and the button work once, for 15 minutes. Asked for another? Only the newest code works.',
+      'The code and the button work once, for 15 minutes. Asked more than once? Use the newest mail.',
       "Didn't ask for this? Ignore it: nothing happens without the code or the button.",
     ]) {
       expect(text).toContain(line);

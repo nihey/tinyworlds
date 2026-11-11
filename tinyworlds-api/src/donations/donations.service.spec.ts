@@ -751,6 +751,30 @@ describe('DonationsService: the thank-you', () => {
     expect(prisma.donations).toHaveLength(1);
   });
 
+  it('tells a donor whose name an admin hid that it is hidden', async () => {
+    const { deliver, mailer, prisma, thanked } = setup();
+    await deliver({
+      id: 'cs_1',
+      email: 'ana@example.com',
+      metadata: lisbon('Ana'),
+    });
+    await thanked();
+    prisma.donors[0].nameHidden = true;
+    await deliver({
+      id: 'cs_2',
+      email: 'ana@example.com',
+      metadata: lisbon('Ana'),
+    });
+    await thanked();
+    expect(mailer.sent[0].text).toContain(
+      "You're on Lisbon's Founding Benefactors as Ana.",
+    );
+    expect(mailer.sent[1].text).toContain(
+      "Your name is hidden from Lisbon's public list.",
+    );
+    expect(mailer.sent[1].text).not.toContain('Ana');
+  });
+
   it("thanks a gift to no city in the donor's language", async () => {
     const { deliver, mailer, thanked } = setup();
     await deliver({

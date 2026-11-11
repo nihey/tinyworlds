@@ -1,6 +1,10 @@
 import type { StoneState } from '../mail/layout.js';
 import type { GiftPlace } from './thanks-facts.js';
-import { thanksMail, type ThanksFacts } from './thanks-mail.js';
+import {
+  STONES_DRAWN_MAX,
+  thanksMail,
+  type ThanksFacts,
+} from './thanks-mail.js';
 
 const SITE = 'https://example.com';
 
@@ -36,6 +40,7 @@ const facts = (over: Partial<ThanksFacts> = {}): ThanksFacts => ({
     place: founding,
   },
   totalVisits: 16396,
+  nameHidden: false,
   ...over,
 });
 
@@ -163,6 +168,52 @@ describe('thanksMail', () => {
       "You're anonymous here. Add your name on Your cities.",
     );
     expect(html).not.toContain('Ana from Recife');
+  });
+
+  it('tells a donor whose name an admin hid that it is hidden, not to add one', () => {
+    const { text, html } = thanksMail(
+      facts({ ...withPlace({ listedAs: null }), nameHidden: true }),
+    );
+    expect(text).toContain("Your name is hidden from São Paulo's public list.");
+    expect(text).not.toContain('Add your name');
+    expect(html).toContain(
+      'Your name is hidden from São Paulo&#39;s public list.',
+    );
+    expect(
+      thanksMail(
+        facts({
+          ...withPlace({ listedAs: null }),
+          locale: 'pt-BR',
+          nameHidden: true,
+        }),
+      ).text,
+    ).toContain('Seu nome está oculto na lista pública de São Paulo.');
+  });
+
+  it('leaves the grid out of a city of more than a hundred stones, and keeps the bar', () => {
+    const city = (stoneCount: number) =>
+      withPlace({
+        stoneCount,
+        goalCents: stoneCount * 100,
+        raisedCents: 1200,
+        stones: [
+          'laid',
+          'laid',
+          ...Array<StoneState>(10).fill('mine'),
+          ...Array<StoneState>(stoneCount - 12).fill(null),
+        ],
+      });
+    const stoneCells = /style="width:22px/g;
+
+    const hundred = thanksMail(facts(city(STONES_DRAWN_MAX))).html;
+    expect(hundred.match(stoneCells)).toHaveLength(100);
+    expect(hundred.length).toBeLessThan(60_000);
+
+    const big = thanksMail(facts(city(STONES_DRAWN_MAX + 200))).html;
+    expect(big).not.toMatch(stoneCells);
+    expect(big).toContain('width="4%"');
+    expect(big).toContain('US$12 of US$300 · 288 stones to go');
+    expect(big.length).toBeLessThan(40_000);
   });
 
   it('sends a gift to no city to the cities to come, without the impact box', () => {

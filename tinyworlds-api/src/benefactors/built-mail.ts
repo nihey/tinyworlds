@@ -52,6 +52,8 @@ interface Words {
   shareBody: string;
   named: string;
   anonymous: string;
+  /** For a donor with no gift in dollars, who is on no list. */
+  unlisted: string;
   why: string;
   alt: string;
 }
@@ -81,6 +83,7 @@ const WORDS: Record<Locale, Words> = {
       "Your name and badges are on {city}'s benefactors, in About on its map.",
     anonymous:
       "You're on {city}'s benefactors as “anonymous”, in About on its map.",
+    unlisted: "{city}'s benefactors are in About on its map.",
     why: "You're getting this because you donated towards {city}.",
     alt: '{city} on tinyworlds',
   },
@@ -109,6 +112,7 @@ const WORDS: Record<Locale, Words> = {
       'Seu nome e suas insígnias estão entre os benfeitores de {city}, em “Sobre este mapa”.',
     anonymous:
       'Você está entre os benfeitores de {city} como “anônimo”, em “Sobre este mapa”.',
+    unlisted: 'Os benfeitores de {city} estão em “Sobre este mapa”.',
     why: 'Você está recebendo isto porque doou para {city}.',
     alt: '{city} no tinyworlds',
   },
@@ -137,6 +141,7 @@ const WORDS: Record<Locale, Words> = {
       'Tu nombre y tus insignias están entre los benefactores de {city}, en «Acerca de este mapa».',
     anonymous:
       'Estás entre los benefactores de {city} como «anónimo», en «Acerca de este mapa».',
+    unlisted: 'Los benefactores de {city} están en «Acerca de este mapa».',
     why: 'Recibes esto porque donaste para {city}.',
     alt: '{city} en tinyworlds',
   },
@@ -196,10 +201,10 @@ export function builtMail(f: BuiltFacts): Omit<Mail, 'to'> {
     fill(w.shareSubject, values),
     `${fill(w.shareBody, values)}\n\n${worldUrl}`,
   );
-  const footer = [
-    fill(f.named ? w.named : w.anonymous, values),
-    fill(w.why, values),
-  ];
+  // only gifts in dollars are listed: a donor with none is on no list, named or not
+  const where =
+    f.givenCents === 0 ? w.unlisted : f.named ? w.named : w.anonymous;
+  const footer = [fill(where, values), fill(w.why, values)];
   const explore = fill(w.explore, values);
 
   return {
