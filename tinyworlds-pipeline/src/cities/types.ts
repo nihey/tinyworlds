@@ -195,7 +195,7 @@ export interface City {
     /** No census: line the streets by rule, one candidate spot every `spacing` metres on each side, kept with this chance. */
     street?: { spacing: number; chance: number };
   };
-  flora: "temperate" | "tropical" | "subtropical" | "boreal";
+  flora: "temperate" | "tropical" | "subtropical" | "boreal" | "montane";
   /** Local reading of the data's land classes: Overture subtype/class → ground kind (see scene/kinds.ts). */
   ground: {
     landCover?: Record<string, number>;

@@ -9,6 +9,7 @@ import { tinyphl } from "./tinyphl.js";
 import { tinypit } from "./tinypit.js";
 import { tinyorl } from "./tinyorl.js";
 import { tinyrao } from "./tinyrao.js";
+import { tinytkf } from "./tinytkf.js";
 import { tinyvlc } from "./tinyvlc.js";
 import { tinywesteros } from "./tinywesteros.js";
 import { tinywinterfell } from "./tinywinterfell.js";
@@ -28,6 +29,7 @@ export const CITIES: Record<string, City> = {
   tinycvg,
   tinypit,
   tinyphl,
+  tinytkf,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,
