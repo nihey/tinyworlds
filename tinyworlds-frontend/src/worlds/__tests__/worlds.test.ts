@@ -27,6 +27,7 @@ describe("resolveWorld", () => {
       "tinycvg",
       "tinypit",
       "tinyphl",
+      "tinycos",
       "tinywinterfell",
       "tinykingslanding",
     ]) {
@@ -48,6 +49,7 @@ describe("resolveWorld", () => {
       "tinycvg",
       "tinypit",
       "tinyphl",
+      "tinycos",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -176,14 +178,14 @@ describe("worlds", () => {
       "Límites de barrios",
     ]);
     // Dallas' and Cincinnati's districts are the cities on the map (Highland Park; Covington and
-    // Newport across the river); Pittsburgh's and Philadelphia's are their parts of town
-    // (Downtown, the North Side; Center City) and the towns round them; all four outline the
-    // neighborhoods
-    for (const id of ["tinydal", "tinycvg", "tinypit", "tinyphl"]) {
+    // Newport across the river); Pittsburgh's, Philadelphia's and Colorado Springs' are their parts
+    // of town (Downtown, the North Side; Center City; the Old North End) and the towns round them;
+    // all five outline the neighborhoods
+    for (const id of ["tinydal", "tinycvg", "tinypit", "tinyphl", "tinycos"]) {
       expect(LOCALES.map((locale) => WORLDS[id].copy[locale].borough)).toEqual(
-        id === "tinypit" || id === "tinyphl"
-          ? ["Area", "Região", "Zona"]
-          : ["City", "Cidade", "Ciudad"],
+        id === "tinydal" || id === "tinycvg"
+          ? ["City", "Cidade", "Ciudad"]
+          : ["Area", "Região", "Zona"],
       );
       expect(LOCALES.map((locale) => WORLDS[id].copy[locale].hoodLines.label)).toEqual([
         "Neighborhood lines",
@@ -279,6 +281,8 @@ describe("worlds", () => {
     // Pittsburgh has about half its buildings measured, Philadelphia nearly all
     expect(WORLDS.tinypit.copy["en-US"].about.notes[0]).toMatch(/about half/);
     expect(WORLDS.tinyphl.copy["en-US"].about.notes[0]).toMatch(/nearly every building/);
+    // Colorado Springs' heights are estimates that read tall buildings low: the floors decide
+    expect(WORLDS.tinycos.copy["en-US"].about.notes[0]).toMatch(/estimated height.*floors decide/);
   });
 
   it("light up their buildings, and play Guess the building only where they do", () => {
@@ -289,6 +293,7 @@ describe("worlds", () => {
       "tinycvg",
       "tinypit",
       "tinyphl",
+      "tinycos",
     ]);
     // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
     for (const world of Object.values(WORLDS)) {

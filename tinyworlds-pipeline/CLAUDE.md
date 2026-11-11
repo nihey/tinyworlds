@@ -18,6 +18,7 @@ chosen with `--city` (default `tinynyc`).
 | `tinycvg`          | ≈ 1 min (+ wiki)    | 0.2 GB, 6,300 files  |
 | `tinypit`          | ≈ 1 min (+ wiki)    | 0.2 GB, 5,200 files  |
 | `tinyphl`          | ≈ 1.5 min (+ wiki)  | 0.1 GB, 5,300 files  |
+| `tinycos`          | ≈ 2 min (+ wiki)    | 0.4 GB, 11,700 files |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 | `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
@@ -65,7 +66,9 @@ src/
 │   ├── tinycvg.ts (+ .places.ts)   # Cincinnati: the Roebling Bridge's cables, a riverboat on the Ohio
 │   ├── tinypit.ts (+ .places.ts)   # Pittsburgh: the Point, three rivers, the city's 90 neighbourhoods
 │   ├── tinyphl.ts (+ .places.ts)   # Philadelphia: Penn's grid, the Parkway, the city's neighbourhoods
-│   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts
+│   ├── tinycos.ts (+ .places.ts)   # Colorado Springs: parts of town round named points, the Academy, red rocks
+│   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts;
+│   │                  # aroundPoints(): parts of town the data knows only as named points
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
 │   ├── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 │   └── tinywesteros.ts (+ .land.ts, .places.ts)  # a whole imagined world as a toy-scale diorama
@@ -74,7 +77,8 @@ src/
 ├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
 ├── sources/           # DataSource providers: overture.ts (DuckDB over public S3), nycOpenData.ts,
 │                      # ibge.ts (census areas), openBuildings.ts (satellite height raster),
-│                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions),
+│                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions,
+│                      #   and land use areas that are places of their own: an academy),
 │                      # laCounty.ts (Los Angeles County's cities and communities),
 │                      # publishedAreas.ts (a GeoJSON of areas a city publishes: Pittsburgh's, Philadelphia's)
 ├── geom/              # wkb.ts (WKB reader), geojson.ts, utm.ts
@@ -129,12 +133,15 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
      too big to have buildings near its middle fades into a hole in the map: name it in
      `parks` (Los Angeles' Griffith Park);
    - `heights.raster`: `true` where buildings have no mapped heights (add `openBuildings` to
-     `sources`, after `overture`);
+     `sources`, after `overture`); `heights.floorsFirst` where the mapped heights are a model's
+     estimates that read tall buildings low (Colorado Springs: twelve floors at 22 m): the floors,
+     where mapped and taller, decide;
    - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`,
      `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, `SOCAL`, `TEXAS`, `OHIO_RIVER`, or a new one);
    - `search.namedBuildings`: which named buildings are listed and light up. New York's default
      (110 m and a few civic classes) leaves a smaller city with a dozen; Dallas lists from 60 m,
-     Cincinnati from 40 m, both with churches, civic buildings and campuses;
+     Cincinnati from 40 m, both with churches, civic buildings and campuses; `skip` leaves out
+     names that say nothing ("Building 4");
    - the water: a river inside the land polygons needs `riverBridges` for its bridges to rise
      (the Ohio); a "reservoir" that is grass most of the year goes in `ground.dryWater` (the
      Trinity's floodway);
@@ -147,7 +154,11 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
      locals name (Pittsburgh's Downtown, North Side, Oakland; Philadelphia's Center City,
      University City): those become the districts, so a context line says "Downtown", not
      "Pittsburgh", and the quiz's areas are a dozen, not one. The towns beside the city stay
-     districts of their own;
+     districts of their own. Where nobody publishes outlines but the data names the parts of
+     town as points (Colorado Springs' Downtown, Old North End, Westside: Overture's macrohoods),
+     `aroundPoints()` makes each the ground nearer its point than any other, out to a radius,
+     listed after the city so it wins over it; a land use area that is a place of its own (the
+     Air Force Academy) becomes a district through `overtureAreas({ landUse })`;
    - `curated`: take coordinates from the data, not from memory.
 2. `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
 3. The viewer's side: see `tinyworlds-frontend/CLAUDE.md` ("Worlds").
@@ -287,7 +298,7 @@ river, an islet, the Wall).
 
 ## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
 
-A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia) gets `sights.json` from `index` and `sights.<locale>.json` from
+A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs) gets `sights.json` from `index` and `sights.<locale>.json` from
 `wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
 one or more search entries point at.
 
@@ -403,7 +414,11 @@ change to the rules below.
   (Covington's middle is off the map, so it is no `borough` place). Pittsburgh: 104 questions
   (easy 26, medium 37, hard 41), Philadelphia: 105 (easy 27, medium 36, hard 42); their
   districts are the parts of town (`sectioned`), so a question's area is Downtown or Oakland,
-  Center City or University City.
+  Center City or University City. Colorado Springs: 60 (easy 15, medium 21, hard 24), its areas
+  the parts of town round Overture's points, Manitou Springs and the Air Force Academy. Most of
+  its articles are on buildings the data names otherwise or not at all (historic houses,
+  churches): they were found by listing every article with coordinates in the box (the
+  `geosearch` API), matching each to the footprint at its point, and curating those.
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
 
@@ -436,7 +451,8 @@ whose shadows reach it, and margins for both.
   the river at the skyline; Pittsburgh at 61°, the Golden Triangle's second grid and the whole
   box's strongest bearing, so the view looks from Mount Washington across the Monongahela at
   the Point; Philadelphia's grid at −8.1°, so City Hall stands at the hub and the Parkway leads
-  the eye up to the Art Museum) so its streets are exact 2:1 lines. Measure it as the peak of the
+  the eye up to the Art Museum; Colorado Springs' downtown and Old North End at 2.3°, General
+  Palmer's grid, rather than the section-line roads' 0°) so its streets are exact 2:1 lines. Measure it as the peak of the
   streets' bearings modulo 90°, weighted by length.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
@@ -482,7 +498,8 @@ whose shadows reach it, and margins for both.
 - **Boats the data has no route for** (`boats`: Cincinnati's riverboat on the Ohio) sail like
   the ferries, there and back; the route is drawn down the middle of the water by hand.
 - New ground kinds go at the **end** of `G` too and get their place in the paint order from
-  `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
+  `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` and `G.RedRock`, Colorado
+  Springs' sandstone through `ground.land`, were added this way), so scenes
   already on disk keep their meaning.
 - New palette ramps go at the **end** of `RAMP_DEFS`: a ramp's id is its position, and scenes
   store ids.
@@ -494,6 +511,11 @@ mapped height → mapped floors × `heights.storey` → the Google Open Building
 raster is read as the median inside the footprint and corrected with a curve fitted against the
 ~4,000 buildings whose floors are mapped (it reads 5.5 m for one storey and saturates near
 95 m). Refit the curve for another city before trusting it there.
+
+Colorado Springs' buildings nearly all come with a height, but an estimated one that reads tall
+buildings low (a dozen floors at 22 m, a six-storey dormitory at 3 m): `heights.floorsFirst`
+lets the mapped floors decide where they say taller, and `heightFixes` set the landmarks that
+have no floors mapped (the Academy's halls, the Broadmoor).
 
 ## Data
 

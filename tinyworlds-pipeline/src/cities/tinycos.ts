@@ -142,6 +142,8 @@ export const tinycos: City = {
       roof: R.roofTerracotta,
       pattern: Pattern.Punched,
     },
+    // the Olympic & Paralympic Museum: white and aluminium
+    "u.s. olympic and paralympic museum": { wall: R.whiteBrick, roof: R.roofSilver, pattern: Pattern.Sparse },
     // the Falcons' blue seats
     "falcon stadium": { wall: R.concrete, roof: R.sidingBlue },
   },
@@ -157,6 +159,7 @@ export const tinycos: City = {
     "broadmoor west": 24,
     "broadmoor west tower": 30,
     "broadmoor south": 22,
+    "u.s. olympic and paralympic museum": 18,
   },
   statues: [],
   sights: {

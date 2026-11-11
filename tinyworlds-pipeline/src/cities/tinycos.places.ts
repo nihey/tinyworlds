@@ -248,6 +248,7 @@ export const CURATED: Curated[] = [
   { n: "Carlton House", t: "landmark", lon: -104.8507, lat: 38.96638, r: 60, s: 2.5, sight: true },
   { n: "United States Air Force Academy", t: "place", lon: -104.8869, lat: 39.0131, r: 96, s: 1 },
   { n: "Cadet Chapel", t: "landmark", lon: -104.89039, lat: 39.00842, r: 97, s: 2, sight: true },
+  { n: "Cadet Field House", t: "landmark", lon: -104.88361, lat: 39.01407, r: 76, s: 2, sight: true },
   { n: "Falcon Stadium", t: "landmark", lon: -104.84365, lat: 38.99706, r: 88, s: 1.5, sight: true },
   {
     n: "Air Force Academy Visitor Center",

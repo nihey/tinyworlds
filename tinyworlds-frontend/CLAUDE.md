@@ -4,7 +4,8 @@ The map viewer: a Next.js 16 static export that draws the tiles and indexes writ
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
 (El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), `tinydal`
-(Dallas), `tinycvg` (Cincinnati), `tinypit` (Pittsburgh), `tinyphl` (Philadelphia), and three
+(Dallas), `tinycvg` (Cincinnati), `tinypit` (Pittsburgh), `tinyphl` (Philadelphia), `tinycos`
+(Colorado Springs), and three
 places that do not exist, `tinywinterfell`,
 `tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
 lists the worlds. The interface speaks the visitor's language (English, Brazilian
@@ -309,7 +310,7 @@ src/
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
   tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
   `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#55aaff` for tinylax, `#6ee05a` for tinydal,
-  `#a56bff` for tinycvg, `#ffd447` for tinypit, `#5b7cfa` for tinyphl, `#a9c7e8` for tinywinterfell, `#ea5257` for tinykingslanding, `#d9b45a` for
+  `#a56bff` for tinycvg, `#ffd447` for tinypit, `#5b7cfa` for tinyphl, `#ff6b57` for tinycos, `#a9c7e8` for tinywinterfell, `#ea5257` for tinykingslanding, `#d9b45a` for
   tinywesteros); the engine and the minimap read the world's value for canvas drawing. Don't
   write the yellow as a literal. `worlds.test.ts` checks the contrast of each pair against its
   ink and against the signs in both themes, which is why King's Landing's red is a shade lighter
@@ -545,7 +546,7 @@ once per redraw with `timeMs = 0`. The live engine is also on `window.tinyworld`
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
-In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia), a building found in the search
+In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs), a building found in the search
 lights up under the mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
 outline cut out), a 2 px line of the accent runs round it, and a sign beside its top says what
 it is (type · context line, name), the opening of its Wikipedia article and "Read on Wikipedia".
@@ -587,7 +588,7 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 
 ### Guess the building (`hooks/use-quiz.ts`, `components/map/quiz-*.tsx`, `lib/quiz*.ts`)
 
-In a world with `quiz: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia; it needs `sights`), a sign under
+In a world with `quiz: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs; it needs `sights`), a sign under
 "more cities and worlds" (`QuizBanner`, class `quiz-invite`) opens the game once the buildings are in. The card
 first asks what to play (`choosing`): a difficulty (easy, medium, hard), a borough or all
 (the areas the questions have, most first; the row is named by the world's `borough` word) and

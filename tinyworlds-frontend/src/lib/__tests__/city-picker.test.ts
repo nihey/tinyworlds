@@ -112,6 +112,11 @@ describe("pickerOptions", () => {
       expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).more, name).toEqual([]);
       expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).typed, name).toBeNull();
     }
+    // Colorado Springs was typed in by its donor
+    for (const name of ["colorado springs", "Colorado Springs"]) {
+      expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).more, name).toEqual([]);
+      expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).typed, name).toBeNull();
+    }
     // the made-up places are worlds too: not to be funded again, under any of their names
     for (const name of [
       "Winterfell",

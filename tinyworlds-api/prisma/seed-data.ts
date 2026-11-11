@@ -19,6 +19,7 @@ export const BUILT: SeedCity[] = [
   { slug: 'cincinnati', name: 'Cincinnati', worldId: 'tinycvg' },
   { slug: 'pittsburgh', name: 'Pittsburgh', worldId: 'tinypit' },
   { slug: 'philadelphia', name: 'Philadelphia', worldId: 'tinyphl' },
+  { slug: 'colorado-springs', name: 'Colorado Springs', worldId: 'tinycos' },
   { slug: 'winterfell', name: 'Winterfell', worldId: 'tinywinterfell' },
   {
     slug: 'king-s-landing',
