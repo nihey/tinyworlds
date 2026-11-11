@@ -6,7 +6,7 @@ describe('signInMail', () => {
 
   it('carries the link, and how long it lasts, in every language', () => {
     for (const locale of LOCALES) {
-      const mail = signInMail(locale, link, 15);
+      const mail = signInMail(locale, link, '482913', 15, 'admin');
       expect(mail.subject).toContain('tinyworlds');
       expect(mail.text).toContain(link);
       expect(mail.text).toContain('15');
@@ -15,8 +15,23 @@ describe('signInMail', () => {
     }
   });
 
+  it('puts the code in the subject and in both bodies, in every language', () => {
+    for (const locale of LOCALES) {
+      const mail = signInMail(locale, link, '482913', 15, 'admin');
+      expect(mail.subject.endsWith('482 913')).toBe(true);
+      expect(mail.text).toContain('482 913');
+      expect(mail.html).toContain('482 913');
+    }
+  });
+
   it('never lets a link break out of its markup', () => {
-    const mail = signInMail('en-US', 'https://example.com/"><b>&', 15);
+    const mail = signInMail(
+      'en-US',
+      'https://example.com/"><b>&',
+      '482913',
+      15,
+      'admin',
+    );
     expect(mail.html).not.toContain('"><b>');
     expect(mail.html).toContain('&quot;&gt;&lt;b&gt;&amp;');
   });

@@ -53,11 +53,14 @@ export class AuthController {
     return { sent: true };
   }
 
-  /** Trades a link's token for a session; 401 when the link is spent, stale or unknown. */
+  /** Trades a link's token, or an address and the code from its mail, for a session; 401 when the link is spent, stale or unknown. */
   @Post('verify')
   @HttpCode(200)
   async verify(@Body() body: VerifyLinkDto): Promise<SessionAnswer> {
-    const session = await this.auth.verify(body.token);
+    const session =
+      body.token !== undefined
+        ? await this.auth.verify(body.token)
+        : await this.auth.verifyCode(body.email ?? '', body.code ?? '');
     return {
       accessToken: session.accessToken,
       expiresAt: session.expiresAt.toISOString(),

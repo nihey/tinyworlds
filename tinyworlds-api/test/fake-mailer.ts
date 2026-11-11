@@ -18,4 +18,11 @@ export class FakeMailer implements Mailer {
     if (!found) throw new Error('no sign-in link in the last mail');
     return found[1];
   }
+
+  /** The 6-digit code the last mail's subject carries, without its space. */
+  code(): string {
+    const found = /(\d{3}) (\d{3})/.exec(this.sent.at(-1)?.subject ?? '');
+    if (!found) throw new Error('no sign-in code in the last mail');
+    return found[1] + found[2];
+  }
 }

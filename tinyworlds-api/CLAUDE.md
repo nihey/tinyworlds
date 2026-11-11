@@ -36,7 +36,7 @@ src/
 ├── health/                         # { health }
 ├── common/                         # rate limit module, GraphQL throttler guard, enum registration
 ├── auth/
-│   ├── auth.service.ts             # sendLink, verify, adminOf: sign-in by emailed link
+│   ├── auth.service.ts             # sendLink, verify, verifyCode, adminOf: sign-in by emailed link or code
 │   ├── auth.controller.ts dto/     # POST /api/auth/magic-link, /api/auth/verify (REST)
 │   ├── jwt.strategy.ts jwt-auth.guard.ts   # the global guard: private unless @Public()
 │   ├── public.decorator.ts current-admin.decorator.ts session-secret.ts
@@ -173,13 +173,19 @@ sign-in).
    plain page of `ALLOWED_ORIGINS` (the site's `/admin/`). The mail goes out after the answer
    (`setImmediate`), so neither the answer nor its timing tells an admin's address from any
    other. One link a minute per admin (`LINK_EVERY_MS`), five requests a minute per address.
-2. The token is 32 random bytes; only its SHA-256 is stored (`magic_links`), it is good for
-   15 minutes (`LINK_MINUTES`) and **once**: it is spent in a single `UPDATE … WHERE used_at
-   IS NULL`, so two openings cannot both sign in. It travels in the URL's hash, which reaches
-   neither a web server's log nor the page analytics.
-3. `POST /api/auth/verify { token }` → `{ accessToken, expiresAt, admin { id, email } }`, or
-   401. The session is a JWT (HS256, `JWT_SECRET`, 7 days: `SESSION_DAYS`) that the site keeps
-   in local storage.
+2. The mail carries the link and a **6-digit code** (`CODE_DIGITS`; in the subject, `482 913`).
+   The token is 32 random bytes; only its SHA-256 is stored (`magic_links`). The code is never
+   stored either: only `HMAC-SHA256(JWT_SECRET, tokenHash:code)` (`hashCode`), compared with
+   `timingSafeEqual`. Link and code are good for 15 minutes (`LINK_MINUTES`) and **once
+   between them**: either is spent in a single `UPDATE … WHERE used_at IS NULL`, so two tries
+   cannot both sign in, and using one spends the other. The token travels in the URL's hash,
+   which reaches neither a web server's log nor the page analytics.
+3. `POST /api/auth/verify { token }` or `{ email, code }` → `{ accessToken, expiresAt,
+   admin { id, email } }`, or 401. The code may be typed "482 913" or "482-913"
+   (`normalizeCode`). A wrong code counts against the admin's newest live link
+   (`attempts`); at `CODE_TRIES` (5) the link is spent. A wrong code, an unknown address and a
+   bad link all answer the same 401. The session is a JWT (HS256, `JWT_SECRET`, 7 days:
+   `SESSION_DAYS`) that the site keeps in local storage.
 
 The mail is sent through SMTP (`SMTP_*`, `MAIL_FROM`; nodemailer), in the language the admin
 asked in (`sign-in-mail.ts`). With no mail server configured the message is written to the log

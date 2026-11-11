@@ -439,6 +439,34 @@ describe('the API over HTTP', () => {
       expect(JSON.stringify(links)).not.toContain(mailer.token());
     });
 
+    it('open to an admin through the code from the mail', async () => {
+      // a link a minute: forget the ones the other tests asked for
+      await prisma.magicLink.deleteMany();
+      const before = mailer.sent.length;
+      await post('/api/auth/magic-link', {
+        email: ADMIN,
+        returnUrl: ADMIN_PAGE,
+      })
+        .set('x-forwarded-for', '203.0.113.40')
+        .expect(202);
+      await vi.waitFor(() =>
+        expect(mailer.sent.length).toBeGreaterThan(before),
+      );
+      const code = mailer.code();
+      const res = await post('/api/auth/verify', {
+        email: ADMIN,
+        code: `${code.slice(0, 3)} ${code.slice(3)}`,
+      })
+        .set('x-forwarded-for', '203.0.113.40')
+        .expect(200);
+      expect((res.body as { admin: { email: string } }).admin.email).toBe(
+        ADMIN,
+      );
+      await post('/api/auth/verify', { email: ADMIN, code })
+        .set('x-forwarded-for', '203.0.113.40')
+        .expect(401);
+    });
+
     it('answer anyone else the same, and mail them nothing', async () => {
       await signIn();
       const before = mailer.sent.length;
