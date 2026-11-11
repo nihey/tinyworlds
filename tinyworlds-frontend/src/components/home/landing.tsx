@@ -6,6 +6,7 @@ import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
 import { BuildNext } from "@/components/donate/build-next";
 import { DonateDialog } from "@/components/donate/donate-dialog";
+import { WallColumns, WallStrip } from "@/components/home/benefactor-wall";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import { NextCityTile } from "@/components/home/next-city-tile";
 import { SectionHead } from "@/components/home/section-head";
@@ -18,6 +19,7 @@ import { useMilestones, type Milestones } from "@/hooks/use-milestones";
 import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
+import { useWall } from "@/hooks/use-wall";
 import { useWorldVisits } from "@/hooks/use-world-visits";
 import { rankCities } from "@/lib/city-picker";
 import { consentStore, GTM_ID } from "@/lib/consent";
@@ -139,6 +141,13 @@ export function Landing() {
   );
   const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
+  // everyone who gave to a city: down the page's sides where there is room, a strip otherwise
+  const wall = useWall();
+  const wallProps = {
+    load: wall,
+    onCity: (slug: string) => openBenefactors({ slug }),
+    onDonate: takesDonations ? () => setDonate({ city: null }) : undefined,
+  };
   // the benefactors need the API; a world's card offers them once the list says it has a city for it
   const withApi = API_URL !== "";
   const benefactorWorlds = new Set(
@@ -202,6 +211,8 @@ export function Landing() {
             funding={funding}
           />
         )}
+
+        {withApi && <WallStrip {...wallProps} />}
       </div>
 
       <WorldGrid
@@ -289,6 +300,8 @@ export function Landing() {
           </p>
         )}
       </footer>
+
+      {withApi && <WallColumns {...wallProps} />}
 
       {withApi && (
         <BenefactorsSign
