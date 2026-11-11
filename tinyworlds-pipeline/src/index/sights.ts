@@ -1,4 +1,7 @@
+import type { Scene } from "../render/scene.js";
 import type { PlaceType } from "./build.js";
+import { silhouette } from "./silhouette.js";
+import { piecesOf } from "./structures.js";
 
 /**
  * Sights: the structures on the map that light up under the pointer. A sight is one building,
@@ -85,4 +88,51 @@ export function resolveSights(
     }
   }
   return sights.sort((a, b) => b.r - a.r || a.order - b.order);
+}
+
+/** A sight as the viewer reads it from sights.json. */
+export interface SightRecord {
+  id: string;
+  n: string;
+  t: SightType;
+  b?: string;
+  lon: number;
+  lat: number;
+  /** the silhouette: flat map px rings, even-odd */
+  rings: number[][];
+  /** the largest ground y of its footprints: the nearer the viewer, the larger */
+  front: number;
+  /** where its sign hangs: the silhouette's topmost point */
+  anchor: [number, number];
+}
+
+const round5 = (v: number): number => Math.round(v * 1e5) / 1e5;
+
+/** The sights with their outlines, as sights.json holds them. A sight with no outline is left out. */
+export function toSightFile(drafts: SightDraft[], scene: Scene): { sights: SightRecord[] } {
+  const sights: SightRecord[] = [];
+  for (const d of drafts) {
+    const pieces = piecesOf(scene, d.vols);
+    const rings = silhouette(pieces);
+    if (rings.length === 0) continue;
+    let front = -Infinity;
+    for (const piece of pieces)
+      for (const ring of piece.rings)
+        for (let i = 1; i < ring.length; i += 2) front = Math.max(front, ring[i]);
+    let anchor: [number, number] = [rings[0][0], rings[0][1]];
+    for (const ring of rings)
+      for (let i = 0; i < ring.length; i += 2) if (ring[i + 1] < anchor[1]) anchor = [ring[i], ring[i + 1]];
+    sights.push({
+      id: d.key,
+      n: d.n,
+      t: d.t,
+      ...(d.b ? { b: d.b } : {}),
+      lon: round5(d.lon),
+      lat: round5(d.lat),
+      rings,
+      front: Math.round(front * 2) / 2,
+      anchor,
+    });
+  }
+  return { sights };
 }
