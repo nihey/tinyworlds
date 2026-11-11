@@ -69,7 +69,7 @@ interface LinkWhere {
   adminId?: string;
   usedAt?: null;
   expiresAt?: { lt?: Date; gt?: Date };
-  createdAt?: { gt?: Date };
+  createdAt?: { lt?: Date; gt?: Date };
   attempts?: { lt: number };
   admin?: { email: string };
   donorId?: string;
@@ -346,6 +346,8 @@ export class FakePrisma {
           link.expiresAt < where.expiresAt.lt) &&
         (where.expiresAt?.gt === undefined ||
           link.expiresAt > where.expiresAt.gt) &&
+        (where.createdAt?.lt === undefined ||
+          link.createdAt < where.createdAt.lt) &&
         (where.createdAt?.gt === undefined ||
           link.createdAt > where.createdAt.gt) &&
         (where.attempts === undefined || link.attempts < where.attempts.lt) &&

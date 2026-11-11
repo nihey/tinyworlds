@@ -27,6 +27,7 @@ const DONOR = 'ana@example.com';
 const PAGE = 'https://example.com/admin/';
 const HOME = 'https://example.com/';
 const SECRET = 'a-secret-for-the-tests-and-nothing-else';
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** A donor row, with one gift unless told otherwise. */
 function seedDonor(prisma: FakePrisma, email = DONOR, given = true) {
@@ -162,15 +163,73 @@ describe('AuthService.sendLink', () => {
     expect(await service.sendLink(ADMIN, PAGE, 'en-US', 'admin')).toBe(true);
   });
 
-  it('clears away the links that have expired', async () => {
+  it('keeps a day of links, expired or not, and clears away older ones', async () => {
     vi.useFakeTimers();
     const { service, prisma } = setup();
     await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     vi.advanceTimersByTime(LINK_MINUTES * 60_000 + 1000);
     await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
+    // the first has expired, but its tries still count towards the day
+    expect(prisma.links).toHaveLength(2);
+    vi.advanceTimersByTime(DAY_MS + 1000);
+    await service.sendLink(ADMIN, PAGE, 'en-US', 'admin');
     expect(prisma.links).toHaveLength(1);
   });
 });
+
+describe.each(['admin', 'donor'] as const)(
+  "AuthService's daily cap on codes (%s)",
+  (kind) => {
+    const wrongOf = (code: string) => (code === '000000' ? '111111' : '000000');
+    const address = kind === 'admin' ? ADMIN : DONOR;
+    const page = kind === 'admin' ? PAGE : HOME;
+    const prepare = () => {
+      vi.useFakeTimers();
+      const made = setup([ADMIN]);
+      if (kind === 'donor') seedDonor(made.prisma);
+      return made;
+    };
+    /** A day's worth of wrong codes, one link at a time, each link left to expire. */
+    const spendTheDay = async ({
+      service,
+      mailer,
+    }: ReturnType<typeof setup>) => {
+      for (let i = 0; i < CODE_TRIES_PER_DAY / CODE_TRIES; i++) {
+        expect(await service.sendLink(address, page, 'en-US', kind)).toBe(true);
+        const code = mailer.code();
+        for (let t = 0; t < CODE_TRIES; t++)
+          await service
+            .verifyCode(address, wrongOf(code), kind)
+            .catch(() => undefined);
+        vi.advanceTimersByTime(LINK_MINUTES * 60_000 + 1000);
+      }
+    };
+
+    it('is not reset when the links it counts expire', async () => {
+      const made = prepare();
+      await spendTheDay(made);
+      const { service, mailer, prisma } = made;
+      expect(await service.sendLink(address, page, 'en-US', kind)).toBe(true);
+      await expect(
+        service.verifyCode(address, mailer.code(), kind),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.links.at(-1)?.attempts).toBe(0); // refused without comparing
+      await expect(service.verify(mailer.token())).resolves.toBeDefined();
+    });
+
+    it('forgets links older than a day, and clears them away', async () => {
+      const made = prepare();
+      await spendTheDay(made);
+      const { service, mailer, prisma } = made;
+      vi.advanceTimersByTime(DAY_MS);
+      expect(await service.sendLink(address, page, 'en-US', kind)).toBe(true);
+      expect(prisma.links).toHaveLength(1);
+      await expect(
+        service.verifyCode(address, mailer.code(), kind),
+      ).resolves.toBeDefined();
+    });
+  },
+);
 
 describe('AuthService.verify', () => {
   it('trades a fresh link for a session that names the admin', async () => {

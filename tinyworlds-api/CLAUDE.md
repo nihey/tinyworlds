@@ -206,7 +206,9 @@ each, and each gets its own links.
    admin's or a donor's address from another. An account gets `CODE_TRIES_PER_DAY` (20) tries
    per rolling 24 hours across all its links (the sum of their `attempts`, by `admin_id` or
    `donor_id`; past it a code is refused without being compared, the token still works;
-   parallel requests may overshoot it by a few).
+   parallel requests may overshoot it by a few). So that expiry cannot reset it, links are
+   kept for a day after they are made, expired or not, and cleared by age when the account
+   next asks for one.
 
 **Sessions** are JWTs (HS256, `JWT_SECRET`, 7 days: `SESSION_DAYS`) that the site keeps in
 local storage, with the payload `{ sub, kind }`: the account's id and `admin | donor`. A token
