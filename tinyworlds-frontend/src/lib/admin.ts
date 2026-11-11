@@ -276,6 +276,36 @@ export function rankWorlds(worlds: FunnelWorld[]): {
 /** "2026-11-10" as a date at noon UTC: safe to format in UTC, whatever the reader's zone. */
 export const dayDate = (day: string): Date => new Date(`${day}T12:00:00Z`);
 
+// ---------------------------------------------------------------------------------------------
+// the names
+// ---------------------------------------------------------------------------------------------
+
+/** A name donors chose to show, as an admin sees it: hidden ones are listed too. */
+export interface BenefactorName {
+  donorId: string;
+  name: string;
+  hidden: boolean;
+  /** the names of the cities the donor gave to */
+  cities: string[];
+  /** ISO 8601 */
+  lastGiftAt: string;
+}
+
+/** Keeps the well-formed rows of whatever the API answered, in its order. */
+export function parseNames(value: unknown): BenefactorName[] {
+  return list(value).flatMap((row) => {
+    const { donorId, name, hidden, lastGiftAt } = row;
+    if (typeof donorId !== "string" || donorId === "") return [];
+    if (typeof name !== "string" || name.trim() === "") return [];
+    if (typeof hidden !== "boolean") return [];
+    if (typeof lastGiftAt !== "string" || Number.isNaN(Date.parse(lastGiftAt))) return [];
+    const cities = Array.isArray(row.cities)
+      ? (row.cities as unknown[]).filter((c): c is string => typeof c === "string" && c !== "")
+      : [];
+    return [{ donorId, name, hidden, cities, lastGiftAt }];
+  });
+}
+
 /** A round number at or above the largest value: where a chart's scale tops out. */
 export function niceMax(value: number): number {
   if (!(value > 0)) return 1;

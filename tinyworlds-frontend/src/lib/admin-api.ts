@@ -1,6 +1,12 @@
 import { ApolloClient, gql, HttpLink, InMemoryCache } from "@apollo/client";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
-import { parseFunnel, type AdminSession, type DonationFunnel } from "./admin";
+import {
+  parseFunnel,
+  parseNames,
+  type AdminSession,
+  type BenefactorName,
+  type DonationFunnel,
+} from "./admin";
 import { API_URL, withTimeout } from "./donate";
 import { SignInError as AdminApiError } from "./sign-in-api";
 
@@ -105,5 +111,71 @@ export async function fetchFunnel(
       CombinedGraphQLErrors.is(error) &&
       error.errors.some((e) => e.extensions?.code === "UNAUTHENTICATED");
     throw new AdminApiError(unauthorized ? "unauthorized" : "failed");
+  }
+}
+
+/** Maps what went wrong with a request to the kinds the admin page tells apart. */
+function failure(error: unknown): AdminApiError {
+  if (error instanceof AdminApiError) return error;
+  const unauthorized =
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some((e) => e.extensions?.code === "UNAUTHENTICATED");
+  return new AdminApiError(unauthorized ? "unauthorized" : "failed");
+}
+
+const NAMES = gql`
+  query BenefactorNames {
+    benefactorNames {
+      donorId
+      name
+      hidden
+      cities
+      lastGiftAt
+    }
+  }
+`;
+
+/** The names on the benefactors' pages, newest gift first (at most 100), hidden ones included. */
+export async function fetchNames(session: AdminSession): Promise<BenefactorName[]> {
+  try {
+    const result = await withTimeout(
+      apollo(session.accessToken).query<{ benefactorNames: unknown }>({
+        query: NAMES,
+        fetchPolicy: "no-cache",
+        context: { fetchOptions: { signal: AbortSignal.timeout(TIMEOUT) } },
+      }),
+      TIMEOUT,
+    );
+    if (!Array.isArray(result.data?.benefactorNames)) throw new AdminApiError("failed");
+    return parseNames(result.data.benefactorNames);
+  } catch (error) {
+    throw failure(error);
+  }
+}
+
+const SET_NAME_HIDDEN = gql`
+  mutation SetNameHidden($input: SetNameHiddenInput!) {
+    setNameHidden(input: $input)
+  }
+`;
+
+/** Hides a donor's name from every benefactors list, or shows it again. */
+export async function setNameHidden(
+  session: AdminSession,
+  donorId: string,
+  hidden: boolean,
+): Promise<void> {
+  try {
+    const result = await withTimeout(
+      apollo(session.accessToken).mutate<{ setNameHidden: boolean }>({
+        mutation: SET_NAME_HIDDEN,
+        variables: { input: { donorId, hidden } },
+        context: { fetchOptions: { signal: AbortSignal.timeout(TIMEOUT) } },
+      }),
+      TIMEOUT,
+    );
+    if (result.data?.setNameHidden !== true) throw new AdminApiError("failed");
+  } catch (error) {
+    throw failure(error);
   }
 }

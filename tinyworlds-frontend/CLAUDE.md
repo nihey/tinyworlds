@@ -117,9 +117,12 @@ src/
 │                        # and the city progress bar the front page's ranking uses
 ├── components/home/     # the front page: landing.tsx, and moving-picture.tsx (a still that
 │                        # comes alive: the hero and the cards)
+├── components/benefactors/ # a city's benefactors (panel, sign, stone grid) and the badges' pixel art
+├── components/me/       # "Your cities" (/me/): your-cities.tsx, name-editor.tsx, me-app.tsx
 ├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
 ├── components/admin/    # the admin pages: admin-app.tsx (signed in or not),
-│                        # funnel-report.tsx (the steps, the cities by visits, the days)
+│                        # funnel-report.tsx (the steps, the cities by visits, the days),
+│                        # names.tsx (donors' names: hide and show)
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
@@ -326,6 +329,29 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
   thin, and every figure a bar stands for is written beside it or in the table.
 - There is nothing secret in the page itself: the numbers come from the API, which gives them
   to signed-in admins alone. Who the admins are is the API's `ADMIN_EMAILS`.
+
+## Benefactors
+
+Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_URL`.
+
+- **Where the sign opens.** `BenefactorsSign` (a city's founders, benefactors and stone grid, from
+  `cityBenefactors`) opens from the front page (a world's card, a ranking row) and, in a map,
+  from About (`BenefactorsPanel`, drawn only for a city the API knows and that is built). The
+  panel is mounted only while open, so each opening fetches afresh. A card offers it only for
+  worlds the API lists a city for.
+- **Built cities reach the Donate sign only through it.** The picker never offers a built city
+  (nothing to fund); the benefactors' sign has a button that closes that sign and opens
+  Donate with the city chosen (one sign at a time).
+- **The join block** (`components/donate/join-block.tsx`) is "Put my name on {city}": off by
+  default, a name field (40 code points, `cleanName`) when on, and Donate disabled until a name
+  is left. The checkout carries `benefactorName`, null when off. The email's existing name is kept.
+- **Badges are SVG pixel maps** (`benefactors/pixel-art.ts`: one character per pixel, a palette
+  with fixed colours; `pixel-badge.tsx` draws one `<rect>` per pixel at a whole-number scale), so
+  they stay crisp at any size and need no image files. Founding, first stone and keystone.
+  Titles and the founder label are in the i18n dictionaries.
+- **"Your cities"** (`/me/`, below) is where a donor sees their own badges and the listing
+  switch; **`/admin/`** can hide a name (`components/admin/names.tsx`: `benefactorNames`,
+  `setNameHidden`; it acts at once, since it is reversible, and is loaded apart from the funnel).
 
 ## "Your cities" (`/me/`)
 

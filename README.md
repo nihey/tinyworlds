@@ -83,8 +83,12 @@ npm run start:dev                  # http://localhost:4000/api/graphql
 To sign in to the admin pages locally, put an address in `ADMIN_EMAILS` and a secret in
 `JWT_SECRET` (`.env`), ask for a link at `/admin/`, and copy it (or its code) from the API's
 log: without a mail server that is where the mail goes. Donors sign in the same way, with an
-address that has a recorded donation. In production the API always needs `JWT_SECRET`,
+address that has a recorded donation; their page is `/me/` of the front page ("Your cities").
+In production the API always needs `JWT_SECRET`,
 `SMTP_HOST` and `MAIL_FROM`, admins or not, because donors sign in too.
+
+After deploying the benefactors feature, run `npm run donors:backfill` once in the API
+container: it gives past donations their donors from Stripe (safe to run again).
 
 Or `./dev.sh [world]` for all three in tmux.
 
