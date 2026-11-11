@@ -4,6 +4,8 @@ import {
   STONE_CENTS,
   cleanName,
   collapseFounders,
+  earnedBadges,
+  earnedWhere,
   givingSummary,
   parseGiving,
   summaryLine,
@@ -13,6 +15,7 @@ import {
   stonePreview,
   stoneRanges,
   type FounderRow,
+  type MyCity,
 } from "../benefactors";
 
 const row = (number: number, extra: Partial<FounderRow> = {}): FounderRow => ({
@@ -282,5 +285,54 @@ describe("moreLine", () => {
     };
     expect(moreLine(3, 1, pt)).toBe("e mais 3, 1 anônimo");
     expect(moreLine(5, 2, pt)).toBe("e mais 5, 2 anônimos");
+  });
+});
+
+const givenCity = (over: Partial<MyCity> & { name: string }): MyCity => ({
+  slug: over.name.toLowerCase().replaceAll(" ", "-"),
+  status: "PROPOSED",
+  worldId: null,
+  goalCents: 3000,
+  raisedCents: 1000,
+  givenCents: 500,
+  founderNumber: null,
+  stones: [],
+  firstStone: false,
+  keystone: false,
+  listed: false,
+  ...over,
+});
+
+describe("earnedBadges", () => {
+  it("says which badges were earned, and in which cities", () => {
+    const cities = [
+      givenCity({ name: "Los Angeles", founderNumber: 1, firstStone: true }),
+      givenCity({ name: "Philadelphia", founderNumber: 2 }),
+      givenCity({ name: "Dallas", founderNumber: null }),
+      givenCity({ name: "Lisbon", founderNumber: 7, keystone: true }),
+    ];
+    expect(earnedBadges(cities)).toEqual({
+      founding: ["Los Angeles", "Philadelphia", "Lisbon"],
+      firstStone: ["Los Angeles"],
+      keystone: ["Lisbon"],
+    });
+  });
+
+  it("has none for someone who has not given", () => {
+    expect(earnedBadges([])).toEqual({ founding: [], firstStone: [], keystone: [] });
+  });
+});
+
+describe("earnedWhere", () => {
+  const words = { one: "{n} city", other: "{n} cities" };
+
+  it("names one or two cities, and counts more", () => {
+    expect(earnedWhere(["Dallas"], words)).toBe("Dallas");
+    expect(earnedWhere(["Dallas", "Lisbon"], words)).toBe("Dallas, Lisbon");
+    expect(earnedWhere(["Dallas", "Lisbon", "Paris"], words)).toBe("3 cities");
+  });
+
+  it("says nothing of a badge that was not earned", () => {
+    expect(earnedWhere([], words)).toBeNull();
   });
 });

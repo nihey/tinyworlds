@@ -5,6 +5,7 @@ import {
   LIVE_SHOWN_ABOVE,
   parseWorldVisits,
   presenceRequest,
+  siteTotals,
   visitsLine,
   visitsRequest,
   type ShownPage,
@@ -209,5 +210,20 @@ describe("everyWhileShown", () => {
     tab.show();
     expect(say).not.toHaveBeenCalled();
     expect(tab.listening()).toBe(0);
+  });
+});
+
+describe("siteTotals", () => {
+  it("knows nothing before the counts come", () => {
+    expect(siteTotals(null)).toBeNull();
+  });
+
+  it("adds the worlds' visits up, and those exploring now", () => {
+    const counts: WorldCounts = new Map([
+      ["tinynyc", { visits: 10, live: 2 }],
+      ["tinyrao", { visits: 5, live: 0 }],
+    ]);
+    expect(siteTotals(counts)).toEqual({ visits: 15, live: 2 });
+    expect(siteTotals(new Map())).toEqual({ visits: 0, live: 0 });
   });
 });

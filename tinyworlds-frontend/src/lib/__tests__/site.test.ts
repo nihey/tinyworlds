@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   BUILT_CITIES,
+  CITIES_PATH,
   CONTACT_EMAIL,
   CONTACT_URL,
   GITHUB_URL,
   HERO,
+  HERO_FILMS,
+  heroSlides,
   HOME_CARD_PATH,
   HOME_URL,
+  RANKING_PATH,
   SITE_ID,
   SITE_NAME,
   worldCardUrl,
+  worldHero,
   worldLoopUrl,
   worldUrl,
 } from "@/site";
@@ -37,6 +42,33 @@ describe("site", () => {
     expect(worldLoopUrl("tinyrao", "/sub/loops")).toBe("/sub/loops/tinyrao.mp4");
     expect(HERO).toEqual({ world: "tinynyc", loop: "/loops/hero.mp4", still: "/loops/hero.jpg" });
     expect(HOME_CARD_PATH).toBe("/og/tinyworlds.jpg");
+  });
+
+  it("finds each world's hero film, New York's under its old name", () => {
+    expect(worldHero("tinynyc")).toEqual({ loop: "/loops/hero.mp4", still: "/loops/hero.jpg" });
+    expect(worldHero("tinylax")).toEqual({
+      loop: "/loops/hero-tinylax.mp4",
+      still: "/loops/hero-tinylax.jpg",
+    });
+    expect(worldHero("tinylax", "/sub/loops").still).toBe("/sub/loops/hero-tinylax.jpg");
+  });
+
+  it("shows the worlds that have a film, in the registry's order, and never none", () => {
+    expect(heroSlides(["tinynyc", "tinyrao", "tinylax"], ["tinylax", "tinynyc"])).toEqual([
+      "tinynyc",
+      "tinylax",
+    ]);
+    expect(heroSlides(["tinynyc", "tinyrao"], [])).toEqual(["tinynyc"]);
+    expect(heroSlides(["tinynyc", "tinyrao"], ["tinyelsewhere"])).toEqual(["tinynyc"]);
+  });
+
+  it("knows of no film until the build lists them", () => {
+    expect(HERO_FILMS).toEqual([]);
+  });
+
+  it("finds the front page's cities and its ranking from its other pages", () => {
+    expect(CITIES_PATH).toBe("/#cities");
+    expect(RANKING_PATH).toBe("/#ranking");
   });
 
   it("says where to write about the project", () => {

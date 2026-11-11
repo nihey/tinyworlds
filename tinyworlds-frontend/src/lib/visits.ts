@@ -65,6 +65,21 @@ export function byVisits<T extends { id: string }>(worlds: T[], counts: WorldCou
   return [...worlds].sort((a, b) => visits(b) - visits(a));
 }
 
+/**
+ * Every world's visits together, and everyone exploring now: the front page's own figures.
+ * Null until the counts are there.
+ */
+export function siteTotals(counts: WorldCounts | null): { visits: number; live: number } | null {
+  if (!counts) return null;
+  let visits = 0;
+  let live = 0;
+  for (const count of counts.values()) {
+    visits += count.visits;
+    live += count.live;
+  }
+  return { visits, live };
+}
+
 /** What a card says: "41,203 visits", and "23 exploring now" above the threshold; null for none. */
 export function visitsLine(
   count: WorldCount | undefined,
