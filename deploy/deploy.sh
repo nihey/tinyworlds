@@ -157,6 +157,23 @@ build_all() {
 
 # ---- uploading ------------------------------------------------------------------------------
 
+# The `build` a manifest names (read from stdin): which render it describes.
+build_of() { { grep -o '"build":"[^"]*"' || true; } | head -n 1 | cut -d '"' -f 4; }
+
+# An index-only upload sends the manifest too (it names the indexes' version), and a manifest
+# also describes the tiles: it may only replace one from the same render, or it would point the
+# viewer at tiles that are not on the server. Says so and fails otherwise.
+same_render() {
+  local target="$1" data="$2" site="$3" here there
+  here="$(build_of <"$data/manifest.json")"
+  there="$(ssh "$DEPLOY_HOST" "cat '$site/data/manifest.json'" 2>/dev/null | build_of)" || true
+  if [[ -z "$here" || "$here" != "$there" ]]; then
+    echo "Not sending $target's indexes: its manifest here is from render ${here:-?}," \
+      "the server's from ${there:-none}. Deploy its data first (without --index)." >&2
+    return 1
+  fi
+}
+
 # Copies one target to the server: its built site from <out> (unless mode is --data), and its
 # map data as the mode says. Every step is checked: uploads side by side run inside an `if`,
 # where `set -e` does not reach.
@@ -166,6 +183,10 @@ upload() {
   site="$DEPLOY_DIR/site$base_path"
   data="$FRONTEND/public/data/$target"
   [[ -t 1 ]] && progress="--info=progress2"
+  # before anything is sent, so a refusal leaves the site as it was
+  if [[ "$mode" == "--index" && "$target" != "home" ]]; then
+    same_render "$target" "$data" "$site" || return
+  fi
   if [[ "$mode" != "--data" ]]; then
     ssh "$DEPLOY_HOST" "mkdir -p '$site'" || return
     if [[ "$target" == "home" ]]; then
@@ -190,6 +211,8 @@ upload() {
         local indexes=("$data/places.json" "$data/hoods.json" "$data/life.json") sight
         for sight in "$data"/sights*.json; do [[ -e "$sight" ]] && indexes+=("$sight"); done
         rsync -az "${indexes[@]}" "$DEPLOY_HOST:$site/data/" || return
+        # the manifest last: it names the indexes' version, so visitors ask for them anew
+        rsync -a "$data/manifest.json" "$DEPLOY_HOST:$site/data/manifest.json" || return
         ;;
       *)
         ssh "$DEPLOY_HOST" "mkdir -p '$site/data'" || return

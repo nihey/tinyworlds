@@ -134,7 +134,10 @@ north points `manifest.northDeg` clockwise from screen-up.
 ```ts
 interface Manifest {
   name: string;                 // the world id: "tinynyc"
-  build: string;                // cache-busting id; append as ?v= to every data URL
+  build: string;                // the render's cache-busting id: append as ?v= to tiles, overview
+  indexes?: string;             // the indexes' (places, hoods, life, sights, their texts and
+                                // pictures): append as ?v= to those; absent: use `build`. A hash
+                                // of their contents, written by the pipeline's index and wiki
   tileSize: number;             // 512
   origin: { x: number; y: number };   // map-px position of tile (z, 0, 0)'s top-left, all levels
   levels: {

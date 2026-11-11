@@ -81,7 +81,9 @@ measurement among them) do not log each pan as a page view. Never call `history.
 directly for the hash.
 
 Every data URL goes through `dataUrl()` in `src/map/data.ts`, which prefixes the data base and
-appends `?v=<manifest.build>`. `public/data/` is generated and gitignored: move it out of the way
+appends a version: `?v=<manifest.build>` for the tiles and the minimap (the render's),
+`?v=<manifest.indexes>` for the indexes, the sights' texts and their pictures (which change
+without a render; `parseManifest` falls back to `build` for a manifest without it). `public/data/` is generated and gitignored: move it out of the way
 before `next build` (the export would copy every tile into `out/`); without it the page shows the
 "map didn't load" dialog. `public/og/<world>.jpg` (1200×630 share cards, made by the pipeline) is
 committed and must stay; so are `public/og/tinyworlds.jpg` (the front page's own share card, the

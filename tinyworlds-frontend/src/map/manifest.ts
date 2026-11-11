@@ -27,8 +27,13 @@ export interface Bounds {
 
 export interface Manifest {
   name: string;
-  /** cache-busting id, appended as ?v= to every data URL */
+  /** cache-busting id of the render, appended as ?v= to the tiles and the minimap */
   build: string;
+  /**
+   * cache-busting id of the indexes (places, hoods, life, the sights, their texts and pictures),
+   * appended as ?v= to those: they can change without a render. `build` when the file has none.
+   */
+  indexes: string;
   tileSize: number;
   /** map-px position of tile (z, 0, 0)'s top-left corner, the same for every level */
   origin: { x: number; y: number };
@@ -116,6 +121,12 @@ export function parseManifest(json: unknown): Manifest {
   return {
     name: typeof m.name === "string" ? m.name : "",
     build: typeof m.build === "string" ? m.build : "",
+    indexes:
+      typeof m.indexes === "string" && m.indexes !== ""
+        ? m.indexes
+        : typeof m.build === "string"
+          ? m.build
+          : "",
     tileSize: m.tileSize!,
     origin: m.origin!,
     levels,

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CITY, DIRS } from "../config.js";
 import { WIKI_USER_AGENT } from "../env.js";
+import { stampIndexes } from "./stamp.js";
 
 /**
  * The `wiki` step: each sight's Wikipedia article, in English, Portuguese and Spanish, matched
@@ -237,6 +238,7 @@ export async function buildWiki(
   }
   for (const { locale } of LOCALES)
     fs.writeFileSync(path.join(out, `sights.${locale}.json`), JSON.stringify(texts[locale]));
+  stampIndexes(out, log);
   log(
     `wiki: ${matched} of ${sights.length} sights have an article${failed ? `, ${failed} failed (run again)` : ""}`,
   );

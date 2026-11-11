@@ -107,7 +107,7 @@ export function MapApp() {
           marks,
           manifest,
           tileUrl: (z, tx, ty) => dataUrl(`tiles/${z}/${tx}_${ty}.webp`, manifest.build),
-          fileUrl: (path) => dataUrl(path, manifest.build),
+          fileUrl: (path) => dataUrl(path, manifest.indexes),
           reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           start: parseHash(window.location.hash) ?? undefined,
         });
@@ -116,21 +116,21 @@ export function MapApp() {
         setSession({ manifest, engine: live });
 
         // the map is usable without these; search and lines arrive when they arrive
-        loadPlaces(manifest.build, abort.signal)
+        loadPlaces(manifest.indexes, abort.signal)
           .then((loaded) => {
             if (!abort.signal.aborted) setPlaces(loaded);
           })
           .catch(() => {
             if (!abort.signal.aborted) setPlacesFailed(true);
           });
-        loadHoods(manifest.build, abort.signal)
+        loadHoods(manifest.indexes, abort.signal)
           .then((hoods) => {
             if (abort.signal.aborted) return;
             live.setHoods(hoods);
             setHasHoods(hoods.length > 0);
           })
           .catch(() => {});
-        loadLife(manifest.build, abort.signal)
+        loadLife(manifest.indexes, abort.signal)
           .then((life) => {
             if (!abort.signal.aborted) createLife(live, life);
           })
@@ -142,7 +142,7 @@ export function MapApp() {
             if (asked || abort.signal.aborted) return;
             asked = true;
             offSettle();
-            loadSights(manifest.build, abort.signal)
+            loadSights(manifest.indexes, abort.signal)
               .then((list) => {
                 if (abort.signal.aborted) return;
                 live.setSights(list);
@@ -187,7 +187,7 @@ export function MapApp() {
     if (!session || !lit || textsFor(sightTexts, locale) === "ready" || asking.current === locale)
       return;
     asking.current = locale;
-    loadSightTexts(session.manifest.build, locale)
+    loadSightTexts(session.manifest.indexes, locale)
       .then((texts) => setSightTexts({ locale, texts }))
       .catch(() => setSightTexts({ locale, texts: {} }))
       .finally(() => {

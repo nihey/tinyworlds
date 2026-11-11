@@ -66,7 +66,7 @@ deploy/deploy.sh check               # only the checks `all` starts with
 
 deploy/deploy.sh tinynyc             # after re-rendering: site + data
 deploy/deploy.sh tinyrao --no-data   # one world's code
-deploy/deploy.sh tinynyc --index     # site + places/hoods/life (and sights, pictures too), not the tiles
+deploy/deploy.sh tinynyc --index     # site + indexes (places, hoods, life, sights and their pictures) + manifest, not the tiles
 deploy/deploy.sh tinyrao --data      # data only, no build
 deploy/deploy.sh home                # the front page
 ```
@@ -87,8 +87,13 @@ by side and the generated data is never moved out of the way. A build already us
 cores, so going wider than 3 or 4 at a time stops paying: on a 20-core machine the ten builds
 took 108 s one at a time, 85 s two at a time, 74 s three at a time and 82 s four at a time.
 
-Data files are requested with `?v=<manifest.build>` and cached as immutable; `manifest.json` is
-always revalidated, and it is copied last so a new build is only announced once its tiles are up.
+Data files are requested with a version and cached as immutable: tiles and the minimap with
+`?v=<manifest.build>`, the indexes with `?v=<manifest.indexes>` (a hash of their contents that
+the pipeline's `index` and `wiki` write into the manifest). `manifest.json` is always revalidated,
+and it is copied last so a new build or a new set of indexes is only announced once its files are
+up. `--index` sends the manifest too, so returning visitors get the new indexes; because a
+manifest also describes the tiles, it refuses (before sending anything) when the server's
+manifest is from another render than the local one: deploy the data first.
 `deploy.sh` also copies `nginx.conf` (in place, because it is a single-file bind mount); after
 changing it, reload nginx in the container (`nginx -s reload`).
 
