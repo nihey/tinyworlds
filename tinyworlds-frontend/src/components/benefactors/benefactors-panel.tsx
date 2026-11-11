@@ -4,7 +4,12 @@ import { Heart } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/use-i18n";
 import type { Strings } from "@/i18n";
-import { collapseFounders, type CityBenefactors, type FounderRow } from "@/lib/benefactors";
+import {
+  collapseFounders,
+  moreLine,
+  type CityBenefactors,
+  type FounderRow,
+} from "@/lib/benefactors";
 import { API_URL, formatUsd } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { statusLabel } from "../donate/milestone-bar";
@@ -132,9 +137,10 @@ function Body({ city, onBecome }: { city: CityBenefactors; onBecome: (cityName: 
                   <div className={ROW}>
                     <span className="font-pixel text-xs text-paper-dim">··</span>
                     <span className="text-paper-dim">
-                      {t.benefactors.more
-                        .replace("{n}", String(hidden.count))
-                        .replace("{anonymous}", String(hidden.anonymous))}
+                      {moreLine(hidden.count, hidden.anonymous, {
+                        more: t.benefactors.more,
+                        anonymous: t.benefactors.moreAnonymous,
+                      })}
                     </span>
                     <div className="text-right leading-[1.3]">
                       <b className="block text-sm font-semibold">

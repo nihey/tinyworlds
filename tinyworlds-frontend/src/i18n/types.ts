@@ -179,7 +179,15 @@ export interface Strings {
      * says that the gift counts with the switch off, that an email which already has a name keeps
      * it, and where the name can be changed later ("Your cities")
      */
-    join: { label: string; name: string; namePlaceholder: string; counter: string; note: string };
+    join: {
+      label: string;
+      name: string;
+      namePlaceholder: string;
+      counter: string;
+      /** shown under the name field while the switch is on and the name is empty */
+      needsName: string;
+      note: string;
+    };
     donations: { none: string; one: string; other: string };
     status: { funded: string; building: string; built: string };
     showAll: string;
@@ -194,8 +202,8 @@ export interface Strings {
     seeYourPlace: string;
   };
   /**
-   * The benefactors sign. "{city}" is a city's name, "{n}" a number; in `more`, "{anonymous}" is
-   * how many of those are anonymous; `founderNo` is the short label of the founding badge.
+   * The benefactors sign. "{city}" is a city's name, "{n}" a number; `more` is the collapsed
+   * founders ("{n} more"), `moreAnonymous` what is added after a comma when some are anonymous; `founderNo` is the short label of the founding badge.
    */
   benefactors: {
     heading: string;
@@ -203,7 +211,8 @@ export interface Strings {
     benefactors: string;
     keepingRunning: string;
     anonymous: string;
-    more: string;
+    more: { one: string; other: string };
+    moreAnonymous: { one: string; other: string };
     stones: { one: string; other: string };
     firstStone: string;
     keystone: string;

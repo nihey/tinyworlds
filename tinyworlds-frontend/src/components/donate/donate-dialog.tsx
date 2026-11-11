@@ -67,6 +67,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
   const { t, locale } = useI18n();
   const cityLabel = useId();
   const amountLabel = useId();
+  const nameHintId = useId();
   const link = paymentLinkFor(locale, SITE_ID);
   const { state: list, cities } = useMilestones();
   const [choice, setChoice] = useState<Choice>(
@@ -222,6 +223,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
                 onOn={setJoinOn}
                 onName={setJoinName}
                 disabled={pending}
+                hint={needsName ? { id: nameHintId } : undefined}
                 t={t}
               />
             )}
@@ -230,6 +232,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
               type="button"
               onClick={checkout}
               disabled={pending || needsName}
+              aria-describedby={needsName ? nameHintId : undefined}
               aria-busy={pending}
               data-rybbit-event="donate_checkout"
               data-rybbit-prop-world={SITE_ID}
