@@ -287,6 +287,12 @@ whose shadows reach it, and margins for both.
 - Trusses are drawn like cables, as 3D lines (`cab` in the scene): kinds 0 and 1 are a main cable
   and a suspender, bare steel a pixel across; 2 and 3 are a truss chord and a lesser member,
   painted and two pixels across, so a truss still reads from afar.
+- A building with parts is drawn as its parts alone, since they normally tile it. The exception
+  is a **grandstand whose parts cover less than half of it**: the parts stand on the stands, so
+  both are drawn (Citi Field's bowl, where only the Home Run Apple is a part).
+- **Unnamed stands take the name of the stadium grounds** they stand in (`class = stadium` land
+  use), so `landmarks` and `heightFixes` can reach them: that is how Citi Field gets its brick
+  and green seats and Yankee Stadium its limestone.
 - New ground kinds go at the **end** of `G` too and get their place in the paint order from
   `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
   already on disk keep their meaning.

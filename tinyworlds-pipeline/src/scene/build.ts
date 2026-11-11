@@ -1084,13 +1084,46 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   let estimated = 0;
   const caps = (CITY.heightCaps ?? []).map((cap) => ({ ...cap, at: proj.toGrid(cap.lon, cap.lat) }));
   let withParts = 0;
+  // a city with no building parts gets an empty file whose geometry column has lost its type
+  const partRows = Number((await conn.runAndReadAll(`SELECT count(*) FROM '${part}'`)).getRows()[0][0]);
+  // A building with parts is drawn as its parts alone: they tile it. Not so a grandstand whose
+  // parts cover little of it (Citi Field's bowl, where only the Home Run Apple is a part): there
+  // the parts are things standing on the stands, and the stands are drawn too.
+  const stands =
+    partRows === 0
+      ? []
+      : (
+          await conn.runAndReadAll(
+            `SELECT b.id
+             FROM '${building}' b
+             JOIN (SELECT building_id, sum(ST_Area(geometry)) a FROM '${part}' GROUP BY 1) c ON c.building_id = b.id
+             WHERE b.class = 'grandstand' AND c.a < 0.5 * ST_Area(b.geometry)`,
+          )
+        )
+          .getRows()
+          .map((r) => `'${String(r[0]).replace(/'/g, "''")}'`);
+  const keepStands = stands.length > 0 ? `AND id NOT IN (${stands.join(", ")})` : "";
+  // A stadium's stands often carry no name of their own; the grounds they stand in do. They take
+  // that name, so the city's `landmarks` and `heightFixes` can find them (Citi Field, Yankee Stadium).
+  const grounds = new Map<string, string>();
+  for (const [id, name] of (
+    await conn.runAndReadAll(
+      `SELECT b.id, any_value(u.names."primary")
+       FROM '${building}' b JOIN '${raw("land_use.parquet")}' u
+         ON ST_Contains(u.geometry, ST_PointOnSurface(b.geometry))
+       WHERE b.names."primary" IS NULL AND b.class IN ('grandstand', 'stadium')
+         AND u.class = 'stadium' AND u.names."primary" IS NOT NULL
+       GROUP BY b.id`,
+    )
+  ).getRows())
+    grounds.set(String(id), String(name));
   await each(
     conn,
     `SELECT id, height, num_floors, min_height, subtype, class, roof_shape, roof_height, facade_color, facade_material, roof_color,
             ST_AsWKB(geometry), names."primary"
      FROM '${building}' b
      WHERE NOT coalesce(is_underground, false) AND coalesce(class, '') <> 'bridge_structure'
-       AND NOT (coalesce(has_parts, false) AND id IN (SELECT building_id FROM '${part}'))`,
+       AND NOT (coalesce(has_parts, false) AND id IN (SELECT building_id FROM '${part}') ${keepStands})`,
     (row) => {
       const bytes = blob(row[11]);
       if (!bytes) return;
@@ -1121,14 +1154,12 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
           facadeColor: str(row[8]),
           facadeMaterial: str(row[9]),
           roofColor: str(row[10]),
-          name: str(row[12]),
+          name: str(row[12]) ?? grounds.get(row[0] as string),
         });
       }
     },
   );
   const wholeBuildings = volumes.count;
-  // a city with no building parts gets an empty file whose geometry column has lost its type
-  const partRows = Number((await conn.runAndReadAll(`SELECT count(*) FROM '${part}'`)).getRows()[0][0]);
   if (partRows > 0)
     await each(
       conn,
@@ -1155,7 +1186,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
             facadeMaterial: str(row[9]),
             roofColor: str(row[10]),
             isPart: true,
-            name: str(row[12]),
+            name: str(row[12]) ?? grounds.get(row[0] as string),
           });
         }
       },

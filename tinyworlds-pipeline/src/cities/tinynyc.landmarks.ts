@@ -51,7 +51,8 @@ export const LANDMARKS: Record<string, LandmarkStyle> = {
   "madison square garden": { wall: R.tan, pattern: Pattern.None },
   "new york public library": stone(R.limestone),
   "yankee stadium": { wall: R.limestone, pattern: Pattern.Tall },
-  "citi field": { wall: R.brickRed, pattern: Pattern.Tall },
+  // the stands: a brick front like Ebbets Field's, and the green of the seats on top
+  "citi field": { wall: R.brickRed, roof: R.roofGreen, pattern: Pattern.Tall },
   "barclays center": { wall: R.brownstone, pattern: Pattern.None },
   "statue of liberty": { wall: R.greyStone, roof: R.greyStone, pattern: Pattern.None },
   "the dakota": stone(R.yellowBrick, R.roofSlate),
