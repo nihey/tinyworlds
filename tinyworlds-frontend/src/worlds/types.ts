@@ -68,6 +68,11 @@ export interface World {
    * with a line from Wikipedia. Without it the viewer never asks for the file.
    */
   sights?: boolean;
+  /**
+   * Its data has Guess the building's questions (quiz.<locale>.json, which need `sights`): a
+   * sign under "more cities" starts the game. Without it the viewer never asks for the files.
+   */
+  quiz?: boolean;
   /** How queries are read. This follows the language of the map's names, not the interface's. */
   search: SearchRules;
 }

@@ -6,7 +6,8 @@ Stripe, records the ones Stripe says were paid, and serves every city's progress
 It also keeps the **donation funnel** (which steps towards a donation each visit reached, and
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
 by email; each world's **visits**, and how many are there now, are public, for the front page's
-cards. **Donors** sign in the same way, to see the cities they helped build. Other visitors
+cards. **Donors** sign in the same way, to see the cities they helped build. And it keeps the
+answers of **Guess the building**, the map's quiz on its famous buildings. Other visitors
 have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
 ## Commands
@@ -46,6 +47,7 @@ src/
 │   ├── current-admin.decorator.ts current-donor.decorator.ts session-secret.ts
 │   ├── mailer.ts sign-in-mail.ts   # SMTP (nodemailer), or the log in development; the mail's words
 │   └── admin.resolver.ts models/   # { me }
+├── quiz/                           # Guess the building: quiz.service.ts (answer, tally), resolver, dto/, models/
 ├── funnel/
 │   ├── funnel.service.ts           # track (a step), report (the funnel over a period)
 │   ├── funnel-report.ts            # pure: days of a period in a time zone, rows → report
@@ -99,6 +101,9 @@ input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  lo
 input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
 input WorldVisitsInput { worlds: [String!]! }                 # 1 to 50 world ids
 type WorldVisits { world: String!  visits: Int!  live: Int! }
+input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  locale: String }
+type QuizPick { choice: String!  count: Int! }
+type QuizTally { answers: Int!  picks: [QuizPick!]! }
 
 # admins only
 type Admin { id: ID!  email: String! }
@@ -121,6 +126,7 @@ type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!   # public
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!                          # public
   trackPresence(input: TrackPresenceInput!): Boolean!                              # public
+  answerQuiz(input: AnswerQuizInput!): QuizTally!                                  # public
   setListing(input: SetListingInput!): Boolean!                                    # donors
   setDisplayName(input: SetDisplayNameInput!): String!                             # donors
   setNameHidden(input: SetNameHiddenInput!): Boolean!                              # admins
@@ -273,6 +279,25 @@ its address, and never carry a code.
 
 To let someone in as an admin: add their address to `ADMIN_EMAILS` and restart. To see who has
 signed in: `SELECT email, last_login_at FROM admins;` (or `donors`).
+
+## Guess the building (`quiz/`)
+
+The site's quiz on the map's famous buildings: the questions are the site's own files
+(`quiz.<locale>.json`, made by the pipeline), and the right name of a building is the building
+itself, so this API keeps no copy of them. It keeps the answers and tallies them.
+
+- `quiz_answers`: one row per answer, unique on `(visit_id, world, sight_id)`: a visit (the
+  funnel's tab id) answers a building once; answering again keeps the first. `choice` is the
+  sight id picked; `locale` the interface language.
+- `answerQuiz` (public, 30 a minute per address: `ANSWERS_PER_MINUTE`) records the answer and
+  answers the building's tally, that answer included: `answers` and every name picked with its
+  count, most picked first, then by id. Without `visitId` (a visit that is not counted: storage
+  blocked, an admin's browser) nothing is recorded and the tally is answered all the same.
+- Validation: `visitId` a UUID, `world` the funnel's pattern, `sightId` and `choice`
+  `SIGHT_ID_PATTERN` (`b19j7udl`, `bridge:brooklyn bridge`, `statue:0`), `locale` one of the
+  three. The API cannot tell a real choice from an invented one; the throttle bounds the harm.
+- The site shows shares over the four names it offered, so picks of a name a later pipeline run
+  stopped offering simply drop out of its card.
 
 ## The donation funnel (`funnel/`)
 

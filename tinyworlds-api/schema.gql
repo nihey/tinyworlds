@@ -8,6 +8,25 @@ type Admin {
   id: ID!
 }
 
+input AnswerQuizInput {
+  """The name picked, as a sight id: right when it is the building itself"""
+  choice: String!
+
+  """The interface language: en-US, pt-BR or es-ES"""
+  locale: String
+
+  """The building asked about: a sight id"""
+  sightId: String!
+
+  """
+  The visit (the funnel's: a UUID the page makes up for its tab). Without it nothing is recorded and the tally is answered all the same.
+  """
+  visitId: ID
+
+  """The world the building is in: a world's id"""
+  world: String!
+}
+
 """A name donors asked to show, for admins to review"""
 type BenefactorName {
   cities: [String!]!
@@ -282,6 +301,11 @@ type FunnelWorld {
 
 type Mutation {
   """
+  Records which name a visit picked for a building in "Guess the building" (once per visit and building) and answers how everyone has answered it.
+  """
+  answerQuiz(input: AnswerQuizInput!): QuizTally!
+
+  """
   Starts a donation at Stripe and answers the page to send the donor to. The amount is the one given, from US$1; without one it is chosen on Stripe's page.
   """
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
@@ -372,6 +396,22 @@ type Query {
   Each world asked for, in that order: how many visits it has had, and how many are there now
   """
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!
+}
+
+"""How many answers picked one name for a building"""
+type QuizPick {
+  """The name picked, as a sight id"""
+  choice: String!
+  count: Int!
+}
+
+"""How everyone has answered one building"""
+type QuizTally {
+  """Answers to this building, one per visit"""
+  answers: Int!
+
+  """Every name picked for it, the most picked first (then by sight id)"""
+  picks: [QuizPick!]!
 }
 
 input SetDisplayNameInput {

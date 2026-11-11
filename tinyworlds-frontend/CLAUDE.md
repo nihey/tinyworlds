@@ -110,6 +110,7 @@ src/
 │   ├── engine.ts        # MapEngine
 │   ├── life.ts          # ferries and flights
 │   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
+│   ├── quiz.ts          # Guess the building's questions (quiz.<locale>.json): parseQuiz
 │   └── __tests__/
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
@@ -293,8 +294,8 @@ Optional, and never in the way: with nothing configured there is no heart, no di
 - The heart in the tool column, the link in About and the front page's ranking all open the
   same sign.
 - **What the page analytics hear** (`lib/site-events.ts`): `donate_open`, `donate_checkout`,
-  `donate_cancelled`, `donate_complete` (the conversion, with `value` in US$ and `currency`) and
-  `explore_more`, each with `world` (and `city`, `amount` when there are). `siteEvent()` pushes
+  `donate_cancelled`, `donate_complete` (the conversion, with `value` in US$ and `currency`),
+  `explore_more` and `quiz_start`, each with `world` (and `city`, `amount` when there are). `siteEvent()` pushes
   every one to Tag Manager's `dataLayer`, where the container sends it on to Google Analytics.
   Rybbit hears the clicks from declarative hooks on the buttons (`data-rybbit-event` with
   `data-rybbit-prop-world`, `-city`, `-amount`), so `siteEvent(…, { rybbit: true })` is only for
@@ -472,6 +473,43 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
   language has none). About credits Wikipedia (CC BY-SA 4.0) in the visitor's language.
 - The outline is the whole building, so a lower one standing in front of it lights up where it
   overlaps: the viewer has no depth information.
+
+### Guess the building (`hooks/use-quiz.ts`, `components/map/quiz-*.tsx`, `lib/quiz*.ts`)
+
+In a world with `quiz: true` (New York; it needs `sights`), a sign under "more cities and
+worlds" (`QuizBanner`, class `quiz-invite`) starts a game once the buildings are in: a building
+is lit, its Wikipedia opening is shown with the name blanked, the visitor picks its name out of
+four, and sees how everyone else answered. As many rounds as they like; Stop, the card's close
+button or Esc ends it with the map where it was.
+
+- **Data.** `quiz.<locale>.json` (`loadQuiz`, `parseQuiz` in `map/quiz.ts`) is fetched the first
+  time the game starts, and again per language; nothing of the game loads before. A question
+  whose building or any wrong name is not in `sights.json` is never asked.
+- **The round** (`useQuiz`): `nextQuestion` picks at random among the buildings this browser has
+  not played (`localStorage` `<world>.quiz.played`, behind try/catch; the list starts over once
+  all are played), `choicesFor` shuffles the four names, and the engine holds the building lit
+  (`engine.holdSight(id)`: the spotlight of a pinned sight, no other lights up, Esc and the view
+  moving do not let it go; `hold` in `sight-state.ts`) and flies to it (`roundView`: the
+  building in the part of the screen the card leaves free, landing on scale 1 when near). Its
+  name sign stays hidden until the answer; then it goes up as a plain name (`SightSign`, not
+  pinned). The visitor can pan, zoom and search meanwhile.
+- **The card** (`QuizCard`, class `quiz-card`, a labelled group like the pinned sign): on the
+  right from 56rem, left of the tools; below that a sheet at the foot of the screen (between
+  640 and 896 px a card on the right would cover the search), and the flight frames the
+  building above it. Blanks are bars
+  of one width (a name's length gives nothing away), with "From Wikipedia, with the name
+  hidden" under the text (CC BY-SA: it is changed), "From Wikipedia" once it is whole. The question follows the building's type
+  (`questionKind`: station, bridge, museum, else building). After the pick: the verdict, the
+  text whole with the name lit, the right name in the accent and the visitor's marked, and once
+  the API answers, each name's share and how many have answered, counted over the four names
+  shown (`tallyShares`); "Next building", "Stop" and the article's link.
+- **Keys** (`quizKey` in `lib/quiz.ts`, taken in `map-app.tsx` before the map's own): A–D or
+  1–4 pick, Enter or N go on (Enter only when no button or link has the focus: Stop, the close
+  button and the article's link keep theirs), Esc stops; a key held down repeats nothing.
+- **The answer** goes out with plain `fetch` (`sendAnswer` in `lib/quiz-api.ts`: the visit from
+  `currentVisit()`, so admins and programs are not counted), never Apollo. No API, an error or
+  no answer within 5 s is no tally: the round ends without the shares (`quizReducer` keeps a
+  tally only for the building it was asked for). Analytics hook: `quiz_start`.
 
 ## Design
 

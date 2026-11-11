@@ -18,6 +18,8 @@ const CHECKOUT =
   'mutation ($input: CreateDonationCheckoutInput!) { createDonationCheckout(input: $input) { url } }';
 const TRACK =
   'mutation ($input: TrackFunnelStepInput!) { trackFunnelStep(input: $input) }';
+const ANSWER_QUIZ =
+  'mutation ($input: AnswerQuizInput!) { answerQuiz(input: $input) { answers picks { choice count } } }';
 const COUNTS =
   'visits donateOpened checkoutStarted checkoutCancelled donations raisedCents';
 const FUNNEL = `query ($input: DonationFunnelInput!) { donationFunnel(input: $input) {
@@ -40,6 +42,7 @@ interface Answer {
     trackFunnelStep: boolean;
     worldVisits: { world: string; visits: number; live: number }[];
     trackPresence: boolean;
+    answerQuiz: { answers: number; picks: { choice: string; count: number }[] };
     me: { id: string; email: string };
     donationFunnel: {
       timeZone: string;
@@ -120,7 +123,7 @@ describe('the API over HTTP', () => {
     // not the admins: the session made by the first sign-in serves every test after it. Links
     // go with the donors they may belong to (and so a test may ask for a fresh one)
     await prisma.$executeRawUnsafe(
-      'TRUNCATE donations, donors, cities, funnel_events, magic_links',
+      'TRUNCATE donations, donors, cities, funnel_events, magic_links, quiz_answers',
     );
     stripe.calls = [];
     stripe.priceLookups = [];
@@ -1499,6 +1502,76 @@ describe('the API over HTTP', () => {
       expect(founders[0]).toMatchObject({ number: 1, name: null, stones: 12 });
       // her second gift is no longer folded into her row: it is a plain benefactor
       expect(founders).toHaveLength(2);
+    });
+  });
+  describe('the quiz', () => {
+    const visit = (n: number) =>
+      `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const good = { world: 'tinynyc', sightId: 'b19j7udl', locale: 'en-US' };
+    const answerQuiz = (input: Record<string, unknown>) =>
+      graphql(ANSWER_QUIZ, { input }).set('x-forwarded-for', '203.0.113.60');
+
+    it('keeps an answer per visit and building, and answers the tally', async () => {
+      await answerQuiz({
+        ...good,
+        visitId: visit(1),
+        choice: 'b19j7udl',
+      }).expect(200);
+      const second = await answerQuiz({
+        ...good,
+        visitId: visit(2),
+        choice: 'b1abc',
+      }).expect(200);
+      expect(answer(second).data.answerQuiz).toEqual({
+        answers: 2,
+        picks: [
+          { choice: 'b19j7udl', count: 1 },
+          { choice: 'b1abc', count: 1 },
+        ],
+      });
+      // the first visit again, with another pick: nothing changes
+      const again = await answerQuiz({
+        ...good,
+        visitId: visit(1),
+        choice: 'b1abc',
+      }).expect(200);
+      expect(answer(again).data.answerQuiz.answers).toBe(2);
+      const rows = await prisma.quizAnswer.findMany({
+        orderBy: { visitId: 'asc' },
+      });
+      expect(rows.map((row) => [row.visitId, row.choice])).toEqual([
+        [visit(1), 'b19j7udl'],
+        [visit(2), 'b1abc'],
+      ]);
+    });
+
+    it('answers the tally without keeping an answer that names no visit', async () => {
+      await answerQuiz({
+        ...good,
+        visitId: visit(1),
+        choice: 'b19j7udl',
+      }).expect(200);
+      const res = await answerQuiz({ ...good, choice: 'b1abc' }).expect(200);
+      expect(answer(res).data.answerQuiz).toEqual({
+        answers: 1,
+        picks: [{ choice: 'b19j7udl', count: 1 }],
+      });
+      expect(await prisma.quizAnswer.count()).toBe(1);
+    });
+
+    it('refuses a visit, a world, a building or a language that is not one', async () => {
+      const input = { ...good, visitId: visit(1), choice: 'b19j7udl' };
+      for (const bad of [
+        { ...input, visitId: 'me' },
+        { ...input, world: 'Tiny NYC' },
+        { ...input, sightId: 'B<script>' },
+        { ...input, choice: '' },
+        { ...input, locale: 'fr-FR' },
+      ]) {
+        const res = await answerQuiz(bad).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+      expect(await prisma.quizAnswer.count()).toBe(0);
     });
   });
 });

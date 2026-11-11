@@ -55,6 +55,16 @@ export const tinynyc: City = {
   landmarks: LANDMARKS,
   statues: [LIBERTY],
   sights: {
+    // never blanked out of a question's text ("Guess the building")
+    placeWords: ["New York", "New York City", "NYC", "Nueva York", "Nova Iorque", "Nova York"],
+    // the short or former names their openings give, which would give them away
+    aliases: {
+      "metropolitan museum of art": ["the Met"],
+      "one world trade center": ["One WTC", "Freedom Tower", "Torre de la Libertad", "Torre da Liberdade"],
+      "museum of sex": ["MoSex"],
+      "masonic hall": ["Masons"],
+      "the bronx museum of the arts": ["BxMA"],
+    },
     // the roads that carry a bridge's towers and decks under names of their own
     bridges: {
       "manhattan bridge": [

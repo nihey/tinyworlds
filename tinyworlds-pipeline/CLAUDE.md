@@ -30,6 +30,7 @@ npm run cli -- render --pyramid-only                    # rebuild the coarse lev
 npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json (+ sights.json, sights/)
                                                 # and the indexes' version in manifest.json (`indexes`)
 npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
+npm run cli -- --city tinynyc quiz [--list]     # quiz.<locale>.json: Guess the building's questions
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
@@ -98,7 +99,9 @@ src/
     ├── write-sights.ts  # the sights pass of `index`
     ├── sprites.ts     # each sight drawn on its own (sights/<hash>.webp)
     ├── stamp.ts       # the indexes' version (a hash of them), written into the manifest
-    └── wiki.ts        # the `wiki` step: each sight's Wikipedia article, cached
+    ├── wiki.ts        # the `wiki` step: each sight's Wikipedia article, cached
+    ├── quiz.ts        # Guess the building: blanking a name out of its text, choosing decoys
+    └── write-quiz.ts  # the `quiz` step: quiz.<locale>.json
 ```
 
 The renderer (`render/`) never imports the city: everything it needs is in the scene (including
@@ -311,6 +314,43 @@ one or more search entries point at.
   asks again. Requests go one at a time, 200 ms apart (a 429 waits for `Retry-After`, else 2 s
   doubling, and asks again), with `WIKI_USER_AGENT` (the project's public page; no person). `sights.wikipedia` in the city forces a title by sight
   name, or `null` for none, for the misses and the wrong ones.
+
+## Guess the building (`index/quiz.ts`, `index/write-quiz.ts`)
+
+The `quiz` step (run by `all` after `wiki`, where a city has sights) writes `quiz.<locale>.json`
+(root `CLAUDE.md`): one question per sight with an English article, in the three languages.
+Offline and deterministic; `--list` prints every blanked text, to read them through after a
+change to the rules below.
+
+- **Blanking** (`blankName`): the sight's name and its article's title (a trailing "(…)"
+  dropped) as whole phrases with a leading article; then each of their _distinctive_ words
+  wherever else it stands, possessive included; then a run of the name's own words that mixes a
+  place word with another ("the Bronx Museum" of The Bronx Museum of the Arts); then the name's
+  initials in capitals ("(MoMA)", "(SNFL)", "(MoMI)"). Accent- and case-blind, whole words. A
+  word is distinctive unless it is common (`COMMON_WORDS`: articles, prepositions, numbers,
+  what buildings are, in the three languages) or a place word of the city
+  (`sights.placeWords`, and the sights' context lines): "New York" stays in "in New York City".
+  A name with nothing but place and common words counts its place words ("Brooklyn" in the
+  Brooklyn Bridge). Blanks that only spaces or dashes part become one. A text with fewer than
+  `MIN_LEFT` (60) characters left is not asked in that language. After changing these rules,
+  read `--list` through: no question may show its own name, its initials or a decoy's name.
+- **Aliases.** The short or former names an opening gives that would give a building away
+  ("the Met", "One WTC", "Freedom Tower") are listed per city (`sights.aliases`, by lower-case
+  sight name) and blanked like its name. Find new ones by reading `--list` for "known as",
+  "referred to as", "conhecido como", "conocido como".
+- **One question per article.** Two sights on one article ("Avenue J", "Avenue J station") are
+  one question, so a right answer can never be graded wrong. A building's own area is part of
+  its name (the Statue of Liberty's "Liberty", on Liberty Island): its context line's words are
+  not place words in its own question.
+- **Decoys** (`pickDecoys`): three other questions' sights of the same kind, nearest first. The
+  kind (`kindOf`) is the type for stations and bridges; else what the English opening says it
+  is after "is a" (museum, library, venue: theatres and concert halls, worship, hotel, school,
+  stadium); else a kind word in the name; else general. A kind with fewer than four borrows the
+  nearest general ones. Never one sharing a distinctive word with the answer, one the
+  question's text names, two names that differ only by common words ("Carnegie Hall", "Carnegie
+  Hall Tower"), or an address the text's own address rules out ("712 Fifth Avenue" beside "at
+  721 Fifth Avenue"; ordinals and numbers read alike). Chosen once for all languages.
+- New York: 393 questions; 389 asked in English and Portuguese, 384 in Spanish.
 
 ## How a tile is drawn (`render/chunk.ts`)
 

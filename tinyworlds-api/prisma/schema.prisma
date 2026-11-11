@@ -153,3 +153,23 @@ model MagicLink {
   @@index([donorId, createdAt])
   @@map("magic_links")
 }
+
+/// One answer to "Guess the building": which name a visit picked for one building. A visit
+/// answers a building once; the API keeps no copy of the questions (the right name is the
+/// building itself).
+model QuizAnswer {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// The tab's visit (as the funnel's): not a person, gone when the tab closes.
+  visitId   String   @map("visit_id") @db.Uuid
+  world     String
+  /// The building asked about: a sight id from the world's sights.json.
+  sightId   String   @map("sight_id")
+  /// The sight id the visitor picked; right when it equals sightId.
+  choice    String
+  locale    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([visitId, world, sightId])
+  @@index([world, sightId])
+  @@map("quiz_answers")
+}

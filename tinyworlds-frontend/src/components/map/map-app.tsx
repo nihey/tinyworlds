@@ -6,6 +6,7 @@ import { DonateDialog } from "@/components/donate/donate-dialog";
 import { ExploreBanner } from "@/components/map/explore-banner";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useQuiz } from "@/hooks/use-quiz";
 import { usePrefs } from "@/hooks/use-prefs";
 import {
   useDocumentLanguage,
@@ -16,6 +17,7 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { prefsStore } from "@/lib/prefs";
+import { quizKey } from "@/lib/quiz";
 import { cn } from "@/lib/utils";
 import { textsFor } from "@/lib/sight-sign";
 import {
@@ -40,6 +42,8 @@ import { CreditStrip } from "./credit-strip";
 import { LoadErrorDialog } from "./load-error-dialog";
 import { Minimap } from "./minimap";
 import { placeMeta } from "./place-types";
+import { QuizBanner } from "./quiz-banner";
+import { QuizCard } from "./quiz-card";
 import { SearchSign } from "./search-sign";
 import { SettingsPanel } from "./settings-panel";
 import { SightSign } from "./sight-sign";
@@ -95,6 +99,8 @@ export function MapApp() {
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, WORLD.id) !== null;
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const compact = useMediaQuery("(max-width: 639px)");
+  // Guess the building's card is a sheet at the foot of the screen until it fits beside the search
+  const quizSheet = useMediaQuery("(max-width: 895.98px)");
 
   const engine = session?.engine ?? null;
 
@@ -206,6 +212,22 @@ export function MapApp() {
   const litText =
     litSight && sightTexts?.locale === locale ? sightTexts.texts[litSight.id] : undefined;
 
+  // Guess the building: a round holds its building lit, so the article loaded above is its own
+  const quiz = useQuiz({
+    engine,
+    sights,
+    build: session?.manifest.indexes ?? null,
+    locale,
+    compact: quizSheet,
+  });
+  const quizOn = quiz.state.phase !== "off";
+  const quizArticle = quiz.sight && litSight?.id === quiz.sight.id ? litText : undefined;
+  // the keys read the game as it is now, without the key handler being made again each round
+  const quizRef = useRef(quiz);
+  useEffect(() => {
+    quizRef.current = quiz;
+  });
+
   // settings → engine
   useEffect(() => engine?.setHoodLines(prefs.hoods), [engine, prefs.hoods]);
   useEffect(() => engine?.setLife(prefs.life), [engine, prefs.life]);
@@ -274,6 +296,20 @@ export function MapApp() {
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)))
         return;
       if (document.querySelector('[role="dialog"]')) return; // a dialog or the settings panel has the keys
+      // a round of Guess the building takes A–D and 1–4, Enter and N, and Esc first
+      const game = quizRef.current;
+      const action = quizKey(game.state.phase, {
+        key: e.key,
+        repeat: e.repeat,
+        onControl: !!target?.closest("button, a, input, [role=button], [role=option]"),
+      });
+      if (action) {
+        if (action === "stop") game.stop();
+        else if (action === "next") game.next();
+        else if (game.state.phase === "asking") game.pick(game.state.choices[action.pick]);
+        e.preventDefault();
+        return;
+      }
       const toggle = (key: "hoods" | "tilt" | "minimap") =>
         prefsStore.set({ [key]: !prefsStore.getSnapshot()[key] });
 
@@ -353,13 +389,33 @@ export function MapApp() {
 
       {session && engine && (
         <>
-          {lit && litSight && (
+          {lit && litSight && !quizOn && (
             <SightSign
               engine={engine}
               sight={litSight}
               text={litText}
               pinned={lit.pinned}
               onClose={() => engine.releaseSight()}
+            />
+          )}
+          {/* a round answered: the building's name goes up on it (the card holds the rest) */}
+          {quiz.state.phase === "answered" && quiz.sight && (
+            <SightSign
+              engine={engine}
+              sight={quiz.sight}
+              text={undefined}
+              pinned={false}
+              onClose={() => {}}
+            />
+          )}
+          {quiz.state.phase !== "off" && (
+            <QuizCard
+              state={quiz.state}
+              sights={sightById}
+              article={quizArticle}
+              onPick={quiz.pick}
+              onNext={quiz.next}
+              onStop={quiz.stop}
             />
           )}
           <SearchSign
@@ -374,11 +430,14 @@ export function MapApp() {
             style={delay(60)}
           />
           {/* under the search sign, and clear of the tools that sit beside it on a narrow screen;
-              it goes up with the map's other signs and stays */}
-          <ExploreBanner
-            className="sign-in fixed top-[calc(var(--edge-t)+3.9375rem)] left-(--edge-l) max-w-[calc(100vw-var(--edge-l)-var(--edge-r)-3.5rem)] sm:max-w-[25rem]"
-            style={delay(100)}
-          />
+              the other places go up with the map's other signs and stay; the game's sign follows
+              once the buildings are in, and steps aside while a game is on */}
+          <div className="fixed top-[calc(var(--edge-t)+3.9375rem)] left-(--edge-l) z-[5] flex max-w-[calc(100vw-var(--edge-l)-var(--edge-r)-3.5rem)] flex-col items-start gap-2 sm:max-w-[25rem]">
+            <ExploreBanner className="sign-in" style={delay(100)} />
+            {WORLD.quiz && sights.length > 0 && !quizOn && (
+              <QuizBanner onStart={quiz.start} className="sign-in" style={delay(0)} />
+            )}
+          </div>
           <ToolColumn
             northDeg={session.manifest.northDeg}
             onZoomIn={() => engine.zoomStep(1)}

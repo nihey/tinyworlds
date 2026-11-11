@@ -17,7 +17,12 @@
  */
 
 export type SiteEventName =
-  "donate_open" | "donate_checkout" | "donate_cancelled" | "donate_complete" | "explore_more";
+  | "donate_open"
+  | "donate_checkout"
+  | "donate_cancelled"
+  | "donate_complete"
+  | "explore_more"
+  | "quiz_start";
 
 export interface SiteEventProps {
   world: string;

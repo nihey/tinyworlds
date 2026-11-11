@@ -56,6 +56,14 @@ interface FunnelEventWhere {
   lastSeenAt?: { gte: Date };
 }
 
+export interface QuizAnswerRow {
+  visitId: string;
+  world: string;
+  sightId: string;
+  choice: string;
+  locale: string | null;
+}
+
 export interface AdminRow {
   id: string;
   email: string;
@@ -110,6 +118,7 @@ export class FakePrisma {
   donations: DonationRow[] = [];
   donors: DonorRow[] = [];
   events: FunnelEventRow[] = [];
+  quizAnswers: QuizAnswerRow[] = [];
   admins: AdminRow[] = [];
   links: MagicLinkRow[] = [];
   /** Set to make the next write of a funnel step fail, the way a database that is away does. */
@@ -367,6 +376,43 @@ export class FakePrisma {
       }
       return Promise.resolve(
         [...counts].map(([world, n]) => ({ world, _count: { _all: n } })),
+      );
+    },
+  };
+
+  quizAnswer = {
+    createMany: (args: {
+      data: QuizAnswerRow[];
+      skipDuplicates?: boolean;
+    }): Promise<{ count: number }> => {
+      let count = 0;
+      for (const row of args.data) {
+        const there = this.quizAnswers.some(
+          (a) =>
+            a.visitId === row.visitId &&
+            a.world === row.world &&
+            a.sightId === row.sightId,
+        );
+        if (there && !args.skipDuplicates)
+          throw unique('visit_id, world, sight_id');
+        if (there) continue;
+        this.quizAnswers.push({ ...row });
+        count++;
+      }
+      return Promise.resolve({ count });
+    },
+    /** Only the shape the quiz asks for: by choice, counted, within one world and building. */
+    groupBy: (args: {
+      by: ['choice'];
+      where: { world: string; sightId: string };
+      _count: { _all: true };
+    }): Promise<{ choice: string; _count: { _all: number } }[]> => {
+      const counts = new Map<string, number>();
+      for (const a of this.quizAnswers)
+        if (a.world === args.where.world && a.sightId === args.where.sightId)
+          counts.set(a.choice, (counts.get(a.choice) ?? 0) + 1);
+      return Promise.resolve(
+        [...counts].map(([choice, n]) => ({ choice, _count: { _all: n } })),
       );
     },
   };
