@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BenefactorLinks } from "@/components/benefactors/benefactor-link";
 import type { Locale, Strings } from "@/i18n";
 import type { AdminSession, BenefactorName } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
 /**
- * The names donors chose to show on benefactors' pages, newest gift first. An admin hides one
- * that should not be there and shows it again: it is reversible, so it acts at once, with no
+ * The names donors chose to show on benefactors' pages, and the links they put beside them,
+ * newest gift first. An admin hides a name that should not be there (its links go with it),
+ * or only the links, and shows them again: it is reversible, so it acts at once, with no
  * confirmation. Loads on its own, so a failure here leaves the funnel above it standing.
  */
 
@@ -55,11 +57,16 @@ export function Names({ session, locale, t, onEnded }: Props) {
     };
   }, [session, attempt, onEnded]);
 
-  const toggle = (row: BenefactorName) => {
+  /** Flips one of a donor's two switches: the name's, or the links'. */
+  const toggle = (row: BenefactorName, what: "hidden" | "linksHidden") => {
     setFailedId(null);
     setBusy((now) => new Set(now).add(row.donorId));
     import("@/lib/admin-api")
-      .then((api) => api.setNameHidden(session, row.donorId, !row.hidden))
+      .then((api) =>
+        what === "hidden"
+          ? api.setNameHidden(session, row.donorId, !row.hidden)
+          : api.setLinksHidden(session, row.donorId, !row.linksHidden),
+      )
       .then(
         () =>
           setState((now) =>
@@ -67,7 +74,7 @@ export function Names({ session, locale, t, onEnded }: Props) {
               ? {
                   status: "ready",
                   rows: now.rows.map((r) =>
-                    r.donorId === row.donorId ? { ...r, hidden: !row.hidden } : r,
+                    r.donorId === row.donorId ? { ...r, [what]: !row[what] } : r,
                   ),
                 }
               : now,
@@ -144,6 +151,16 @@ export function Names({ session, locale, t, onEnded }: Props) {
                         `${words.cities.replace("{cities}", row.cities.join(", "))} · `}
                       {when.format(new Date(row.lastGiftAt))}
                     </p>
+                    {row.links.length > 0 && (
+                      <div className={cn("pt-2", (row.hidden || row.linksHidden) && "opacity-60")}>
+                        {row.linksHidden && (
+                          <p className="pb-1.5 text-xs font-semibold text-paper-dim">
+                            {words.linksHidden}
+                          </p>
+                        )}
+                        <BenefactorLinks links={row.links} look="row" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     {failedId === row.donorId && (
@@ -151,10 +168,20 @@ export function Names({ session, locale, t, onEnded }: Props) {
                         {t.admin.loadFailed}
                       </span>
                     )}
+                    {row.links.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={busy.has(row.donorId)}
+                        onClick={() => toggle(row, "linksHidden")}
+                        className={ACTION}
+                      >
+                        {row.linksHidden ? words.showLinks : words.hideLinks}
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy.has(row.donorId)}
-                      onClick={() => toggle(row)}
+                      onClick={() => toggle(row, "hidden")}
                       className={ACTION}
                     >
                       {row.hidden ? words.unhide : words.hide}

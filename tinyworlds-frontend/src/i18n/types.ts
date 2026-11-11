@@ -269,6 +269,21 @@ export interface Strings {
     become: string;
     failed: string;
     stoneTitle: string;
+    /**
+     * A link beside a named benefactor, as a screen reader hears it: "{title}" is the page's
+     * title, "{host}" where it leads.
+     */
+    linkLabel: string;
+    /**
+     * Everyone who gave to a city, down the front page's sides: what the list is called, an
+     * unnamed gift's name, "{n}" more cities than are named, and the card that invites.
+     */
+    wall: {
+      label: string;
+      anonymous: string;
+      moreCities: string;
+      invite: { title: string; body: string };
+    };
   };
   loadError: {
     title: string;
@@ -396,6 +411,38 @@ export interface Strings {
     buildAll: string;
     /** the worlds under it; "{n}" is how many there are */
     exploring: { title: string; body: string; all: string };
+    /**
+     * The links a donor shows beside their name: "{max}" is how many there may be, "{n}" how
+     * many there are, "{amount}" a sum, "{title}" a link's title.
+     */
+    links: {
+      heading: string;
+      body: string;
+      count: string;
+      label: string;
+      placeholder: string;
+      add: string;
+      /** while the API reads the page */
+      reading: string;
+      invalid: string;
+      duplicate: string;
+      failed: string;
+      remove: string;
+      refresh: string;
+      removeLabel: string;
+      refreshLabel: string;
+      refreshFailed: string;
+      /** no link yet */
+      empty: string;
+      /** the donor is named nowhere, so the links show nowhere */
+      needsName: string;
+      /** an admin took them off the lists */
+      hidden: string;
+      picturesOn: string;
+      picturesOff: string;
+      /** on a link's picture that the lists do not show yet */
+      pictureWaiting: string;
+    };
   };
   /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
@@ -462,6 +509,9 @@ export interface Strings {
       unhide: string;
       hidden: string;
       cities: string;
+      hideLinks: string;
+      showLinks: string;
+      linksHidden: string;
     };
     /** the link in the front page's footer that only a signed-in admin sees */
     footerLink: string;

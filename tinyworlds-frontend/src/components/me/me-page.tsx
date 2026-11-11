@@ -19,6 +19,7 @@ import { HOME_URL, RANKING_PATH } from "@/site";
 import { YourBadges } from "./badges";
 import { KeepExploring } from "./keep-exploring";
 import { YourCities } from "./your-cities";
+import { YourLinks } from "./your-links";
 
 /**
  * "Your cities", signed in: the donor's giving, and always somewhere to go from it. Beside the
@@ -49,7 +50,8 @@ export function MePage({
     by: { slug: "" },
   });
 
-  const cities = load.state === "ready" ? load.giving.cities : [];
+  const giving = load.state === "ready" ? load.giving : null;
+  const cities = giving?.cities ?? [];
   const donor = cities.length > 0;
   const listed = milestones.state === "ready";
   const ranking = rankCities(milestones.cities);
@@ -84,14 +86,27 @@ export function MePage({
           donor ? "lg:grid-cols-[7fr_5fr]" : "lg:grid-cols-[5fr_7fr]",
         )}
       >
-        <YourCities
-          session={session}
-          load={load}
-          retry={retry}
-          patch={patch}
-          onEnded={onEnded}
-          onGive={(city) => setDonate({ city })}
-        />
+        {/* one column that may shrink: a long title in it is cut short, never the page widened */}
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+          <YourCities
+            session={session}
+            load={load}
+            retry={retry}
+            patch={patch}
+            onEnded={onEnded}
+            onGive={(city) => setDonate({ city })}
+          />
+          {/* links go beside a name on a city's list: for those who gave to one */}
+          {donor && giving?.links && (
+            <YourLinks
+              session={session}
+              giving={giving}
+              links={giving.links}
+              patch={patch}
+              onEnded={onEnded}
+            />
+          )}
+        </div>
 
         <div className="grid min-w-0 gap-6">
           <section aria-labelledby="build-next" className="sign px-5 py-5 sm:px-6">

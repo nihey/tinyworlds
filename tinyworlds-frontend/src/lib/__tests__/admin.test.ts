@@ -244,7 +244,29 @@ describe("the benefactor names", () => {
     hidden: false,
     cities: ["New York", "Orlando"],
     lastGiftAt: "2026-11-10T12:00:00.000Z",
+    links: [],
+    linksHidden: false,
   };
+
+  it("reads a donor's links and whether they are hidden; none from an older API", () => {
+    const shop = {
+      url: "https://shop.example.com/",
+      title: "A tiny shop",
+      description: null,
+      icon: null,
+      image: "/api/link-images/b",
+    };
+    const [read] = parseNames(
+      [{ ...row, links: [shop], linksHidden: true }],
+      "https://example.com",
+    );
+    expect(read.linksHidden).toBe(true);
+    expect(read.links).toEqual([{ ...shop, image: "https://example.com/api/link-images/b" }]);
+    const older: Partial<typeof row> = { ...row };
+    delete older.links;
+    delete older.linksHidden;
+    expect(parseNames([older])).toEqual([row]);
+  });
 
   it("keeps valid rows in the order given", () => {
     const second = { ...row, donorId: "d2", name: "Bo", hidden: true, cities: [] };

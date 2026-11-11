@@ -8,6 +8,8 @@
  * sign-in covers them all.
  */
 
+import { parseLinks, type BenefactorLink } from "./links";
+
 export const ADMIN_KEY = "tinyworlds.admin";
 /** Where a donor's session is kept: the same shape, a different key, so the two never mix. */
 export const DONOR_KEY = "tinyworlds.donor";
@@ -289,10 +291,17 @@ export interface BenefactorName {
   cities: string[];
   /** ISO 8601 */
   lastGiftAt: string;
+  /** the donor's links, each with its picture, hidden or not: what there is to review */
+  links: BenefactorLink[];
+  /** the links are kept off the lists (the name may still show) */
+  linksHidden: boolean;
 }
 
-/** Keeps the well-formed rows of whatever the API answered, in its order. */
-export function parseNames(value: unknown): BenefactorName[] {
+/**
+ * Keeps the well-formed rows of whatever the API answered, in its order. `origin` is where the
+ * API serves the links' pictures from.
+ */
+export function parseNames(value: unknown, origin: string | null = null): BenefactorName[] {
   return list(value).flatMap((row) => {
     const { donorId, name, hidden, lastGiftAt } = row;
     if (typeof donorId !== "string" || donorId === "") return [];
@@ -302,7 +311,17 @@ export function parseNames(value: unknown): BenefactorName[] {
     const cities = Array.isArray(row.cities)
       ? (row.cities as unknown[]).filter((c): c is string => typeof c === "string" && c !== "")
       : [];
-    return [{ donorId, name, hidden, cities, lastGiftAt }];
+    return [
+      {
+        donorId,
+        name,
+        hidden,
+        cities,
+        lastGiftAt,
+        links: parseLinks(row.links, origin),
+        linksHidden: row.linksHidden === true,
+      },
+    ];
   });
 }
 

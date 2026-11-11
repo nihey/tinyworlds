@@ -7,6 +7,7 @@ import {
   earnedBadges,
   earnedWhere,
   givingSummary,
+  namedSomewhere,
   parseGiving,
   moreLine,
   parseCityBenefactors,
@@ -24,6 +25,7 @@ const row = (number: number, extra: Partial<FounderRow> = {}): FounderRow => ({
   stones: 10,
   firstStone: number === 1,
   keystone: false,
+  links: [],
   ...extra,
 });
 
@@ -164,12 +166,60 @@ describe("parseCityBenefactors", () => {
     raisedCents: 300,
     stones: [1, 1, 2, null],
     founders: [
-      { number: 1, name: "Ana", amountCents: 200, stones: 2, firstStone: true, keystone: false },
+      {
+        number: 1,
+        name: "Ana",
+        amountCents: 200,
+        stones: 2,
+        firstStone: true,
+        keystone: false,
+        links: [],
+      },
     ],
-    benefactors: [{ rank: 1, name: null, amountCents: 200 }],
+    benefactors: [{ rank: 1, name: null, amountCents: 200, links: [] }],
+  };
+  const shop = {
+    url: "https://shop.example.com/",
+    title: "A tiny shop",
+    description: null,
+    icon: "/api/link-images/a",
+    image: "/api/link-images/b",
   };
   it("keeps a valid payload", () => {
     expect(parseCityBenefactors(valid)).toEqual(valid);
+  });
+  it("reads an answer without links (an older API) as rows with none", () => {
+    const bare = <T extends { links: unknown }>(row: T): Omit<T, "links"> => {
+      const copy: Partial<T> = { ...row };
+      delete copy.links;
+      return copy as Omit<T, "links">;
+    };
+    const older = {
+      ...valid,
+      founders: valid.founders.map(bare),
+      benefactors: valid.benefactors.map(bare),
+    };
+    expect(parseCityBenefactors(older)).toEqual(valid);
+  });
+  it("reads a named row's links, their pictures at the API's address", () => {
+    const city = parseCityBenefactors(
+      { ...valid, founders: [{ ...valid.founders[0], links: [shop] }] },
+      "https://example.com",
+    );
+    expect(city?.founders[0].links).toEqual([
+      {
+        ...shop,
+        icon: "https://example.com/api/link-images/a",
+        image: "https://example.com/api/link-images/b",
+      },
+    ]);
+  });
+  it("shows no link on an unnamed row, whatever the answer says", () => {
+    const city = parseCityBenefactors(
+      { ...valid, benefactors: [{ ...valid.benefactors[0], links: [shop] }] },
+      "https://example.com",
+    );
+    expect(city?.benefactors[0].links).toEqual([]);
   });
   it("drops a payload without stones", () => {
     const rest: Partial<typeof valid> = { ...valid };
@@ -213,6 +263,29 @@ describe("parseGiving", () => {
     expect(giving?.cities).toHaveLength(2);
     expect(giving?.cities[1].worldId).toBe("tinyvlc");
     expect(giving?.projectCents).toBe(500);
+    // nothing was said of the links
+    expect(giving?.links).toBeNull();
+  });
+  it("carries the links asked with it, and knows when the donor is named somewhere", () => {
+    const links = { links: [], max: 3, givenCents: 700, picturesFromCents: 1000, hidden: false };
+    const named = parseGiving(
+      { displayName: "Ana", cities: [myCity({ listed: true })], projectCents: 0 },
+      links,
+    );
+    expect(named?.links).toBe(links);
+    expect(named && namedSomewhere(named)).toBe(true);
+    const unlisted = parseGiving({
+      displayName: "Ana",
+      cities: [myCity({ listed: false })],
+      projectCents: 0,
+    });
+    expect(unlisted && namedSomewhere(unlisted)).toBe(false);
+    const nameless = parseGiving({
+      displayName: null,
+      cities: [myCity({ listed: true })],
+      projectCents: 0,
+    });
+    expect(nameless && namedSomewhere(nameless)).toBe(false);
   });
   it("accepts no name", () => {
     expect(parseGiving({ displayName: null, cities: [], projectCents: 0 })?.displayName).toBeNull();
