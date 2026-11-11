@@ -28,4 +28,18 @@ describe('VerifyLinkDto', () => {
     expect(await errors({ token: 'short' })).toBeGreaterThan(0);
     expect(await errors({ token: 'short', code: 'x' })).toBeGreaterThan(0);
   });
+
+  it("takes a code's purpose, admin when left out, and nothing else", async () => {
+    const dto = (body: Record<string, unknown>) =>
+      plainToInstance(VerifyLinkDto, body);
+    expect(await errors({ email, code: '482913', purpose: 'donor' })).toBe(0);
+    expect(await errors({ email, code: '482913', purpose: 'admin' })).toBe(0);
+    expect(dto({ email, code: '482913' }).purpose).toBe('admin');
+    expect(
+      await errors({ email, code: '482913', purpose: 'root' }),
+    ).toBeGreaterThan(0);
+    expect(
+      await errors({ email, code: '482913', purpose: null }),
+    ).toBeGreaterThan(0);
+  });
 });

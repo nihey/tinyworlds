@@ -74,8 +74,9 @@ Each sub-project has its own `CLAUDE.md`.
   `/<world>` plus one for the front page. No server components fetch at request time; Apollo
   Client is used only where the API is (the Donate dialog, the front page's milestones).
 - **No accounts for visitors.** What the site calls for them is public and throttled. Auth
-  exists for admins only, and without passwords: a sign-in link by email, then a JWT in local
-  storage (`tinyworlds-api/CLAUDE.md`). Signing in is REST, as the global stack has it.
+  exists for admins and for donors (who sign in to see the cities they helped build), and
+  without passwords: a sign-in link or its code by email, then a JWT in local storage
+  (`tinyworlds-api/CLAUDE.md`). Signing in is REST, as the global stack has it.
 - **Funnel steps go out with plain `fetch`**, not Apollo Client: every page sends one, and
   Apollo is only downloaded when the donate sign or the admin page asks for it.
 
@@ -244,15 +245,19 @@ type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
 }
-# admins only (Authorization: Bearer <session>): me, donationFunnel
+# admins only (Authorization: Bearer <an admin's session>): me, donationFunnel
 ```
 
 `amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
 (from US$1). `visitId` is the tab's visit (a UUID from session storage); `world` is a world's id
-or `"home"`. REST: `POST /api/stripe/webhook`, and signing in (`POST /api/auth/magic-link`,
-`POST /api/auth/verify`). When the contract grows, deploy the API before the viewers: an older
-API refuses a checkout that carries a field it does not know, and the site then falls back to
-its payment link. Details in `tinyworlds-api/CLAUDE.md`.
+or `"home"`. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
+`POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
+`POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered
+`{ accessToken, expiresAt, admin | donor: { id, email } }`. `purpose` is `"admin"` (the default)
+or `"donor"`; a session of one kind is `FORBIDDEN` on the other's queries. When the contract
+grows, deploy the API before the viewers: an older API refuses a checkout that carries a field
+it does not know, and the site then falls back to its payment link. Details in
+`tinyworlds-api/CLAUDE.md`.
 
 ## Running and deploying
 

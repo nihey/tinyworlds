@@ -109,9 +109,10 @@ describe('the API over HTTP', () => {
   });
 
   beforeEach(async () => {
-    // not the admins: the session made by the first sign-in serves every test after it
+    // not the admins: the session made by the first sign-in serves every test after it. Links
+    // go with the donors they may belong to (and so a test may ask for a fresh one)
     await prisma.$executeRawUnsafe(
-      'TRUNCATE donations, donors, cities, funnel_events',
+      'TRUNCATE donations, donors, cities, funnel_events, magic_links',
     );
     stripe.calls = [];
     stripe.priceLookups = [];
@@ -497,8 +498,17 @@ describe('the API over HTTP', () => {
         returnUrl: ADMIN_PAGE,
         locale: 'fr-FR',
       }).expect(400);
+      await from({
+        email: ADMIN,
+        returnUrl: ADMIN_PAGE,
+        purpose: 'root',
+      }).expect(400);
       await from({ token: 'x'.repeat(43) }, 'verify').expect(401);
       await from({ token: 'short' }, 'verify').expect(400);
+      await from(
+        { email: ADMIN, code: '482913', purpose: 'root' },
+        'verify',
+      ).expect(400);
     });
 
     it('limit how often one address may ask for a link', async () => {
@@ -511,6 +521,175 @@ describe('the API over HTTP', () => {
         codes.push(res.status);
       }
       expect(codes).toEqual([202, 202, 202, 202, 202, 429, 429]);
+    });
+  });
+
+  describe('donors signing in', () => {
+    const DONOR = 'dora@example.com';
+    const HOME = 'https://example.com/';
+    /** A paid gift from the address, which is what makes it a donor's. */
+    const give = (email = DONOR) =>
+      webhook({
+        id: `cs_${email}`,
+        amount: 500,
+        email,
+        metadata: {
+          app: 'tinyworlds',
+          city: 'Lisbon',
+          world: 'tinynyc',
+          locale: 'en-US',
+        },
+      }).expect(200);
+    const askAsDonor = (email: string, from: string) =>
+      post('/api/auth/magic-link', {
+        email,
+        returnUrl: HOME,
+        purpose: 'donor',
+      }).set('x-forwarded-for', from);
+    const verify = (body: Record<string, unknown>, from: string) =>
+      post('/api/auth/verify', body).set('x-forwarded-for', from);
+    /** Waits for the mail that should follow an answer, and says it is the latest. */
+    const mailFollows = async (before: number) => {
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+      return mailer.sent[before];
+    };
+    /** A donor's session, through the link of a fresh mail. */
+    const signInDonor = async (from: string) => {
+      await give();
+      const before = mailer.sent.length;
+      await askAsDonor(DONOR, from).expect(202);
+      await mailFollows(before);
+      const res = await verify({ token: mailer.token() }, from).expect(200);
+      return res.body as { accessToken: string; donor: { id: string } };
+    };
+
+    it('a donor signs in with the link or the code', async () => {
+      await give();
+      let before = mailer.sent.length;
+      await askAsDonor(DONOR, '203.0.113.50').expect(202, { sent: true });
+      const mail = await mailFollows(before);
+      expect(mail.to).toBe(DONOR);
+      expect(mail.text).toContain(`${HOME}#token=`);
+
+      const byLink = await verify(
+        { token: mailer.token() },
+        '203.0.113.50',
+      ).expect(200);
+      const donor = await prisma.donor.findUniqueOrThrow({
+        where: { email: DONOR },
+      });
+      expect(byLink.body).toMatchObject({
+        accessToken: expect.any(String) as string,
+        expiresAt: expect.any(String) as string,
+        donor: { id: donor.id, email: DONOR },
+      });
+      expect(byLink.body).not.toHaveProperty('admin');
+      expect(donor.lastLoginAt).toBeInstanceOf(Date);
+
+      // a link a minute: forget this one, and ask again for its code
+      await prisma.magicLink.deleteMany();
+      before = mailer.sent.length;
+      await askAsDonor(DONOR, '203.0.113.50').expect(202);
+      await mailFollows(before);
+      const code = mailer.code();
+      // asked as an admin's, the donor's code is nobody's
+      await verify({ email: DONOR, code }, '203.0.113.50').expect(401);
+      const byCode = await verify(
+        {
+          email: DONOR,
+          code: `${code.slice(0, 3)}-${code.slice(3)}`,
+          purpose: 'donor',
+        },
+        '203.0.113.50',
+      ).expect(200);
+      expect((byCode.body as { donor: unknown }).donor).toEqual({
+        id: donor.id,
+        email: DONOR,
+      });
+    });
+
+    it('a donor session is refused by admin queries', async () => {
+      // the other half, an admin session on a donor query, is with the donor's queries
+      const { accessToken } = await signInDonor('203.0.113.51');
+      for (const [query, variables] of [
+        ['{ me { email } }', undefined],
+        [
+          FUNNEL,
+          {
+            input: {
+              from: '2026-01-01T00:00:00.000Z',
+              to: '2026-12-31T00:00:00.000Z',
+            },
+          },
+        ],
+      ] as const) {
+        const res = await graphql(query, variables)
+          .set('Authorization', `Bearer ${accessToken}`)
+          .expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('FORBIDDEN');
+        expect((res.body as { data: unknown }).data).toBeNull();
+      }
+    });
+
+    it('an admin token from before this change still works', async () => {
+      const { admin } = await signIn();
+      const jwt = new JwtService({ secret: process.env.JWT_SECRET });
+      // no kind: every admin session signed before donors could sign in
+      const legacy = await jwt.signAsync(
+        { sub: admin.id },
+        { expiresIn: '7d' },
+      );
+      const res = await graphql('{ me { id email } }')
+        .set('Authorization', `Bearer ${legacy}`)
+        .expect(200);
+      expect(answer(res).data.me).toEqual({ id: admin.id, email: ADMIN });
+
+      // but a donor's id is no admin's, and a kind it does not know is no session
+      const { donor } = await signInDonor('203.0.113.52');
+      for (const payload of [
+        { sub: donor.id },
+        { sub: admin.id, kind: 'root' },
+      ]) {
+        const token = await jwt.signAsync(payload, { expiresIn: '7d' });
+        const refused = await graphql('{ me { id } }')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+        expect(answer(refused).errors?.[0].extensions.code).toBe(
+          'UNAUTHENTICATED',
+        );
+      }
+    });
+
+    it('asking for a donor link answers the same for any address', async () => {
+      await give();
+      // not a donor: someone who has never given, and an admin who has not either
+      const asked = [DONOR, 'stranger@example.com', ADMIN];
+      const before = mailer.sent.length;
+      const answers = [];
+      for (const [i, email] of asked.entries()) {
+        const res = await askAsDonor(email, `203.0.113.6${i}`);
+        answers.push({ status: res.status, body: res.body as unknown });
+      }
+      expect(answers[0]).toEqual({ status: 202, body: { sent: true } });
+      expect(answers[1]).toEqual(answers[0]);
+      expect(answers[2]).toEqual(answers[0]);
+      await mailFollows(before);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(mailer.sent.slice(before).map((mail) => mail.to)).toEqual([DONOR]);
+
+      // and a wrong code is refused alike, the donor's or the stranger's
+      const right = mailer.code();
+      const wrong = right === '000000' ? '111111' : '000000';
+      const refusals = [];
+      for (const [i, email] of asked.slice(0, 2).entries()) {
+        const res = await verify(
+          { email, code: wrong, purpose: 'donor' },
+          `203.0.113.6${i}`,
+        );
+        refusals.push({ status: res.status, body: res.body as unknown });
+      }
+      expect(refusals[0].status).toBe(401);
+      expect(refusals[1]).toEqual(refusals[0]);
     });
   });
 

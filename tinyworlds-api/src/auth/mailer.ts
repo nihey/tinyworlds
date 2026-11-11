@@ -22,8 +22,9 @@ export const SMTP_TIMEOUT_MS = 10_000;
 
 /**
  * No mail server: the message goes to the log instead, so signing in works on a developer's
- * machine with nothing set up. Never in production: there the link is a key to the admin
- * pages, and logs are read by more people than mailboxes.
+ * machine with nothing set up. Never in production (the environment check refuses to start
+ * without a mail server): there the link is a key to an account, and logs are read by more
+ * people than mailboxes.
  */
 export class LogMailer implements Mailer {
   private readonly logger = new Logger('Mail');
@@ -32,9 +33,8 @@ export class LogMailer implements Mailer {
 
   send(mail: Mail): Promise<void> {
     if (this.production)
-      this.logger.error(
-        `No mail server is configured: "${mail.subject}" was not sent`,
-      );
+      // not even the subject: it carries the code
+      this.logger.error('No mail server is configured: a mail was not sent');
     else
       this.logger.log(
         `No mail server is configured, so here is the mail.\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}`,

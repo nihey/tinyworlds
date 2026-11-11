@@ -32,6 +32,7 @@ export interface DonorRow {
   id: string;
   email: string;
   displayName: string | null;
+  lastLoginAt?: Date | null;
 }
 
 export interface FunnelEventRow {
@@ -51,7 +52,9 @@ export interface AdminRow {
 
 export interface MagicLinkRow {
   id: string;
-  adminId: string;
+  /** Exactly one of the two is set: whose link it is. */
+  adminId: string | null;
+  donorId: string | null;
   tokenHash: string;
   codeHash: string;
   attempts: number;
@@ -69,7 +72,15 @@ interface LinkWhere {
   createdAt?: { gt?: Date };
   attempts?: { lt: number };
   admin?: { email: string };
+  donorId?: string;
+  donor?: { email: string };
 }
+
+/** A link with the account it belongs to, as a `select` of both relations gives it. */
+type LinkWithOwner = MagicLinkRow & {
+  admin: AdminRow | null;
+  donor: DonorRow | null;
+};
 
 type Step = { increment: number } | number | undefined;
 
@@ -227,12 +238,31 @@ export class FakePrisma {
     },
     update: (args: {
       where: { id: string };
-      data: { displayName: string };
+      data: { displayName?: string; lastLoginAt?: Date };
     }): Promise<DonorRow> => {
       const row = this.donors.find((d) => d.id === args.where.id);
       if (!row) throw new Error('No such donor');
-      row.displayName = args.data.displayName;
+      if (args.data.displayName !== undefined)
+        row.displayName = args.data.displayName;
+      if (args.data.lastLoginAt !== undefined)
+        row.lastLoginAt = args.data.lastLoginAt;
       return Promise.resolve({ ...row });
+    },
+    findUnique: (args: { where: { id: string } }): Promise<DonorRow | null> => {
+      const row = this.donors.find((d) => d.id === args.where.id);
+      return Promise.resolve(row ? { ...row } : null);
+    },
+    /** The one `where` the API asks: an address, and optionally that it has given. */
+    findFirst: (args: {
+      where: { email: string; donations?: { some: Record<string, never> } };
+    }): Promise<DonorRow | null> => {
+      const row = this.donors.find(
+        (d) =>
+          d.email === args.where.email &&
+          (args.where.donations === undefined ||
+            this.donations.some((gift) => gift.donorId === d.id)),
+      );
+      return Promise.resolve(row ? { ...row } : null);
     },
     findMany: (): Promise<DonorRow[]> =>
       Promise.resolve(this.donors.map((d) => ({ ...d }))),
@@ -295,11 +325,22 @@ export class FakePrisma {
     },
   };
 
+  private withOwner(link: MagicLinkRow): LinkWithOwner {
+    const admin = this.admins.find((a) => a.id === link.adminId);
+    const donor = this.donors.find((d) => d.id === link.donorId);
+    return {
+      ...link,
+      admin: admin ? { ...admin } : null,
+      donor: donor ? { ...donor } : null,
+    };
+  }
+
   private linksWhere(where: LinkWhere): MagicLinkRow[] {
     return this.links.filter(
       (link) =>
         (where.id === undefined || link.id === where.id) &&
         (where.adminId === undefined || link.adminId === where.adminId) &&
+        (where.donorId === undefined || link.donorId === where.donorId) &&
         (where.usedAt === undefined || link.usedAt === null) &&
         (where.expiresAt?.lt === undefined ||
           link.expiresAt < where.expiresAt.lt) &&
@@ -310,7 +351,10 @@ export class FakePrisma {
         (where.attempts === undefined || link.attempts < where.attempts.lt) &&
         (where.admin === undefined ||
           this.admins.find((a) => a.id === link.adminId)?.email ===
-            where.admin.email),
+            where.admin.email) &&
+        (where.donor === undefined ||
+          this.donors.find((d) => d.id === link.donorId)?.email ===
+            where.donor.email),
     );
   }
 
@@ -329,7 +373,8 @@ export class FakePrisma {
     },
     create: (args: {
       data: {
-        adminId: string;
+        adminId?: string;
+        donorId?: string;
         tokenHash: string;
         codeHash: string;
         expiresAt: Date;
@@ -337,12 +382,20 @@ export class FakePrisma {
     }): Promise<MagicLinkRow> => {
       if (this.links.some((l) => l.tokenHash === args.data.tokenHash))
         throw unique('token_hash');
+      // the database's check: a link belongs to exactly one account
+      if (
+        (args.data.adminId === undefined) ===
+        (args.data.donorId === undefined)
+      )
+        throw new Error('magic_links_one_owner');
       const row: MagicLinkRow = {
         id: randomUUID(),
         usedAt: null,
         attempts: 0,
         createdAt: new Date(),
         ...args.data,
+        adminId: args.data.adminId ?? null,
+        donorId: args.data.donorId ?? null,
       };
       this.links.push(row);
       return Promise.resolve({ ...row });
@@ -350,13 +403,12 @@ export class FakePrisma {
     findFirst: (args: {
       where: LinkWhere;
       orderBy?: { createdAt: 'desc' };
-    }): Promise<(MagicLinkRow & { admin: AdminRow }) | null> => {
+    }): Promise<LinkWithOwner | null> => {
       const found = this.linksWhere(args.where);
       if (args.orderBy)
         found.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      const link = found[0];
-      const admin = link && this.admins.find((a) => a.id === link.adminId);
-      return Promise.resolve(link && admin ? { ...link, admin } : null);
+      const link = found.at(0);
+      return Promise.resolve(link ? this.withOwner(link) : null);
     },
     update: (args: {
       where: { id: string };
@@ -369,14 +421,13 @@ export class FakePrisma {
     },
     findUnique: (args: {
       where: { tokenHash?: string; id?: string };
-    }): Promise<(MagicLinkRow & { admin: AdminRow }) | null> => {
+    }): Promise<LinkWithOwner | null> => {
       const link = this.links.find((l) =>
         args.where.id !== undefined
           ? l.id === args.where.id
           : l.tokenHash === args.where.tokenHash,
       );
-      const admin = link && this.admins.find((a) => a.id === link.adminId);
-      return Promise.resolve(link && admin ? { ...link, admin } : null);
+      return Promise.resolve(link ? this.withOwner(link) : null);
     },
     updateMany: (args: {
       where: LinkWhere;

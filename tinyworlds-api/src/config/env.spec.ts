@@ -110,9 +110,34 @@ describe('validateEnv', () => {
       MAIL_FROM: 'tinyworlds <hello@example.com>',
     });
     expect(env.SMTP_PORT).toBe(465);
-    // and production without admins still starts as before
-    expect(validateEnv({ ...base, NODE_ENV: 'production' }).NODE_ENV).toBe(
-      'production',
+  });
+
+  it('production needs a session secret and a mail server even without admins', () => {
+    const production = { ...base, NODE_ENV: 'production' };
+    expect(() => validateEnv(production)).toThrow(/JWT_SECRET/);
+    expect(() => validateEnv({ ...production, JWT_SECRET: 'short' })).toThrow(
+      /at least 32 characters/,
     );
+    const secret = { ...production, JWT_SECRET: 'x'.repeat(32) };
+    expect(() => validateEnv(secret)).toThrow(/SMTP_HOST/);
+    expect(() =>
+      validateEnv({ ...secret, SMTP_HOST: 'smtp.example.com' }),
+    ).toThrow(/MAIL_FROM/);
+    const env = validateEnv({
+      ...secret,
+      SMTP_HOST: 'smtp.example.com',
+      MAIL_FROM: 'tinyworlds <hello@example.com>',
+    });
+    expect(env.ADMIN_EMAILS).toEqual([]);
+    expect(env.NODE_ENV).toBe('production');
+  });
+
+  it('development needs neither', () => {
+    for (const NODE_ENV of ['development', 'test']) {
+      const env = validateEnv({ ...base, NODE_ENV });
+      expect(env.JWT_SECRET).toBeUndefined();
+      expect(env.SMTP_HOST).toBeUndefined();
+      expect(env.MAIL_FROM).toBeUndefined();
+    }
   });
 });

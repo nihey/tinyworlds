@@ -6,9 +6,9 @@ import type { Env } from '../config/env.js';
 const UNKNOWABLE = randomBytes(32).toString('hex');
 
 /**
- * What the admins' sessions are signed with. JWT_SECRET is required as soon as there is an
- * admin (config/env.ts); without admins there are no sessions, and a made-up secret makes sure
- * of it: no token can be valid.
+ * What sessions are signed with (and sign-in codes keyed by). JWT_SECRET is required in
+ * production, and anywhere as soon as there is an admin (config/env.ts). Without it, in
+ * development, a secret made up at start serves: the sessions it signs end with the process.
  */
 export const sessionSecret = (config: ConfigService<Env, true>): string =>
   config.get('JWT_SECRET', { infer: true }) ?? UNKNOWABLE;

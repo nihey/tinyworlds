@@ -92,9 +92,9 @@ const baseSchema = z.object({
    * where a sign-in link may lead.
    */
   ALLOWED_ORIGINS: origins,
-  /** Who may sign in to the admin pages. Empty: nobody, and nothing below is needed. */
+  /** Who may sign in to the admin pages. Empty: nobody. */
   ADMIN_EMAILS: emails,
-  /** Signs the admins' sessions. */
+  /** Signs the sessions, and keys the sign-in codes' HMAC. */
   JWT_SECRET: optional,
   /** The mail server that sends the sign-in links, and the address they come from. */
   SMTP_HOST: optional,
@@ -105,25 +105,31 @@ const baseSchema = z.object({
 });
 
 /**
- * Signing in is switched on by naming an admin, and then it has to be able to work: a secret to
- * sign sessions with, and in production a mail server to send the links through (elsewhere the
- * link is written to the log instead).
+ * Signing in has to be able to work wherever someone can sign in. In production that is always
+ * (donors sign in whether or not there are admins): a secret to sign sessions with, and a mail
+ * server to send the links through. Elsewhere only naming an admin asks for the secret, and the
+ * link is written to the log instead of mailed.
  */
 export const envSchema = baseSchema.superRefine((env, ctx) => {
-  if (env.ADMIN_EMAILS.length === 0) return;
-  if ((env.JWT_SECRET ?? '').length < JWT_SECRET_MIN)
+  const production = env.NODE_ENV === 'production';
+  if (
+    (production || env.ADMIN_EMAILS.length > 0) &&
+    (env.JWT_SECRET ?? '').length < JWT_SECRET_MIN
+  )
     ctx.addIssue({
       code: 'custom',
       path: ['JWT_SECRET'],
-      message: `With ADMIN_EMAILS set, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters`,
+      message: production
+        ? `In production, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters: donors sign in whether or not there are admins`
+        : `With ADMIN_EMAILS set, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters`,
     });
-  if (env.NODE_ENV !== 'production') return;
+  if (!production) return;
   for (const name of ['SMTP_HOST', 'MAIL_FROM'] as const)
     if (!env[name])
       ctx.addIssue({
         code: 'custom',
         path: [name],
-        message: `With ADMIN_EMAILS set, ${name} is required in production: sign-in links go out by email`,
+        message: `${name} is required in production: sign-in links go out by email`,
       });
 });
 

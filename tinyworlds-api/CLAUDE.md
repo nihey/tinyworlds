@@ -5,8 +5,8 @@ city is built once the donations naming it reach a goal (US$100). This API start
 Stripe, records the ones Stripe says were paid, and serves every city's progress to the viewer.
 It also keeps the **donation funnel** (which steps towards a donation each visit reached, and
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
-by email. Visitors have no accounts: what they call is public. ESM throughout (`.js` in import
-paths).
+by email. **Donors** sign in the same way, to see the cities they helped build. Other visitors
+have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
 ## Commands
 
@@ -36,10 +36,11 @@ src/
 ├── health/                         # { health }
 ├── common/                         # rate limit module, GraphQL throttler guard, enum registration
 ├── auth/
-│   ├── auth.service.ts             # sendLink, verify, verifyCode, adminOf: sign-in by emailed link or code
+│   ├── auth.service.ts             # sendLink, verify, verifyCode, identityOf: link or code, admins and donors
 │   ├── auth.controller.ts dto/     # POST /api/auth/magic-link, /api/auth/verify (REST)
-│   ├── jwt.strategy.ts jwt-auth.guard.ts   # the global guard: private unless @Public()
-│   ├── public.decorator.ts current-admin.decorator.ts session-secret.ts
+│   ├── jwt.strategy.ts jwt-auth.guard.ts   # the global guard: admins' unless @Public() / @ForDonors()
+│   ├── public.decorator.ts for-donors.decorator.ts   # the marks the guard reads
+│   ├── current-admin.decorator.ts current-donor.decorator.ts session-secret.ts
 │   ├── mailer.ts sign-in-mail.ts   # SMTP (nodemailer), or the log in development; the mail's words
 │   └── admin.resolver.ts models/   # { me }
 ├── funnel/
@@ -110,10 +111,13 @@ type Mutation {
 }
 ```
 
-**Private unless marked.** `JwtAuthGuard` is global (`AuthModule`): every resolver and route
-needs an admin's session in `Authorization: Bearer …` unless it carries `@Public()`. A new
-operation is therefore closed until someone opens it; without a session the answer is
-`UNAUTHENTICATED`.
+**Admins' unless marked.** `JwtAuthGuard` is global (`AuthModule`): every resolver and route
+needs an admin's session in `Authorization: Bearer …` unless it carries `@Public()` (anyone) or
+`@ForDonors()` (a donor's session), on the method or its class, the method's mark first. A new
+operation is therefore closed to all but admins until someone opens it. Without a session the
+answer is `UNAUTHENTICATED`; with a session of the other kind it is `FORBIDDEN`, never an answer.
+`@CurrentAdmin()` and `@CurrentDonor()` give a resolver the signed-in `{ id, email }` (and
+refuse the other kind, should one ever reach them).
 
 - `cityMilestones`: hidden cities left out; cities still to be built first (most raised first,
   ties by name), built ones last.
@@ -160,19 +164,29 @@ gift is listed, the donor has a name, and `name_hidden` is false; hiding it (SQL
 `UPDATE donors SET name_hidden = true WHERE …`) changes no stones or numbers. Emails never reach
 GraphQL types or logs.
 
-## Admins and signing in (`auth/`)
+## Signing in, for admins and donors (`auth/`)
 
-There are no passwords. **Who is an admin is `ADMIN_EMAILS`**, a list in the environment (so no
-address is in the repository, and taking one off the list ends its sessions at once: the JWT
-strategy asks on every request). An `admins` row is made the first time an address on the list
-asks for a link; it is the account (its id is the session's subject, `last_login_at` its last
-sign-in).
+There are no passwords. Two kinds of account sign in (`Purpose`: `admin | donor`), sharing the
+links, the codes and every limit below, never an account: an address that is both has one of
+each, and each gets its own links.
 
-1. `POST /api/auth/magic-link { email, returnUrl, locale? }` → `202 { sent: true }`, whoever
-   asks. For an admin's address it mails a link to `returnUrl#token=…`; `returnUrl` must be a
-   plain page of `ALLOWED_ORIGINS` (the site's `/admin/`). The mail goes out after the answer
-   (`setImmediate`), so neither the answer nor its timing tells an admin's address from any
-   other. One link a minute per admin (`LINK_EVERY_MS`), five requests a minute per address.
+- **An admin** is an address on `ADMIN_EMAILS`, a list in the environment (so no address is in
+  the repository, and taking one off the list ends its sessions at once: the JWT strategy asks
+  on every request). An `admins` row is made the first time an address on the list asks for a
+  link; it is the account (its id is the session's subject, `last_login_at` its last sign-in).
+- **A donor** is a `donors` row with at least one donation: the webhook makes it (see
+  Benefactors), nothing else does. Signing in sets its `last_login_at`.
+
+`magic_links` belong to one account: `admin_id` or `donor_id`, exactly one of them (the check
+`magic_links_one_owner`, in the migration since Prisma has no checks).
+
+1. `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (`purpose` defaults to
+   `admin`) → `202 { sent: true }`, whoever asks. It mails a link to `returnUrl#token=…` only
+   to an admin's address asked as an admin, or a donor's (one with a donation) asked as a
+   donor; `returnUrl` must be a plain page of `ALLOWED_ORIGINS` (the site's `/admin/`, or the
+   page a donor asked from). The mail goes out after the answer (`setImmediate`), so neither
+   the answer nor its timing tells an admin's address, or a donor's, from any other. One link
+   a minute per account (`LINK_EVERY_MS`), five requests a minute per address.
 2. The mail carries the link and a **6-digit code** (`CODE_DIGITS`; in the subject, `482 913`).
    The token is 32 random bytes; only its SHA-256 is stored (`magic_links`). The code is never
    stored either: only `HMAC-SHA256(JWT_SECRET, tokenHash:code)` (`hashCode`), compared with
@@ -180,27 +194,38 @@ sign-in).
    between them**: either is spent in a single `UPDATE … WHERE used_at IS NULL`, so two tries
    cannot both sign in, and using one spends the other. The token travels in the URL's hash,
    which reaches neither a web server's log nor the page analytics.
-3. `POST /api/auth/verify { token }` or `{ email, code }` → `{ accessToken, expiresAt,
-   admin { id, email } }`, or 401. The code may be typed "482 913" or "482-913"
-   (`normalizeCode`). A wrong code counts against the admin's newest live link
+3. `POST /api/auth/verify { token }` or `{ email, code, purpose? }` → `{ accessToken,
+   expiresAt, admin { id, email } }` for an admin, `{ accessToken, expiresAt, donor { id,
+   email } }` for a donor, or 401. A token's link knows whose it is; a code is looked up
+   among the links of the account of that `purpose` (default `admin`), so a donor's code asked
+   as an admin's is refused. The code may be typed "482 913" or "482-913"
+   (`normalizeCode`). A wrong code counts against the account's newest live link
    (`attempts`); at `CODE_TRIES` (5) the link is spent. A wrong code, an unknown address and a
    bad link all answer the same 401, and a refused code try never returns before
    `REFUSAL_FLOOR_MS` (300; injected as `REFUSAL_FLOOR`) has passed, so timing does not tell an
-   admin's address from another. An account gets `CODE_TRIES_PER_DAY` (20) tries per rolling
-   24 hours across all its links (the sum of their `attempts`; past it a code is refused
-   without being compared, the token still works; parallel requests may overshoot it by a
-   few). The session is a JWT (HS256, `JWT_SECRET`, 7 days:
-   `SESSION_DAYS`) that the site keeps in local storage.
+   admin's or a donor's address from another. An account gets `CODE_TRIES_PER_DAY` (20) tries
+   per rolling 24 hours across all its links (the sum of their `attempts`, by `admin_id` or
+   `donor_id`; past it a code is refused without being compared, the token still works;
+   parallel requests may overshoot it by a few).
 
-The mail is sent through SMTP (`SMTP_*`, `MAIL_FROM`; nodemailer), in the language the admin
-asked in (`sign-in-mail.ts`). With no mail server configured the message is written to the log
-instead, which is how signing in works in development; in production that never happens (a
-link is a key), and the environment check refuses to start with an admin and no mail server.
-With `ADMIN_EMAILS` empty nobody can sign in and none of the settings are needed: sessions are
-then signed with a secret made up at start, so no token can be valid.
+**Sessions** are JWTs (HS256, `JWT_SECRET`, 7 days: `SESSION_DAYS`) that the site keeps in
+local storage, with the payload `{ sub, kind }`: the account's id and `admin | donor`. A token
+without `kind` was signed before donors could sign in and is an admin's. `JwtStrategy` turns
+the payload into a `SessionIdentity { kind, id, email }` through `identityOf` on every request
+(an admin only while on `ADMIN_EMAILS`, a donor while the row is there); an unknown kind is
+`UNAUTHENTICATED`.
 
-To let someone in: add their address to `ADMIN_EMAILS` and restart. To see who has signed in:
-`SELECT email, last_login_at FROM admins;`.
+The mail is sent through SMTP (`SMTP_*`, `MAIL_FROM`; nodemailer), in the language it was asked
+in, with words for an admin or for a donor (`sign-in-mail.ts`). With no mail server configured
+the message is written to the log instead, which is how signing in works in development; in
+production that never happens (a link is a key), and the environment check refuses to start
+without `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM`, admins or not, because donors sign in
+whenever there are donations. Elsewhere, without `JWT_SECRET`, sessions are signed with a
+secret made up at start (they end with the process). Logs name an account by its id, never by
+its address, and never carry a code.
+
+To let someone in as an admin: add their address to `ADMIN_EMAILS` and restart. To see who has
+signed in: `SELECT email, last_login_at FROM admins;` (or `donors`).
 
 ## The donation funnel (`funnel/`)
 
@@ -302,8 +327,8 @@ Validated at startup (`config/env.ts`); the server does not start with anything 
 | `CITY_GOAL_CENTS` | `10000` | what a new city needs, in US cents; stored on the city when it is created |
 | `ALLOWED_ORIGINS` | required | comma-separated origins of the site: the CORS allow-list, where a checkout may return to and where a sign-in link may lead |
 | `ADMIN_EMAILS` | empty | comma-separated addresses that may sign in to the admin pages; empty = nobody |
-| `JWT_SECRET` | required with an admin | signs the sessions; at least 32 characters |
-| `SMTP_HOST`, `MAIL_FROM` | required in production with an admin | the mail server that sends the sign-in links, and the address they come from |
+| `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions and keys the codes' HMAC; at least 32 characters |
+| `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the sign-in links (admins' and donors'), and the address they come from |
 | `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | `587`, none, none | 465 means TLS from the start, anything else STARTTLS |
 | `PORT` | `4000` | |
 | `NODE_ENV` | `development` | GraphiQL and introspection are off in `production` |
@@ -331,8 +356,8 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
   (`tinyworlds_test`, created on the compose Postgres if missing), and goes through HTTP: the
   global prefix, validation, the raw-body webhook, throttling by forwarded address, CORS,
   signing in through a mailed link (the mail is kept by the fake mailer) and the funnel's SQL
-  on a real database. The admin signs in once for the whole file (one link a minute), so
-  `admins` is not emptied between tests. The
+  on a real database. The admin signs in once for the whole file, so `admins` is not emptied
+  between tests; `magic_links` is (with `donors`), so a test may ask for a fresh link. The
   checkout limit is per address and the tests share a minute: a test that starts several
   checkouts sets its own `x-forwarded-for`.
 - By hand, without Stripe: `npm run webhook:send` posts a signed `checkout.session.completed` to

@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsIn,
   IsString,
   Length,
   Matches,
@@ -11,7 +12,7 @@ import {
   type ValidatorConstraintInterface,
   type ValidationArguments,
 } from 'class-validator';
-import { normalizeCode } from '../auth.service.js';
+import { normalizeCode, PURPOSES, type Purpose } from '../auth.service.js';
 
 /** A token comes alone: with an address or a code beside it, the body is ambiguous. */
 @ValidatorConstraint({ name: 'tokenAlone' })
@@ -27,7 +28,7 @@ class TokenAlone implements ValidatorConstraintInterface {
 
 /**
  * The body of `POST /api/auth/verify`: a link's token, or the address with the code from the
- * same mail.
+ * same mail and whose code it is.
  */
 export class VerifyLinkDto {
   /** The token a sign-in link carries after its `#token=`. Required unless email and code come. */
@@ -56,4 +57,11 @@ export class VerifyLinkDto {
   )
   @Matches(/^\d{6}$/)
   code?: string;
+
+  /**
+   * Whose code it is: an admin's (when left out) or a donor's. A token needs none, since its link
+   * knows whose it is; one sent beside it is not used.
+   */
+  @IsIn(PURPOSES)
+  purpose: Purpose = 'admin';
 }
