@@ -1,5 +1,54 @@
 import { describe, expect, it } from "vitest";
-import { resolveSights, type Candidate, type Found } from "./sights.js";
+import type { Scene } from "../render/scene.js";
+import { resolveSights, toSightFile, type Candidate, type Found } from "./sights.js";
+
+describe("toSightFile", () => {
+  it("says how near the viewer a sight stands and where its sign hangs", () => {
+    // one 10 × 10 px footprint, 40 px tall
+    const scene = {
+      vol: {
+        ringStart: Uint32Array.from([0, 1]),
+        vertStart: Uint32Array.from([0, 4]),
+        xy: Float32Array.from([100, 200, 110, 200, 110, 210, 100, 210]),
+        bbox: Float32Array.from([100, 200, 110, 210]),
+        count: 1,
+        seed: Uint32Array.from([3]),
+        base: Float32Array.from([0]),
+        top: Float32Array.from([40]),
+        roofH: Float32Array.from([0]),
+      },
+    } as unknown as Scene;
+    const file = toSightFile(
+      [
+        {
+          key: "b3",
+          vols: [0],
+          n: "Tower",
+          t: "landmark",
+          b: "Manhattan",
+          lon: -73.123456,
+          lat: 40.654321,
+          r: 50,
+          order: 0,
+        },
+      ],
+      scene,
+    );
+    expect(file.sights).toHaveLength(1);
+    const [sight] = file.sights;
+    expect(sight).toMatchObject({
+      id: "b3",
+      n: "Tower",
+      t: "landmark",
+      b: "Manhattan",
+      lon: -73.12346,
+      lat: 40.65432,
+    });
+    expect(sight.front).toBe(210);
+    expect(sight.anchor[1]).toBe(160);
+    expect(sight.rings).toHaveLength(1);
+  });
+});
 
 const at = { lon: -74, lat: 40.7 };
 const cand = (c: Partial<Candidate> & Pick<Candidate, "n" | "src">): Candidate => ({

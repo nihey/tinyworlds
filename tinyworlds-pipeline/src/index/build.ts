@@ -8,7 +8,10 @@ import { makeProjection, type Projection } from "../projection.js";
 import { fillPolygon } from "../render/raster.js";
 import { cityFog, GEO } from "../scene/build.js";
 import { FOG, fogAt } from "../scene/fog.js";
+import { hashString } from "../scene/hash.js";
 import { buildSyntheticIndex } from "../scene/synthetic.js";
+import { writeSights } from "./write-sights.js";
+import type { Source } from "./sights.js";
 
 /**
  * The viewer's indexes: what can be searched for (places.json), the outlines of the city's
@@ -19,7 +22,7 @@ import { buildSyntheticIndex } from "../scene/synthetic.js";
 export type PlaceType =
   "borough" | "hood" | "landmark" | "park" | "bridge" | "museum" | "station" | "street" | "place";
 
-interface Place {
+export interface Place {
   n: string;
   t: PlaceType;
   lon: number;
@@ -27,7 +30,16 @@ interface Place {
   b?: string;
   r: number;
   s?: number;
+  // the index's own notes, not written to places.json: where the entry came from (for sights)
+  src?: Source;
+  /** a building entry's building: hashString of its id */
+  seed?: number;
+  /** a curated entry that is one structure */
+  sight?: boolean;
 }
+
+/** Overture place categories that are areas, never one structure: their entries never light up. */
+const AREA_CATEGORIES = new Set(["college_university", "airport", "zoo", "amusement_park"]);
 
 const round5 = (v: number): number => Math.round(v * 1e5) / 1e5;
 
@@ -232,12 +244,19 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
   };
 
   const places: Place[] = [];
-  const seen = new Set<string>();
+  const seen = new Map<string, Place>();
   const add = (place: Place): void => {
     const key = `${place.n.toLowerCase()}|${place.b ?? ""}`;
-    if (!place.n || seen.has(key)) return;
-    seen.add(key);
-    places.push({ ...place, lon: round5(place.lon), lat: round5(place.lat) });
+    if (!place.n) return;
+    const prior = seen.get(key);
+    if (prior) {
+      // the building data knows which building a hand-picked name means (its point may miss it)
+      if (place.seed !== undefined && prior.seed === undefined) prior.seed = place.seed;
+      return;
+    }
+    const kept = { ...place, lon: round5(place.lon), lat: round5(place.lat) };
+    seen.set(key, kept);
+    places.push(kept);
   };
 
   // ---- hand-picked: the places people will type first
@@ -247,7 +266,7 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
       log(`index: "${c.n}" is off the map, left out`);
       continue;
     }
-    add({ ...c, b: c.b ?? contextOf(c.lon, c.lat) });
+    add({ ...c, b: c.b ?? contextOf(c.lon, c.lat), src: "curated" });
   }
 
   // ---- districts: boroughs, zones
@@ -330,12 +349,12 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
   for (const row of await rows(
     conn,
     `SELECT names."primary", ST_X(ST_Centroid(geometry)), ST_Y(ST_Centroid(geometry)),
-            coalesce(height, num_floors * ${CITY.heights.storey}, 0), class
+            coalesce(height, num_floors * ${CITY.heights.storey}, 0), class, id
      FROM '${raw("building.parquet")}'
      WHERE names."primary" IS NOT NULL
        AND (height >= 110 OR (height IS NULL AND num_floors >= 24)
             OR class IN ('stadium', 'museum', 'train_station', 'cathedral', 'grandstand'))
-     ORDER BY 4 DESC`,
+     ORDER BY 4 DESC, id`,
   )) {
     const lon = numberOf(row[1]);
     const lat = numberOf(row[2]);
@@ -349,6 +368,8 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
       lat,
       b: contextOf(lon, lat),
       r: Math.round(Math.max(40, Math.min(78, 36 + height / 9))),
+      src: "building",
+      seed: hashString(text(row[5])),
     });
   }
 
@@ -367,7 +388,16 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
     const lat = numberOf(row[3]);
     const context = onMap(lon, lat) ? contextAt(lon, lat) : null;
     if (context === null) continue;
-    add({ n: text(row[0]), t: PLACE_CATEGORIES[text(row[1])], lon, lat, b: context, r: 34 });
+    const category = text(row[1]);
+    add({
+      n: text(row[0]),
+      t: PLACE_CATEGORIES[category],
+      lon,
+      lat,
+      b: context,
+      r: 34,
+      ...(AREA_CATEGORIES.has(category) ? {} : { src: "poi" as const }),
+    });
   }
 
   // ---- rail and subway stations
@@ -382,7 +412,15 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
       const lat = numberOf(row[2]);
       const context = contextAt(lon, lat);
       if (context !== null)
-        add({ n: withSuffix(text(row[0]), stationSuffix), t: "station", lon, lat, b: context, r: 30 });
+        add({
+          n: withSuffix(text(row[0]), stationSuffix),
+          t: "station",
+          lon,
+          lat,
+          b: context,
+          r: 30,
+          src: "station",
+        });
     }
   }
 
@@ -484,7 +522,14 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
   conn.closeSync();
 
   places.sort((a, b) => b.r - a.r || a.n.localeCompare(b.n));
-  fs.writeFileSync(path.join(out, "places.json"), JSON.stringify({ places }));
+  if (CITY.sights) await writeSights({ places, proj, out, log });
+  fs.writeFileSync(
+    path.join(out, "places.json"),
+    JSON.stringify({
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      places: places.map(({ src, seed, sight, ...place }) => place),
+    }),
+  );
   fs.writeFileSync(path.join(out, "hoods.json"), JSON.stringify({ hoods }));
   // ---- flights: [lon, lat, metres up] triples, flattened
   const flights = CITY.flights.map((flight) => ({

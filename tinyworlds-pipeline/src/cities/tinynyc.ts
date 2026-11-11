@@ -54,6 +54,7 @@ export const tinynyc: City = {
   style: NEW_YORK,
   landmarks: LANDMARKS,
   statues: [LIBERTY],
+  sights: {},
   roofs: { waterTanks: true },
   trees: { census: "street_trees.csv" },
   flora: "temperate",

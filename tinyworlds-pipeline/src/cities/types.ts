@@ -40,6 +40,8 @@ export interface Curated {
   b?: string;
   r: number;
   s?: number;
+  /** It is one structure on the map (a building, stadium, statue or bridge), not an area: it lights up. */
+  sight?: boolean;
 }
 
 /** A lon/lat polygon set: polygons → rings → [lon, lat] points. */
@@ -123,6 +125,12 @@ export interface City {
    */
   heightCaps?: { lon: number; lat: number; radius: number; max: number }[];
   statues: Statue[];
+  /**
+   * The structures found in the search light up in the viewer (sights.json, and their Wikipedia
+   * articles: the `wiki` step). `wikipedia` forces a match by lower-case sight name: an English
+   * article title, or null for none.
+   */
+  sights?: { wikipedia?: Record<string, string | null> };
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };
   trees: {
