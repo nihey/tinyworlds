@@ -1,7 +1,7 @@
 import { PartyPopper } from "lucide-react";
 import type { Locale, Strings } from "@/i18n";
 import { STONE_CENTS, stonePreview } from "@/lib/benefactors";
-import { previewBar } from "@/lib/city-picker";
+import { previewBar, withGoal } from "@/lib/city-picker";
 import { formatUsd, type CityMilestone } from "@/lib/donate";
 
 interface FundingPreviewProps {
@@ -87,7 +87,9 @@ export function FundingPreview({
           </p>
         )}
         {bar.overCents > 0 && !upkeep && (
-          <p className="pt-2 text-xs leading-relaxed text-paper">{t.donate.over}</p>
+          <p className="pt-2 text-xs leading-relaxed text-paper">
+            {withGoal(t.donate.over, city.goalCents, locale)}
+          </p>
         )}
         {isNew && !bar.fills && bar.overCents === 0 && (
           <p className="pt-2 text-xs leading-relaxed text-paper-dim">{t.donate.newCity}</p>

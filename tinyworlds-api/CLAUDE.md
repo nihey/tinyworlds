@@ -1,7 +1,7 @@
 # tinyworlds-api
 
 NestJS 12 + GraphQL (code-first, Apollo) + Prisma 7 + PostgreSQL. Donations fund new cities: each
-city is built once the donations naming it reach a goal (US$100). This API starts a donation at
+city is built once the donations naming it reach a goal (US$30). This API starts a donation at
 Stripe, records the ones Stripe says were paid, and serves every city's progress to the viewer.
 It also keeps the **donation funnel** (which steps towards a donation each visit reached, and
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
@@ -361,7 +361,7 @@ Validated at startup (`config/env.ts`); the server does not start with anything 
 | `STRIPE_SECRET_KEY` | required | creates Checkout sessions |
 | `STRIPE_WEBHOOK_SECRET` | required | verifies the webhook's signature |
 | `STRIPE_PRICE_EN`, `STRIPE_PRICE_PT`, `STRIPE_PRICE_ES` | required | pay-what-you-want prices (minimum US$1), one per interface language |
-| `CITY_GOAL_CENTS` | `10000` | what a new city needs, in US cents; stored on the city when it is created |
+| `CITY_GOAL_CENTS` | `3000` | what a new city needs, in US cents; stored on the city when it is created, so changing it leaves the cities already there as they were: move them with a migration, as `20261111180000_city_goal_thirty_dollars` did when the goal went from US$100 to US$30 |
 | `ALLOWED_ORIGINS` | required | comma-separated origins of the site: the CORS allow-list, where a checkout may return to and where a sign-in link may lead |
 | `ADMIN_EMAILS` | empty | comma-separated addresses that may sign in to the admin pages; empty = nobody |
 | `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions and keys the codes' HMAC; at least 32 characters |

@@ -13,7 +13,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { activeLocale } from "@/i18n";
 import { useMilestones } from "@/hooks/use-milestones";
 import { cleanName } from "@/lib/benefactors";
-import { defaultGoal, findMilestone, previewBar } from "@/lib/city-picker";
+import { defaultGoal, findMilestone, previewBar, withGoal } from "@/lib/city-picker";
 import {
   AMOUNT_DEFAULT,
   API_URL,
@@ -157,7 +157,9 @@ function DonateBody({ city: opening }: { city: string | null }) {
 
       <div className="px-5 pt-3 pb-5">
         <p className="text-sm leading-relaxed text-paper-dim">
-          {mode === "api" ? `${t.donate.goal} ${t.donate.priority}` : t.donate.wish}
+          {mode === "api"
+            ? `${withGoal(t.donate.goal, defaultGoal(cities), locale)} ${t.donate.priority}`
+            : t.donate.wish}
         </p>
 
         {mode === "api" && (
@@ -255,7 +257,9 @@ function DonateBody({ city: opening }: { city: string | null }) {
               </p>
             )}
             <p className="pt-3 text-center text-xs leading-relaxed text-paper-dim">
-              {overGoal ? t.donate.footnoteApi : `${t.donate.over} ${t.donate.footnoteApi}`}
+              {overGoal
+                ? t.donate.footnoteApi
+                : `${withGoal(t.donate.over, defaultGoal(cities), locale)} ${t.donate.footnoteApi}`}
             </p>
           </>
         )}

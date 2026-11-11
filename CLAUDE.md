@@ -46,7 +46,7 @@ Each sub-project has its own `CLAUDE.md`.
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
 - **The API exists only for donations.** Each proposed city is built when donations for it reach
-  its goal (US$100); what comes in above the goal pays for servers and upkeep, and the most
+  its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
   ranking) and start a Stripe Checkout through `createDonationCheckout` for the city and amount
   the donor chose; a Stripe webhook records what was paid. If
