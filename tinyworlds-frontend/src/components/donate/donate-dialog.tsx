@@ -26,6 +26,7 @@ import {
   type Choice,
 } from "@/lib/donate";
 import { currentVisit, trackStep } from "@/lib/funnel";
+import { rememberCheckout, sessionStore, siteEvent } from "@/lib/site-events";
 import { BUILT_CITIES, SITE_ID, SITE_NAME } from "@/site";
 import { AmountPicker } from "./amount-picker";
 import { CityPicker } from "./city-picker";
@@ -77,6 +78,9 @@ function DonateBody({ city: opening }: { city: string | null }) {
   // the sign is open: a step of the donation funnel (the body is mounted once per opening)
   useEffect(() => {
     trackStep("DONATE_OPENED", SITE_ID, activeLocale());
+    siteEvent("donate_open", { world: SITE_ID, city: opening });
+    // what it opened with, once: a city chosen afterwards is the checkout's to say
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const mode = donateMode({ api: API_URL !== "", link: link !== null, list, checkoutFailed });
@@ -95,6 +99,8 @@ function DonateBody({ city: opening }: { city: string | null }) {
   const checkout = async () => {
     setPending(true);
     setCheckoutFailed(false);
+    const chosen = { world: SITE_ID, city: name, amount };
+    siteEvent("donate_checkout", chosen);
     try {
       const api = await import("@/lib/donate-api");
       // with the visit, so the API can note that it reached the checkout, and which donation it made
@@ -106,8 +112,12 @@ function DonateBody({ city: opening }: { city: string | null }) {
         returnUrlOf(window.location),
         currentVisit(),
       );
+      const url = await api.createCheckout(input);
+      // for the page the donor comes back to, which says whether they gave, and what
+      const store = sessionStore();
+      if (store) rememberCheckout(store, chosen);
       // the page is left for the checkout: the button stays busy until it is gone
-      window.location.assign(await api.createCheckout(input));
+      window.location.assign(url);
     } catch {
       // the API must never stand between a donor and donating: the plain checkout takes over
       setPending(false);
@@ -236,7 +246,11 @@ function DonateBody({ city: opening }: { city: string | null }) {
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={() => trackStep("CHECKOUT_STARTED", SITE_ID, locale)}
+              onClick={() => {
+                trackStep("CHECKOUT_STARTED", SITE_ID, locale);
+                // the amount and the city are chosen on the payment page
+                siteEvent("donate_checkout", { world: SITE_ID });
+              }}
               data-rybbit-event="donate_checkout"
               data-rybbit-prop-world={SITE_ID}
               className={ACTION}

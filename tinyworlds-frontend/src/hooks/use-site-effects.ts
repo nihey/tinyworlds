@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { activeLocale, activeStrings, type Locale } from "@/i18n";
 import { readDonated } from "@/lib/donate";
 import { trackStep } from "@/lib/funnel";
+import { sessionStore, siteEvent, takeCheckout } from "@/lib/site-events";
 import { replaceUrl } from "@/map/hash";
 import { SITE_ID } from "@/site";
 
@@ -31,6 +32,12 @@ export function useDocumentLanguage(locale: Locale, title: string): void {
   }, [title]);
 }
 
+/** Runs `fn` once the page has finished loading (at once if it has). */
+function afterLoad(fn: () => void): void {
+  if (document.readyState === "complete") fn();
+  else window.addEventListener("load", fn, { once: true });
+}
+
 /**
  * Coming back from the checkout: thank the donor if they gave, and take the `donated` marker
  * out of the address (keeping the hash, so a shared view stays shared).
@@ -40,6 +47,13 @@ export function useDonationReturn(): void {
     const { donated, search } = readDonated(window.location.search);
     if (donated === null) return;
     replaceUrl(window.location.pathname + search + window.location.hash);
+    // what was chosen on the way out, for the page analytics: once the page has loaded, so the
+    // trackers are there to hear it
+    const store = sessionStore();
+    const chosen = { ...(store ? takeCheckout(store) : null), world: SITE_ID };
+    afterLoad(() =>
+      siteEvent(donated ? "donate_complete" : "donate_cancelled", chosen, { rybbit: true }),
+    );
     if (!donated) {
       // gave the checkout up: a step of the donation funnel (the API knows the paid ones itself)
       trackStep("CHECKOUT_CANCELLED", SITE_ID, activeLocale());

@@ -3,6 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import { placesUrl } from "@/lib/explore";
+import { siteEvent } from "@/lib/site-events";
 import { cn } from "@/lib/utils";
 import { HOME_URL, SITE_ID } from "@/site";
 import { WORLDS } from "@/worlds";
@@ -54,6 +55,7 @@ export function ExploreBanner({
       href={placesUrl(HOME_URL)}
       data-rybbit-event="explore_more"
       data-rybbit-prop-world={SITE_ID}
+      onClick={() => siteEvent("explore_more", { world: SITE_ID })}
       className={cn(
         "other-places sign group z-[5] flex items-center gap-2.5 py-2.5 pr-3 pl-3 text-[13px] leading-snug font-semibold text-paper outline-none focus-visible:shadow-[0_0_0_2px_var(--taxi)]",
         className,

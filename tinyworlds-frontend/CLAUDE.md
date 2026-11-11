@@ -111,7 +111,8 @@ src/
                          # city-catalogue.ts (well-known cities to pick from), donate-api.ts
                          # (Apollo Client; imported lazily), funnel.ts (the visit and the
                          # steps it reports), admin.ts (pure: the session, the funnel's
-                         # arithmetic), admin-api.ts (sign-in and the report; imported lazily)
+                         # arithmetic), admin-api.ts (sign-in and the report; imported lazily),
+                         # site-events.ts (what the page analytics hear)
 ```
 
 ## Targets: worlds and the front page
@@ -250,8 +251,18 @@ Optional, and never in the way: with nothing configured there is no heart, no di
 - `lib/donate-api.ts` (Apollo Client 4, core API, no provider) is only ever imported dynamically
   (`useMilestones`, the checkout button), so Apollo is not in the bundle the map starts with.
 - The heart in the tool column, the link in About and the front page's ranking all open the
-  same sign. Analytics hooks are declarative: `data-rybbit-event="donate_open" |
-"donate_checkout"` with `data-rybbit-prop-world` (and `-city`, `-amount`).
+  same sign.
+- **What the page analytics hear** (`lib/site-events.ts`): `donate_open`, `donate_checkout`,
+  `donate_cancelled`, `donate_complete` (the conversion, with `value` in US$ and `currency`) and
+  `explore_more`, each with `world` (and `city`, `amount` when there are). `siteEvent()` pushes
+  every one to Tag Manager's `dataLayer`, where the container sends it on to Google Analytics.
+  Rybbit hears the clicks from declarative hooks on the buttons (`data-rybbit-event` with
+  `data-rybbit-prop-world`, `-city`, `-amount`), so `siteEvent(…, { rybbit: true })` is only for
+  the two returns from the checkout, which no click marks. What the donor chose rides to the
+  checkout and back in session storage (`tinyworlds.checkout`); only an API checkout returns
+  here, so a payment-link donation is not a `donate_complete` (the API still knows it from
+  Stripe). Every message carries all its keys, `undefined` when absent, because the data layer
+  keeps the last value of a key it is not told again.
 - Never put a real payment link, key or API host in the repository: they come from the
   environment at build time.
 
