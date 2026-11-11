@@ -40,7 +40,7 @@ src/
 ├── main.ts http.ts app.module.ts   # global prefix /api, CORS, trust proxy, raw body
 ├── config/env.ts                   # zod: the environment is validated at startup
 ├── prisma/                         # PrismaService (pg driver adapter)
-├── health/                         # { health }
+├── health/                         # { health }, { uptime }: what a deploy waits on
 ├── common/                         # rate limit module, GraphQL throttler guard, enum registration
 ├── mail/
 │   ├── mailer.ts mail.module.ts    # MAILER: SMTP (nodemailer), or the log in development; createMailer
@@ -128,7 +128,7 @@ type FunnelDonation { id: ID!  createdAt: DateTime!  amountCents: Int!  currency
 type DonationFunnel { from: DateTime!  to: DateTime!  timeZone: String!  totals: FunnelCounts!  worlds: [FunnelWorld!]!  days: [FunnelDay!]!  recentDonations: [FunnelDonation!]! }
 
 type Query {
-  health: String!  cityMilestones: [CityMilestone!]!                    # public
+  health: String!  uptime: Int!  cityMilestones: [CityMilestone!]!      # public; uptime: seconds since the process started
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors        # public; null: unknown or hidden city
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!                # public; the worlds asked, in that order
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
@@ -496,8 +496,8 @@ built ones (New York, Ribeirão Preto, Orlando; re-asserted as `BUILT` with thei
 six suggestions at zero. It never touches a city's name, goal or what it has raised, and never
 changes a suggestion that is already there. A built city that donors had already put on the list
 as a proposal is therefore promoted in place: it becomes `BUILT` with its world and keeps every
-cent and donation. So **adding a world** on this side is one line in `seed-data.ts` and a run of
-the seed.
+cent and donation. So **adding a world** on this side is one line in `seed-data.ts`: the
+container runs the seed every time it starts, so deploying it is enough.
 
 ## Environment
 
@@ -525,8 +525,11 @@ Secrets live in the host's environment, never in the repository. `.env` is gitig
 ## Docker
 
 `Dockerfile` is a two-stage build on `node:22-bookworm-slim`. The container runs as the `node`
-user and starts with `npx prisma migrate deploy && node dist/main.js` (single replica: the
-migrations run before the server). `npm run seed` works inside the image
+user and starts with `npx prisma migrate deploy && npm run seed && node dist/main.js` (single
+replica: the migrations, then the seed, which is safe to repeat, run before the server). It is
+redeployed on every push to main that changes this folder (`deploy/deploy.sh release`, root
+`CLAUDE.md`), which then waits for `{ uptime }` to come from the new process before the viewers
+go up. `npm run seed` also works by hand inside the image
 (`docker exec <container> npm run seed`), and so do `npm run donors:backfill` and
 `npm run cities:announce -- <world>...` (the image has
 `dist/` and `prisma/` only, so scripts that need `src/` code live in `src/`). Rolling back past the

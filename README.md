@@ -127,7 +127,7 @@ variables:
 | `ADMIN_EMAILS` | api | empty | who may sign in to the admin pages |
 | `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | the sessions' secret and the mail server that sends the mails (sign-in links, thank-yous, a city is built); `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM` are required in production |
 | `SITE_URL` | api | first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail |
-| `API_SERVICE` | deploy | empty | the API's container (or Swarm service) on the server, where `deploy.sh` announces a built city |
+| `ANNOUNCE_HOST`, `API_SERVICE` | deploy | empty | how `deploy.sh` announces a built city: an ssh target whose key may only announce, or the API's container (or Swarm service) on the server, reached with a shell |
 
 ## Adding a city
 
@@ -140,13 +140,15 @@ pull request with one.
 
 ## Deploy
 
-The site is static files behind a stock nginx; the API is one container.
+The site is static files behind a stock nginx; the API is one container. Every push to `main`
+deploys itself (GitHub Actions: the API when it changed, then every viewer); the map data, which
+is not in git, goes up by hand:
 
 ```bash
 cp deploy/.env.example deploy/.env    # where your server is; never committed
+deploy/deploy.sh tinynyc --data       # a world's tiles and indexes, after rendering it
 deploy/deploy.sh tinynyc              # build for /tinynyc, rsync the site and the tiles
-deploy/deploy.sh home                 # the front page
-deploy/deploy.sh all --no-data        # every world and the front page, after a viewer change
+deploy/deploy.sh release              # what the workflow runs: main, where the server is behind
 ```
 
 See [deploy/README.md](deploy/README.md).

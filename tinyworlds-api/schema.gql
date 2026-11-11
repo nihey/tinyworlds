@@ -397,6 +397,9 @@ type Query {
   """The signed-in donor's own giving"""
   myGiving: MyGiving!
 
+  """Seconds since this API process started"""
+  uptime: Int!
+
   """
   Each world asked for, in that order: how many visits it has had, and how many are there now
   """
