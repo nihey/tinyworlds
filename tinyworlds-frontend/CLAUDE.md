@@ -124,7 +124,9 @@ src/
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
 ├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
-│                        # and the city progress bar the front page's ranking uses
+│                        # "Build the next city" (build-next.tsx), a city's card and its
+│                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
+├── components/styles.ts # the buttons the front page and "Your cities" share, as class lists
 ├── components/home/     # the front page: landing.tsx, and moving-picture.tsx (a still that
 │                        # comes alive: the hero and the cards)
 ├── components/benefactors/ # a city's benefactors (panel, sign, stone grid) and the badges' pixel art
@@ -292,10 +294,29 @@ Optional, and never in the way: with nothing configured there is no heart, no di
     `benefactorName: on ? cleanName(name) : null`.
   - It says, in every language: cities with the most funding are built first, and what is given
     beyond a city's goal pays for the servers and keeps the project improving.
-- **The front page's ranking** (`rankCities`): the cities that reached their goal ("Funded":
-  `FUNDED` and `BUILDING`) apart, then the ones still collecting, numbered, most funded first,
-  ten before "show all". A row opens the donate sign with that city chosen
-  (`<DonateDialog city>`).
+- **"Build the next city"** (`components/donate/build-next.tsx`, `rankCities`): the front
+  page's ranking, and a short form of it on "Your cities". Three steps say how it works (pick
+  a city, give from US$1, at the goal it is built), each under one of the badges' pictures.
+  Then every city is a card (`city-fund-card.tsx`) in three groups:
+  - **Built**: `BUILT` with `raisedCents >= goalCents`, most raised first. A city never leaves
+    the ranking: once built it stays here, lit in the accent, with its share card as a band,
+    every stone laid, "Funded in full", and two actions, Benefactors and Explore. No Donate
+    (see Benefactors). The rule is the whole rule: one of the worlds built without funding
+    joins the group if its gifts ever reach its goal, which is why the card never says
+    "built by". Six before a "show all" of their own (`BUILT_LIMIT`).
+  - **Funded** (`FUNDED` and `BUILDING`), as before.
+  - **Being funded**, numbered, most funded first, eight before "show all"
+    (`RANKING_LIMIT`), and last an empty lot, "A city that is not here?", which opens the
+    donate sign with no city chosen.
+- **A city's card** shows its bar as **its foundation, a stone per dollar** (`StoneWall`,
+  `cityStones` in `lib/stones.ts`: `ceil(goal / 100)` stones, `floor(raised / 100)` laid, all
+  of them once the goal is reached; fifteen to a row, the first and last marked like the
+  benefactors' sign's; one plain bar above 60 stones). Under it: "10 of 30 stones laid ·
+  1 donation", the status of a funded city, or "The First Stone is still unclaimed". **Every
+  action carries its word**: Donate (opens `<DonateDialog city>`) and, once someone has given,
+  Benefactors. With no list (no API, or it failed) the section is one sentence and a Donate
+  button. `leading()` is the funded then the best funded, never a built city: what the short
+  forms of the ranking show.
 - **The API must never block a donation.** List or checkout failing, or taking over 5 s, drops
   the sign back to the payment link (`donateMode` in `lib/donate.ts` is the whole rule), where
   the amount and the city are set on the checkout page instead.
@@ -363,7 +384,8 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
 Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_URL`.
 
 - **Where the sign opens.** `BenefactorsSign` (a city's founders, benefactors and stone grid, from
-  `cityBenefactors`) opens from the front page (a world's card, a ranking row) and, in a map,
+  `cityBenefactors`) opens from the front page (a world's card, a city's card in the ranking),
+  from "Your cities" and, in a map,
   from About (`BenefactorsPanel`, drawn only for a city the API knows and that is built). The
   panel is mounted only while open, so each opening fetches afresh. A card offers it only for
   worlds the API lists a city for.
