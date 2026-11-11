@@ -56,7 +56,8 @@ interface Placed {
   stones: number[];
 }
 
-const byTime = (a: Gift, b: Gift) =>
+/** The order gifts are laid in: when they were given, then by id. */
+export const byTime = (a: Gift, b: Gift): number =>
   a.at.getTime() - b.at.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**

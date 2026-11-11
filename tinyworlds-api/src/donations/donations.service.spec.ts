@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import { FakeMailer } from '../../test/fake-mailer.js';
 import { FakePrisma } from '../../test/fake-prisma.js';
 import {
   checkoutSession,
@@ -12,8 +13,11 @@ import {
   TEST_WEBHOOK_SECRET,
 } from '../../test/fake-stripe.js';
 import type { Env } from '../config/env.js';
+import { BenefactorsService } from '../benefactors/benefactors.service.js';
 import { FunnelService } from '../funnel/funnel.service.js';
+import { VisitsService } from '../visits/visits.service.js';
 import { DonationsService } from './donations.service.js';
+import { ThanksService } from './thanks.service.js';
 
 const ENV = {
   STRIPE_WEBHOOK_SECRET: TEST_WEBHOOK_SECRET,
@@ -22,6 +26,7 @@ const ENV = {
   STRIPE_PRICE_ES: 'price_es',
   CITY_GOAL_CENTS: 10_000,
   ALLOWED_ORIGINS: ['https://example.com', 'http://localhost:3000'],
+  SITE_URL: 'https://example.com',
 } as const;
 
 beforeAll(() => Logger.overrideLogger(false));
@@ -32,12 +37,29 @@ function setup() {
   const config = {
     get: (key: keyof typeof ENV) => ENV[key],
   } as unknown as ConfigService<Env, true>;
+  const mailer = new FakeMailer();
+  const thanks = new ThanksService(
+    prisma.asService(),
+    config,
+    mailer,
+    new BenefactorsService(prisma.asService()),
+    new VisitsService(prisma.asService()),
+  );
+  const send = vi.spyOn(thanks, 'send');
   const service = new DonationsService(
     stripe,
     prisma.asService(),
     config,
     new FunnelService(prisma.asService()),
+    thanks,
   );
+  /** Waits for the thank-yous the deliveries set off: they go out after them, on their own. */
+  const thanked = async (): Promise<boolean[]> => {
+    await new Promise((resolve) => setImmediate(resolve));
+    return Promise.all(
+      send.mock.results.map((result) => result.value as Promise<boolean>),
+    );
+  };
   const deliver = (
     options: Parameters<typeof checkoutSession>[0],
     type?: string,
@@ -45,7 +67,7 @@ function setup() {
     const { body, signature } = signedEvent(checkoutSession(options), type);
     return service.handleWebhook(body, signature);
   };
-  return { prisma, stripe, service, deliver };
+  return { prisma, stripe, service, deliver, mailer, send, thanked };
 }
 
 const forCity = (city: string, world = 'tinynyc') => ({
@@ -647,6 +669,99 @@ describe('DonationsService: donors', () => {
     });
     expect(JSON.stringify(logged.mock.calls)).not.toContain('example.com');
     logged.mockRestore();
+  });
+});
+
+describe('DonationsService: the thank-you', () => {
+  const lisbon = (name?: string) => ({
+    ...forCity('Lisbon'),
+    ...(name === undefined ? {} : { benefactor_name: name }),
+  });
+
+  it('thanks each new donation with an email, once, at that address', async () => {
+    const { deliver, mailer, prisma, thanked } = setup();
+    await deliver({
+      id: 'cs_1',
+      amount: 500,
+      email: 'Ana@example.com',
+      metadata: lisbon('Ana'),
+    });
+    // the mail goes out after the webhook has been answered
+    expect(mailer.sent).toHaveLength(0);
+    expect(await thanked()).toEqual([true]);
+    expect(mailer.sent).toHaveLength(1);
+    const [mail] = mailer.sent;
+    expect(mail.to).toBe('ana@example.com');
+    expect(mail.subject).toBe('You laid stones 1–5 of Lisbon');
+    expect(mail.text).toContain(
+      "You're on Lisbon's Founding Benefactors as Ana.",
+    );
+    expect(mail.html).toContain('href="https://example.com/me/"');
+
+    await deliver({
+      id: 'cs_2',
+      amount: 300,
+      email: 'bo@example.com',
+      metadata: lisbon(),
+    });
+    await thanked();
+    expect(mailer.sent.map((m) => [m.to, m.subject])).toEqual([
+      ['ana@example.com', 'You laid stones 1–5 of Lisbon'],
+      ['bo@example.com', 'You laid stones 6–8 of Lisbon'],
+    ]);
+    expect(prisma.donations).toHaveLength(2);
+  });
+
+  it('thanks no one for a replay, nor for a gift without an email', async () => {
+    const { deliver, mailer, send, thanked } = setup();
+    await deliver({ id: 'cs_1', email: 'ana@example.com', metadata: lisbon() });
+    await deliver({ id: 'cs_1', email: 'ana@example.com', metadata: lisbon() });
+    await deliver({ id: 'cs_2', metadata: lisbon() });
+    await deliver({ id: 'cs_3', email: 'not an address', metadata: lisbon() });
+    await thanked();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(mailer.sent.map((m) => m.to)).toEqual(['ana@example.com']);
+  });
+
+  it('leaves the donation recorded when the mail cannot go out, and logs no address', async () => {
+    const { deliver, mailer, prisma, thanked } = setup();
+    mailer.failWith = Object.assign(new Error('550 ana@example.com refused'), {
+      responseCode: 550,
+    });
+    const logged = vi.spyOn(Logger.prototype, 'error');
+    await expect(
+      deliver({ id: 'cs_1', email: 'ana@example.com', metadata: lisbon() }),
+    ).resolves.toBeUndefined();
+    expect(await thanked()).toEqual([false]);
+    expect(prisma.donations).toMatchObject([{ stripeSessionId: 'cs_1' }]);
+    expect(prisma.cities[0]).toMatchObject({ raisedCents: 500 });
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining(prisma.donations[0].id),
+    );
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('example.com');
+    logged.mockRestore();
+  });
+
+  it('leaves the donation recorded when the thank-you cannot be put together', async () => {
+    const { deliver, mailer, prisma, thanked } = setup();
+    prisma.funnelEvent.groupBy = () => Promise.reject(new Error('away'));
+    await deliver({ id: 'cs_1', email: 'ana@example.com', metadata: lisbon() });
+    expect(await thanked()).toEqual([false]);
+    expect(mailer.sent).toHaveLength(0);
+    expect(prisma.donations).toHaveLength(1);
+  });
+
+  it("thanks a gift to no city in the donor's language", async () => {
+    const { deliver, mailer, thanked } = setup();
+    await deliver({
+      id: 'cs_1',
+      email: 'ana@example.com',
+      metadata: { app: 'tinyworlds', locale: 'pt-BR' },
+    });
+    await thanked();
+    expect(mailer.sent[0].subject).toBe(
+      'Obrigado pela sua doação ao tinyworlds',
+    );
   });
 });
 

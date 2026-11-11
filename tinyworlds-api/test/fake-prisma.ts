@@ -26,12 +26,15 @@ export interface DonationRow {
   visitId: string | null;
   donorId: string | null;
   listed: boolean;
+  /** Set by `create`, one millisecond after the last, so the order of gifts is the order made. */
+  createdAt?: Date;
 }
 
 export interface DonorRow {
   id: string;
   email: string;
   displayName: string | null;
+  nameHidden?: boolean;
   lastLoginAt?: Date | null;
 }
 
@@ -132,6 +135,18 @@ export class FakePrisma {
    */
   commitDuringNextTransaction: (() => void) | null = null;
   private committedElsewhere: (() => void) | null = null;
+  private lastCreatedAt = 0;
+
+  /** A donation with its donor and its city, the way a `select` of both relations gives them. */
+  private withRelations(row: DonationRow) {
+    const donor = this.donors.find((d) => d.id === row.donorId);
+    const city = this.cities.find((c) => c.id === row.cityId);
+    return {
+      ...row,
+      donor: donor ? { ...donor, nameHidden: donor.nameHidden ?? false } : null,
+      city: city ? { ...city } : null,
+    };
+  }
 
   seedCity(over: Partial<CityRow> & { slug: string; name: string }): CityRow {
     const row: CityRow = {
@@ -189,27 +204,33 @@ export class FakePrisma {
       return Promise.resolve({ ...row });
     },
     findMany: (
-      args: { where?: { hidden?: boolean } } = {},
+      args: {
+        where?: { hidden?: boolean; worldId?: { not: null } };
+      } = {},
     ): Promise<CityRow[]> =>
       Promise.resolve(
         this.cities
           .filter(
             (c) =>
-              args.where?.hidden === undefined ||
-              c.hidden === args.where.hidden,
+              (args.where?.hidden === undefined ||
+                c.hidden === args.where.hidden) &&
+              (args.where?.worldId === undefined || c.worldId !== null),
           )
           .map((c) => ({ ...c })),
       ),
   };
 
   donation = {
+    /** By session id, or by id; with its donor and city. */
     findUnique: (args: {
-      where: { stripeSessionId: string };
-    }): Promise<DonationRow | null> => {
-      const found =
-        this.donations.find(
-          (d) => d.stripeSessionId === args.where.stripeSessionId,
-        ) ?? null;
+      where: { stripeSessionId?: string; id?: string };
+    }): Promise<ReturnType<FakePrisma['withRelations']> | null> => {
+      const row = this.donations.find((d) =>
+        args.where.id !== undefined
+          ? d.id === args.where.id
+          : d.stripeSessionId === args.where.stripeSessionId,
+      );
+      const found = row ? this.withRelations(row) : null;
       const commit = this.commitDuringNextTransaction;
       if (commit && this.inTransaction) {
         this.commitDuringNextTransaction = null;
@@ -218,12 +239,22 @@ export class FakePrisma {
       }
       return Promise.resolve(found);
     },
-    /** The one `where` the backfill asks: gifts with no donor yet. */
-    findMany: (args: { where: { donorId: null } }): Promise<DonationRow[]> =>
+    /** Gifts with no donor yet (the backfill), or a city's gifts in one currency; in order made. */
+    findMany: (args: {
+      where: { donorId?: null; cityId?: string; currency?: string };
+    }): Promise<ReturnType<FakePrisma['withRelations']>[]> =>
       Promise.resolve(
         this.donations
-          .filter((d) => d.donorId === args.where.donorId)
-          .map((d) => ({ ...d })),
+          .filter(
+            (d) =>
+              (args.where.donorId === undefined ||
+                d.donorId === args.where.donorId) &&
+              (args.where.cityId === undefined ||
+                d.cityId === args.where.cityId) &&
+              (args.where.currency === undefined ||
+                d.currency === args.where.currency),
+          )
+          .map((d) => this.withRelations(d)),
       ),
     update: (args: {
       where: { id: string };
@@ -244,10 +275,12 @@ export class FakePrisma {
         )
       )
         throw unique('stripe_session_id');
+      this.lastCreatedAt = Math.max(Date.now(), this.lastCreatedAt + 1);
       const row: DonationRow = {
         id: randomUUID(),
         donorId: null,
         listed: false,
+        createdAt: new Date(this.lastCreatedAt),
         ...args.data,
       };
       this.donations.push(row);

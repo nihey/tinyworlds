@@ -132,6 +132,19 @@ describe('VisitsService.ofWorlds', () => {
     expect((await service.ofWorlds(['tinynyc']))[0].visits).toBe(2);
   });
 
+  it("adds up the worlds' visits, and leaves the front page out", async () => {
+    const { service, prisma } = setup();
+    prisma.events.push(
+      seen(1, 'tinynyc', NOW),
+      seen(2, 'tinynyc', null),
+      seen(3, 'tinyrao', null),
+      seen(4, 'home', NOW),
+      seen(5, 'made-up', NOW),
+    );
+    expect(await service.totalOf(['tinynyc', 'tinyrao', 'home'])).toBe(3);
+    expect(await service.totalOf([])).toBe(0);
+  });
+
   it('asks again after a count that failed', async () => {
     const { service, prisma } = setup();
     const groupBy = prisma.funnelEvent.groupBy;
