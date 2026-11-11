@@ -57,6 +57,60 @@ export function orderJob(
   return { ground: Uint32Array.from(ground), lines: Uint32Array.from(lines) };
 }
 
+/**
+ * The volumes that show in a rectangle, those whose shadows reach it, and the margins the renderer
+ * needs for them. `among` (ascending volume ids) narrows the search to candidates found some
+ * faster way; without it every volume is looked at.
+ */
+export function binVolumes(
+  scene: Scene,
+  rect: Rect,
+  among?: ArrayLike<number>,
+): { vols: number[]; casters: number[]; marginLeft: number; marginDown: number } {
+  const { x0, y0, w, h } = rect;
+  const x1 = x0 + w;
+  const y1 = y0 + h;
+  const count = among ? among.length : scene.vol.count;
+  const at = among ? (n: number) => among[n] : (n: number) => n;
+
+  const vols: number[] = [];
+  const vb = scene.vol.bbox;
+  let marginDown = 0;
+  for (let n = 0; n < count; n++) {
+    const v = at(n);
+    const rise = scene.vol.top[v] + scene.vol.roofH[v] + 2;
+    if (
+      vb[v * 4] < x1 + 4 &&
+      vb[v * 4 + 2] > x0 - 4 &&
+      vb[v * 4 + 1] - rise < y1 + 4 &&
+      vb[v * 4 + 3] > y0 - 4
+    ) {
+      vols.push(v);
+      const below = Math.min(rise, vb[v * 4 + 3] - y0);
+      if (below > marginDown) marginDown = below;
+    }
+  }
+
+  const casters: number[] = [];
+  let marginLeft = 0;
+  for (let n = 0; n < count; n++) {
+    const v = at(n);
+    const rise = scene.vol.top[v] + scene.vol.roofH[v];
+    const reach = rise / SUN_DROP + 2;
+    if (
+      vb[v * 4] < x1 + 4 &&
+      vb[v * 4 + 2] + reach > x0 - 4 &&
+      vb[v * 4 + 1] < y1 + marginDown + 4 &&
+      vb[v * 4 + 3] > y0 - 4
+    ) {
+      casters.push(v);
+      const left = x0 - vb[v * 4];
+      if (left > marginLeft) marginLeft = Math.min(left, reach + (vb[v * 4 + 2] - vb[v * 4]));
+    }
+  }
+  return { vols, casters, marginLeft, marginDown };
+}
+
 /** Everything one rectangle needs, found by brute force. Fine for a preview; the full run bins on a grid. */
 export function binRect(scene: Scene, rect: Rect): ChunkJob {
   const { x0, y0, w, h } = rect;
@@ -84,39 +138,7 @@ export function binRect(scene: Scene, rect: Rect): ChunkJob {
       lines.push(f);
   }
 
-  const vols: number[] = [];
-  const vb = scene.vol.bbox;
-  let marginDown = 0;
-  for (let v = 0; v < scene.vol.count; v++) {
-    const rise = scene.vol.top[v] + scene.vol.roofH[v] + 2;
-    if (
-      vb[v * 4] < x1 + 4 &&
-      vb[v * 4 + 2] > x0 - 4 &&
-      vb[v * 4 + 1] - rise < y1 + 4 &&
-      vb[v * 4 + 3] > y0 - 4
-    ) {
-      vols.push(v);
-      const below = Math.min(rise, vb[v * 4 + 3] - y0);
-      if (below > marginDown) marginDown = below;
-    }
-  }
-
-  const casters: number[] = [];
-  let marginLeft = 0;
-  for (let v = 0; v < scene.vol.count; v++) {
-    const rise = scene.vol.top[v] + scene.vol.roofH[v];
-    const reach = rise / SUN_DROP + 2;
-    if (
-      vb[v * 4] < x1 + 4 &&
-      vb[v * 4 + 2] + reach > x0 - 4 &&
-      vb[v * 4 + 1] < y1 + marginDown + 4 &&
-      vb[v * 4 + 3] > y0 - 4
-    ) {
-      casters.push(v);
-      const left = x0 - vb[v * 4];
-      if (left > marginLeft) marginLeft = Math.min(left, reach + (vb[v * 4 + 2] - vb[v * 4]));
-    }
-  }
+  const { vols, casters, marginLeft, marginDown } = binVolumes(scene, rect);
 
   const trees: number[] = [];
   const txy = scene.trees.xy;

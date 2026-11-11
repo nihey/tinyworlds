@@ -52,6 +52,11 @@ export interface ChunkJob {
   marginDown: number;
   /** False when the rectangle lies entirely inside the city: skips every fog test. */
   foggy: boolean;
+  /**
+   * Keep only what `vols` draw, everything else transparent: one structure on its own, with
+   * the shadows `casters` throw on it, as the tiles show it but with nothing in front of it.
+   */
+  alone?: boolean;
 }
 
 /** Sun from the west-south-west: shadows fall straight to the right on screen. */
@@ -837,6 +842,10 @@ export class ChunkRenderer {
         }
         const H = hb[i];
         const who = obj[i];
+        if (job.alone && who <= 0) {
+          out[o] = TRANSPARENT;
+          continue;
+        }
         // where on the ground this surface stands
         const gi = (my + H - gy0) * GW + (mx - gx0);
         let c: number;

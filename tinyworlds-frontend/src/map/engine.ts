@@ -14,7 +14,14 @@ import {
   tap,
   type SightState,
 } from "./sight-state";
-import { buildSightShapes, sightAt, sightInView, type Sight, type SightShape } from "./sights";
+import {
+  buildSightShapes,
+  picturesToDrop,
+  sightAt,
+  sightInView,
+  type Sight,
+  type SightShape,
+} from "./sights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
 
 /**
@@ -75,9 +82,18 @@ export interface EngineOptions {
   manifest: Manifest;
   /** full URL of a tile file */
   tileUrl: (z: number, tx: number, ty: number) => string;
+  /** full URL of another file in the world's data folder (a sight's picture); none: no pictures */
+  fileUrl?: (path: string) => string;
   reducedMotion?: boolean;
   /** first view; defaults to manifest.start */
   start?: { lon: number; lat: number; scale?: number };
+}
+
+/** A sight's picture, loaded the first time it lights up (no bitmap: loading, or it failed). */
+interface SightPicture {
+  bitmap: ImageBitmap | null;
+  readyAt: number;
+  usedAt: number;
 }
 
 interface Tile {
@@ -121,6 +137,8 @@ function hexToRgb(hex: string): string {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 /** How long the spotlight takes to come on from nothing (ms). */
 const SPOT_FADE_MS = 120;
+/** Px of sights' pictures kept once they are out of the spotlight (four bytes each). */
+const PICTURE_BUDGET = 24_000_000;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export class MapEngine {
@@ -133,6 +151,7 @@ export class MapEngine {
   private readonly mctx: CanvasRenderingContext2D;
   private readonly pyramid: Pyramid;
   private readonly tileUrl: EngineOptions["tileUrl"];
+  private readonly fileUrl: EngineOptions["fileUrl"];
 
   private view: ViewState = {
     x: 0,
@@ -211,6 +230,8 @@ export class MapEngine {
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
   /** when the spotlight came on from nothing (it fades in), or -1 while it is off */
   private spotT0 = -1;
+  /** the lit sights' pictures, whole: drawn over the tiles so nothing in front hides them */
+  private readonly pictures = new Map<string, SightPicture>();
   private shownKey = "";
 
   // scene
@@ -230,6 +251,7 @@ export class MapEngine {
     this.marks = options.marks;
     this.manifest = options.manifest;
     this.tileUrl = options.tileUrl;
+    this.fileUrl = options.fileUrl;
     this.reducedMotion = options.reducedMotion ?? false;
     this.projection = createProjection(options.manifest.geo);
     this.pyramid = new Pyramid(options.manifest);
@@ -283,6 +305,8 @@ export class MapEngine {
     cancelAnimationFrame(this.raf);
     if (this.settleTimer) clearTimeout(this.settleTimer);
     if (this.holdTimer) clearTimeout(this.holdTimer);
+    for (const picture of this.pictures.values()) picture.bitmap?.close();
+    this.pictures.clear();
     this.resizeObserver.disconnect();
     window.removeEventListener("resize", this.onWindowResize);
     const c = this.canvas;
@@ -466,6 +490,8 @@ export class MapEngine {
   setSights(sights: Sight[]): void {
     this.sights = buildSightShapes(sights);
     this.sightIndex = new Map(this.sights.map((s, i) => [s.id, i]));
+    for (const picture of this.pictures.values()) picture.bitmap?.close();
+    this.pictures.clear();
     this.setSightState({ hovered: null, pinned: null, leftAt: null });
     this.invalidate();
   }
@@ -592,6 +618,7 @@ export class MapEngine {
     if (this.dirty || this.moving || lifeRuns) {
       this.dirty = false;
       fading = this.drawTiles(now);
+      if (this.drawSightPicture(now)) fading = true;
       this.drawScene(now);
       this.drawMarks(now);
       this.pump(now);
@@ -891,6 +918,81 @@ export class MapEngine {
     }
   }
 
+  // ---- the lit sight's picture ------------------------------------------------------------
+
+  /**
+   * The lit sight drawn whole over the tiles, under the dim's cut-out: what stands in front of it
+   * in the map no longer hides it. Placed and smoothed like the tiles, so it lines up with them
+   * and takes the blur and the dusk like them. Returns whether it is still fading in.
+   */
+  private drawSightPicture(now: number): boolean {
+    const lit = shown(this.sightState);
+    if (!lit) return false;
+    const i = this.sightIndex.get(lit.id);
+    const sprite = i === undefined ? undefined : this.sights[i].sprite;
+    const picture = this.pictures.get(lit.id);
+    if (!sprite || !picture?.bitmap) return false;
+    picture.usedAt = now;
+    const { ctx, view: v } = this;
+    const s = v.scale * v.dpr;
+    const dx = Math.round((sprite.x - v.left) * s);
+    const dy = Math.round((sprite.y - v.top) * s);
+    const dw = Math.round((sprite.x + sprite.w - v.left) * s) - dx;
+    const dh = Math.round((sprite.y + sprite.h - v.top) * s) - dy;
+    if (dw <= 0 || dh <= 0) return false;
+    // it comes on with the spotlight, or as it arrives if the spotlight was there first
+    const from = Math.max(this.spotT0, picture.readyAt);
+    const alpha = this.reducedMotion ? 1 : clamp((now - from) / SPOT_FADE_MS, 0, 1);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = v.scale < 1;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(picture.bitmap, dx, dy, dw, dh);
+    ctx.globalAlpha = 1;
+    return alpha < 1;
+  }
+
+  /** Fetches a sight's picture once, the first time it lights up; a failure is not asked again. */
+  private askPicture(id: string): void {
+    const i = this.sightIndex.get(id);
+    const sprite = i === undefined ? undefined : this.sights[i].sprite;
+    if (!sprite || !this.fileUrl || this.pictures.has(id)) return;
+    const picture: SightPicture = { bitmap: null, readyAt: 0, usedAt: performance.now() };
+    this.pictures.set(id, picture);
+    fetch(this.fileUrl(sprite.src))
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => createImageBitmap(blob))
+      .then((bitmap) => {
+        if (this.destroyed || this.pictures.get(id) !== picture) {
+          bitmap.close();
+          return;
+        }
+        picture.bitmap = bitmap;
+        picture.readyAt = performance.now();
+        this.dropPictures();
+        this.invalidate();
+      })
+      .catch(() => {
+        // kept without a bitmap, so it is not asked again: the spotlight works without it
+      });
+  }
+
+  /** Keeps the pictures within PICTURE_BUDGET, the lit one always. */
+  private dropPictures(): void {
+    const lit = shown(this.sightState);
+    const list = [...this.pictures].map(([id, p]) => ({
+      id,
+      px: p.bitmap ? p.bitmap.width * p.bitmap.height : 0,
+      usedAt: p.usedAt,
+    }));
+    for (const id of picturesToDrop(list, lit?.id ?? null, PICTURE_BUDGET)) {
+      this.pictures.get(id)?.bitmap?.close();
+      this.pictures.delete(id);
+    }
+  }
+
   // ---- scene (sprites, in map space) -----------------------------------------------------
 
   private drawScene(now: number): void {
@@ -1138,6 +1240,7 @@ export class MapEngine {
     if (key === this.shownKey) return;
     if (!lit) this.spotT0 = -1;
     else if (!this.shownKey) this.spotT0 = performance.now();
+    if (lit) this.askPicture(lit.id);
     this.shownKey = key;
     for (const listener of this.listeners.sight) listener(lit);
     this.invalidate();

@@ -3,6 +3,7 @@ import {
   buildSightShapes,
   parseSights,
   parseSightTexts,
+  picturesToDrop,
   sightAt,
   sightInView,
   type Sight,
@@ -88,6 +89,27 @@ describe("parseSights", () => {
     expect(parseSights({})).toEqual([]);
     expect(parseSights(null)).toEqual([]);
   });
+
+  it("keeps a sight's picture, and a sight whose picture is not one it can use without it", () => {
+    const good = sight("ok", [square(0, 0, 10)], 10);
+    const sprite = { src: "sights/1t8jb05.webp", x: -2, y: -2, w: 14, h: 14 };
+    const parsed = parseSights({
+      sights: [
+        { ...good, id: "pictured", sprite },
+        { ...good, id: "elsewhere", sprite: { ...sprite, src: "https://example.com/x.webp" } },
+        { ...good, id: "upwards", sprite: { ...sprite, src: "sights/../manifest.json" } },
+        { ...good, id: "empty", sprite: { ...sprite, w: 0 } },
+        { ...good, id: "plain" },
+      ],
+    });
+    expect(parsed.map((s) => [s.id, s.sprite])).toEqual([
+      ["pictured", sprite],
+      ["elsewhere", undefined],
+      ["upwards", undefined],
+      ["empty", undefined],
+      ["plain", undefined],
+    ]);
+  });
 });
 
 describe("parseSightTexts", () => {
@@ -111,5 +133,27 @@ describe("parseSightTexts", () => {
       b1: { title: "x", url: "javascript:alert(1)", text: "x", lang: "en" },
     });
     expect(texts).toEqual({});
+  });
+});
+
+describe("picturesToDrop", () => {
+  const pics = [
+    { id: "old", px: 400, usedAt: 1 },
+    { id: "lit", px: 500, usedAt: 2 },
+    { id: "loading", px: 0, usedAt: 0 },
+    { id: "new", px: 300, usedAt: 3 },
+  ];
+
+  it("keeps everything that fits", () => {
+    expect(picturesToDrop(pics, null, 1200)).toEqual([]);
+  });
+
+  it("lets the least recently used go first, until the rest fit", () => {
+    expect(picturesToDrop(pics, null, 900)).toEqual(["old"]);
+    expect(picturesToDrop(pics, null, 300)).toEqual(["old", "lit"]);
+  });
+
+  it("never lets the picture in use go, even over budget", () => {
+    expect(picturesToDrop(pics, "lit", 100)).toEqual(["old", "new"]);
   });
 });

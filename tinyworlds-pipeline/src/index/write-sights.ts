@@ -9,11 +9,13 @@ import { hashString } from "../scene/hash.js";
 import type { Owners } from "../scene/owners.js";
 import type { Place } from "./build.js";
 import { resolveSights, toSightFile, type Candidate } from "./sights.js";
+import { writeSprites } from "./sprites.js";
 import { makeFinder, type Stands } from "./structures.js";
 
 /**
  * sights.json: the search entries that name one structure, found in the scene, named, and
- * outlined as the map draws them. `places` is the index in its final order.
+ * outlined as the map draws them; and each one's picture (`sights/`). `places` is the index in
+ * its final order.
  */
 export async function writeSights(opts: {
   places: Place[];
@@ -73,6 +75,19 @@ export async function writeSights(opts: {
   const find = makeFinder(scene, owners, proj, stands, CITY.sights?.bridges ?? {});
   const drafts = resolveSights(candidates, find, (seed) => ownNames.get(seed));
   const file = toSightFile(drafts, scene);
+  // each one drawn again on its own, so the viewer can show all of it when it lights up
+  const volsOf = new Map(drafts.map((d) => [d.key, d.vols]));
+  const sprites = await writeSprites({
+    scene,
+    sights: file.sights,
+    volsOf: (id) => volsOf.get(id),
+    out,
+    log,
+  });
+  for (const s of file.sights) {
+    const sprite = sprites.get(s.id);
+    if (sprite) s.sprite = sprite;
+  }
   fs.writeFileSync(path.join(out, "sights.json"), JSON.stringify(file));
 
   const byType: Record<string, number> = {};
