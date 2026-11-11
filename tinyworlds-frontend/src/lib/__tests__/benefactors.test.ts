@@ -4,6 +4,8 @@ import {
   STONE_CENTS,
   cleanName,
   collapseFounders,
+  givingSummary,
+  parseGiving,
   parseCityBenefactors,
   stoneLooks,
   stonePreview,
@@ -174,5 +176,69 @@ describe("parseCityBenefactors", () => {
     expect(parseCityBenefactors(null)).toBeNull();
     expect(parseCityBenefactors({ ...valid, status: "NOPE" })).toBeNull();
     expect(parseCityBenefactors({ ...valid, founders: [{ number: "x" }] })).toBeNull();
+  });
+});
+
+const myCity = (extra: Record<string, unknown> = {}) => ({
+  slug: "lisbon",
+  name: "Lisbon",
+  status: "FUNDED",
+  worldId: null,
+  goalCents: 10000,
+  raisedCents: 4200,
+  givenCents: 4200,
+  founderNumber: 1,
+  stones: [1, 2, 3],
+  firstStone: true,
+  keystone: false,
+  listed: true,
+  ...extra,
+});
+
+describe("parseGiving", () => {
+  it("reads the donor's giving", () => {
+    const giving = parseGiving({
+      displayName: "Ana from Recife",
+      cities: [
+        myCity(),
+        myCity({ slug: "valencia", founderNumber: null, stones: [], worldId: "tinyvlc" }),
+      ],
+      projectCents: 500,
+    });
+    expect(giving?.displayName).toBe("Ana from Recife");
+    expect(giving?.cities).toHaveLength(2);
+    expect(giving?.cities[1].worldId).toBe("tinyvlc");
+    expect(giving?.projectCents).toBe(500);
+  });
+  it("accepts no name", () => {
+    expect(parseGiving({ displayName: null, cities: [], projectCents: 0 })?.displayName).toBeNull();
+  });
+  it("rejects a malformed answer", () => {
+    expect(parseGiving(null)).toBeNull();
+    expect(parseGiving({ displayName: null, cities: "x", projectCents: 0 })).toBeNull();
+    expect(parseGiving({ displayName: null, cities: [], projectCents: "0" })).toBeNull();
+    expect(
+      parseGiving({ displayName: null, cities: [myCity({ status: "NOPE" })], projectCents: 0 }),
+    ).toBeNull();
+    expect(
+      parseGiving({ displayName: null, cities: [myCity({ stones: [1, "a"] })], projectCents: 0 }),
+    ).toBeNull();
+    expect(
+      parseGiving({ displayName: null, cities: [myCity({ listed: "yes" })], projectCents: 0 }),
+    ).toBeNull();
+  });
+});
+
+describe("givingSummary", () => {
+  it("adds up cities, stones and gifts", () => {
+    const giving = parseGiving({
+      displayName: null,
+      cities: [
+        myCity({ stones: Array.from({ length: 12 }, (_, i) => i + 1), givenCents: 4200 }),
+        myCity({ slug: "x", stones: [], givenCents: 1500 }),
+      ],
+      projectCents: 0,
+    });
+    expect(givingSummary(giving!)).toEqual({ cities: 2, stones: 12, givenCents: 5700 });
   });
 });

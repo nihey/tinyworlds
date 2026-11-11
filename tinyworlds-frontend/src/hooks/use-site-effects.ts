@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { activeLocale, activeStrings, type Locale } from "@/i18n";
-import { readDonated } from "@/lib/donate";
+import { API_URL, readDonated } from "@/lib/donate";
 import { trackStep } from "@/lib/funnel";
 import { sessionStore, siteEvent, takeCheckout } from "@/lib/site-events";
 import { replaceUrl } from "@/map/hash";
-import { SITE_ID } from "@/site";
+import { ME_URL, SITE_ID } from "@/site";
 
 /**
  * The HTML is baked in the site's home language; once the visitor's own is known the document
@@ -62,7 +62,16 @@ export function useDonationReturn(): void {
     // A moment later: the toaster has to be listening, and the page should have appeared. The
     // timer is deliberately not cancelled on cleanup: the marker is already gone from the
     // address, so a second run of this effect (React's strict mode) would thank nobody.
-    window.setTimeout(() => toast.success(activeStrings().donate.thanks), 700);
+    window.setTimeout(() => {
+      const t = activeStrings();
+      toast.success(t.donate.thanks, {
+        // to the donor's own page; with no API there is nobody to sign in to
+        action:
+          API_URL === ""
+            ? undefined
+            : { label: t.donate.seeYourPlace, onClick: () => location.assign(ME_URL) },
+      });
+    }, 700);
   }, []);
 }
 
