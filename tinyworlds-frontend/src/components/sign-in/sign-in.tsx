@@ -138,7 +138,9 @@ export function SignIn({
           >
             <Wordmark className="text-4xl" />
           </a>
-          <h1 className="pt-4 text-xl leading-tight font-semibold text-paper">{words.heading}</h1>
+          <h1 className="pt-4 text-xl leading-tight font-semibold text-paper">
+            {sentTo && !verifying ? t.signIn.checkEmail : words.heading}
+          </h1>
 
           {verifying ? (
             <p role="status" className="flex items-center gap-2 pt-4 text-[15px] text-paper">

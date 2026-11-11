@@ -161,6 +161,7 @@ export const ptBR: Strings = {
     settings: "Configurações de cookies",
   },
   signIn: {
+    checkEmail: "Confira seu e-mail",
     code: "Código",
     codePlaceholder: "6 dígitos",
     submit: "Entrar",

@@ -225,6 +225,8 @@ export interface Strings {
   };
   /** what every sign-in shares: the code, the spam warning, waiting to send again */
   signIn: {
+    /** the sheet's heading once a link and code were sent */
+    checkEmail: string;
     code: string;
     codePlaceholder: string;
     submit: string;
