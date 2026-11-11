@@ -6,11 +6,21 @@ const isSignIn = (mail: Mail): boolean => /#token=[\w-]+/.test(mail.text);
 /** Keeps the mail instead of sending it. */
 export class FakeMailer implements Mailer {
   sent: Mail[] = [];
-  /** Set to make the next mail fail the way a mail server that is away does. */
-  failWith: Error | null = null;
+  /** How many mails were asked to go out, sent or not. */
+  attempts = 0;
+  /**
+   * Set to make mails fail: an error for every one, or a function of the attempt's number
+   * (counted from 1, as `attempts` counts) that answers an error for the ones that fail.
+   */
+  failWith: Error | ((attempt: number) => Error | null) | null = null;
 
   send(mail: Mail): Promise<void> {
-    if (this.failWith) return Promise.reject(this.failWith);
+    this.attempts++;
+    const failure =
+      typeof this.failWith === 'function'
+        ? this.failWith(this.attempts)
+        : this.failWith;
+    if (failure) return Promise.reject(failure);
     this.sent.push(mail);
     return Promise.resolve();
   }

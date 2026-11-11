@@ -43,6 +43,28 @@ export class LogMailer implements Mailer {
   }
 }
 
+/**
+ * The codes of a mail server that is away or refuses the connection itself (not one address):
+ * every mail after such a failure would fail the same way, after the same wait.
+ */
+const SERVER_FAILURES = new Set([
+  'ECONNECTION',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ESOCKET',
+  'EDNS',
+  'ETLS',
+  'EAUTH',
+  'EPROTOCOL',
+]);
+
+/** The mail server failed, not the mail: no use trying the next one now. */
+export function isServerFailure(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' && SERVER_FAILURES.has(code);
+}
+
 /** What the mailer is made from. */
 export type MailEnv = Pick<
   Env,
