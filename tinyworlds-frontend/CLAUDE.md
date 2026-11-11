@@ -3,10 +3,10 @@
 The map viewer: a Next.js 16 static export that draws the tiles and indexes written by
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
-(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), and three places that do not
-exist, `tinywinterfell`, `tinykingslanding` and `tinywesteros` (the whole known world) — or
-`home`, the front page that lists the worlds. The
-interface speaks the visitor's language (English, Brazilian
+(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), `tinydal`
+(Dallas), `tinycvg` (Cincinnati), and three places that do not exist, `tinywinterfell`,
+`tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
+lists the worlds. The interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
 `tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
 With the API, every page also reports the steps of the donation funnel, and the front page's
@@ -191,7 +191,7 @@ src/
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
   link back to the front page (`NEXT_PUBLIC_HOME_URL`).
 - **The invitation to the other places** (`components/map/explore-banner.tsx`): a small sign
-  under the search box, "9 more cities and worlds to explore", linking to the front page's
+  under the search box, "11 more cities and worlds to explore", linking to the front page's
   list (`placesUrl` in `lib/explore.ts`: `/#cities`). Most visitors land on one map and never
   see that there are others. It is **always there**, for everyone: it goes up with the map's
   other signs and cannot be put away. The one moment it is not drawn is while the search box
@@ -249,8 +249,9 @@ src/
   unaccented.
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
   tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
-  `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#55aaff` for tinylax, `#a9c7e8` for tinywinterfell, `#ea5257` for
-  tinykingslanding, `#d9b45a` for tinywesteros); the engine and the minimap read the world's value for canvas drawing. Don't
+  `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#55aaff` for tinylax, `#6ee05a` for tinydal,
+  `#a56bff` for tinycvg, `#a9c7e8` for tinywinterfell, `#ea5257` for tinykingslanding, `#d9b45a` for
+  tinywesteros); the engine and the minimap read the world's value for canvas drawing. Don't
   write the yellow as a literal. `worlds.test.ts` checks the contrast of each pair against its
   ink and against the signs in both themes, which is why King's Landing's red is a shade lighter
   than a flag red.
@@ -443,8 +444,8 @@ once per redraw with `timeMs = 0`. The live engine is also on `window.tinyworld`
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
-In a world with `sights: true` (New York), a building found in the search lights up under the
-mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
+In a world with `sights: true` (New York, Dallas, Cincinnati), a building found in the search
+lights up under the mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
 outline cut out), a 2 px line of the accent runs round it, and a sign beside its top says what
 it is (type · context line, name), the opening of its Wikipedia article and "Read on Wikipedia".
 
@@ -485,8 +486,8 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 
 ### Guess the building (`hooks/use-quiz.ts`, `components/map/quiz-*.tsx`, `lib/quiz*.ts`)
 
-In a world with `quiz: true` (New York; it needs `sights`), a sign under "more cities and
-worlds" (`QuizBanner`, class `quiz-invite`) opens the game once the buildings are in. The card
+In a world with `quiz: true` (New York, Dallas, Cincinnati; it needs `sights`), a sign under
+"more cities and worlds" (`QuizBanner`, class `quiz-invite`) opens the game once the buildings are in. The card
 first asks what to play (`choosing`): a difficulty (easy, medium, hard), a borough or all
 (the areas the questions have, most first; the row is named by the world's `borough` word) and
 a kind or all (buildings, museums, landmarks, stations), and says how many buildings that makes
