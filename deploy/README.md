@@ -47,8 +47,8 @@ change.
 - the image built from `tinyworlds-api/Dockerfile` (build context `tinyworlds-api`), which runs
   `prisma migrate deploy` and then the server on port 4000; its environment is listed in
   `tinyworlds-api/.env.example` (database URL, Stripe keys and price ids, allowed origins;
-  and, for the admin pages, who may sign in, a secret for their sessions and the mail server
-  that sends their sign-in links);
+  who may sign in to the admin pages, a secret for the sessions, the mail server that sends the
+  sign-in links and the donors' mails, and `SITE_URL`, the site's origin those mails link to);
 - route `https://<site>/api/` to it on the same host name as the site (a path rule on the
   reverse proxy, no prefix stripping: the API serves under `/api`), so the browser needs no CORS;
 - in Stripe, a webhook endpoint for `https://<site>/api/stripe/webhook` sending
@@ -115,6 +115,6 @@ The API is redeployed by rebuilding its image from the repository; its migration
 container starts. When a change touches both, **deploy the API first**, then the viewers: a
 viewer may send a field an older API does not know.
 
-The admin pages are part of the front page (`/admin/`), so `deploy/deploy.sh home` publishes
-them; the funnel's reporting is in every viewer, so a change to it needs
-`deploy/deploy.sh all --no-data`.
+The admin pages are part of the front page (`/admin/`), and so are the mails' pictures
+(`/email/`), so `deploy/deploy.sh home` publishes them; the funnel's reporting is in every
+viewer, so a change to it needs `deploy/deploy.sh all --no-data`.
