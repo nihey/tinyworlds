@@ -212,3 +212,85 @@ export function cleanName(text: string): string | null {
   const cut = Array.from(cleaned).slice(0, NAME_MAX).join("").trim();
   return /[\p{L}\p{N}]/u.test(cut) ? cut : null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// the donor's own page
+// ---------------------------------------------------------------------------------------------
+
+/** One city a donor has given to, as the donor's page shows it. */
+export interface MyCity {
+  slug: string;
+  name: string;
+  status: CityStatus;
+  worldId: string | null;
+  goalCents: number;
+  raisedCents: number;
+  /** what this donor gave to the city */
+  givenCents: number;
+  /** the founder number, for a donor among the founders */
+  founderNumber: number | null;
+  /** the stone numbers this donor laid, ascending */
+  stones: number[];
+  firstStone: boolean;
+  keystone: boolean;
+  /** whether the donor is named in the city's benefactors */
+  listed: boolean;
+}
+
+export interface MyGiving {
+  /** the one name shown in every city the donor is listed in */
+  displayName: string | null;
+  /** newest gift first */
+  cities: MyCity[];
+  /** gifts that named no city */
+  projectCents: number;
+}
+
+function parseMyCity(v: unknown): MyCity | null {
+  if (!isRec(v)) return null;
+  const { slug, name, status, worldId, founderNumber } = v;
+  if (typeof slug !== "string" || typeof name !== "string") return null;
+  if (typeof status !== "string" || !STATUSES.includes(status)) return null;
+  if (worldId !== null && typeof worldId !== "string") return null;
+  if (founderNumber !== null && !isInt(founderNumber)) return null;
+  if (!isInt(v.goalCents) || !isInt(v.raisedCents) || !isInt(v.givenCents)) return null;
+  if (!Array.isArray(v.stones) || !v.stones.every(isInt)) return null;
+  if (typeof v.firstStone !== "boolean" || typeof v.keystone !== "boolean") return null;
+  if (typeof v.listed !== "boolean") return null;
+  return {
+    slug,
+    name,
+    status: status as CityStatus,
+    worldId,
+    goalCents: v.goalCents,
+    raisedCents: v.raisedCents,
+    givenCents: v.givenCents,
+    founderNumber,
+    stones: v.stones as number[],
+    firstStone: v.firstStone,
+    keystone: v.keystone,
+    listed: v.listed,
+  };
+}
+
+/** The API's `myGiving` answer, or null when it is not what the contract says. */
+export function parseGiving(value: unknown): MyGiving | null {
+  if (!isRec(value)) return null;
+  if (!isName(value.displayName) || !isInt(value.projectCents)) return null;
+  const cities = parseAll(value.cities, parseMyCity);
+  if (!cities) return null;
+  return { displayName: value.displayName, cities, projectCents: value.projectCents };
+}
+
+/** The line at the top of the page: how many cities, how many stones, how much given to them. */
+export function givingSummary(giving: MyGiving): {
+  cities: number;
+  stones: number;
+  givenCents: number;
+} {
+  return {
+    cities: giving.cities.length,
+    stones: giving.cities.reduce((sum, c) => sum + c.stones.length, 0),
+    givenCents: giving.cities.reduce((sum, c) => sum + c.givenCents, 0),
+  };
+}

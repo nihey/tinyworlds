@@ -327,6 +327,17 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
 - There is nothing secret in the page itself: the numbers come from the API, which gives them
   to signed-in admins alone. Who the admins are is the API's `ADMIN_EMAILS`.
 
+## "Your cities" (`/me/`)
+
+The donor's own page, `src/app/me/page.home.tsx`: front page's build only, `noindex`, like
+`/admin/`. `MeApp` mirrors `AdminApp` (token out of the hash, `verifyLink(token, "donor")`,
+session in `donorStore`, "unauthorized" → back to sign-in with the `ended` notice) and shows
+`SignIn purpose="donor"` to anyone else. `YourCities` reads `myGiving` (`lib/benefactors-api.ts`,
+a per-session Apollo client, `fetchGiving` / `setListing` / `setDisplayName`): a summary, one
+card per city (badges, given, stones, bar or status, explore link, listing switch) and the
+project line. Turning a listing on with no name opens `NameEditor` first. Linked from the front
+page's header, About in every map (`ME_URL`) and the thank-you toast; links show only with an API.
+
 ## The engine (`src/map/engine.ts`)
 
 `MapEngine` is a plain class that owns two canvases and the view. React never re-renders per

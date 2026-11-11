@@ -73,6 +73,12 @@ export const worldLoopUrl = (id: string, base = LOOPS_BASE): string => `${base}/
 /** The admin pages: part of the front page's build, linked only for an admin who is signed in. */
 export const ADMIN_PATH = `${BASE_PATH}/admin/`;
 
+/** The donor's own page ("Your cities"): part of the front page's build, like the admin pages. */
+export const ME_PATH = `${BASE_PATH}/me/`;
+
+/** The same page, from inside a world's build: the front page's address, then "me/". */
+export const ME_URL = `${HOME_URL.replace(/\/+$/, "")}/me/`;
+
 /** The front page's own share card (public/og/tinyworlds.jpg, made by the pipeline's `home-card`). */
 export const HOME_CARD_PATH = `${BASE_PATH}/og/tinyworlds.jpg`;
 

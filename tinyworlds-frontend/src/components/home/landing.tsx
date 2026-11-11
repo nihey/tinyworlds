@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, BadgeCheck, Code, Heart } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, Code, Heart, UserRound } from "lucide-react";
 import { useState } from "react";
 import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import { PixelIcon } from "@/components/benefactors/pixel-badge";
@@ -26,6 +26,7 @@ import {
   CONTACT_URL,
   GITHUB_URL,
   HERO,
+  ME_PATH,
   SITE_ID,
   worldCardUrl,
   worldLoopUrl,
@@ -250,6 +251,18 @@ export function Landing() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-12 sm:px-6 sm:pt-8">
+      {showBenefactors && (
+        <nav aria-label={t.home.yourCities} className="-mb-6 flex justify-end sm:-mb-8">
+          <a
+            href={ME_PATH}
+            className="inline-flex items-center gap-1.5 rounded-sm text-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper"
+          >
+            <UserRound aria-hidden className="size-4" strokeWidth={2.25} />
+            {t.home.yourCities}
+          </a>
+        </nav>
+      )}
+
       {/* The hero is a share card grown to the page's width: a city, alive, signed in its lower
           left corner. On a narrow screen the sign hangs from the picture's edge instead of
           covering it. */}

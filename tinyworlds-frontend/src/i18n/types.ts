@@ -70,6 +70,8 @@ export interface Strings {
     gettingAround: string;
     /** the label of the benefactors section, for a city that is built */
     benefactors: string;
+    /** the quiet link to the donor's own page */
+    yourCities: string;
     drag: string;
     keysSearch: string;
     keysToggles: string;
@@ -106,6 +108,8 @@ export interface Strings {
     donateTo: string;
     /** names the flag beside a row: opens the city's benefactors; "{city}" is the city */
     benefactorsOf: string;
+    /** the link in the header to the donor's own page */
+    yourCities: string;
     /** why donate, when there is no list of cities to show */
     nextPitch: string;
     openSource: string;
@@ -186,6 +190,8 @@ export interface Strings {
     none: string;
     /** back from a finished checkout */
     thanks: string;
+    /** the thank-you's action: opens "Your cities" */
+    seeYourPlace: string;
   };
   /**
    * The benefactors sign. "{city}" is a city's name, "{n}" a number; in `more`, "{anonymous}" is
@@ -274,6 +280,44 @@ export interface Strings {
     /** "{seconds}": the countdown to sending again */
     sendAgainIn: string;
     wrongCode: string;
+  };
+  /**
+   * "Your cities" (the front page's build, at /me/): a donor signs in and sees what they gave,
+   * the badges they earned and whether they are named. "{cities}", "{stones}" and "{given}" make
+   * the summary; "{amount}" is money, "{ranges}" stone ranges ("1–12"), "{left}" money still
+   * missing, "{city}" a city's name, "{name}" the donor's, "{email}" their address, "{n}" a number.
+   */
+  me: {
+    title: string;
+    signIn: SignInWords;
+    summary: string;
+    founderNo: string;
+    firstStone: string;
+    keystone: string;
+    benefactor: string;
+    given: string;
+    stonesRange: string;
+    toGo: string;
+    status: { funded: string; building: string; built: string };
+    explore: string;
+    listedAs: string;
+    notListed: string;
+    /** names the switch of a city: "{city}" */
+    listLabel: string;
+    edit: string;
+    save: string;
+    cancel: string;
+    /** the name field's label, and what is said when a listing is asked for before a name is set */
+    nameLabel: string;
+    nameFirst: string;
+    namePlaceholder: string;
+    project: string;
+    signedInAs: string;
+    signOut: string;
+    loading: string;
+    failed: string;
+    retry: string;
+    empty: string;
   };
   /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
