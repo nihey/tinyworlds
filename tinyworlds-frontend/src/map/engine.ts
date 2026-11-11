@@ -3,6 +3,8 @@ import { WORLD } from "@/worlds";
 import { buildHoodShapes, hoodAt, type HoodShape } from "./hoods";
 import type { Hood, Manifest } from "./manifest";
 import { createProjection, type GeoPoint, type MapPoint, type Projection } from "./projection";
+import { hover, press, release, shown, type SightState } from "./sight-state";
+import { buildSightShapes, sightAt, type Sight, type SightShape } from "./sights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
 
 /**
@@ -53,6 +55,8 @@ export interface EngineEvents {
   settle: (view: Readonly<ViewState>) => void;
   /** the neighbourhood under the pointer changed (lines on only) */
   hood: (name: string | null) => void;
+  /** the lit sight changed: hovered, pinned (a click or a tap), or none */
+  sight: (shown: { id: string; pinned: boolean } | null) => void;
 }
 
 export interface EngineOptions {
@@ -188,6 +192,10 @@ export class MapEngine {
   private readonly labelWidths = new Map<string, number>();
   private fontFamily = "sans-serif";
   private marksDrawn = false;
+  private sights: SightShape[] = [];
+  private sightIndex = new Map<string, number>();
+  private sightState: SightState = { hovered: null, pinned: null };
+  private shownKey = "";
 
   // scene
   private life = true;
@@ -197,6 +205,7 @@ export class MapEngine {
     view: new Set(),
     settle: new Set(),
     hood: new Set(),
+    sight: new Set(),
   };
   private readonly resizeObserver: ResizeObserver;
 
@@ -434,6 +443,27 @@ export class MapEngine {
     this.hoodLines = on;
     if (!on) this.setHoveredHood(-1);
     this.invalidate();
+  }
+
+  /** The structures that light up under the pointer (sights.json). */
+  setSights(sights: Sight[]): void {
+    this.sights = buildSightShapes(sights);
+    this.sightIndex = new Map(this.sights.map((s, i) => [s.id, i]));
+    this.setSightState({ hovered: null, pinned: null });
+    this.invalidate();
+  }
+
+  /** Let the pinned sight go (Esc, the sign's close button). */
+  releaseSight(): void {
+    this.setSightState(release(this.sightState));
+  }
+
+  /** Where a sight's sign hangs, in CSS px on screen. */
+  sightAnchor(id: string): MapPoint | null {
+    const i = this.sightIndex.get(id);
+    if (i === undefined) return null;
+    const [x, y] = this.sights[i].anchor;
+    return this.mapToScreen(x, y);
   }
 
   setPin(pin: Pin | null): void {
@@ -860,7 +890,8 @@ export class MapEngine {
 
   private drawMarks(now: number): void {
     const ctx = this.mctx;
-    const show = (this.hoodLines && this.hoods.length > 0) || this.pin !== null;
+    const lit = shown(this.sightState);
+    const show = (this.hoodLines && this.hoods.length > 0) || this.pin !== null || lit !== null;
     if (!show && !this.marksDrawn) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.marks.width, this.marks.height);
@@ -868,7 +899,39 @@ export class MapEngine {
     if (!show) return;
 
     if (this.hoodLines && this.hoods.length > 0) this.drawHoods();
+    if (lit) this.drawSpotlight(lit.id);
     if (this.pin) this.drawPin(now);
+  }
+
+  /** The rest of the map dims; the sight keeps its colour inside a thin line of the accent. */
+  private drawSpotlight(id: string): void {
+    const i = this.sightIndex.get(id);
+    if (i === undefined) return;
+    const sight = this.sights[i];
+    const { mctx: ctx, view: v } = this;
+    const s = v.scale * v.dpr;
+    const trace = () => {
+      for (const ring of sight.paths) {
+        ctx.moveTo(ring[0], ring[1]);
+        for (let j = 2; j < ring.length; j += 2) ctx.lineTo(ring[j], ring[j + 1]);
+        ctx.closePath();
+      }
+    };
+    // the whole screen with the outline cut out of it (points are fixed as they are added)
+    ctx.beginPath();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.rect(0, 0, this.marks.width, this.marks.height);
+    ctx.setTransform(s, 0, 0, s, -v.left * s, -v.top * s);
+    trace();
+    ctx.fillStyle = "rgba(12, 14, 16, 0.58)";
+    ctx.fill("evenodd");
+
+    ctx.beginPath();
+    trace();
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = TAXI;
+    ctx.lineWidth = 2 / v.scale; // two CSS px, in map units
+    ctx.stroke();
   }
 
   private drawHoods(): void {
@@ -1033,6 +1096,26 @@ export class MapEngine {
     this.invalidate();
   }
 
+  private setSightState(next: SightState): void {
+    if (next === this.sightState) return;
+    this.sightState = next;
+    this.canvas.classList.toggle("over-sight", next.hovered !== null);
+    const lit = shown(next);
+    const key = lit ? `${lit.id}|${lit.pinned}` : "";
+    if (key === this.shownKey) return;
+    this.shownKey = key;
+    for (const listener of this.listeners.sight) listener(lit);
+    this.invalidate();
+  }
+
+  /** The id of the sight under a screen point, or null. */
+  private sightUnder(sx: number, sy: number): string | null {
+    if (this.sights.length === 0) return null;
+    const m = this.screenToMap(sx, sy);
+    const i = sightAt(this.sights, m.x, m.y);
+    return i >= 0 ? this.sights[i].id : null;
+  }
+
   private hoodUnder(sx: number, sy: number): number {
     const m = this.screenToMap(sx, sy);
     return hoodAt(this.hoods, m.x, m.y);
@@ -1077,15 +1160,19 @@ export class MapEngine {
   private readonly onPointerMove = (e: PointerEvent): void => {
     const p = this.local(e);
     if (!this.pointers.has(e.pointerId)) {
-      // a mouse passing over: which neighbourhood is under it
-      if (e.pointerType === "mouse" && this.hoodLines && this.hoods.length > 0) {
+      // a mouse passing over: which sight, else which neighbourhood, is under it
+      const lines = this.hoodLines && this.hoods.length > 0;
+      if (e.pointerType === "mouse" && (lines || this.sights.length > 0)) {
         this.hoverPoint = p;
         if (!this.hoverPending) {
           this.hoverPending = true;
           requestAnimationFrame(() => {
             this.hoverPending = false;
-            if (this.destroyed || !this.hoverPoint || !this.hoodLines) return;
-            this.setHoveredHood(this.hoodUnder(this.hoverPoint.x, this.hoverPoint.y));
+            if (this.destroyed || !this.hoverPoint) return;
+            const { x, y } = this.hoverPoint;
+            const sight = this.sightUnder(x, y);
+            this.setSightState(hover(this.sightState, sight));
+            if (this.hoodLines) this.setHoveredHood(sight ? -1 : this.hoodUnder(x, y));
           });
         }
       }
@@ -1171,17 +1258,30 @@ export class MapEngine {
         return;
       }
       this.lastTap = { t: now, x, y };
-      // a finger has no hover: a tap picks the neighbourhood, a tap elsewhere lets it go
+      // a finger has no hover: a tap pins the building under it, or picks the neighbourhood;
+      // a tap elsewhere lets either go
+      const sight = this.sightUnder(x, y);
+      this.setSightState(press(this.sightState, sight));
+      if (sight) {
+        this.setHoveredHood(-1);
+        return;
+      }
       if (this.hoodLines && this.hoods.length > 0) {
         const hit = this.hoodUnder(x, y);
         this.setHoveredHood(hit === this.hoveredHood ? -1 : hit);
       }
+    } else {
+      // a click pins the building under the mouse (its sign stays, so its link can be reached)
+      this.setSightState(press(this.sightState, this.sightUnder(x, y)));
     }
   }
 
   private readonly onPointerLeave = (): void => {
     this.hoverPoint = null;
-    if (this.lastPointerType === "mouse") this.setHoveredHood(-1);
+    if (this.lastPointerType === "mouse") {
+      this.setHoveredHood(-1);
+      this.setSightState(hover(this.sightState, null));
+    }
   };
 
   private readonly onWheel = (e: WheelEvent): void => {
