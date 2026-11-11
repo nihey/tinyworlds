@@ -1,5 +1,6 @@
 import type { Projection } from "../projection.js";
 import type { Scene } from "../render/scene.js";
+import { Roof } from "../scene/kinds.js";
 import type { Owners } from "../scene/owners.js";
 import type { Piece } from "./silhouette.js";
 import type { Candidate, Found } from "./sights.js";
@@ -17,6 +18,8 @@ const STATUE = 30;
 /** How far apart the pieces of one building may stand, in metres. */
 const SPREAD = 300;
 const CELL = 256;
+/** How far past a bridge's own pieces a piece filed under another road's name may stand, in metres. */
+const BRIDGE_PAD = 40;
 
 /** "Ed Koch Queensboro Bridge — Upper Level" → "ed koch queensboro bridge upper level" */
 export const normalizeName = (s: string): string =>
@@ -69,13 +72,39 @@ function ringsOf(scene: Scene, v: number): number[][] {
   return rings;
 }
 
-/** What silhouette() needs of each volume: footprint, underside and top (px). */
+/** Steps a tapered roof's outline is built of. */
+const ROOF_STEPS = 10;
+
+/**
+ * What silhouette() needs of each volume: footprint, underside and top (px). A spire or a dome
+ * narrows towards the volume's centre as the renderer draws it (`1 − f` and `√(1 − f²)` of the
+ * footprint at a share f of the roof's height): its walls, then the roof in steps, each as wide
+ * as the roof at its foot, so the outline never cuts into what is drawn.
+ */
 export function piecesOf(scene: Scene, vols: number[]): Piece[] {
-  return vols.map((v) => ({
-    rings: ringsOf(scene, v),
-    lift: scene.vol.base[v],
-    rise: scene.vol.top[v] + scene.vol.roofH[v],
-  }));
+  const { base, top, roofH, roofShape, center } = scene.vol;
+  const pieces: Piece[] = [];
+  for (const v of vols) {
+    const rings = ringsOf(scene, v);
+    const shape = roofShape?.[v] ?? Roof.Flat;
+    if ((shape !== Roof.Pyramid && shape !== Roof.Dome) || roofH[v] <= 0) {
+      pieces.push({ rings, lift: base[v], rise: top[v] + roofH[v] });
+      continue;
+    }
+    pieces.push({ rings, lift: base[v], rise: top[v] });
+    const cx = center[v * 2];
+    const cy = center[v * 2 + 1];
+    for (let k = 0; k < ROOF_STEPS; k++) {
+      const f = k / ROOF_STEPS;
+      const s = shape === Roof.Dome ? Math.sqrt(1 - f * f) : 1 - f;
+      pieces.push({
+        rings: rings.map((ring) => ring.map((c, i) => (i % 2 === 0 ? cx + (c - cx) * s : cy + (c - cy) * s))),
+        lift: top[v] + roofH[v] * f,
+        rise: top[v] + (roofH[v] * (k + 1)) / ROOF_STEPS,
+      });
+    }
+  }
+  return pieces;
 }
 
 /**
@@ -88,6 +117,8 @@ export function makeFinder(
   owners: Owners,
   proj: Projection,
   stands: Stands[],
+  /** a bridge (lower-case name) → other roads' names its pieces are filed under (`sights.bridges`) */
+  bridgeAliases: Record<string, string[]> = {},
 ): (c: Candidate) => Found | null {
   const { bbox, seed, count } = scene.vol;
 
@@ -194,6 +225,27 @@ export function makeFinder(
       for (const b of owners.bridges)
         if (` ${normalizeName(b.name)} `.includes(name)) for (const v of b.vols) vols.add(v);
       if (vols.size === 0) return null;
+      // pieces filed under other roads' names (a tower under "Canal Street (lower level)"):
+      // those that stand within the bridge's own extent
+      const aliases = new Set((bridgeAliases[c.n.toLowerCase()] ?? []).map(normalizeName));
+      if (aliases.size > 0) {
+        let [l, t, r, b] = [Infinity, Infinity, -Infinity, -Infinity];
+        for (const v of vols) {
+          l = Math.min(l, bbox[v * 4]);
+          t = Math.min(t, bbox[v * 4 + 1]);
+          r = Math.max(r, bbox[v * 4 + 2]);
+          b = Math.max(b, bbox[v * 4 + 3]);
+        }
+        const pad = span(BRIDGE_PAD);
+        for (const owner of owners.bridges) {
+          if (!aliases.has(normalizeName(owner.name))) continue;
+          for (const v of owner.vols) {
+            const cx = (bbox[v * 4] + bbox[v * 4 + 2]) / 2;
+            const cy = (bbox[v * 4 + 1] + bbox[v * 4 + 3]) / 2;
+            if (cx >= l - pad && cx <= r + pad && cy >= t - pad && cy <= b + pad) vols.add(v);
+          }
+        }
+      }
       return { key: `bridge:${normalizeName(c.n)}`, vols: [...vols].sort((a, b) => a - b) };
     }
 

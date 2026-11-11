@@ -54,8 +54,19 @@ export const tinynyc: City = {
   style: NEW_YORK,
   landmarks: LANDMARKS,
   statues: [LIBERTY],
-  // the articles a nearby title match misses: another name, or too far from the sight's point
   sights: {
+    // the roads that carry a bridge's towers and decks under names of their own
+    bridges: {
+      "manhattan bridge": [
+        "Canal Street (lower level)",
+        "Canal Street",
+        "Chrystie Street",
+        "BMT Brighton Line",
+      ],
+      "williamsburg bridge": ["BMT Jamaica Line"],
+      "george washington bridge": ["North Walk", "Southwalk"],
+    },
+    // the articles a nearby title match misses: another name, or too far from the sight's point
     wikipedia: {
       "george washington bridge": "George Washington Bridge",
       "guggenheim museum": "Solomon R. Guggenheim Museum",

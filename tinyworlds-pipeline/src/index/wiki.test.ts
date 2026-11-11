@@ -16,6 +16,11 @@ describe("titles", () => {
     expect(titleMatches("Verrazzano-Narrows Bridge", "Verrazzano–Narrows Bridge")).toBe(true);
   });
 
+  it("does not take the article of a building that is gone", () => {
+    expect(titleMatches("Louis Armstrong Stadium", "Louis Armstrong Stadium (1978–2016)")).toBe(false);
+    expect(titleMatches("270 Park Avenue", "270 Park Avenue (2025–present)")).toBe(true);
+  });
+
   it("does not match a different place that shares words", () => {
     expect(titleMatches("Wall Street", "40 Wall Street")).toBe(false);
     expect(titleMatches("America's Response Monument", "One World Trade Center")).toBe(false);
@@ -210,6 +215,20 @@ describe("articleFor", () => {
     ]);
     const station = { n: "Grand Central Terminal", t: "station", lon: -73.97, lat: 40.75 };
     expect((await articleFor(http, station)).en?.title).toBe("Grand Central Terminal");
+  });
+
+  it("prefers the article named exactly as the sight over a qualified one nearer", async () => {
+    const http = stub([
+      ["list=geosearch", { query: { geosearch: [{ title: "Citi Field (1964)" }, { title: "Citi Field" }] } }],
+      ["prop=langlinks", { query: { pages: [{ title: "Citi Field" }] } }],
+      [
+        "en.wikipedia.org/api/rest_v1",
+        summary("Citi Field", "A stadium.", "https://en.wikipedia.org/wiki/C"),
+      ],
+    ]);
+    const found = await articleFor(http, { n: "Citi Field", lon: -73.85, lat: 40.76 });
+    expect(http.asked.find((u) => u.includes("prop=langlinks"))).toContain("titles=Citi%20Field&");
+    expect(found.en?.title).toBe("Citi Field");
   });
 
   it("asks nothing when the city forbids a match", async () => {
