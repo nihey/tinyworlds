@@ -28,13 +28,24 @@ const sign = await page.evaluate(() =>
   [...document.querySelectorAll("p[lang]")].map((p) => p.closest(".sign")?.innerText ?? p.innerText),
 );
 await page.mouse.move(5, 450);
-await page.click(".quiz-invite").catch((e) => errors.push("no quiz invite: " + e.message));
+// a world without the game (too few articles) has no invitation: nothing more to check
+const invited = await page.$(".quiz-invite");
+if (invited) await invited.click();
 await new Promise((r) => setTimeout(r, 5000));
+// the game opens on its choices (difficulty, area, kind): start a round with them as they are
+await page.evaluate(() => {
+  const start = [...document.querySelectorAll(".quiz-card button")].find((b) =>
+    /^(start|começar|empezar)/i.test(b.textContent?.trim() ?? ""),
+  );
+  start?.click();
+});
+await new Promise((r) => setTimeout(r, 3000));
 await page.screenshot({ path: `${out}-quiz.png` });
 const quiz = await page.evaluate(() => document.querySelector(".quiz-card")?.innerText ?? null);
 // pick the first name offered, then look at the answer
 await page.keyboard.press("A");
 await new Promise((r) => setTimeout(r, 2500));
 await page.screenshot({ path: `${out}-answer.png` });
-console.log(JSON.stringify({ sign, quiz, errors: errors.slice(0, 10) }, null, 1));
+const answer = await page.evaluate(() => document.querySelector(".quiz-card")?.innerText ?? null);
+console.log(JSON.stringify({ sign, quiz, answer, errors: errors.slice(0, 10) }, null, 1));
 await browser.close();

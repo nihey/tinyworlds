@@ -2,7 +2,8 @@
 // usage: node bearing.mjs <pipelineDir> <city> <west> <south> <east> <north>
 import { createRequire } from "node:module";
 import path from "node:path";
-const [pipe, city, w, s, e, n] = process.argv.slice(2);
+const [pipeArg, city, w, s, e, n] = process.argv.slice(2);
+const pipe = path.resolve(pipeArg);
 const require = createRequire(path.join(pipe, "package.json"));
 const { DuckDBInstance } = require("@duckdb/node-api");
 const db = await DuckDBInstance.create(":memory:");

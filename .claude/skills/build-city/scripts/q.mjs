@@ -2,7 +2,8 @@
 // usage: node q.mjs <pipelineDir> "<sql>"   ({raw:city} in the SQL becomes data/<city>/raw)
 import { createRequire } from "node:module";
 import path from "node:path";
-const [pipe, sqlIn] = process.argv.slice(2);
+const [pipeArg, sqlIn] = process.argv.slice(2);
+const pipe = path.resolve(pipeArg);
 const require = createRequire(path.join(pipe, "package.json"));
 const { DuckDBInstance } = require("@duckdb/node-api");
 const db = await DuckDBInstance.create(":memory:");
