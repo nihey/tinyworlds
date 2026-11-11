@@ -8,6 +8,40 @@ type Admin {
   id: ID!
 }
 
+"""A benefactor: gave once the city had its goal"""
+type BenefactorRow {
+  amountCents: Int!
+  name: String
+
+  """By amount given, from 1"""
+  rank: Int!
+}
+
+"""A city's stones, founders and benefactors"""
+type CityBenefactors {
+  benefactors: [BenefactorRow!]!
+  founders: [FounderRow!]!
+  goalCents: Int!
+  name: String!
+  raisedCents: Int!
+  slug: String!
+  status: CityStatus!
+
+  """
+  For each stone, the number of the founder who laid it; null while it is not laid
+  """
+  stones: [Int]!
+  worldId: String
+}
+
+input CityBenefactorsInput {
+  """The city by its slug; give this or `world`, not both"""
+  slug: String
+
+  """The city by the id of its map ("tinynyc"); give this or `slug`"""
+  world: String
+}
+
 """A city and how far it is from the donations that get it built"""
 type CityMilestone {
   """How many donations named this city"""
@@ -115,6 +149,26 @@ input DonationFunnelInput {
 
   """The end of the period (excluded); at most 366 days after the start"""
   to: DateTime!
+}
+
+"""A founder of a city: the gifts that laid its stones, as one row"""
+type FounderRow {
+  amountCents: Int!
+
+  """Laid the first stone"""
+  firstStone: Boolean!
+
+  """Laid the last stone"""
+  keystone: Boolean!
+
+  """The public name; null when the founder is not named"""
+  name: String
+
+  """The founding number, from 1"""
+  number: Int!
+
+  """How many stones these gifts laid"""
+  stones: Int!
 }
 
 """
@@ -230,6 +284,11 @@ type Mutation {
 }
 
 type Query {
+  """
+  A city's stones, founders and benefactors, by slug or by world; null for an unknown or hidden city
+  """
+  cityBenefactors(input: CityBenefactorsInput!): CityBenefactors
+
   """
   Cities people can fund and the ones already built: most raised first, built ones last
   """
