@@ -6,7 +6,11 @@ import { PassportModule } from '@nestjs/passport';
 import type { Env } from '../config/env.js';
 import { AdminResolver } from './admin.resolver.js';
 import { AuthController } from './auth.controller.js';
-import { AuthService } from './auth.service.js';
+import {
+  AuthService,
+  REFUSAL_FLOOR,
+  REFUSAL_FLOOR_MS,
+} from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { mailerProvider } from './mailer.js';
@@ -30,6 +34,7 @@ import { sessionSecret } from './session-secret.js';
   controllers: [AuthController],
   providers: [
     AuthService,
+    { provide: REFUSAL_FLOOR, useValue: REFUSAL_FLOOR_MS },
     JwtStrategy,
     mailerProvider,
     AdminResolver,

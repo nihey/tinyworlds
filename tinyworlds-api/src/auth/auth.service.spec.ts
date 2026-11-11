@@ -11,6 +11,7 @@ import type { Env } from '../config/env.js';
 import {
   AuthService,
   CODE_TRIES,
+  CODE_TRIES_PER_DAY,
   hashCode,
   hashToken,
   LINK_EVERY_MS,
@@ -26,7 +27,7 @@ const SECRET = 'a-secret-for-the-tests-and-nothing-else';
 beforeAll(() => Logger.overrideLogger(false));
 afterEach(() => vi.useRealTimers());
 
-function setup(admins: string[] = [ADMIN]) {
+function setup(admins: string[] = [ADMIN], floorMs = 0) {
   const env = {
     ADMIN_EMAILS: admins,
     JWT_SECRET: SECRET,
@@ -38,7 +39,13 @@ function setup(admins: string[] = [ADMIN]) {
   const config = {
     get: (key: keyof typeof env) => env[key],
   } as unknown as ConfigService<Env, true>;
-  const service = new AuthService(prisma.asService(), config, jwt, mailer);
+  const service = new AuthService(
+    prisma.asService(),
+    config,
+    jwt,
+    mailer,
+    floorMs,
+  );
   return { prisma, mailer, jwt, service, env };
 }
 
@@ -316,6 +323,60 @@ describe('AuthService.verifyCode', () => {
     await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+
+  it('never refuses sooner than the floor, for a stranger or an admin with a live link', async () => {
+    const floor = 80;
+    const { service, mailer } = setup([ADMIN], floor);
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const code = codeOf(mailer);
+    for (const [address, tried] of [
+      ['someone@example.com', code],
+      [ADMIN, wrongOf(code)],
+    ]) {
+      const started = Date.now();
+      await expect(service.verifyCode(address, tried)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(Date.now() - started).toBeGreaterThanOrEqual(floor - 5);
+    }
+  });
+
+  it('allows an account only so many tries a day across its links, but the token still works', async () => {
+    vi.useFakeTimers();
+    const { service, mailer, prisma } = setup();
+    for (let i = 0; i < CODE_TRIES_PER_DAY / CODE_TRIES; i++) {
+      await service.sendLink(ADMIN, PAGE, 'en-US');
+      const code = codeOf(mailer);
+      for (let t = 0; t < CODE_TRIES; t++)
+        await service.verifyCode(ADMIN, wrongOf(code)).catch(() => undefined);
+      vi.advanceTimersByTime(LINK_EVERY_MS + 1);
+    }
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const fresh = prisma.links.at(-1);
+    expect(fresh?.attempts).toBe(0);
+    await expect(
+      service.verifyCode(ADMIN, codeOf(mailer)),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(fresh?.attempts).toBe(0); // refused without claiming
+    await expect(service.verify(mailer.token())).resolves.toBeDefined();
+  });
+
+  it('forgets tries older than a day', async () => {
+    vi.useFakeTimers();
+    const { service, mailer } = setup();
+    for (let i = 0; i < CODE_TRIES_PER_DAY / CODE_TRIES; i++) {
+      await service.sendLink(ADMIN, PAGE, 'en-US');
+      const code = codeOf(mailer);
+      for (let t = 0; t < CODE_TRIES; t++)
+        await service.verifyCode(ADMIN, wrongOf(code)).catch(() => undefined);
+      vi.advanceTimersByTime(LINK_EVERY_MS + 1);
+    }
+    vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    await expect(
+      service.verifyCode(ADMIN, codeOf(mailer)),
+    ).resolves.toBeDefined();
   });
 
   it('refuses a code past its time', async () => {

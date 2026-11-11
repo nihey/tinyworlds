@@ -30,6 +30,12 @@ export const LINK_EVERY_MS = 60_000;
 export const CODE_DIGITS = 6;
 /** Wrong codes a link allows before it is spent. */
 export const CODE_TRIES = 5;
+/** Code tries one account gets in a rolling 24 hours, across all its links. */
+export const CODE_TRIES_PER_DAY = 20;
+/** The least a refused code try takes, so its timing says nothing about the address. */
+export const REFUSAL_FLOOR_MS = 300;
+/** Injection token for the refusal floor, so tests can shorten it. */
+export const REFUSAL_FLOOR = Symbol('REFUSAL_FLOOR');
 /** How long a session lasts before the admin signs in again. */
 export const SESSION_DAYS = 7;
 
@@ -82,6 +88,7 @@ export class AuthService {
     private readonly config: ConfigService<Env, true>,
     private readonly jwt: JwtService,
     @Inject(MAILER) private readonly mailer: Mailer,
+    @Inject(REFUSAL_FLOOR) private readonly refusalFloorMs: number,
   ) {}
 
   private isAdmin(email: string): boolean {
@@ -220,6 +227,20 @@ export class AuthService {
    * a wrong code all answer alike.
    */
   async verifyCode(address: string, code: string): Promise<Session> {
+    const started = Date.now();
+    try {
+      return await this.tryCode(address, code);
+    } catch (error) {
+      // every refusal takes the same least time, whatever it cost to reach
+      if (error instanceof UnauthorizedException) {
+        const wait = this.refusalFloorMs - (Date.now() - started);
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      }
+      throw error;
+    }
+  }
+
+  private async tryCode(address: string, code: string): Promise<Session> {
     const email = address.trim().toLowerCase();
     // the same lookups whatever the address, so timing does not tell an admin's from a stranger's
     const digits = normalizeCode(code) ?? '000000';
@@ -240,6 +261,17 @@ export class AuthService {
     );
     const expected = Buffer.from(link?.codeHash ?? '', 'hex');
     if (!link || normalizeCode(code) === null) throw this.refused();
+
+    // an account's tries over a day, across its links. Parallel requests may overshoot this by
+    // a few: the per-link claim below is the exact limit, this one only bounds the long run.
+    const day = await this.prisma.magicLink.aggregate({
+      where: {
+        adminId: link.admin.id,
+        createdAt: { gt: new Date(now.getTime() - DAY_MS) },
+      },
+      _sum: { attempts: true },
+    });
+    if ((day._sum.attempts ?? 0) >= CODE_TRIES_PER_DAY) throw this.refused();
 
     // a try is claimed before the code is compared, in one statement: however many tries run at
     // once, no more than CODE_TRIES of them are ever compared
