@@ -1,0 +1,136 @@
+import { describe, expect, it } from "vitest";
+import { makeGeo, makeProjection } from "../projection.js";
+import type { Scene } from "../render/scene.js";
+import type { Owners } from "../scene/owners.js";
+import type { Candidate } from "./sights.js";
+import { makeFinder, piecesOf } from "./structures.js";
+
+const proj = makeProjection(makeGeo(-74, 40.7, 0, 2));
+
+/** A square of `s` metres whose corner is at grid (p, q), as flat map px. */
+function square(p: number, q: number, s: number): number[] {
+  const out: number[] = [];
+  for (const [dp, dq] of [
+    [0, 0],
+    [s, 0],
+    [s, s],
+    [0, s],
+  ])
+    out.push(...proj.gridToMap(p + dp, q + dq));
+  return out;
+}
+
+interface FakeVol {
+  ring: number[];
+  seed: number;
+  base?: number;
+  top?: number;
+  roofH?: number;
+}
+
+/** Just the volumes, packed the way the scene packs them. */
+function fakeScene(vols: FakeVol[]): Scene {
+  const ringStart: number[] = [];
+  const vertStart: number[] = [];
+  const xy: number[] = [];
+  const bbox: number[] = [];
+  for (const [i, v] of vols.entries()) {
+    ringStart.push(i);
+    vertStart.push(xy.length / 2);
+    xy.push(...v.ring);
+    const xs = v.ring.filter((_, j) => j % 2 === 0);
+    const ys = v.ring.filter((_, j) => j % 2 === 1);
+    bbox.push(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+  }
+  ringStart.push(vols.length);
+  vertStart.push(xy.length / 2);
+  return {
+    vol: {
+      ringStart: Uint32Array.from(ringStart),
+      vertStart: Uint32Array.from(vertStart),
+      xy: Float32Array.from(xy),
+      bbox: Float32Array.from(bbox),
+      count: vols.length,
+      seed: Uint32Array.from(vols.map((v) => v.seed)),
+      base: Float32Array.from(vols.map((v) => v.base ?? 0)),
+      top: Float32Array.from(vols.map((v) => v.top ?? 30)),
+      roofH: Float32Array.from(vols.map((v) => v.roofH ?? 0)),
+    },
+  } as unknown as Scene;
+}
+
+/** A candidate standing at grid (p, q). */
+function at(p: number, q: number, more: Partial<Candidate> = {}): Candidate {
+  const [lon, lat] = proj.toLonLat(...proj.gridToMap(p, q));
+  return { n: "x", t: "landmark", r: 34, lon, lat, order: 0, src: "poi", ...more };
+}
+
+const scene = fakeScene([
+  { ring: square(0, 0, 20), seed: 7 },
+  { ring: square(20, 0, 20), seed: 7 },
+  { ring: square(500, 500, 20), seed: 9 },
+  { ring: square(-200, 0, 10), seed: 11 }, // a deck piece of a bridge
+  { ring: square(-400, 0, 4), seed: 12, top: 50 }, // the statue
+  { ring: square(300, 0, 30), seed: 21 }, // stands of a stadium, west side
+  { ring: square(300, 60, 30), seed: 22 }, // and east side
+]);
+const owners: Owners = {
+  bridges: [{ name: "Ed Koch Queensboro Bridge Upper Level", vols: [3] }],
+  statues: [
+    {
+      ...((): { lon: number; lat: number } => {
+        const [lon, lat] = proj.toLonLat(...proj.gridToMap(-398, 2));
+        return { lon, lat };
+      })(),
+      vols: [4],
+    },
+  ],
+};
+const stands = [{ ring: [...square(290, -10, 110)], seeds: [21, 22] }];
+const find = makeFinder(scene, owners, proj, stands);
+
+describe("makeFinder", () => {
+  it("finds a building and all its parts from a point inside it", () => {
+    expect(find(at(5, 5))).toEqual({ key: "b7", vols: [0, 1], seed: 7 });
+  });
+
+  it("lets a point just outside a footprint snap to it, but not one further out", () => {
+    expect(find(at(-3, 10))?.key).toBe("b7");
+    expect(find(at(-6, 10))).toBeNull();
+  });
+
+  it("finds a building entry's own building by its seed, wherever its point is", () => {
+    expect(find(at(450, 450, { src: "building", seed: 9 }))).toEqual({ key: "b9", vols: [2], seed: 9 });
+  });
+
+  it("finds a bridge by its name inside the roads' names", () => {
+    expect(find(at(0, -300, { t: "bridge", n: "Queensboro Bridge" }))).toEqual({
+      key: "bridge:queensboro bridge",
+      vols: [3],
+    });
+    expect(find(at(0, -300, { t: "bridge", n: "Manhattan Bridge" }))).toBeNull();
+  });
+
+  it("finds the statue from a point beside it", () => {
+    expect(find(at(-380, 2))?.key).toBe("statue:0");
+  });
+
+  it("lights a stadium's stands from a point on its field", () => {
+    expect(find(at(340, 40))).toEqual({ key: "b" + (21).toString(36), vols: [5, 6], seed: 21 });
+  });
+
+  it("gives the same stadium whichever stand a point lands on", () => {
+    expect(find(at(310, 70))?.key).toBe("b" + (21).toString(36));
+  });
+});
+
+describe("piecesOf", () => {
+  it("reads a volume's footprint, underside and top", () => {
+    const s = fakeScene([{ ring: square(0, 0, 10), seed: 1, base: 4, top: 20, roofH: 6 }]);
+    const [piece] = piecesOf(s, [0]);
+    expect(piece.lift).toBe(4);
+    expect(piece.rise).toBe(26);
+    expect(piece.rings).toHaveLength(1);
+    expect(piece.rings[0]).toHaveLength(8);
+  });
+});
