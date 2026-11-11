@@ -1,5 +1,6 @@
+import { BadRequestException } from '@nestjs/common';
 import { FakePrisma } from '../../test/fake-prisma.js';
-import { QuizService } from './quiz.service.js';
+import { MAX_PICKS, QuizService } from './quiz.service.js';
 
 const VISIT = '0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10';
 const OTHER = '6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f';
@@ -110,5 +111,67 @@ describe('QuizService.tally', () => {
         { choice: 'zz', count: 1 },
       ],
     });
+  });
+});
+
+describe('the tally, bounded', () => {
+  const visit = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const offered = [FLATIRON, ONE_MADISON, 'b2', 'b3'];
+
+  it('counts only the names the page offered, and everyone in answers', async () => {
+    const { service } = setup();
+    for (const [i, choice] of ['zz1', 'zz2', FLATIRON, ONE_MADISON].entries())
+      await service.answer({
+        visitId: visit(i),
+        world: 'tinynyc',
+        sightId: FLATIRON,
+        choice,
+      });
+    const tally = await service.answer({
+      visitId: visit(9),
+      world: 'tinynyc',
+      sightId: FLATIRON,
+      choice: FLATIRON,
+      choices: offered,
+    });
+    expect(tally).toEqual({
+      answers: 5,
+      picks: [
+        { choice: FLATIRON, count: 2 },
+        { choice: ONE_MADISON, count: 1 },
+      ],
+    });
+  });
+
+  it('refuses a pick, or a building, that is not among the names offered', async () => {
+    const { service, prisma } = setup();
+    const base = { visitId: visit(1), world: 'tinynyc', sightId: FLATIRON };
+    await expect(
+      service.answer({ ...base, choice: 'zz', choices: offered }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.answer({
+        ...base,
+        choice: 'b2',
+        choices: ['b2', 'b3', 'b4', 'b5'],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.quizAnswers).toHaveLength(0);
+  });
+
+  it('gives at most the most picked names when the page does not say which it offered', async () => {
+    const { service } = setup();
+    for (let i = 0; i < MAX_PICKS + 5; i++)
+      await service.answer({
+        visitId: visit(i),
+        world: 'tinynyc',
+        sightId: FLATIRON,
+        choice: i < 3 ? FLATIRON : `zz${i}`,
+      });
+    const tally = await service.tally('tinynyc', FLATIRON);
+    expect(tally.answers).toBe(MAX_PICKS + 5);
+    expect(tally.picks).toHaveLength(MAX_PICKS);
+    expect(tally.picks[0]).toEqual({ choice: FLATIRON, count: 3 });
   });
 });

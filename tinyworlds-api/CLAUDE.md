@@ -101,7 +101,7 @@ input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  lo
 input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
 input WorldVisitsInput { worlds: [String!]! }                 # 1 to 50 world ids
 type WorldVisits { world: String!  visits: Int!  live: Int! }
-input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  locale: String }
+input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  locale: String }
 type QuizPick { choice: String!  count: Int! }
 type QuizTally { answers: Int!  picks: [QuizPick!]! }
 
@@ -290,8 +290,11 @@ itself, so this API keeps no copy of them. It keeps the answers and tallies them
   funnel's tab id) answers a building once; answering again keeps the first. `choice` is the
   sight id picked; `locale` the interface language.
 - `answerQuiz` (public, 30 a minute per address: `ANSWERS_PER_MINUTE`) records the answer and
-  answers the building's tally, that answer included: `answers` and every name picked with its
-  count, most picked first, then by id. Without `visitId` (a visit that is not counted: storage
+  answers the building's tally, that answer included: `answers` (everyone who answered it) and
+  the names picked with their counts, most picked first, then by id. The page sends the names it
+  offered (`choices`, up to four, the building and the pick among them, else `BAD_REQUEST`) and
+  only those are counted, so what comes back stays small whatever anyone has sent; without
+  `choices` (older pages) it gives the `MAX_PICKS` (20) most picked. Without `visitId` (a visit that is not counted: storage
   blocked, an admin's browser) nothing is recorded and the tally is answered all the same.
 - Validation: `visitId` a UUID, `world` the funnel's pattern, `sightId` and `choice`
   `SIGHT_ID_PATTERN` (`b19j7udl`, `bridge:brooklyn bridge`, `statue:0`), `locale` one of the

@@ -1,5 +1,14 @@
 import { Field, ID, InputType } from '@nestjs/graphql';
-import { IsIn, IsOptional, IsUUID, Matches } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsUUID,
+  Matches,
+} from 'class-validator';
 import { WORLD_PATTERN } from '../../donations/donation-facts.js';
 import { LOCALES } from '../../donations/locales.js';
 
@@ -31,6 +40,19 @@ export class AnswerQuizInput {
   })
   @Matches(SIGHT_ID_PATTERN)
   choice: string;
+
+  @Field(() => [String], {
+    nullable: true,
+    description:
+      'The names the page offered, as sight ids (up to four, the building and the pick among them): the tally counts only these. Without them it gives the most picked.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(4)
+  @ArrayUnique()
+  @Matches(SIGHT_ID_PATTERN, { each: true })
+  choices?: string[] | null;
 
   @Field(() => String, {
     nullable: true,

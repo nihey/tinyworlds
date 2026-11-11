@@ -120,8 +120,8 @@ export function useQuiz({
       if (state.phase !== "asking" || !state.choices.includes(choice)) return;
       const sightId = state.question.id;
       dispatch({ type: "pick", choice });
-      void sendAnswer({ world: WORLD.id, sightId, choice, locale }).then((tally) =>
-        dispatch({ type: "tally", sightId, tally }),
+      void sendAnswer({ world: WORLD.id, sightId, choice, choices: state.choices, locale }).then(
+        (tally) => dispatch({ type: "tally", sightId, tally }),
       );
     },
     [state, locale],

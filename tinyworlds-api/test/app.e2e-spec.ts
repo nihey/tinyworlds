@@ -1559,6 +1559,35 @@ describe('the API over HTTP', () => {
       expect(await prisma.quizAnswer.count()).toBe(1);
     });
 
+    it('counts only the names the page offered, when it says which', async () => {
+      await answerQuiz({ ...good, visitId: visit(1), choice: 'zzz' }).expect(
+        200,
+      );
+      const res = await answerQuiz({
+        ...good,
+        visitId: visit(2),
+        choice: 'b19j7udl',
+        choices: ['b1abc', 'b19j7udl', 'b2', 'b3'],
+      }).expect(200);
+      expect(answer(res).data.answerQuiz).toEqual({
+        answers: 2,
+        picks: [{ choice: 'b19j7udl', count: 1 }],
+      });
+    });
+
+    it('refuses names offered that are too many, or leave out the pick', async () => {
+      const input = { ...good, visitId: visit(1), choice: 'b19j7udl' };
+      for (const choices of [
+        ['b19j7udl', 'b1', 'b2', 'b3', 'b4'],
+        ['b1', 'b2', 'b3', 'b4'],
+        ['b19j7udl', 'b19j7udl'],
+      ]) {
+        const res = await answerQuiz({ ...input, choices }).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+      expect(await prisma.quizAnswer.count()).toBe(0);
+    });
+
     it('refuses a visit, a world, a building or a language that is not one', async () => {
       const input = { ...good, visitId: visit(1), choice: 'b19j7udl' };
       for (const bad of [

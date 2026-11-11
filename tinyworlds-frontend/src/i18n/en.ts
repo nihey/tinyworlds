@@ -342,7 +342,7 @@ export const en: Strings = {
   quiz: {
     invite: "Guess the building: can you name what you see?",
     title: "Guess the building",
-    score: "round {round} · {right} right",
+    score: { one: "round {round} · {right} right", other: "round {round} · {right} right" },
     close: "Stop playing",
     ask: {
       building: "Which building is this?",
