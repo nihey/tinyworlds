@@ -290,6 +290,34 @@ describe('AuthService.verifyCode', () => {
     expect((error as Error).message).toBe((bad as Error).message);
   });
 
+  it('signs in with the right code after four wrong ones, and the link is still unspent', async () => {
+    const { service, mailer, prisma } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const code = codeOf(mailer);
+    for (let i = 0; i < CODE_TRIES - 1; i++)
+      await service.verifyCode(ADMIN, wrongOf(code)).catch(() => undefined);
+    expect(prisma.links[0].usedAt).toBeNull();
+    expect(prisma.links[0].attempts).toBe(CODE_TRIES - 1);
+    await expect(service.verifyCode(ADMIN, code)).resolves.toBeDefined();
+  });
+
+  it('compares no more than five codes however many arrive at once', async () => {
+    const { service, mailer, prisma } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const code = codeOf(mailer);
+    const results = await Promise.allSettled([
+      ...Array.from({ length: 20 }, () =>
+        service.verifyCode(ADMIN, wrongOf(code)),
+      ),
+      service.verifyCode(ADMIN, code),
+    ]);
+    expect(results.every((r) => r.status === 'rejected')).toBe(true);
+    expect(prisma.links[0].attempts).toBeLessThanOrEqual(CODE_TRIES);
+    await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
   it('refuses a code past its time', async () => {
     vi.useFakeTimers();
     const { service, mailer } = setup();

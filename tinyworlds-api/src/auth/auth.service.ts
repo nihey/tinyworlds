@@ -221,42 +221,54 @@ export class AuthService {
    */
   async verifyCode(address: string, code: string): Promise<Session> {
     const email = address.trim().toLowerCase();
-    const digits = normalizeCode(code);
-    if (!digits || !this.isAdmin(email)) throw this.refused();
-
+    // the same lookups whatever the address, so timing does not tell an admin's from a stranger's
+    const digits = normalizeCode(code) ?? '000000';
     const now = new Date();
-    const admin = await this.prisma.admin.findUnique({
-      where: { email },
-      select: { id: true, email: true },
+    const link = await this.prisma.magicLink.findFirst({
+      where: { admin: { email }, usedAt: null, expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        tokenHash: true,
+        codeHash: true,
+        admin: { select: { id: true, email: true } },
+      },
     });
-    const link =
-      admin &&
-      (await this.prisma.magicLink.findFirst({
-        where: { adminId: admin.id, usedAt: null, expiresAt: { gt: now } },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, tokenHash: true, codeHash: true },
-      }));
-    if (!admin || !link) throw this.refused();
-
-    const expected = Buffer.from(link.codeHash, 'hex');
     const given = Buffer.from(
-      hashCode(sessionSecret(this.config), link.tokenHash, digits),
+      hashCode(sessionSecret(this.config), link?.tokenHash ?? '', digits),
       'hex',
     );
-    if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
-      const tried = await this.prisma.magicLink.update({
+    const expected = Buffer.from(link?.codeHash ?? '', 'hex');
+    if (!link || normalizeCode(code) === null) throw this.refused();
+
+    // a try is claimed before the code is compared, in one statement: however many tries run at
+    // once, no more than CODE_TRIES of them are ever compared
+    const claimed = await this.prisma.magicLink.updateMany({
+      where: {
+        id: link.id,
+        usedAt: null,
+        expiresAt: { gt: now },
+        attempts: { lt: CODE_TRIES },
+      },
+      data: { attempts: { increment: 1 } },
+    });
+    if (claimed.count !== 1) throw this.refused();
+
+    const right =
+      expected.length === given.length && timingSafeEqual(expected, given);
+    if (!right || !this.isAdmin(link.admin.email)) {
+      const after = await this.prisma.magicLink.findUnique({
         where: { id: link.id },
-        data: { attempts: { increment: 1 } },
         select: { attempts: true },
       });
-      if (tried.attempts >= CODE_TRIES)
+      if (after && after.attempts >= CODE_TRIES)
         await this.prisma.magicLink.updateMany({
           where: { id: link.id, usedAt: null },
           data: { usedAt: now },
         });
       throw this.refused();
     }
-    return this.spend({ id: link.id, admin });
+    return this.spend({ id: link.id, admin: link.admin });
   }
 
   /** The admin a session names, if they still are one. */
