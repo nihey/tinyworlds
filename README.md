@@ -51,7 +51,7 @@ the Wall to Asshai as one toy-scale diorama (unofficial; places from *A Song of 
 |------|------|
 | `tinyworlds-pipeline/` | TypeScript CLI: downloads the data, builds the scene, renders the tiles and indexes |
 | `tinyworlds-frontend/` | Next.js 16 static site: the map viewer (one build per city) and the front page |
-| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, and the donation funnel for admins |
+| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, each world's visits, and the donation funnel for admins |
 | `tinyworlds-videos/` | HyperFrames: the front page's loops, city flyovers, the showcase film and a tour of tinywesteros, all from the real tiles and viewer |
 | `deploy/` | nginx config and the deploy script |
 
@@ -71,8 +71,8 @@ npm install
 NEXT_PUBLIC_WORLD=tinynyc npm run dev      # http://localhost:3000
 ```
 
-The API is only needed for the donation milestones and the admin pages (the donation funnel
-and each city's visits, at `/admin/` of the front page):
+The API is only needed for the donation milestones, the visits on the front page's cards and
+the admin pages (the donation funnel and each city's visits, at `/admin/` of the front page):
 
 ```bash
 cd tinyworlds-api

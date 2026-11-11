@@ -5,7 +5,8 @@ city is built once the donations naming it reach a goal (US$30). This API starts
 Stripe, records the ones Stripe says were paid, and serves every city's progress to the viewer.
 It also keeps the **donation funnel** (which steps towards a donation each visit reached, and
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
-by email. **Donors** sign in the same way, to see the cities they helped build. Other visitors
+by email; each world's **visits**, and how many are there now, are public, for the front page's
+cards. **Donors** sign in the same way, to see the cities they helped build. Other visitors
 have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
 ## Commands
@@ -49,6 +50,9 @@ src/
 │   ├── funnel.service.ts           # track (a step), report (the funnel over a period)
 │   ├── funnel-report.ts            # pure: days of a period in a time zone, rows → report
 │   └── funnel.resolver.ts dto/ models/
+├── visits/
+│   ├── visits.service.ts           # stillHere (a map is open), ofWorlds (visits and live, cached)
+│   └── visits.resolver.ts dto/ models/   # worldVisits, trackPresence: both public
 ├── benefactors/
 │   ├── standing.ts                 # pure: a city's gifts → stones, founders, benefactors
 │   ├── display-name.ts             # cleanDisplayName: what a listed name may be
@@ -92,6 +96,9 @@ type CityBenefactors { slug: String!  name: String!  status: CityStatus!  worldI
 
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
+input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
+input WorldVisitsInput { worlds: [String!]! }                 # 1 to 50 world ids
+type WorldVisits { world: String!  visits: Int!  live: Int! }
 
 # admins only
 type Admin { id: ID!  email: String! }
@@ -105,6 +112,7 @@ type DonationFunnel { from: DateTime!  to: DateTime!  timeZone: String!  totals:
 type Query {
   health: String!  cityMilestones: [CityMilestone!]!                    # public
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors        # public; null: unknown or hidden city
+  worldVisits(input: WorldVisitsInput!): [WorldVisits!]!                # public; the worlds asked, in that order
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
   myGiving: MyGiving!                                                   # donors
   benefactorNames: [BenefactorName!]!                                   # admins
@@ -112,6 +120,7 @@ type Query {
 type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!   # public
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!                          # public
+  trackPresence(input: TrackPresenceInput!): Boolean!                              # public
   setListing(input: SetListingInput!): Boolean!                                    # donors
   setDisplayName(input: SetDisplayNameInput!): String!                             # donors
   setNameHidden(input: SetNameHiddenInput!): Boolean!                              # admins
@@ -274,7 +283,7 @@ saying a step twice changes nothing.
 
 | Step | Who says it |
 | --- | --- |
-| `VISIT` | the site, when a page opens (`trackFunnelStep`) |
+| `VISIT` | the site, when a page opens (`trackFunnelStep`); `last_seen_at` starts at the same moment as `created_at`, and an open map moves it on (`trackPresence`, below) |
 | `DONATE_OPENED` | the site, when the donate sign opens |
 | `CHECKOUT_STARTED` | this API, in `createDonationCheckout` once Stripe has answered a page (with the city and the amount); the site only for the plain payment link |
 | `CHECKOUT_CANCELLED` | the site, when Stripe sends the donor back with `?donated=0` |
@@ -304,6 +313,31 @@ ClickHouse database (page views → `VISIT` by the path's first segment, the sit
 session id): give it the site id and the moment the site started reporting its own steps
 (`--param_until`), so nothing is counted twice. In the container:
 `docker exec -i <container> npm run funnel:import < funnel.ndjson`.
+
+## Visits (`visits/`)
+
+The front page's cards say how visited each world is. A **visit** is the funnel's `VISIT` row:
+one per tab and world, with `created_at` (when it opened) and `last_seen_at` (when the page last
+said it was open). Rows from before `last_seen_at` existed, the page analytics' history among
+them, have it null: unknown, not "no time at all".
+
+- `trackPresence` (public, 120 a minute per address: `PRESENCE_PER_MINUTE`): a map says it every
+  30 s while it is in view. It sets the visit's `last_seen_at` to now, and makes the `VISIT` row
+  if its opening never arrived (an upsert on `visit_id, step, world`). It never touches another
+  step.
+- `worldVisits` (public): for each world asked (1 to 50 ids, `MAX_WORLDS`, each like a world id;
+  answered once each, in the order asked, zero for one never visited), `visits` is every `VISIT`
+  row of that world and `live` those seen in the last 75 s (`LIVE_MS`). Every world's counts
+  are made at once (two `groupBy`, on the indexes `(step, world)` and `(step, last_seen_at)`) and
+  kept in memory for 10 s (`CACHE_MS`), so the front pages asking every half minute cost a
+  count every 10 s at most; a failed count is not kept.
+- Whether a live count is worth showing (more than ten) is the site's call, not the API's.
+- What the counts include is what the funnel counts: every tab but an admin's or a program's
+  (the site's own rule), and the page analytics' history before the site counted for itself.
+  Anyone can post steps, so the counts are only as honest as the address limits make them.
+
+To see how long visits stay: `SELECT world, last_seen_at - created_at FROM funnel_events WHERE
+step = 'VISIT' AND last_seen_at IS NOT NULL`.
 
 ## How a donation is recorded (`donations.service.ts`)
 
@@ -395,8 +429,9 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
 - `npm run test:e2e` boots the whole app with the fake Stripe on its own database
   (`tinyworlds_test`, created on the compose Postgres if missing), and goes through HTTP: the
   global prefix, validation, the raw-body webhook, throttling by forwarded address, CORS,
-  signing in through a mailed link (the mail is kept by the fake mailer) and the funnel's SQL
-  on a real database. The admin signs in once for the whole file, so `admins` is not emptied
+  signing in through a mailed link (the mail is kept by the fake mailer), the funnel's SQL
+  and each world's visits on a real database (the visits tests move the API's clock, `Date`
+  only, past the counts kept in memory). The admin signs in once for the whole file, so `admins` is not emptied
   between tests; `magic_links` is (with `donors`), so a test may ask for a fresh link. The
   checkout limit is per address and the tests share a minute: a test that starts several
   checkouts sets its own `x-forwarded-for`.

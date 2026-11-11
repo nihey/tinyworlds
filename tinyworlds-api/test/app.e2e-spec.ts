@@ -8,6 +8,7 @@ import { MAILER } from '../src/auth/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { CACHE_MS, LIVE_MS } from '../src/visits/visits.service.js';
 import { FakeMailer } from './fake-mailer.js';
 import { checkoutSession, FakeStripe, signedEvent } from './fake-stripe.js';
 
@@ -23,6 +24,11 @@ const FUNNEL = `query ($input: DonationFunnelInput!) { donationFunnel(input: $in
   timeZone totals { ${COUNTS} } worlds { world ${COUNTS} } days { day ${COUNTS} }
   recentDonations { id createdAt amountCents currency city world locale } } }`;
 
+const WORLD_VISITS =
+  'query ($input: WorldVisitsInput!) { worldVisits(input: $input) { world visits live } }';
+const PRESENCE =
+  'mutation ($input: TrackPresenceInput!) { trackPresence(input: $input) }';
+
 const ADMIN = 'admin@example.com';
 const ADMIN_PAGE = 'https://example.com/admin/';
 
@@ -32,6 +38,8 @@ interface Answer {
     cityMilestones: Record<string, unknown>[];
     createDonationCheckout: { url: string };
     trackFunnelStep: boolean;
+    worldVisits: { world: string; visits: number; live: number }[];
+    trackPresence: boolean;
     me: { id: string; email: string };
     donationFunnel: {
       timeZone: string;
@@ -913,6 +921,115 @@ describe('the API over HTTP', () => {
       }
     });
   });
+  describe("each world's visits", () => {
+    const visit = (n: number) =>
+      `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const opens = (n: number, world: string) =>
+      graphql(TRACK, {
+        input: { visitId: visit(n), step: 'VISIT', world, locale: 'en-US' },
+      })
+        .set('x-forwarded-for', '203.0.113.50')
+        .expect(200);
+    const stillHere = (n: number, world: string) =>
+      graphql(PRESENCE, { input: { visitId: visit(n), world } })
+        .set('x-forwarded-for', '203.0.113.51')
+        .expect(200);
+    const visitsOf = async (worlds: string[]) =>
+      answer(await graphql(WORLD_VISITS, { input: { worlds } }).expect(200))
+        .data.worldVisits;
+    /** Time passes (only as the API's clock tells it): past the counts kept in memory. */
+    let clock = Date.now();
+    const wait = (ms: number) => {
+      clock += ms;
+      vi.setSystemTime(clock);
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'], now: clock });
+      // every test counts afresh
+      wait(CACHE_MS);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('counts every visit of each world asked for, and those exploring now', async () => {
+      for (const n of [1, 2, 3]) await opens(n, 'tinynyc');
+      await opens(4, 'tinyrao');
+      await opens(1, 'home');
+      // a visit from the page analytics' history, and one that left a while ago
+      await prisma.funnelEvent.createMany({
+        data: [
+          { visitId: visit(5), step: 'VISIT', world: 'tinynyc' },
+          {
+            visitId: visit(6),
+            step: 'VISIT',
+            world: 'tinynyc',
+            lastSeenAt: new Date(clock - LIVE_MS - 1_000),
+          },
+          { visitId: visit(2), step: 'DONATE_OPENED', world: 'tinynyc' },
+        ],
+      });
+      expect(await visitsOf(['tinynyc', 'tinyrao', 'tinyfte'])).toEqual([
+        { world: 'tinynyc', visits: 5, live: 3 },
+        { world: 'tinyrao', visits: 1, live: 1 },
+        { world: 'tinyfte', visits: 0, live: 0 },
+      ]);
+    });
+
+    it('keeps a visit exploring while its map says it is still there', async () => {
+      await opens(1, 'tinynyc');
+      const opened = await prisma.funnelEvent.findFirstOrThrow();
+      wait(LIVE_MS + 1_000);
+      expect(await visitsOf(['tinynyc'])).toEqual([
+        { world: 'tinynyc', visits: 1, live: 0 },
+      ]);
+
+      const res = await stillHere(1, 'tinynyc');
+      expect(answer(res).data.trackPresence).toBe(true);
+      wait(CACHE_MS);
+      expect(await visitsOf(['tinynyc'])).toEqual([
+        { world: 'tinynyc', visits: 1, live: 1 },
+      ]);
+      // the same visit, seen later: when it started stays, how long it stayed grows
+      const seen = await prisma.funnelEvent.findMany();
+      expect(seen).toHaveLength(1);
+      expect(seen[0].createdAt).toEqual(opened.createdAt);
+      expect(seen[0].lastSeenAt!.getTime()).toBe(clock - CACHE_MS);
+    });
+
+    it('counts a visit whose opening never arrived', async () => {
+      await stillHere(7, 'tinylas');
+      expect(await visitsOf(['tinylas'])).toEqual([
+        { world: 'tinylas', visits: 1, live: 1 },
+      ]);
+    });
+
+    it('refuses a visit or a world that is not one, and too many worlds at once', async () => {
+      for (const input of [
+        { visitId: 'me', world: 'tinynyc' },
+        { visitId: visit(1), world: 'Tiny NYC' },
+        { visitId: visit(1), world: 'tinynyc', locale: 'fr-FR' },
+      ]) {
+        const res = await graphql(PRESENCE, { input }).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+      expect(await prisma.funnelEvent.count()).toBe(0);
+
+      for (const worlds of [
+        [],
+        ['tinynyc', 'Tiny NYC'],
+        Array.from({ length: 51 }, (_, i) => `tiny${i}`),
+      ]) {
+        const res = await graphql(WORLD_VISITS, {
+          input: { worlds },
+        }).expect(200);
+        expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+      }
+    });
+  });
+
   describe('benefactors', () => {
     const BENEFACTORS = `query ($input: CityBenefactorsInput!) { cityBenefactors(input: $input) {
       slug name status worldId goalCents raisedCents stones

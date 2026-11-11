@@ -14,20 +14,32 @@ describe('FunnelService.track', () => {
     const { service, prisma } = setup();
     await service.track({
       visitId: VISIT,
-      step: 'VISIT',
+      step: 'DONATE_OPENED',
       world: 'tinynyc',
       locale: 'pt-BR',
     });
     expect(prisma.events).toEqual([
       {
         visitId: VISIT,
-        step: 'VISIT',
+        step: 'DONATE_OPENED',
         world: 'tinynyc',
         locale: 'pt-BR',
         city: null,
         amountCents: null,
       },
     ]);
+  });
+
+  it('sees a visit as it opens', async () => {
+    const { service, prisma } = setup();
+    const before = Date.now();
+    await service.track({ visitId: VISIT, step: 'VISIT', world: 'tinynyc' });
+    const seen = prisma.events[0].lastSeenAt;
+    expect(seen).toBeInstanceOf(Date);
+    // when it opened, on the same clock: how long it stayed starts at zero
+    expect(prisma.events[0]).toMatchObject({ createdAt: seen });
+    expect(seen!.getTime()).toBeGreaterThanOrEqual(before);
+    expect(seen!.getTime()).toBeLessThanOrEqual(Date.now());
   });
 
   it('records a step once per visit and world, however often it is said', async () => {

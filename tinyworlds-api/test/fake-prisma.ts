@@ -42,6 +42,18 @@ export interface FunnelEventRow {
   locale: string | null;
   city: string | null;
   amountCents: number | null;
+  /** Set by the code on a VISIT only; the database's own default otherwise. */
+  createdAt?: Date;
+  /** On a VISIT, when the page last said it was open; left out on rows from before. */
+  lastSeenAt?: Date | null;
+}
+
+type FunnelEventKey = Pick<FunnelEventRow, 'visitId' | 'step' | 'world'>;
+
+/** The conditions the code puts on funnel events, as Prisma spells them. */
+interface FunnelEventWhere {
+  step?: FunnelEventRow['step'];
+  lastSeenAt?: { gte: Date };
 }
 
 export interface AdminRow {
@@ -319,6 +331,43 @@ export class FakePrisma {
         count++;
       }
       return Promise.resolve({ count });
+    },
+    upsert: (args: {
+      where: { visitId_step_world: FunnelEventKey };
+      create: FunnelEventRow;
+      update: Partial<FunnelEventRow>;
+    }): Promise<FunnelEventRow> => {
+      if (this.failEvents) return Promise.reject(this.failEvents);
+      const key = args.where.visitId_step_world;
+      let row = this.events.find(
+        (e) =>
+          e.visitId === key.visitId &&
+          e.step === key.step &&
+          e.world === key.world,
+      );
+      if (row) Object.assign(row, args.update);
+      else {
+        row = { ...args.create };
+        this.events.push(row);
+      }
+      return Promise.resolve({ ...row });
+    },
+    groupBy: (args: {
+      by: ['world'];
+      where: FunnelEventWhere;
+      _count: { _all: true };
+    }): Promise<{ world: string; _count: { _all: number } }[]> => {
+      const { step, lastSeenAt } = args.where;
+      const counts = new Map<string, number>();
+      for (const e of this.events) {
+        if (step !== undefined && e.step !== step) continue;
+        if (lastSeenAt && !(e.lastSeenAt && e.lastSeenAt >= lastSeenAt.gte))
+          continue;
+        counts.set(e.world, (counts.get(e.world) ?? 0) + 1);
+      }
+      return Promise.resolve(
+        [...counts].map(([world, n]) => ({ world, _count: { _all: n } })),
+      );
     },
   };
 

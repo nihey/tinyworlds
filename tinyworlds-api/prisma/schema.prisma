@@ -108,9 +108,15 @@ model FunnelEvent {
   city        String?
   amountCents Int?       @map("amount_cents")
   createdAt   DateTime   @default(now()) @map("created_at")
+  /// On a VISIT: the last time the page said it was still open (and in view). It starts as the
+  /// visit's own time; null on visits from before the site said so (the history from the page
+  /// analytics among them). With `created_at`, how long a visit stayed.
+  lastSeenAt  DateTime?  @map("last_seen_at")
 
   @@unique([visitId, step, world])
   @@index([createdAt])
+  @@index([step, world])
+  @@index([step, lastSeenAt])
   @@map("funnel_events")
 }
 

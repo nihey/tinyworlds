@@ -299,6 +299,11 @@ type Mutation {
   Reports that a visit reached a step towards a donation. Says true; saying a step twice changes nothing.
   """
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
+
+  """
+  Says a visit's map is still open and in view: the page says it every half minute. Says true.
+  """
+  trackPresence(input: TrackPresenceInput!): Boolean!
 }
 
 """One city a donor gave to, and the donor's place in it"""
@@ -362,6 +367,11 @@ type Query {
 
   """The signed-in donor's own giving"""
   myGiving: MyGiving!
+
+  """
+  Each world asked for, in that order: how many visits it has had, and how many are there now
+  """
+  worldVisits(input: WorldVisitsInput!): [WorldVisits!]!
 }
 
 input SetDisplayNameInput {
@@ -395,4 +405,40 @@ input TrackFunnelStepInput {
 
   """Where it happened: a world's id, or "home" for the front page"""
   world: String!
+}
+
+input TrackPresenceInput {
+  """The interface language: en-US, pt-BR or es-ES"""
+  locale: String
+
+  """
+  The visit: the same UUID the page's funnel steps carry. It names no person and is gone with the tab's session.
+  """
+  visitId: ID!
+
+  """
+  The world whose map is open: "tinynyc"
+  """
+  world: String!
+}
+
+"""How many visits a world has had, and how many are there now"""
+type WorldVisits {
+  """Visits whose map said it was open (and in view) in the last 75 seconds"""
+  live: Int!
+
+  """
+  Every visit it has had: one per browser tab, the history from the page analytics included
+  """
+  visits: Int!
+
+  """
+  The world's id: "tinynyc"
+  """
+  world: String!
+}
+
+input WorldVisitsInput {
+  """The worlds' ids ("tinynyc"), at most 50; answered in this order"""
+  worlds: [String!]!
 }

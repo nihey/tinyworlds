@@ -58,6 +58,12 @@ Each sub-project has its own `CLAUDE.md`.
   (no cookie, no address). That gives the donation funnel and each city's count of visits,
   which admins read at `/admin/` (part of the front page's build). Admins sign in through a
   link sent by email; who they are is the API's `ADMIN_EMAILS`, never a tracked file.
+- **Every card says how visited its world is.** The front page's cards show each world's visits
+  since the site opened (the page analytics' history up to 2026-11-10, the site's own count
+  after) and, above ten, how many have that map open now; each group of cards comes most
+  visited first. An open map tells the API every half minute while it is in view
+  (`trackPresence`), which keeps its visit's `last_seen_at` fresh: a visit keeps when it started
+  and when it was last seen, for whatever the data is wanted for later.
 - **Donors and benefactors.** A donor is an email address Stripe gave at checkout: no
   password, no account made by hand. A donor who signs in (a link or a 6-digit code sent by email,
   `purpose: "donor"`) reads their own page, "Your cities" at `/me/` of the front page's build:
@@ -249,15 +255,20 @@ type Query {
   health: String!
   cityMilestones: [CityMilestone!]!
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors   # public; null for an unknown or hidden city
+  worldVisits(input: WorldVisitsInput!): [WorldVisits!]!          # public; the worlds asked, in that order
 }
+input WorldVisitsInput { worlds: [String!]! }                        # 1 to 50 world ids
+type WorldVisits { world: String!  visits: Int!  live: Int! }       # live: maps open in the last 75 s
 input CityBenefactorsInput { slug: String  world: String }          # one of the two
 input CreateDonationCheckoutInput { city: String  amountCents: Int  world: String!  locale: String!  returnUrl: String!  visitId: ID  benefactorName: String }
 type DonationCheckout { url: String! }
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
+input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
 type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
+  trackPresence(input: TrackPresenceInput!): Boolean!               # a map, every 30 s while in view
 }
 # donors only (Authorization: Bearer <a donor's session>):
 #   query    myGiving: MyGiving!                         # their cities, stones, badges, listing

@@ -34,8 +34,12 @@ export const RECENT_DONATIONS = 25;
 export class FunnelService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Records a step. A visit reaches a step on a world once: saying it again changes nothing. */
+  /**
+   * Records a step. A visit reaches a step on a world once: saying it again changes nothing.
+   * A VISIT is seen as it opens (`lastSeenAt`); the map then keeps it fresh (`VisitsService`).
+   */
   async track(facts: FunnelStepFacts): Promise<void> {
+    const now = new Date();
     await this.prisma.funnelEvent.createMany({
       data: [
         {
@@ -45,6 +49,8 @@ export class FunnelService {
           locale: facts.locale ?? null,
           city: facts.city ?? null,
           amountCents: facts.amountCents ?? null,
+          // one clock for both, so how long a visit stayed never comes out below zero
+          ...(facts.step === 'VISIT' && { createdAt: now, lastSeenAt: now }),
         },
       ],
       skipDuplicates: true,
