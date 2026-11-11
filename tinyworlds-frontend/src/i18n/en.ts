@@ -121,7 +121,7 @@ export const en: Strings = {
       name: "Name to show",
       namePlaceholder: "Ana from Recife",
       counter: "{n}/{max}",
-      note: "Off: you still count, as “anonymous”. Sign in later with the email you give Stripe to change your name or take it off.",
+      note: "Your gift counts either way; with this off you show as “anonymous”. If this email already has a name, that one is shown. You can change it or take it off later on “Your cities”, signing in with the email you give Stripe.",
     },
     donations: { none: "No donations yet", one: "{n} donation", other: "{n} donations" },
     status: { funded: "Funded, in the queue", building: "Being built", built: "Built" },
