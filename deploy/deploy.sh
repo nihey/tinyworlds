@@ -181,7 +181,10 @@ upload() {
     case "$mode" in
       --no-data) ;;
       --index)
-        rsync -az "$data/places.json" "$data/hoods.json" "$data/life.json" "$DEPLOY_HOST:$site/data/" || return
+        # the indexes, and the sights with their texts where the world has them
+        local indexes=("$data/places.json" "$data/hoods.json" "$data/life.json") sight
+        for sight in "$data"/sights*.json; do [[ -e "$sight" ]] && indexes+=("$sight"); done
+        rsync -az "${indexes[@]}" "$DEPLOY_HOST:$site/data/" || return
         ;;
       *)
         ssh "$DEPLOY_HOST" "mkdir -p '$site/data'" || return
