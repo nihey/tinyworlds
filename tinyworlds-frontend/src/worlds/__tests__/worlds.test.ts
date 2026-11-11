@@ -20,7 +20,7 @@ describe("resolveWorld", () => {
     expect(resolveWorld("tinyfte").homeLocale).toBe("es-ES");
     expect(resolveWorld("tinyvlc").id).toBe("tinyvlc");
     expect(resolveWorld("tinyvlc").homeLocale).toBe("es-ES");
-    for (const id of ["tinylas", "tinywinterfell", "tinykingslanding"]) {
+    for (const id of ["tinylas", "tinylax", "tinywinterfell", "tinykingslanding"]) {
       expect(resolveWorld(id).id).toBe(id);
       expect(resolveWorld(id).homeLocale).toBe("en-US");
     }
@@ -34,6 +34,7 @@ describe("resolveWorld", () => {
       "tinyfte",
       "tinyvlc",
       "tinylas",
+      "tinylax",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -150,6 +151,17 @@ describe("worlds", () => {
       "Linhas dos bairros",
       "Límites de barrios",
     ]);
+    // Los Angeles' districts are the cities of the basin; its outlines, the communities
+    expect(LOCALES.map((locale) => WORLDS.tinylax.copy[locale].borough)).toEqual([
+      "City",
+      "Cidade",
+      "Ciudad",
+    ]);
+    expect(LOCALES.map((locale) => WORLDS.tinylax.copy[locale].hoodLines.label)).toEqual([
+      "Neighborhood lines",
+      "Linhas dos bairros",
+      "Límites de barrios",
+    ]);
     // a castle has areas, a walled capital has quarters; both are outlined as districts
     expect(LOCALES.map((locale) => WORLDS.tinywinterfell.copy[locale].borough)).toEqual([
       "Area",
@@ -208,6 +220,11 @@ describe("worlds", () => {
       "Las Vegas, em miniatura",
       "Las Vegas, en miniatura",
     ]);
+    expect(LOCALES.map((locale) => WORLDS.tinylax.copy[locale].city)).toEqual([
+      "Los Angeles",
+      "Los Angeles",
+      "Los Ángeles",
+    ]);
     expect(LOCALES.map((locale) => WORLDS.tinyvlc.copy[locale].city)).toEqual([
       "Valencia",
       "Valência",
@@ -227,6 +244,7 @@ describe("worlds", () => {
     expect(WORLDS.tinyfte.copy["en-US"].about.notes[0]).toMatch(/satellite/);
     expect(WORLDS.tinyvlc.copy["en-US"].about.notes[0]).toMatch(/number of floors/);
     expect(WORLDS.tinylas.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
+    expect(WORLDS.tinylax.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {

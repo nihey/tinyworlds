@@ -55,6 +55,8 @@ describe("site", () => {
       "Valencia",
       "Valência",
       "Las Vegas",
+      "Los Angeles",
+      "Los Ángeles",
       "Winterfell",
       "Invernalia",
       "King's Landing",

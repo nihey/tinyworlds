@@ -3,7 +3,7 @@
 The map viewer: a Next.js 16 static export that draws the tiles and indexes written by
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
-(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), and three places that do not
+(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), and three places that do not
 exist, `tinywinterfell`, `tinykingslanding` and `tinywesteros` (the whole known world) — or
 `home`, the front page that lists the worlds. The
 interface speaks the visitor's language (English, Brazilian
@@ -170,7 +170,7 @@ src/
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
   link back to the front page (`NEXT_PUBLIC_HOME_URL`).
 - **The invitation to the other places** (`components/map/explore-banner.tsx`): a small sign
-  under the search box, "8 more cities and worlds to explore", linking to the front page's
+  under the search box, "9 more cities and worlds to explore", linking to the front page's
   list (`placesUrl` in `lib/explore.ts`: `/#cities`). Most visitors land on one map and never
   see that there are others. It is **always there**, for everyone: it goes up with the map's
   other signs and cannot be put away. The one moment it is not drawn is while the search box
@@ -228,7 +228,7 @@ src/
   unaccented.
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
   tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
-  `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#a9c7e8` for tinywinterfell, `#ea5257` for
+  `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#55aaff` for tinylax, `#a9c7e8` for tinywinterfell, `#ea5257` for
   tinykingslanding, `#d9b45a` for tinywesteros); the engine and the minimap read the world's value for canvas drawing. Don't
   write the yellow as a literal. `worlds.test.ts` checks the contrast of each pair against its
   ink and against the signs in both themes, which is why King's Landing's red is a shade lighter

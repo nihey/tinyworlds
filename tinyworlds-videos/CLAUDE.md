@@ -13,7 +13,7 @@ Four HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`: each an `i
 
 ```bash
 npm run plates [-- tinynyc …]   # cut the map plates and wordmark sheets from the tiles → */assets/plates/, */batch/
-npm run loops                   # render every card loop → ../tinyworlds-frontend/public/loops/<world>.mp4 (committed)
+npm run loops [-- tinylax …]    # render the card loops (every one, or the worlds named) → ../tinyworlds-frontend/public/loops/<world>.mp4 (committed)
 npm run flyovers [-- hero|cities]   # the hero → …/public/loops/hero.{mp4,jpg} (committed); city flyovers → out/flyovers/
 npm run takes -- main [--until 8.4]   # film the New York map for the film (VIEWER_URL, a dev server of the viewer)
 npm run takes -- page           # capture the front page for the film (HOME_URL, a dev server of the front page)
@@ -77,8 +77,9 @@ same code as the share card's.
   the site's address under the wordmark when one is known. Only real cities have one: the
   fan-made places stay out of what is made to promote the project. **The hero** is New York's
   flyover with no sign, on a smaller lap, reframed to keep Manhattan clear of the page's sign.
-- A new world: `npm run plates -- <id> && npm run loops`. To give it a flyover, add its
-  framing to `worlds.ts`.
+- A new world: `npm run plates -- <id> && npm run loops -- <id>` (naming it renders its loop
+  alone; the others' committed loops stay as they are). To give it a flyover, add its framing
+  to `worlds.ts`.
 - The one lint warning these projects keep (`nested_structure_needs_subcomposition`) is on
   purpose: a batch render sets only the root's variables, so the plate lives in the root.
 
