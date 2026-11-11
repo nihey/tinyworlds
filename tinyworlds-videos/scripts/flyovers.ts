@@ -2,16 +2,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { encodeForWeb, run } from "./lib/run.js";
 import { REPO, ROOT } from "./lib/world.js";
+import { heroName } from "./worlds.js";
 
 /**
  * Render the flyovers (flyover/, rows from `npm run plates`):
  *  - one per city with its sign, 1920 × 1080, to share: out/flyovers/<world>.mp4 (not committed);
- *  - the hero, with no sign, small for the front page:
- *    tinyworlds-frontend/public/loops/hero.mp4 and its first frame, hero.jpg (committed).
- *   npm run flyovers [-- hero | cities]
+ *  - the heroes, with no sign, small for the front page, one per world:
+ *    tinyworlds-frontend/public/loops/hero.mp4 (the first world's) and hero-<world>.mp4, each
+ *    with its first frame as a .jpg (committed).
+ *   npm run flyovers [-- hero [world …] | cities]
  */
 const FLYOVER = path.join(ROOT, "flyover");
 const only = process.argv[2];
+/** After "hero": the worlds whose films to render. None named: all of them. */
+const named = process.argv.slice(3).map(heroName);
 const render = (batch: string): { name: string }[] => {
   run(
     "npx",
@@ -48,7 +52,20 @@ if (only !== "hero") {
 if (only !== "cities") {
   const target = path.join(REPO, "tinyworlds-frontend/public/loops");
   fs.mkdirSync(target, { recursive: true });
-  for (const { name } of render("hero.json")) {
+  let batch = "hero.json";
+  if (named.length > 0) {
+    // the rows `npm run plates` wrote, for the worlds asked for only
+    const rows = JSON.parse(fs.readFileSync(path.join(FLYOVER, "batch/hero.json"), "utf8")) as {
+      name: string;
+    }[];
+    const wanted = rows.filter((row) => named.includes(row.name));
+    const missing = named.filter((name) => !wanted.some((row) => row.name === name));
+    if (missing.length > 0)
+      throw new Error(`No hero row for ${missing.join(", ")}: run "npm run plates" for them first.`);
+    batch = "hero-named.json";
+    fs.writeFileSync(path.join(FLYOVER, "batch", batch), JSON.stringify(wanted, null, 2) + "\n");
+  }
+  for (const { name } of render(batch)) {
     const source = path.join(FLYOVER, "renders", `${name}.mp4`);
     const file = path.join(target, `${name}.mp4`);
     encodeForWeb(source, file, { width: 1280, height: 720, crf: 30 }, FLYOVER);

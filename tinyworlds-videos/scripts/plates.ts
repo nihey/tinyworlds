@@ -17,7 +17,7 @@ import {
 import { CARD_DRIFT, FLYOVER_DRIFT, plateSize, type Drift } from "./lib/drift.js";
 import { siteAddress } from "./lib/site.js";
 import { ROOT, WORLD_IDS, cutPlate, loadWorld, type World } from "./lib/world.js";
-import { HERO, SHOTS } from "./worlds.js";
+import { HEROES, SHOTS, heroName } from "./worlds.js";
 
 /**
  * Cut what the drift compositions show, from the tiles: for each world a plate of map wide
@@ -152,21 +152,23 @@ for (const id of ids) {
   if (flyover) flyovers.push(flyover);
   console.log(`plates: ${id} card${flyover ? " + flyover" : ""}`);
 }
-// the hero: its world's flyover on a smaller lap, reframed, with nothing drawn on it
+// the heroes: each world's own flyover on a smaller lap, reframed, with nothing drawn on it
 fs.writeFileSync(path.join(flyDir, "blank-sign.png"), await sheet(FLYOVER_DRIFT).png());
 const heroRows: Row[] = [];
-const heroShot = SHOTS[HERO.world]?.flyover;
-if (heroShot && ids.includes(HERO.world)) {
-  const world = loadWorld(HERO.world);
-  const spot = world.toMap(heroShot.lon ?? world.card.lon, heroShot.lat ?? world.card.lat);
-  const centre = { x: spot.x + HERO.dx * heroShot.shrink, y: spot.y + HERO.dy * heroShot.shrink };
-  await mapPlate(world, FLYOVER_DRIFT, centre, heroShot.shrink, path.join(flyDir, "hero.png"));
+for (const id of ids) {
+  const shot = HEROES[id];
+  if (!shot) continue;
+  const world = loadWorld(id);
+  const spot = world.toMap(shot.lon ?? world.card.lon, shot.lat ?? world.card.lat);
+  const centre = { x: spot.x + shot.dx * shot.shrink, y: spot.y + shot.dy * shot.shrink };
+  const name = heroName(id);
+  await mapPlate(world, FLYOVER_DRIFT, centre, shot.shrink, path.join(flyDir, `${name}.png`));
   heroRows.push({
-    name: "hero",
-    plate: "assets/plates/hero.png",
+    name,
+    plate: `assets/plates/${name}.png`,
     sign: "assets/plates/blank-sign.png",
-    a: HERO.a,
-    b: HERO.b,
+    a: shot.a,
+    b: shot.b,
   });
 }
 
@@ -174,7 +176,7 @@ if (heroShot && ids.includes(HERO.world)) {
 const writeRows = (file: string, rows: Row[]): number => {
   const kept = fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, "utf8")) as Row[]) : [];
   const byName = new Map([...kept, ...rows].map((row) => [row.name, row]));
-  const order = [...WORLD_IDS, "hero"];
+  const order = [...WORLD_IDS, ...WORLD_IDS.map(heroName)];
   const merged = [...byName.values()].sort(
     (x, y) => order.indexOf(String(x.name)) - order.indexOf(String(y.name)),
   );
@@ -185,6 +187,6 @@ writeRows(path.join(ROOT, "loop/batch/cards.json"), cards);
 writeRows(path.join(ROOT, "flyover/batch/flyovers.json"), flyovers);
 writeRows(path.join(ROOT, "flyover/batch/hero.json"), heroRows);
 console.log(
-  `rows: ${cards.length} card loops, ${flyovers.length} flyovers${heroRows.length ? ", the hero" : ""}` +
+  `rows: ${cards.length} card loops, ${flyovers.length} flyovers, ${heroRows.length} hero films` +
     (address ? "" : " (no site address known: the flyovers carry the wordmark alone)"),
 );

@@ -120,6 +120,10 @@ check_all() {
     elif [[ ! -f "$FRONTEND/public/loops/$world.mp4" ]]; then
       # not a failure: without a loop the world's card on the front page simply stays still
       echo "$world: ok (no front-page loop yet: its card stays still)"
+    elif [[ ! -f "$FRONTEND/public/loops/hero-$world.jpg" && "$world" != "tinynyc" ]]; then
+      # nor is this: the front page's hero goes round the worlds that have a film (the first
+      # world's is hero.jpg)
+      echo "$world: ok (no hero film yet: it is left out of the front page's hero)"
     else
       echo "$world: ok"
     fi

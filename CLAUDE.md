@@ -89,9 +89,10 @@ Each sub-project has its own `CLAUDE.md`.
   (`tinyworlds-frontend/public/email/`), the city's picture its real share card; `SITE_URL` is
   where they are. A mail never holds up or undoes a donation, a deploy or a sign-in, and goes
   only to the person's own address (`tinyworlds-api/CLAUDE.md`, Mails).
-- **The front page moves.** Its hero and each world's card play a short silent loop made by
-  `tinyworlds-videos` from the world's own tiles, over a still; the loops are the front page's
-  own files, so nothing but its build needs deploying for them.
+- **The front page moves.** Its hero goes round every world, one slide each, and each world's
+  card plays a short silent loop; all are made by `tinyworlds-videos` from the world's own
+  tiles and play over a still. They are the front page's own files, so nothing but its build
+  needs deploying for them.
 - **Google's tags wait for consent.** Google Tag Manager (and the Google Analytics in it) is the
   one thing on the site that sets cookies: visitors in Europe are asked first, and nothing from
   Google loads before they say yes (`tinyworlds-frontend/CLAUDE.md`, Analytics).
@@ -121,7 +122,9 @@ Each sub-project has its own `CLAUDE.md`.
    whenever the API starts; see `tinyworlds-api/CLAUDE.md`).
 4. Videos: `npm run plates -- <id> && npm run loops -- <id>` in `tinyworlds-videos` gives the world its
    card loop on the front page (`tinyworlds-frontend/public/loops/<id>.mp4`); without one its
-   card simply stays still.
+   card simply stays still. A framing in `HEROES` (`scripts/worlds.ts`), then
+   `npm run flyovers -- hero <id>`, give it its slide in the front page's hero
+   (`loops/hero-<id>.{mp4,jpg}`); without one the hero simply leaves it out.
 5. `deploy/deploy.sh check` (every world in the registry has its data, card, pipeline city and
    docs, this one included), then send its data, `deploy/deploy.sh <id> --data`, **before** the
    merge to main: the push deploys the API (whose seed marks the city `BUILT`), then every
