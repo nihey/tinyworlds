@@ -536,6 +536,12 @@ end it with the map where it was.
   all the API counts, and the game's `level`, which the API tallies apart), never Apollo. No API, an error or
   no answer within 5 s is no tally: the round ends without the shares (`quizReducer` keeps a
   tally only for the building it was asked for). Analytics hook: `quiz_start`.
+- **Small rules.** The questions' file is given 10 s (`AbortSignal.timeout`), then the card says
+  there is nothing to play. Play again right after a language change uses the questions the
+  game started with (`questionsToPlay`). The last round's button reads "See your score"
+  (`isLastRound`). "You're the first" is said only of the visitor's own counted answer
+  (`peopleNote`: an admin's browser is not counted). A polite live region tells a screen
+  reader the verdict, then the score (`liveLine`).
 
 ## Design
 
