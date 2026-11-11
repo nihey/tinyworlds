@@ -23,6 +23,8 @@ export const SHOTS: Record<string, Shot> = {
   tinylax: { flyover: { shrink: 2 } },
   tinydal: { flyover: { shrink: 2 } },
   tinycvg: { flyover: { shrink: 2 } },
+  tinypit: { flyover: { shrink: 2 } },
+  tinyphl: { flyover: { shrink: 2 } },
   tinywesteros: { dir: 1 },
 };
 
