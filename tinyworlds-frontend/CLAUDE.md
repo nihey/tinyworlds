@@ -25,6 +25,7 @@ npm run preview      # serve out/ under NEXT_PUBLIC_BASE_PATH, like production (
 npm run lint         # eslint + prettier --check      (lint:fix to fix)
 npm run typecheck    # next typegen (route types such as LayoutProps) + tsc
 npm test             # vitest
+npm run email-images # public/email/: the API's mails' pictures (the wordmark, the three badges)
 ```
 
 ### Environment (all inlined at build time)
@@ -87,8 +88,14 @@ without a render; `parseManifest` falls back to `build` for a manifest without i
 before `next build` (the export would copy every tile into `out/`); without it the page shows the
 "map didn't load" dialog. `public/og/<world>.jpg` (1200×630 share cards, made by the pipeline) is
 committed and must stay; so are `public/og/tinyworlds.jpg` (the front page's own share card, the
-pipeline's `home-card`) and `public/loops/` (the front page's moving pictures, made by
-`tinyworlds-videos`: `<world>.mp4`, `hero.mp4`, `hero.jpg`).
+pipeline's `home-card`), `public/loops/` (the front page's moving pictures, made by
+`tinyworlds-videos`: `<world>.mp4`, `hero.mp4`, `hero.jpg`) and `public/email/`: the pictures
+the API's mails show (`tinyworlds-api/CLAUDE.md`, Mails), loaded from the site's root, so the
+front page's build serves them. `wordmark.png` (Tiny5's letters, "tiny" paper white and
+"worlds" taxi yellow, transparent, 2×) and `founding.png`, `first-stone.png`, `keystone.png`
+(the badges' maps of `pixel-art.ts` at 3×, nearest neighbour) are made by
+`scripts/email-images.mjs` (`npm run email-images`, Node 22.18+: it imports the `.ts` maps);
+run it after changing the art, and commit what it writes.
 
 ## Layout
 
@@ -366,7 +373,8 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
 - **Badges are SVG pixel maps** (`benefactors/pixel-art.ts`: one character per pixel, a palette
   with fixed colours; `pixel-badge.tsx` draws one `<rect>` per pixel at a whole-number scale), so
   they stay crisp at any size and need no image files. Founding, first stone and keystone.
-  Titles and the founder label are in the i18n dictionaries.
+  Titles and the founder label are in the i18n dictionaries. Mails cannot draw SVG: they show
+  PNGs made from the same maps (`public/email/`).
 - **"Your cities"** (`/me/`, below) is where a donor sees their own badges and the listing
   switch; **`/admin/`** can hide a name (`components/admin/names.tsx`: `benefactorNames`,
   `setNameHidden`; it acts at once, since it is reversible, and is loaded apart from the funnel).
