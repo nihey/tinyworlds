@@ -117,7 +117,8 @@ src/
 │                        # and the city progress bar the front page's ranking uses
 ├── components/home/     # the front page: landing.tsx, and moving-picture.tsx (a still that
 │                        # comes alive: the hero and the cards)
-├── components/admin/    # the admin pages: admin-app.tsx (signed in or not), sign-in.tsx,
+├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
+├── components/admin/    # the admin pages: admin-app.tsx (signed in or not),
 │                        # funnel-report.tsx (the steps, the cities by visits, the days)
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/ui/       # shadcn/ui
@@ -129,9 +130,10 @@ src/
                          # city-catalogue.ts (well-known cities to pick from), donate-api.ts
                          # (Apollo Client; imported lazily), funnel.ts (the visit and the
                          # steps it reports), admin.ts (pure: the session, the funnel's
-                         # arithmetic), admin-api.ts (sign-in and the report; imported lazily),
-                         # site-events.ts (what the page analytics hear), consent.ts (who is
-                         # asked before Google's tags load, and loading them)
+                         # arithmetic), sign-in-api.ts (REST sign-in: link, code; lazy),
+                         # admin-api.ts (the report; lazy), site-events.ts (what the page
+                         # analytics hear), consent.ts (who is asked before Google's tags
+                         # load, and loading them)
 ```
 
 ## Targets: worlds and the front page
@@ -308,8 +310,8 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
 - **The admin pages** are `src/app/admin/page.home.tsx`: a route of the front page's build
   only (`/admin/`; a world's build answers 404 there), `noindex`, and linked from nowhere
   except the front page's footer **when an admin is signed in**. To anyone else it is a sign-in
-  form: an address, a button, and a link in the mail (`/admin/#token=…`). `AdminApp` takes the
-  token out of the address at once and trades it for a session (`lib/admin-api.ts`, REST), kept
+  form: an address, a button, then the link in the mail (`/admin/#token=…`) or the 6-digit code that came with it, typed on the page (`SignIn`, shared with the donor page; a spam-folder warning and a 60 s "send again"). `AdminApp` takes the
+  token out of the address at once and trades it for a session (`lib/sign-in-api.ts`, REST), kept
   in `localStorage` (`tinyworlds.admin`; `hooks/use-admin-session.ts` is its store) and sent as
   `Authorization: Bearer …`. A session the API no longer knows signs the page out.
 - **The report** (`components/admin/funnel-report.tsx`, numbers from `donationFunnel`): the

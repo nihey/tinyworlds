@@ -4,6 +4,7 @@ import {
   dayDate,
   formatShare,
   funnelSteps,
+  normalizeCode,
   niceMax,
   parseFunnel,
   parseSession,
@@ -58,6 +59,36 @@ describe("the admin's session", () => {
     ).toEqual(stored);
     expect(sessionOf(null)).toBeNull();
     expect(sessionOf({ accessToken: "a.b.c", expiresAt: stored.expiresAt })).toBeNull();
+  });
+});
+
+describe("a donor's session", () => {
+  const answer = {
+    accessToken: "a.b.c",
+    expiresAt: "2026-11-17T12:00:00.000Z",
+    donor: { id: "1", email: "a@example.com" },
+  };
+
+  it("is read from a donor's answer, and only as a donor's", () => {
+    expect(sessionOf(answer, "donor")).toEqual({
+      accessToken: "a.b.c",
+      expiresAt: answer.expiresAt,
+      email: "a@example.com",
+    });
+    expect(sessionOf(answer, "admin")).toBeNull();
+    expect(sessionOf(answer)).toBeNull();
+  });
+});
+
+describe("a sign-in code", () => {
+  it("is the six digits, however they were typed or pasted", () => {
+    for (const text of ["482913", "482 913", "482-913", " 482913 ", "482\u00a0913", "482 - 913"])
+      expect(normalizeCode(text), text).toBe("482913");
+  });
+
+  it("is nothing when it is not six digits", () => {
+    for (const text of ["", "48291", "4829131", "48291a", "abcdef"])
+      expect(normalizeCode(text), text).toBeNull();
   });
 });
 

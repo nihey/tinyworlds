@@ -159,6 +159,16 @@ export const en: Strings = {
     deny: "No, thanks",
     settings: "Cookie settings",
   },
+  signIn: {
+    code: "Code",
+    codePlaceholder: "6 digits",
+    submit: "Sign in",
+    spam: "Not in your inbox? Look in your spam or junk folder too: the mail comes from tinyworlds, and the first one sometimes lands there.",
+    changeAddress: "Wrong address? Change it",
+    sendAgain: "Send again",
+    sendAgainIn: "Send again in {seconds}",
+    wrongCode: "That code is wrong or has expired. Check the mail, or send a new one.",
+  },
   admin: {
     title: "tinyworlds admin",
     signIn: {
@@ -168,7 +178,7 @@ export const en: Strings = {
       placeholder: "you@example.com",
       action: "Email me a sign-in link",
       sending: "Sending…",
-      sent: "If {email} is an admin's address, a sign-in link is on its way to it. The link works once, for {minutes} minutes.",
+      sent: "If {email} is an admin's address, a link and a code are on their way. Open the link, or type the code here. Both work once, for {minutes} minutes.",
       again: "Use another address",
       verifying: "Signing you in…",
       expired: "That link has expired or was already used. Ask for a new one.",

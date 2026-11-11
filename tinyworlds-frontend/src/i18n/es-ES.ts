@@ -160,6 +160,16 @@ export const esES: Strings = {
     deny: "No, gracias",
     settings: "Configuración de cookies",
   },
+  signIn: {
+    code: "Código",
+    codePlaceholder: "6 dígitos",
+    submit: "Entrar",
+    spam: "¿No está en tu bandeja de entrada? Mira también en la carpeta de spam o correo no deseado: el correo viene de tinyworlds, y el primero a veces acaba ahí.",
+    changeAddress: "¿Correo equivocado? Cámbialo",
+    sendAgain: "Enviar de nuevo",
+    sendAgainIn: "Enviar de nuevo en {seconds}",
+    wrongCode: "Ese código es incorrecto o ha caducado. Revisa el correo o pide otro.",
+  },
   admin: {
     title: "administración de tinyworlds",
     signIn: {
@@ -169,7 +179,7 @@ export const esES: Strings = {
       placeholder: "tu@example.com",
       action: "Enviarme un enlace de acceso",
       sending: "Enviando…",
-      sent: "Si {email} es el correo de un administrador, un enlace de acceso va en camino. El enlace funciona una sola vez, durante {minutes} minutos.",
+      sent: "Si {email} es el correo de un administrador, un enlace y un código van en camino. Abre el enlace o escribe el código aquí. Los dos funcionan una sola vez, durante {minutes} minutos.",
       again: "Usar otro correo",
       verifying: "Entrando…",
       expired: "Ese enlace ha caducado o ya se usó. Pide uno nuevo.",
