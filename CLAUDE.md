@@ -88,7 +88,8 @@ Each sub-project has its own `CLAUDE.md`.
 4. Videos: `npm run plates -- <id> && npm run loops` in `tinyworlds-videos` gives the world its
    card loop on the front page (`tinyworlds-frontend/public/loops/<id>.mp4`); without one its
    card simply stays still.
-5. `deploy/deploy.sh <id>` and `deploy/deploy.sh home`.
+5. `deploy/deploy.sh check` (every world in the registry has its data, card, pipeline city and
+   docs, this one included), then `deploy/deploy.sh <id>` and `deploy/deploy.sh home`.
 
 The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
 `NEXT_PUBLIC_WORLD`, the data folder and the URL path.
@@ -224,8 +225,9 @@ its payment link. Details in `tinyworlds-api/CLAUDE.md`.
 - `./dev.sh [world]` opens tmux with the viewer's dev server, the API and a pipeline shell.
 - The pipeline is run by hand (`npm run all -- --city <id>` in `tinyworlds-pipeline`).
 - `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the world's data) to the
-  web server; the API is a container built from `tinyworlds-api/Dockerfile`. See
-  `deploy/README.md`.
+  web server; `deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data]` checks and builds
+  every world in the viewer's registry and the front page, and uploads only if all of them
+  built. The API is a container built from `tinyworlds-api/Dockerfile`. See `deploy/README.md`.
 
 ## Conventions
 

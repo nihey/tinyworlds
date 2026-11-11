@@ -59,12 +59,33 @@ change.
 ## Updating
 
 ```bash
+deploy/deploy.sh all --no-data       # after a frontend change: every world, then the front page
+deploy/deploy.sh all --no-data --serial      # the same, one build and one upload at a time
+deploy/deploy.sh all --no-data --parallel=5  # the same, 5 at a time (default 3)
+deploy/deploy.sh check               # only the checks `all` starts with
+
 deploy/deploy.sh tinynyc             # after re-rendering: site + data
-deploy/deploy.sh tinyrao --no-data   # after a frontend change
+deploy/deploy.sh tinyrao --no-data   # one world's code
 deploy/deploy.sh tinynyc --index     # site + places/hoods/life JSON, not the tiles
 deploy/deploy.sh tinyrao --data      # data only, no build
 deploy/deploy.sh home                # the front page
 ```
+
+**`all`** takes its worlds from the viewer's registry (`tinyworlds-frontend/src/worlds/index.ts`),
+so a world added there is deployed with the rest, and one left out is not. Before building
+anything it checks every world and lists everything missing: its map data, its share card,
+its pipeline city (`tinyworlds-pipeline/src/cities/<id>.ts`), and a mention in `CLAUDE.md`'s
+worlds table, `README.md` and `tinyworlds-frontend/CLAUDE.md`. A world without a front-page loop
+only gets a note. Then it builds every target, and **uploads only once all of them have
+built**: a failing build leaves the whole site as it was, and its log's end is printed. The
+worlds go up first and the front page last, since its links lead to them. `all` also takes
+`--index` and `--data` (no build: every world's data).
+
+Every build runs in a temporary copy of the frontend beside it (`.deploy-work.*`, removed when
+the script ends; `node_modules` is hard-linked, `public/data` left out), so builds can run side
+by side and the generated data is never moved out of the way. A build already uses several
+cores, so going wider than 3 or 4 at a time stops paying: on a 20-core machine the ten builds
+took 108 s one at a time, 85 s two at a time, 74 s three at a time and 82 s four at a time.
 
 Data files are requested with `?v=<manifest.build>` and cached as immutable; `manifest.json` is
 always revalidated, and it is copied last so a new build is only announced once its tiles are up.
@@ -76,5 +97,5 @@ container starts. When a change touches both, **deploy the API first**, then the
 viewer may send a field an older API does not know.
 
 The admin pages are part of the front page (`/admin/`), so `deploy/deploy.sh home` publishes
-them; the funnel's reporting is in every viewer, so each world needs its own
-`deploy/deploy.sh <world> --no-data` to start counting its visits.
+them; the funnel's reporting is in every viewer, so a change to it needs
+`deploy/deploy.sh all --no-data`.

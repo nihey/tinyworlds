@@ -11,4 +11,6 @@ tinyworlds-frontend/public/data/
 tinyworlds-frontend/.next/
 tinyworlds-frontend/out/
 tinyworlds-frontend/.data-stash.*/
+# deploy/deploy.sh's build copies (removed when it ends)
+.deploy-work.*/
 *.tsbuildinfo

@@ -3,8 +3,9 @@
 The map viewer: a Next.js 16 static export that draws the tiles and indexes written by
 `tinyworlds-pipeline` into `public/data/<world>/`. No auth, no server of its own at runtime.
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
-(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), and two places that do not exist,
-`tinywinterfell` and `tinykingslanding` — or `home`, the front page that lists the worlds. The
+(El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), and three places that do not
+exist, `tinywinterfell`, `tinykingslanding` and `tinywesteros` (the whole known world) — or
+`home`, the front page that lists the worlds. The
 interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
 `tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
@@ -170,7 +171,7 @@ src/
 - **Contact.** `CONTACT_EMAIL` in `site.ts` is the one place the project's address lives: the
   front page's footer shows it (a `mailto:` in a localized sentence), and About in every map has
   a quiet "Contact" link.
-- **Fictional worlds** (`fictional: true` on the `World`: Winterfell, King's Landing) are places
+- **Fictional worlds** (`fictional: true` on the `World`: Winterfell, King's Landing, Westeros) are places
   from a story, on a layout invented for the map. The flag does three things: the corner readout
   shows only the zoom (`viewReadout` in `lib/readout.ts`: the coordinates mean nothing) and says
   "fan-made" in the visitor's language instead of crediting map data; About sets the world's
@@ -220,7 +221,7 @@ src/
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
   tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
   `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#a9c7e8` for tinywinterfell, `#ea5257` for
-  tinykingslanding); the engine and the minimap read the world's value for canvas drawing. Don't
+  tinykingslanding, `#d9b45a` for tinywesteros); the engine and the minimap read the world's value for canvas drawing. Don't
   write the yellow as a literal. `worlds.test.ts` checks the contrast of each pair against its
   ink and against the signs in both themes, which is why King's Landing's red is a shade lighter
   than a flag red.

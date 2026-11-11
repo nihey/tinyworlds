@@ -118,6 +118,7 @@ The site is static files behind a stock nginx; the API is one container.
 cp deploy/.env.example deploy/.env    # where your server is; never committed
 deploy/deploy.sh tinynyc              # build for /tinynyc, rsync the site and the tiles
 deploy/deploy.sh home                 # the front page
+deploy/deploy.sh all --no-data        # every world and the front page, after a viewer change
 ```
 
 See [deploy/README.md](deploy/README.md).
