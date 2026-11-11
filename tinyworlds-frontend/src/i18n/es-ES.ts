@@ -122,7 +122,7 @@ export const esES: Strings = {
       name: "Nombre a mostrar",
       namePlaceholder: "Ana de Sevilla",
       counter: "{n}/{max}",
-      note: "Desactivado: cuentas igual, como “anónimo”. Inicia sesión después con el correo que des a Stripe para cambiar tu nombre o quitarlo.",
+      note: "Tu donación cuenta igualmente; con esto apagado apareces como «anónimo». Si este correo ya tiene un nombre, se muestra ese. Puedes cambiarlo o quitarlo más tarde en «Tus ciudades», entrando con el correo que des a Stripe.",
     },
     donations: { none: "Aún sin donaciones", one: "{n} donación", other: "{n} donaciones" },
     status: { funded: "Meta alcanzada, en cola", building: "En construcción", built: "Construida" },
