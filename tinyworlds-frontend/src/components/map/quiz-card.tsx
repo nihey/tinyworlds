@@ -7,6 +7,9 @@ import {
   areasOf,
   chipCounts,
   countFor,
+  isLastRound,
+  liveLine,
+  peopleNote,
   questionKind,
   quizScore,
   tallyShares,
@@ -79,6 +82,10 @@ export function QuizCard(props: QuizCardProps) {
       )}
     >
       <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />
+      {/* what a screen reader is told as the game moves on: the verdict, then the score */}
+      <p className="sr-only" aria-live="polite">
+        {liveLine(state, name, t.quiz)}
+      </p>
       <div className="flex items-center gap-2 border-b border-sign-line py-1.5 pr-1.5 pl-3">
         <span className="font-pixel text-[15px] leading-none tracking-[0.03em] text-taxi uppercase">
           {t.quiz.title}
@@ -353,6 +360,7 @@ function Round({
   const answered = state.phase === "answered" ? state : null;
   const tally = answered && answered.tally !== "waiting" && answered.tally ? answered.tally : null;
   const counted = tally ? tallyShares(tally, choices) : null;
+  const note = counted && answered ? peopleNote(counted.people, answered.recorded) : null;
   const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
   const number = new Intl.NumberFormat(locale);
   const right = answered?.pick === question.id;
@@ -395,9 +403,9 @@ function Round({
         {answered ? t.quiz.credit : t.quiz.source}
       </p>
 
-      {counted && (
+      {counted && note && (
         <p className="mt-2 text-[13px] text-paper-dim">
-          {counted.people <= 1
+          {note === "first"
             ? t.quiz.first
             : (new Intl.PluralRules(locale).select(counted.people) === "one"
                 ? t.quiz.people.one
@@ -476,7 +484,7 @@ function Round({
             onClick={onNext}
             className="flex items-center gap-1.5 bg-taxi px-3 py-2 text-[14px] font-bold text-taxi-ink outline-none focus-visible:shadow-[0_0_0_2px_var(--paper)]"
           >
-            {t.quiz.next}
+            {isLastRound(state.game) ? t.quiz.seeScore : t.quiz.next}
             <ArrowRight aria-hidden className="size-4" strokeWidth={2.5} />
           </button>
           <button

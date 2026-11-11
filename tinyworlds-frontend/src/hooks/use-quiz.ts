@@ -9,6 +9,7 @@ import {
   gameOrder,
   loadChoice,
   loadPlayed,
+  questionsToPlay,
   quizReducer,
   roundView,
   saveChoice,
@@ -19,6 +20,7 @@ import {
   type QuizChoice,
   type QuizState,
 } from "@/lib/quiz";
+import { currentVisit } from "@/lib/funnel";
 import { sendAnswer } from "@/lib/quiz-api";
 import { loadQuiz } from "@/map/data";
 import type { MapEngine } from "@/map/engine";
@@ -95,7 +97,8 @@ export function useQuiz({
       return;
     }
     let gone = false;
-    loadQuiz(build, locale)
+    // a file that does not come within 10 s is none: the card says there is nothing to play
+    loadQuiz(build, locale, AbortSignal.timeout(10_000))
       .catch(() => [] as QuizQuestion[])
       .then((list) => {
         if (gone) return;
@@ -130,8 +133,10 @@ export function useQuiz({
   const queueFor = useCallback(
     (c: QuizChoice) => {
       played.current ??= loadPlayed(local, WORLD.id);
-      gameQuestions.current = questions ?? [];
-      return gameOrder(questions ?? [], c, played.current, has, Math.random);
+      // while a new language's questions load, Play again uses those the game started with
+      const list = questionsToPlay(questions, gameQuestions.current);
+      gameQuestions.current = list;
+      return gameOrder(list, c, played.current, has, Math.random);
     },
     [questions, has],
   );
@@ -198,7 +203,8 @@ export function useQuiz({
     (picked: string) => {
       if (state.phase !== "asking" || !state.choices.includes(picked)) return;
       const sightId = state.question.id;
-      dispatch({ type: "pick", choice: picked });
+      // only an answer the API keeps (a counted visit) can be "the first"
+      dispatch({ type: "pick", choice: picked, recorded: currentVisit() !== null });
       void sendAnswer({
         world: WORLD.id,
         sightId,

@@ -9,6 +9,10 @@ import {
   fixChoice,
   gameOrder,
   inChoice,
+  isLastRound,
+  liveLine,
+  peopleNote,
+  questionsToPlay,
   loadChoice,
   loadPlayed,
   saveChoice,
@@ -504,5 +508,69 @@ describe("quizKey in the new places", () => {
     expect(quizKey("choosing", key("Enter", true))).toBeNull();
     expect(quizKey("finished", key("Enter"))).toBe("again");
     expect(quizKey("choosing", key("Escape"))).toBe("stop");
+  });
+});
+
+describe("polish (follow-up)", () => {
+  const game = { choice: DEFAULT_CHOICE, queue: ["a", "b"], index: 0, right: 0 };
+
+  it("plays again from the questions the game started with while a new language loads", () => {
+    const started = [city[0], city[1]];
+    expect(questionsToPlay(null, started)).toBe(started);
+    expect(questionsToPlay([], started)).toBe(started);
+    const fresh = [city[2]];
+    expect(questionsToPlay(fresh, started)).toBe(fresh);
+  });
+
+  it("knows the last round, whose button leads to the score", () => {
+    expect(isLastRound(game)).toBe(false);
+    expect(isLastRound({ ...game, index: 1 })).toBe(true);
+  });
+
+  it("says first only of the visitor's own counted answer", () => {
+    expect(peopleNote(1, true)).toBe("first");
+    expect(peopleNote(1, false)).toBe("count");
+    expect(peopleNote(0, false)).toBeNull();
+    expect(peopleNote(0, true)).toBeNull();
+    expect(peopleNote(5, true)).toBe("count");
+  });
+
+  it("keeps whether an answer was counted with the round", () => {
+    const asking = quizReducer(
+      quizReducer(quizReducer({ phase: "off" }, { type: "open" }), {
+        type: "start",
+        choice: DEFAULT_CHOICE,
+        queue: ["a"],
+      }),
+      { type: "ask", question: city[0], choices: ["a", "e1", "e2", "e3"] },
+    );
+    expect(quizReducer(asking, { type: "pick", choice: "a", recorded: false })).toMatchObject({
+      recorded: false,
+    });
+    expect(quizReducer(asking, { type: "pick", choice: "a" })).toMatchObject({ recorded: true });
+  });
+
+  it("gives a screen reader the verdict, then the score", () => {
+    const words = {
+      right: "Right!",
+      wrong: "Not quite. It's {name}.",
+      end: "You named {right} of {total}.",
+    };
+    const answered = {
+      phase: "answered" as const,
+      game,
+      question: city[0],
+      choices: ["a", "e1", "e2", "e3"],
+      pick: "e1",
+      tally: "waiting" as const,
+      recorded: true,
+    };
+    const name = (id: string) => (id === "a" ? "Alpha Tower" : id);
+    expect(liveLine(answered, name, words)).toBe("Not quite. It's Alpha Tower.");
+    expect(liveLine({ ...answered, pick: "a" }, name, words)).toBe("Right!");
+    expect(liveLine({ phase: "finished", game: { ...game, right: 1 } }, name, words)).toBe(
+      "You named 1 of 2.",
+    );
+    expect(liveLine({ phase: "choosing" }, name, words)).toBe("");
   });
 });

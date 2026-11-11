@@ -386,6 +386,7 @@ export const ptBR: Strings = {
     people: { one: "{n} pessoa já respondeu", other: "{n} pessoas já responderam" },
     first: "Você é a primeira pessoa a responder.",
     next: "Próximo prédio",
+    seeScore: "Ver o resultado",
     stop: "Parar",
     loading: "Procurando um prédio…",
     empty: "Nenhum prédio para adivinhar agora.",

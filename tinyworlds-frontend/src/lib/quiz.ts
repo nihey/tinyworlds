@@ -286,6 +286,8 @@ export type QuizState =
       pick: string;
       /** "waiting" while the API is asked; null when it did not answer */
       tally: QuizTally | null | "waiting";
+      /** whether the API keeps this answer (a visit is counted): only then is it "the first" */
+      recorded: boolean;
     }
   | { phase: "finished"; game: QuizGame };
 
@@ -293,7 +295,7 @@ export type QuizAction =
   | { type: "open" }
   | { type: "start"; choice: QuizChoice; queue: string[] }
   | { type: "ask"; question: QuizQuestion; choices: string[] }
-  | { type: "pick"; choice: string }
+  | { type: "pick"; choice: string; recorded?: boolean }
   | { type: "tally"; sightId: string; tally: QuizTally | null }
   | { type: "next" }
   | { type: "again"; queue: string[] }
@@ -332,6 +334,7 @@ export function quizReducer(state: QuizState, action: QuizAction): QuizState {
           right: state.game.right + (action.choice === state.question.id ? 1 : 0),
         },
         tally: "waiting",
+        recorded: action.recorded ?? true,
       };
     case "tally":
       return state.phase === "answered" && state.question.id === action.sightId
@@ -397,4 +400,43 @@ export function quizScore(
     .replace("{round}", String(round))
     .replace("{total}", String(total))
     .replace("{right}", String(right));
+}
+
+/** The questions a game plays from: this language's, or, while they load, those it started with. */
+export function questionsToPlay(
+  current: QuizQuestion[] | null,
+  started: QuizQuestion[],
+): QuizQuestion[] {
+  return current && current.length > 0 ? current : started;
+}
+
+/** Whether the round being played is the game's last: its button leads to the score. */
+export function isLastRound(game: QuizGame): boolean {
+  return game.index + 1 >= game.queue.length;
+}
+
+/**
+ * What the line under the verdict says: "first" when the visitor's own counted answer is the
+ * only one, a count when others have answered, nothing when nobody has been counted.
+ */
+export function peopleNote(people: number, recorded: boolean): "first" | "count" | null {
+  if (people === 0) return null;
+  return recorded && people === 1 ? "first" : "count";
+}
+
+/** What a screen reader is told as the game moves on: the verdict, then the score at the end. */
+export function liveLine(
+  state: QuizState,
+  name: (id: string) => string,
+  words: { right: string; wrong: string; end: string },
+): string {
+  if (state.phase === "answered")
+    return state.pick === state.question.id
+      ? words.right
+      : words.wrong.replace("{name}", name(state.question.id));
+  if (state.phase === "finished")
+    return words.end
+      .replace("{right}", String(state.game.right))
+      .replace("{total}", String(state.game.queue.length));
+  return "";
 }

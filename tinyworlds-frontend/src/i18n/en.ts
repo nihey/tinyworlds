@@ -384,6 +384,7 @@ export const en: Strings = {
     people: { one: "{n} person has answered this one", other: "{n} people have answered this one" },
     first: "You're the first to answer this one.",
     next: "Next building",
+    seeScore: "See your score",
     stop: "Stop",
     loading: "Finding a building…",
     empty: "No buildings to guess right now.",
