@@ -1,3 +1,5 @@
+import { tinycvg } from "./tinycvg.js";
+import { tinydal } from "./tinydal.js";
 import { tinyfte } from "./tinyfte.js";
 import { tinykingslanding } from "./tinykingslanding.js";
 import { tinylas } from "./tinylas.js";
@@ -20,6 +22,8 @@ export const CITIES: Record<string, City> = {
   tinyvlc,
   tinylas,
   tinylax,
+  tinydal,
+  tinycvg,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,

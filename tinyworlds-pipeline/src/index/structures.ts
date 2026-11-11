@@ -254,8 +254,12 @@ export function makeFinder(
       const [sp, sq] = proj.toGrid(statue.lon, statue.lat);
       if (Math.hypot(gp - sp, gq - sq) > STATUE) continue;
       const [sx, sy] = proj.toMap(statue.lon, statue.lat);
-      const pedestal = footprint(sx, sy);
       const vols = new Set(statue.vols);
+      // what it stands on: the entry's own building when it has one (Reunion Tower's ball is a
+      // statue on the tower, whose base the hotel beside it wraps round), else whatever holds its spot
+      const own = c.seed !== undefined ? bySeed(c.seed, sx, sy) : [];
+      const pedestal = own.length > 0 ? null : footprint(sx, sy);
+      for (const v of own) vols.add(v);
       if (pedestal !== null) for (const v of bySeed(seed[pedestal], sx, sy)) vols.add(v);
       return { key: `statue:${i}`, vols: [...vols].sort((a, b) => a - b) };
     }
