@@ -114,6 +114,26 @@ export interface Strings {
     exploringNow: string;
     /** the link in the header to the donor's own page */
     yourCities: string;
+    /** names the row of links to the page's sections */
+    navLabel: string;
+    /** the line under each section's title */
+    citiesLine: string;
+    imaginedLine: string;
+    rankingLine: string;
+    /** the hero's button, where the sign names the city beside it; and the one towards funding */
+    exploreShort: string;
+    fundNext: string;
+    /** the hero goes round the worlds: its name, its arrows, and a dot's ("{city}") */
+    carousel: { label: string; previous: string; next: string; show: string };
+    /** under the hero, each a figure and what it counts (the figure is set apart: no "{n}") */
+    numbers: {
+      worlds: { one: string; other: string };
+      visits: { one: string; other: string };
+      live: string;
+      funding: { one: string; other: string };
+    };
+    /** the tile after the cities: which one is built next; "{goal}" is a sum */
+    next: { kicker: string; title: string; body: string; action: string; ranking: string };
     /** why donate, when there is no list of cities to show */
     nextPitch: string;
     openSource: string;
@@ -197,6 +217,25 @@ export interface Strings {
     status: { funded: string; building: string; built: string };
     showAll: string;
     showFewer: string;
+    /**
+     * "Build the next city": the three steps, a city's card and the last card. "{amount}" and
+     * "{goal}" are sums; "{laid}" and "{total}" count stones.
+     */
+    build: {
+      steps: {
+        pick: { title: string; body: string };
+        give: { title: string; body: string };
+        build: { title: string; body: string };
+      };
+      stonesLaid: string;
+      firstUnclaimed: string;
+      raised: string;
+      /** a built city whose donations reached its goal */
+      fundedInFull: string;
+      groupBuilt: string;
+      /** the card for a city nobody has named yet */
+      other: { title: string; body: string; action: string };
+    };
     /** the choice of a city that is not on the list, and the hint in its text field */
     other: string;
     otherPlaceholder: string;
@@ -335,6 +374,33 @@ export interface Strings {
     failed: string;
     retry: string;
     empty: string;
+    /** someone who has not given yet */
+    noStones: string;
+    noStonesBody: string;
+    badgesToEarn: string;
+    yourBadges: string;
+    /** each badge's name and how it is earned; "{n}" counts the cities it was earned in */
+    badges: {
+      founding: { name: string; how: string };
+      firstStone: { name: string; how: string };
+      keystone: { name: string; how: string };
+      notYet: string;
+      inCities: { one: string; other: string };
+    };
+    /** the three figures at the top: each a number and what it counts (no "{n}") */
+    tiles: {
+      cities: { one: string; other: string };
+      stones: { one: string; other: string };
+      given: string;
+    };
+    legendYours: string;
+    legendOthers: string;
+    giveAgain: string;
+    /** the cities to fund beside the giving: "{goal}" is a sum, "{n}" how many cities */
+    buildBody: string;
+    buildAll: string;
+    /** the worlds under it; "{n}" is how many there are */
+    exploring: { title: string; body: string; all: string };
   };
   /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,

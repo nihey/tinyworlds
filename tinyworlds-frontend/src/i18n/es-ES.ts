@@ -63,7 +63,7 @@ export const esES: Strings = {
     explore: "Explorar {city}",
     cities: "Ciudades",
     imagined: "Lugares imaginarios",
-    ranking: "Ranking de ciudades",
+    ranking: "Construye la próxima ciudad",
     funded: "Meta alcanzada",
     rankingEmpty: "Todavía no hay donaciones: la primera pone su ciudad en cabeza.",
     donateTo: "Donar para {city}",
@@ -71,6 +71,32 @@ export const esES: Strings = {
     visits: { one: "{n} visita", other: "{n} visitas" },
     exploringNow: "{n} explorando ahora",
     yourCities: "Tus ciudades",
+    navLabel: "Secciones",
+    citiesLine: "Lugares reales, dibujados por un programa a partir de datos abiertos.",
+    imaginedLine:
+      "Mapas hechos por fans de lugares de ficción, con trazados inventados para ellos.",
+    rankingLine: "Elige la ciudad que quieres ver, o propón la tuya.",
+    exploreShort: "Explorar",
+    fundNext: "Apoya la próxima ciudad",
+    carousel: {
+      label: "Mundos por explorar",
+      previous: "Anterior",
+      next: "Siguiente",
+      show: "Mostrar {city}",
+    },
+    numbers: {
+      worlds: { one: "ciudad o mundo", other: "ciudades y mundos" },
+      visits: { one: "visita hasta ahora", other: "visitas hasta ahora" },
+      live: "explorando ahora",
+      funding: { one: "ciudad recaudando", other: "ciudades recaudando" },
+    },
+    next: {
+      kicker: "A continuación",
+      title: "¿Qué ciudad construyo a continuación?",
+      body: "Cada una cuesta unos {goal}. La que tenga más apoyo se construye primero.",
+      action: "Apoyar una ciudad",
+      ranking: "Ver el ranking",
+    },
     nextPitch:
       "Las donaciones pagan los servidores y las horas de trabajo que lleva construir cada ciudad. ¿Quieres ver la tuya? Escribe su nombre en la donación.",
     openSource: "Código abierto",
@@ -133,6 +159,32 @@ export const esES: Strings = {
     status: { funded: "Meta alcanzada, en cola", building: "En construcción", built: "Construida" },
     showAll: "Ver todas las ciudades",
     showFewer: "Ver menos",
+    build: {
+      steps: {
+        pick: {
+          title: "Elige una ciudad",
+          body: "La que tenga más apoyo es la siguiente en construirse.",
+        },
+        give: {
+          title: "Dona desde {amount}",
+          body: "Cada dólar coloca una piedra, con tu nombre si quieres.",
+        },
+        build: {
+          title: "Con {goal}, la construyo",
+          body: "Lo que supere esa cifra mantiene los servidores en marcha.",
+        },
+      },
+      stonesLaid: "{laid} de {total} piedras colocadas",
+      firstUnclaimed: "La Primera Piedra sigue sin dueño",
+      raised: "{amount} recaudados",
+      fundedInFull: "Meta alcanzada",
+      groupBuilt: "Construidas · financiadas por sus benefactores",
+      other: {
+        title: "¿Tu ciudad no está aquí?",
+        body: "Di el nombre de cualquier ciudad del mundo y entra en el ranking.",
+        action: "Donar y proponerla",
+      },
+    },
     other: "Otra ciudad",
     otherPlaceholder: "Nombre de la ciudad",
     none: "Ninguna en particular",
@@ -259,6 +311,40 @@ export const esES: Strings = {
     failed: "No se pudieron cargar tus ciudades ni guardar el cambio. Inténtalo de nuevo.",
     retry: "Reintentar",
     empty: "Aún no hay nada. Las donaciones hechas con este correo aparecen aquí.",
+    noStones: "Aún no has colocado ninguna piedra.",
+    noStonesBody:
+      "Dona para una ciudad y aparecerá aquí: lo que donaste, las piedras que colocaste y las insignias que ganaste.",
+    badgesToEarn: "Insignias por ganar",
+    yourBadges: "Tus insignias",
+    badges: {
+      founding: {
+        name: "Benefactor Fundador",
+        how: "Ayuda a financiar una ciudad antes de que se construya. Recibes un número de fundador.",
+      },
+      firstStone: { name: "Primera Piedra", how: "Coloca la primerísima piedra de una ciudad." },
+      keystone: {
+        name: "Piedra Clave",
+        how: "Coloca la última: la piedra que hace que se construya.",
+      },
+      notYet: "Todavía no",
+      inCities: { one: "{n} ciudad", other: "{n} ciudades" },
+    },
+    tiles: {
+      cities: { one: "ciudad", other: "ciudades" },
+      stones: { one: "piedra colocada", other: "piedras colocadas" },
+      given: "en donaciones",
+    },
+    legendYours: "tuyas",
+    legendOthers: "de otros benefactores",
+    giveAgain: "Donar otra vez",
+    buildBody:
+      "Cada una cuesta unos {goal}. Elige la que quieres ver: la que tenga más apoyo se construye primero.",
+    buildAll: "Ver las {n} ciudades, o proponer la tuya",
+    exploring: {
+      title: "Sigue explorando",
+      body: "Los más visitados primero.",
+      all: "Los {n} lugares en la portada",
+    },
   },
   admin: {
     title: "administración de tinyworlds",
