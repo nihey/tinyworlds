@@ -6,13 +6,12 @@ import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
 import { BuildNext } from "@/components/donate/build-next";
 import { DonateDialog } from "@/components/donate/donate-dialog";
-import { MovingPicture } from "@/components/home/moving-picture";
+import { HeroCarousel } from "@/components/home/hero-carousel";
 import { NextCityTile } from "@/components/home/next-city-tile";
 import { SectionHead } from "@/components/home/section-head";
 import { SiteNumbers } from "@/components/home/site-numbers";
 import { WorldCard } from "@/components/home/world-card";
-import { Wordmark } from "@/components/map/wordmark";
-import { ACTION, ACTION_QUIET } from "@/components/styles";
+import { ACTION_QUIET } from "@/components/styles";
 import { useAdminSession } from "@/hooks/use-admin-session";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMilestones, type Milestones } from "@/hooks/use-milestones";
@@ -25,16 +24,7 @@ import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { byVisits, siteTotals, type WorldCounts } from "@/lib/visits";
-import {
-  ADMIN_PATH,
-  CONTACT_EMAIL,
-  CONTACT_URL,
-  GITHUB_URL,
-  HERO,
-  ME_PATH,
-  SITE_ID,
-  worldUrl,
-} from "@/site";
+import { ADMIN_PATH, CONTACT_EMAIL, CONTACT_URL, GITHUB_URL, ME_PATH, SITE_ID } from "@/site";
 import { WORLDS, type World } from "@/worlds";
 
 /** the footer's quiet links: the address, the cookie settings, the admin pages */
@@ -160,8 +150,6 @@ export function Landing() {
   const ranking = rankCities(milestones.cities);
   const funding =
     milestones.state === "ready" ? ranking.funded.length + ranking.ranked.length : null;
-  // the world the hero's picture shows, and its button leads into
-  const lead = WORLDS[HERO.world];
   const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
 
   return (
@@ -205,34 +193,7 @@ export function Landing() {
           )}
         </nav>
 
-        {/* The hero is a share card grown to the page's width: a city, alive, signed in its lower
-            left corner. On a narrow screen the sign hangs from the picture's edge instead of
-            covering it. */}
-        <header className="relative">
-          <MovingPicture
-            still={HERO.still}
-            loop={HERO.loop}
-            alt=""
-            eager
-            className="aspect-[16/11] w-full rounded-[10px] shadow-[0_0_0_1px_rgb(0_0_0/0.6),0_16px_34px_-14px_rgb(0_0_0/0.65)] sm:aspect-[16/9] lg:aspect-[2/1]"
-          />
-          <div className="sign relative mx-3 -mt-14 overflow-hidden sm:mx-5 sm:-mt-24 sm:max-w-md lg:absolute lg:bottom-5 lg:left-5 lg:m-0">
-            <div aria-hidden className="h-[3px] bg-taxi" />
-            <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6">
-              <h1>
-                <Wordmark className="text-[clamp(2.75rem,12vw,3.75rem)]" />
-              </h1>
-              <p className="pt-2.5 text-xl leading-tight font-semibold text-paper">
-                {t.home.tagline}
-              </p>
-              <p className="pt-1.5 text-[15px] leading-relaxed text-paper-dim">{t.home.pitch}</p>
-              <a href={worldUrl(lead.id)} className={cn(ACTION, "mt-4")}>
-                {t.home.explore.replace("{city}", lead.copy[locale].city)}
-                <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.5} />
-              </a>
-            </div>
-          </div>
-        </header>
+        <HeroCarousel takesDonations={takesDonations} />
 
         {withApi && (
           <SiteNumbers

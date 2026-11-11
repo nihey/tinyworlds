@@ -31,20 +31,21 @@ npm run email-images # public/email/: the API's mails' pictures (the wordmark, t
 
 ### Environment (all inlined at build time)
 
-| Variable                                                      | Default                    | Meaning                                                                                   |
-| ------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_WORLD`                                           | `tinynyc`                  | the build target: a world id, or `home` for the front page; anything else fails the build |
-| `NEXT_PUBLIC_BASE_PATH`                                       | empty                      | sub-path the build is served under (`/tinyrao`; empty for `home`)                         |
-| `NEXT_PUBLIC_DATA_BASE`                                       | `<base path>/data/<world>` | URL prefix of the world's data folder (`/tinyrao/data`)                                   |
-| `NEXT_PUBLIC_SITE_URL`                                        | unset                      | site origin, for share cards; unset = text-only card                                      |
-| `NEXT_PUBLIC_ANALYTICS_SRC` / `NEXT_PUBLIC_ANALYTICS_SITE_ID` | unset                      | tracker script URL and site id; unset = no analytics                                      |
-| `NEXT_PUBLIC_GTM_ID`                                          | unset                      | Google Tag Manager container id (`GTM-XXXXXXX`); unset = nothing from Google is loaded    |
-| `NEXT_PUBLIC_DONATE_URL`                                      | unset                      | payment link (hosted checkout) in English, and the fallback for the other languages       |
-| `NEXT_PUBLIC_DONATE_URL_PT` / `NEXT_PUBLIC_DONATE_URL_ES`     | unset                      | the same checkout in Portuguese / Spanish                                                 |
-| `NEXT_PUBLIC_API_URL`                                         | unset                      | GraphQL endpoint of `tinyworlds-api`: a URL or a same-origin path (`/api/graphql`)        |
-| `NEXT_PUBLIC_HOME_URL`                                        | `/`                        | where the front page is, for the "All cities" link inside a map                           |
-| `NEXT_PUBLIC_WORLDS_BASE`                                     | empty                      | what the worlds' folders hang from on the front page (`""` → `/tinynyc/`)                 |
-| `NEXT_PUBLIC_CARDS_BASE`                                      | unset                      | **dev only**: take the front page's card pictures from one folder (`/og`)                 |
+| Variable                                                      | Default                    | Meaning                                                                                                                   |
+| ------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_WORLD`                                           | `tinynyc`                  | the build target: a world id, or `home` for the front page; anything else fails the build                                 |
+| `NEXT_PUBLIC_BASE_PATH`                                       | empty                      | sub-path the build is served under (`/tinyrao`; empty for `home`)                                                         |
+| `NEXT_PUBLIC_DATA_BASE`                                       | `<base path>/data/<world>` | URL prefix of the world's data folder (`/tinyrao/data`)                                                                   |
+| `NEXT_PUBLIC_SITE_URL`                                        | unset                      | site origin, for share cards; unset = text-only card                                                                      |
+| `NEXT_PUBLIC_ANALYTICS_SRC` / `NEXT_PUBLIC_ANALYTICS_SITE_ID` | unset                      | tracker script URL and site id; unset = no analytics                                                                      |
+| `NEXT_PUBLIC_GTM_ID`                                          | unset                      | Google Tag Manager container id (`GTM-XXXXXXX`); unset = nothing from Google is loaded                                    |
+| `NEXT_PUBLIC_DONATE_URL`                                      | unset                      | payment link (hosted checkout) in English, and the fallback for the other languages                                       |
+| `NEXT_PUBLIC_DONATE_URL_PT` / `NEXT_PUBLIC_DONATE_URL_ES`     | unset                      | the same checkout in Portuguese / Spanish                                                                                 |
+| `NEXT_PUBLIC_API_URL`                                         | unset                      | GraphQL endpoint of `tinyworlds-api`: a URL or a same-origin path (`/api/graphql`)                                        |
+| `NEXT_PUBLIC_HOME_URL`                                        | `/`                        | where the front page is, for the "All cities" link inside a map                                                           |
+| `NEXT_PUBLIC_WORLDS_BASE`                                     | empty                      | what the worlds' folders hang from on the front page (`""` → `/tinynyc/`)                                                 |
+| `NEXT_PUBLIC_CARDS_BASE`                                      | unset                      | **dev only**: take the front page's card pictures from one folder (`/og`)                                                 |
+| `NEXT_PUBLIC_HERO_FILMS`                                      | what is in `public/loops/` | the worlds the front page's hero shows, comma-separated; set by `next.config.ts`, by hand only to try the hero with fewer |
 
 Production builds:
 
@@ -90,7 +91,8 @@ before `next build` (the export would copy every tile into `out/`); without it t
 "map didn't load" dialog. `public/og/<world>.jpg` (1200×630 share cards, made by the pipeline) is
 committed and must stay; so are `public/og/tinyworlds.jpg` (the front page's own share card, the
 pipeline's `home-card`), `public/loops/` (the front page's moving pictures, made by
-`tinyworlds-videos`: `<world>.mp4`, `hero.mp4`, `hero.jpg`) and `public/email/`: the pictures
+`tinyworlds-videos`: `<world>.mp4`, and a hero film and its still per world, `hero.{mp4,jpg}`
+and `hero-<world>.{mp4,jpg}`) and `public/email/`: the pictures
 the API's mails show (`tinyworlds-api/CLAUDE.md`, Mails), loaded from the site's root, so the
 front page's build serves them. `wordmark.png` (Tiny5's letters, "tiny" paper white and
 "worlds" taxi yellow, on the mail band's dark, baked in so a client that recolours the band
@@ -194,15 +196,40 @@ src/
 - **The front page's pictures move** (`components/home/moving-picture.tsx`). Each card plays
   its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
   the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
-  to it, so the still hands over to the film unseen and the film loops unseen. The hero is the
-  same idea at the page's width: `/loops/hero.jpg` and `hero.mp4`, a lap over the tip of
-  Manhattan, with the page's sign (wordmark, tagline, pitch, "Explore New York") over its lower
-  left; below `lg` the sign hangs from the picture's bottom edge instead of covering it.
+  to it, so the still hands over to the film unseen and the film loops unseen.
   A loop is fetched only when its picture is on screen (`preload="none"`, an
-  `IntersectionObserver`), plays while it stays there, and is never fetched under
-  `prefers-reduced-motion` or `Save-Data`; if it is missing or cannot play, the still stays.
-  The loops are the front page's own files (`LOOPS_BASE` in `site.ts`), unlike the share cards:
-  `deploy/deploy.sh home` is all they need, and a world's folder does not carry them.
+  `IntersectionObserver`) and is the one being shown (`active`), plays while it stays there,
+  and is never fetched under `prefers-reduced-motion` or `Save-Data`; if it is missing or
+  cannot play, the still stays. The loops are the front page's own files (`LOOPS_BASE` in
+  `site.ts`), unlike the share cards: `deploy/deploy.sh home` is all they need, and a world's
+  folder does not carry them.
+- **The hero goes round the worlds** (`components/home/hero-carousel.tsx`): a slide for every
+  world that has a hero film (`heroSlides`: the registry's order, New York first), the same
+  idea at the page's width. A film is a slow lap with no sign on it, `/loops/hero.{mp4,jpg}`
+  for New York and `/loops/hero-<id>.{mp4,jpg}` for the others (`worldHero`), framed by
+  `tinyworlds-videos` to keep what is worth seeing clear of the page's sign. Which worlds
+  have one is what the build finds in `public/loops/` (`next.config.ts` →
+  `NEXT_PUBLIC_HERO_FILMS` → `HERO_FILMS`), so a world added without a film is simply not in
+  the hero, and with one film listed the hero is a picture and a sign, with no controls.
+  - **The sign** stays over the picture's lower left (below `lg` it hangs from the picture's
+    bottom edge instead): the wordmark, the tagline, the pitch, then the world being shown
+    (its wordmark in its colour, its city on one line, so the sign is as tall whatever the
+    world), "Explore" (the link to that world, named "Explore {city}") and, where donations
+    are taken, "Fund the next city" (`#ranking`). The buttons share a row from `sm` and stack
+    below it: they never wrap.
+  - **It moves on by itself** every `SLIDE_MS` (8 s), the new picture fading in over the old
+    (`FADE_MS`, the `hero-in` keyframes), only while `mayAdvance` (`lib/home.ts`) says so:
+    more than one slide, the hero on screen, the page in view, no pointer on it, no keyboard
+    focus in it, and never under `prefers-reduced-motion` or `Save-Data` (then it stands
+    still and only the stills are fetched). Choosing a slide restarts the wait.
+  - **Choosing**: a pill at the picture's lower right from `lg`, at its top right below (where
+    the sign would cover it): previous, a dot per world (the current one in that world's
+    colour; a count instead on a phone, where dots are too small to press), next; the arrow
+    keys work inside it. A slide chosen by hand is said to a screen reader (`aria-live`), one
+    the timer brought is not.
+  - **What is fetched**: the first still at once; each other still a second before its turn
+    (`AHEAD_MS`); a film only when its slide is the one showing. Only the current slide and
+    the one it is fading in over are in the page.
 - **Each card says how visited its world is** (with an API): "41,203 visits" under the card's
   text, and "● 23 exploring now" beside it once more than ten (`LIVE_SHOWN_ABOVE`) have that
   map open (`visitsLine` in `lib/visits.ts`, numbers in the visitor's way of writing them).
