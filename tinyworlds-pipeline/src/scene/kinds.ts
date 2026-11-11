@@ -59,8 +59,10 @@ export const enum G {
   Cobble = 42,
   DirtRoad = 43,
   Meadow = 44,
+  /** Red sandstone: the fins of the Garden of the Gods. */
+  RedRock = 45,
 }
-export const G_COUNT = 45;
+export const G_COUNT = 46;
 
 /**
  * Paint order by kind: a higher rank is painted over a lower one. For the original kinds it is
@@ -73,6 +75,7 @@ PAINT_RANK[G.Snow] = G.Land + 0.5; // a wash under everything that grows or is b
 PAINT_RANK[G.Meadow] = G.Land + 0.6; // open grass country, likewise
 PAINT_RANK[G.DirtRoad] = G.Pier + 0.5; // the humblest of the ways
 PAINT_RANK[G.Cobble] = G.Service + 0.5; // a paved street, over lanes of dirt
+PAINT_RANK[G.RedRock] = G.Rock + 0.5; // rock, of another colour
 /** Ways (roads, paths, rails) start at this rank. */
 export const WAY_RANK = G.Pier + 0.5;
 

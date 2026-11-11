@@ -386,7 +386,7 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
   )) {
     const lon = numberOf(row[1]);
     const lat = numberOf(row[2]);
-    if (!onMap(lon, lat)) continue;
+    if (!onMap(lon, lat) || named.skip?.test(text(row[0]))) continue;
     const height = numberOf(row[3]);
     const cls = text(row[4]);
     add({

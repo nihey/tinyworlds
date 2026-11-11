@@ -118,6 +118,7 @@ function landKind(subtype: string | null, cls: string | null): number {
     case "sand":
       return G.Sand;
     case "rock":
+      if (cls && CITY.ground.land?.[cls] !== undefined) return CITY.ground.land[cls];
       return cls === "bare_rock" || cls === "rock" || cls === "shingle" || cls === "scree" ? G.Rock : -1;
     case "grass":
       return G.Lawn;
@@ -848,8 +849,17 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     attrs: VolumeAttrs,
   ): { h: number; style: Style } | null => {
     const fixed = attrs.name && !attrs.keepHeight ? CITY.heightFixes?.[attrs.name.toLowerCase()] : undefined;
+    const mapped = height && height > 0 ? height : null;
+    // where the mapped heights are estimates that read tall buildings low, the floors, when taller
+    const byFloors =
+      CITY.heights.floorsFirst && attrs.floors && attrs.floors > 0
+        ? attrs.floors * CITY.heights.storey + 1
+        : null;
     const h =
-      fixed ?? (height && height > 0 ? height : fallbackHeight(attrs.cls, attrs.floors ?? null, area, seed));
+      fixed ??
+      (mapped !== null
+        ? Math.max(mapped, byFloors ?? 0)
+        : fallbackHeight(attrs.cls, attrs.floors ?? null, area, seed));
     if (h - base < 0.4) return null;
     const style = chooseStyle(
       {

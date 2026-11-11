@@ -8,6 +8,8 @@ const { DuckDBInstance } = require("@duckdb/node-api");
 const db = await DuckDBInstance.create(":memory:");
 const c = await db.connect();
 await c.run("LOAD spatial;");
+// lon, lat order for the spheroid functions (ST_Area_Spheroid, ST_Distance_Spheroid)
+await c.run("SET geometry_always_xy = true;");
 const sql = sqlIn.replace(/\{raw:(\w+)\}/g, (_, city) => path.join(pipe, "data", city, "raw"));
 const r = await c.runAndReadAll(sql);
 console.log(r.columnNames().join("\t"));

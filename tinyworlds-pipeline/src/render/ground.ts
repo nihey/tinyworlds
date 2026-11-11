@@ -27,6 +27,7 @@ const NATURAL_BANK = new Set<number>([
   G.Rock,
   G.Snow,
   G.Meadow,
+  G.RedRock,
 ]);
 
 const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
@@ -134,6 +135,10 @@ export function groundColor(ctx: GroundContext, kind: number, x: number, y: numb
       if ((h & 7) === 0) return idx(R.rock, S_HALF);
       if ((h & 31) === 1) return idx(R.rock, S_HIGH);
       return idx(R.rock, S_LIT);
+    case G.RedRock:
+      if ((h & 7) === 0) return idx(R.redStone, S_HALF);
+      if ((h & 31) === 1) return idx(R.redStone, S_HIGH);
+      return idx(R.redStone, S_LIT);
     case G.Cemetery:
       // headstones in rows along the street grid
       if ((a & 7) === 0 && (b & 15) === 0) return idx(R.greyStone, S_HIGH);
