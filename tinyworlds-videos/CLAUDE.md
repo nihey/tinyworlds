@@ -14,7 +14,7 @@ Four HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`: each an `i
 ```bash
 npm run plates [-- tinynyc …]   # cut the map plates and wordmark sheets from the tiles → */assets/plates/, */batch/
 npm run loops [-- tinylax …]    # render the card loops (every one, or the worlds named) → ../tinyworlds-frontend/public/loops/<world>.mp4 (committed)
-npm run flyovers [-- hero|cities]   # the hero → …/public/loops/hero.{mp4,jpg} (committed); city flyovers → out/flyovers/
+npm run flyovers [-- hero [world …]|cities]   # the heroes → …/public/loops/hero.{mp4,jpg}, hero-<world>.{mp4,jpg} (committed); city flyovers → out/flyovers/
 npm run takes -- main [--until 8.4]   # film the New York map for the film (VIEWER_URL, a dev server of the viewer)
 npm run takes -- page           # capture the front page for the film (HOME_URL, a dev server of the front page)
 ELEVENLABS_API_KEY=… npm run sound [-- --for film|westeros]   # compose a NEW music bed → <film>/assets/music/bed.mp3 (replaces the committed one)
@@ -49,11 +49,11 @@ scripts/
 ├── lib/boroughs.ts  # a world's large divisions as districts: each one its neighbourhoods merged
 ├── lib/site.ts      # the site's address, from SITE_URL or the gitignored deploy/.env: never from a tracked file
 ├── lib/run.ts       # run a command; encode a render for the web
-├── worlds.ts        # per world: which way its card loop sets off, its flyover's framing; the hero's
+├── worlds.ts        # per world: which way its card loop sets off, its flyover's framing, its hero's
 ├── plates.ts loops.ts flyovers.ts takes.ts sound.ts film.ts context.ts probe.ts
 ├── westeros.ts      # the tour of tinywesteros: its stops, its take, its render
 loop/                # 1200 × 630, 10 s: a card loop (variables: plate, sign, dir)
-flyover/             # 1920 × 1080, 12 s: a city flyover, and the hero (variables: plate, sign, a, b)
+flyover/             # 1920 × 1080, 12 s: a city flyover, and a world's hero (variables: plate, sign, a, b)
 film/                # 1920 × 1080, 31 s: the showcase film (SPEC.md, REVIEW.md)
 westeros/            # 1920 × 1080, 35 s: the tour of tinywesteros (SPEC.md, REVIEW.md)
 ```
@@ -75,11 +75,23 @@ same code as the share card's.
   keeps a slow move over pixel art from shimmering.
 - **A flyover** laps round a framing of its own (`worlds.ts`), with a larger sign that carries
   the site's address under the wordmark when one is known. Only real cities have one: the
-  fan-made places stay out of what is made to promote the project. **The hero** is New York's
-  flyover with no sign, on a smaller lap, reframed to keep Manhattan clear of the page's sign.
+  fan-made places stay out of what is made to promote the project.
+- **A hero for every world** (`HEROES` in `worlds.ts`): the front page's hero goes round the
+  worlds, so each has a film of its own for it. A flyover with no sign, on a smaller lap
+  (`a`, `b`), from as far as its `shrink` says and moved by `dx`, `dy` (px of the picture) so
+  that what is worth seeing stands clear of the page's sign: of the 2 : 1 the page shows of
+  it, the sign covers from 2 % to 46 % across and 32 % to 96 % down. New York's is called
+  `hero` (the showcase film's take copies it by that name), the others `hero-<world>`
+  (`heroName`). The fan-made places have one too: these are the front page's own pictures, on
+  a page that already lists those worlds, and they are shared nowhere, so the rule above
+  still holds. **Look at each framing before rendering**: `npm run plates -- <world>` cuts
+  `flyover/assets/plates/<name>.png`, whose middle is the picture. Then
+  `npm run flyovers -- hero <world>` renders that world's alone (1280 × 720, with its first
+  frame as the still).
 - A new world: `npm run plates -- <id> && npm run loops -- <id>` (naming it renders its loop
-  alone; the others' committed loops stay as they are). To give it a flyover, add its framing
-  to `worlds.ts`.
+  alone; the others' committed loops stay as they are). Give it a hero framing in `HEROES`
+  and `npm run flyovers -- hero <id>`; without one it is simply not in the front page's hero.
+  To give it a flyover to share, add that framing to `SHOTS`.
 - The one lint warning these projects keep (`nested_structure_needs_subcomposition`) is on
   purpose: a batch render sets only the root's variables, so the plate lives in the root.
 
