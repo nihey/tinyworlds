@@ -107,6 +107,7 @@ export function MapApp() {
           marks,
           manifest,
           tileUrl: (z, tx, ty) => dataUrl(`tiles/${z}/${tx}_${ty}.webp`, manifest.build),
+          fileUrl: (path) => dataUrl(path, manifest.build),
           reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           start: parseHash(window.location.hash) ?? undefined,
         });

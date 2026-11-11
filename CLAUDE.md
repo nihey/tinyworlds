@@ -108,6 +108,7 @@ data/<world>/
 ├── hoods.json               # outlines of the city's areas (may be empty)
 ├── life.json                # ferry routes and flights for the animated layer
 ├── sights.json              # buildings that light up under the pointer (worlds with sights)
+├── sights/<hash>.webp       # each of them drawn on its own, nothing in front of it
 └── sights.<locale>.json     # their Wikipedia openings: en-US, pt-BR, es-ES
 ```
 
@@ -211,13 +212,18 @@ outlined as the map draws it, and what Wikipedia says of them. Only for a world 
 //                          // it is screen geometry, not geodata (the one exception to lon/lat)
 //   front: number;         // largest ground y of its footprints: the nearer the viewer, the larger
 //   anchor: [number, number];  // where its sign hangs (the outline's top), map px
+//   sprite?: { src: string; x: number; y: number; w: number; h: number };
+//                          // its picture: "sights/<hash>.webp", lossless, transparent but for
+//                          // the structure, drawn as the tiles draw it (shadows and all) with
+//                          // nothing in front of it; x, y, w, h place it in map px
 // }[] }
 // sights.<locale>.json: { [id]: { title: string; url: string; text: string; lang: string } }
 //   text: the article's opening (≤ 220 characters); lang: the article's own language, "en" where
 //   the visitor's has none
 ```
 
-Optional for the viewer: without them nothing lights up.
+Optional for the viewer: without them nothing lights up; without a sight's picture it still
+lights up, as far as the map shows it.
 
 ## API contract (viewer ↔ API)
 

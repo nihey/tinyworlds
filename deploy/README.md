@@ -66,7 +66,7 @@ deploy/deploy.sh check               # only the checks `all` starts with
 
 deploy/deploy.sh tinynyc             # after re-rendering: site + data
 deploy/deploy.sh tinyrao --no-data   # one world's code
-deploy/deploy.sh tinynyc --index     # site + places/hoods/life (and sights) JSON, not the tiles
+deploy/deploy.sh tinynyc --index     # site + places/hoods/life (and sights, pictures too), not the tiles
 deploy/deploy.sh tinyrao --data      # data only, no build
 deploy/deploy.sh home                # the front page
 ```

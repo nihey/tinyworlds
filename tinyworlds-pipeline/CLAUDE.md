@@ -26,7 +26,7 @@ npm run cli -- --city tinyrao scene             # raw data → data/<city>/scene
 npm run cli -- --city tinyrao render            # scene → ../tinyworlds-frontend/public/data/<city>
 npm run cli -- render --around -73.9857,40.7484,1500   # only redraw near a point
 npm run cli -- render --pyramid-only                    # rebuild the coarse levels from level 0
-npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json (+ sights.json)
+npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json (+ sights.json, sights/)
 npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
@@ -282,6 +282,14 @@ one or more search entries point at.
   dome (`Roof.Pyramid`, `Roof.Dome`) narrows towards the volume's centre as the renderer draws it
   (`piecesOf`: the walls to `top`, then ten steps of the roof, each as wide as the roof at its
   foot), so the Chrysler's outline follows its spire, not a box round it.
+- **The picture** (`sprites.ts`, `sights/<hash>.webp`): each sight drawn again on its own, so
+  the viewer can show all of it when it lights up, even where a nearer tower hides it in the
+  tiles. It is the tile renderer's own drawing of the outline's box with only the sight's volumes
+  (`ChunkJob.alone`: everything else transparent) and every volume that shades them
+  (`binVolumes`, fed by a `VolumeGrid` so a small box need not look at all 1.4 million), so its
+  windows and shadows are the tiles'. Trees, cables and the ground are left out: a tree standing
+  in front would leave a hole. A picture over `MAX_SPRITE_PX` is not made. New York's 1,219 come
+  to 3 MB in about 8 s; `index` empties `sights/` and draws them all again.
 - **The scene keeps the owners** of what is not a building (`owners.json` beside it): a bridge's
   decks, piers, towers and cantilever steel under its roads' name, each statue's pieces.
 - **Wikipedia** (`wiki`): the English article whose title matches the sight's name (normalised:

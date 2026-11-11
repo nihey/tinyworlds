@@ -391,6 +391,13 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
   building, so the sign takes the pointer and its link can be reached; a click elsewhere, the
   sign's close button or Esc lets it go; a second click on it too. Double-tap zoom is unchanged.
   The pinned sign is a labelled group, not a dialog, so the map's keys keep working.
+- **The whole building.** The tiles are flat, so a lower tower in front still hides the lit one;
+  each sight's picture (`sprite` in `sights.json`: the pipeline draws it alone, nothing in front)
+  goes over the tiles on the tiles canvas, under the dim's cut-out, placed and smoothed exactly
+  like a tile so it lines up and takes the blur and the dusk like the map. It is fetched the
+  first time the sight lights up (`fileUrl`), fades in with the spotlight (or as it arrives),
+  and the last few stay, up to `PICTURE_BUDGET` px (`picturesToDrop`). A sight without one, or
+  whose picture fails, lights up as before.
 - **Out of view, out of the spotlight.** Once the view leaves a lit building wholly behind (a
   drag, the wheel, the keys, a flight from the search or the minimap), it lets go, pinned or
   hovered (`keepInView`, checked each frame against the outline's box, `sightInView`): the map

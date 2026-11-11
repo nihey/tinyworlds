@@ -1,6 +1,7 @@
 import type { Scene } from "../render/scene.js";
 import type { PlaceType } from "./build.js";
 import { silhouette } from "./silhouette.js";
+import type { SpriteRef } from "./sprites.js";
 import { piecesOf } from "./structures.js";
 
 /**
@@ -104,6 +105,8 @@ export interface SightRecord {
   front: number;
   /** where its sign hangs: the silhouette's topmost point */
   anchor: [number, number];
+  /** its picture with nothing in front of it, where one was drawn */
+  sprite?: SpriteRef;
 }
 
 const round5 = (v: number): number => Math.round(v * 1e5) / 1e5;
