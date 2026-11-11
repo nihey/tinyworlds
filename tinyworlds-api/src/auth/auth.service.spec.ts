@@ -10,9 +10,12 @@ import { FakePrisma } from '../../test/fake-prisma.js';
 import type { Env } from '../config/env.js';
 import {
   AuthService,
+  CODE_TRIES,
+  hashCode,
   hashToken,
   LINK_EVERY_MS,
   LINK_MINUTES,
+  normalizeCode,
   SESSION_DAYS,
 } from './auth.service.js';
 
@@ -26,6 +29,7 @@ afterEach(() => vi.useRealTimers());
 function setup(admins: string[] = [ADMIN]) {
   const env = {
     ADMIN_EMAILS: admins,
+    JWT_SECRET: SECRET,
     ALLOWED_ORIGINS: ['https://example.com', 'http://localhost:3000'],
   };
   const prisma = new FakePrisma();
@@ -72,7 +76,9 @@ describe('AuthService.sendLink', () => {
   it('writes the mail in the language asked for', async () => {
     const { service, mailer } = setup();
     await service.sendLink(ADMIN, PAGE, 'pt-BR');
-    expect(mailer.sent[0].subject).toBe('Seu link de acesso ao tinyworlds');
+    expect(mailer.sent[0].subject).toMatch(
+      /^Seu código do tinyworlds: \d{3} \d{3}$/,
+    );
     expect(mailer.sent[0].text).toContain(`${LINK_MINUTES} minutos`);
   });
 
@@ -198,6 +204,100 @@ describe('AuthService.verify', () => {
     await expect(service.verify(mailer.token())).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+});
+
+describe('normalizeCode', () => {
+  it('takes a code however it is pasted', () => {
+    for (const raw of ['482 913', '482-913', ' 482913 '])
+      expect(normalizeCode(raw)).toBe('482913');
+    expect(normalizeCode('48291')).toBeNull();
+    expect(normalizeCode('4829134')).toBeNull();
+  });
+});
+
+describe('AuthService.verifyCode', () => {
+  const codeOf = (mailer: FakeMailer) => mailer.code();
+  const wrongOf = (code: string) => (code === '000000' ? '111111' : '000000');
+
+  it('mails a code with the link, and keeps only its HMAC', async () => {
+    const { service, mailer, prisma } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    expect(mailer.sent[0].subject).toMatch(/\d{3} \d{3}/);
+    const code = codeOf(mailer);
+    expect(prisma.links[0].codeHash).not.toBe(code);
+    expect(prisma.links[0].codeHash).toBe(
+      hashCode(SECRET, hashToken(mailer.token()), code),
+    );
+    expect(JSON.stringify(prisma.links)).not.toContain(code);
+  });
+
+  it('trades the right code for a session, once', async () => {
+    const { service, mailer, prisma } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const code = codeOf(mailer);
+    const session = await service.verifyCode('Admin@Example.com', code);
+    expect(session.admin).toEqual({ id: prisma.admins[0].id, email: ADMIN });
+    await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('spends the link after five wrong codes, even for the right one after', async () => {
+    const { service, mailer, prisma } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const code = codeOf(mailer);
+    for (let i = 0; i < CODE_TRIES; i++)
+      await expect(
+        service.verifyCode(ADMIN, wrongOf(code)),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(prisma.links[0].usedAt).toBeInstanceOf(Date);
+    await expect(service.verifyCode(ADMIN, code)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    await expect(service.verify(mailer.token())).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('a code spends the link, and the link spends the code', async () => {
+    const first = setup();
+    await first.service.sendLink(ADMIN, PAGE, 'en-US');
+    await first.service.verifyCode(ADMIN, codeOf(first.mailer));
+    await expect(
+      first.service.verify(first.mailer.token()),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    const second = setup();
+    await second.service.sendLink(ADMIN, PAGE, 'en-US');
+    await second.service.verify(second.mailer.token());
+    await expect(
+      second.service.verifyCode(ADMIN, codeOf(second.mailer)),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('refuses a code for an address that is not an admin, the same way', async () => {
+    const { service, mailer } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    const code = codeOf(mailer);
+    const error = await service
+      .verifyCode('someone@example.com', code)
+      .catch((e: unknown) => e);
+    const bad = await service
+      .verifyCode(ADMIN, wrongOf(code))
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnauthorizedException);
+    expect((error as Error).message).toBe((bad as Error).message);
+  });
+
+  it('refuses a code past its time', async () => {
+    vi.useFakeTimers();
+    const { service, mailer } = setup();
+    await service.sendLink(ADMIN, PAGE, 'en-US');
+    vi.advanceTimersByTime(LINK_MINUTES * 60_000 + 1);
+    await expect(
+      service.verifyCode(ADMIN, codeOf(mailer)),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });
 

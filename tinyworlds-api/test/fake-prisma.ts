@@ -53,6 +53,8 @@ export interface MagicLinkRow {
   id: string;
   adminId: string;
   tokenHash: string;
+  codeHash: string;
+  attempts: number;
   expiresAt: Date;
   usedAt: Date | null;
   createdAt: Date;
@@ -270,8 +272,14 @@ export class FakePrisma {
       }
       return Promise.resolve({ ...row });
     },
-    findUnique: (args: { where: { id: string } }): Promise<AdminRow | null> => {
-      const row = this.admins.find((a) => a.id === args.where.id);
+    findUnique: (args: {
+      where: { id?: string; email?: string };
+    }): Promise<AdminRow | null> => {
+      const row = this.admins.find((a) =>
+        args.where.id !== undefined
+          ? a.id === args.where.id
+          : a.email === args.where.email,
+      );
       return Promise.resolve(row ? { ...row } : null);
     },
     update: (args: {
@@ -302,21 +310,43 @@ export class FakePrisma {
 
   magicLink = {
     create: (args: {
-      data: { adminId: string; tokenHash: string; expiresAt: Date };
+      data: {
+        adminId: string;
+        tokenHash: string;
+        codeHash: string;
+        expiresAt: Date;
+      };
     }): Promise<MagicLinkRow> => {
       if (this.links.some((l) => l.tokenHash === args.data.tokenHash))
         throw unique('token_hash');
       const row: MagicLinkRow = {
         id: randomUUID(),
         usedAt: null,
+        attempts: 0,
         createdAt: new Date(),
         ...args.data,
       };
       this.links.push(row);
       return Promise.resolve({ ...row });
     },
-    findFirst: (args: { where: LinkWhere }): Promise<MagicLinkRow | null> =>
-      Promise.resolve(this.linksWhere(args.where)[0] ?? null),
+    findFirst: (args: {
+      where: LinkWhere;
+      orderBy?: { createdAt: 'desc' };
+    }): Promise<MagicLinkRow | null> => {
+      const found = this.linksWhere(args.where);
+      if (args.orderBy)
+        found.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return Promise.resolve(found[0] ?? null);
+    },
+    update: (args: {
+      where: { id: string };
+      data: { attempts: { increment: number } };
+    }): Promise<MagicLinkRow> => {
+      const link = this.links.find((l) => l.id === args.where.id);
+      if (!link) throw new Error('no such link');
+      link.attempts += args.data.attempts.increment;
+      return Promise.resolve({ ...link });
+    },
     findUnique: (args: {
       where: { tokenHash: string };
     }): Promise<(MagicLinkRow & { admin: AdminRow }) | null> => {
