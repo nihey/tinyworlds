@@ -77,6 +77,7 @@ function WorldGrid({
   locale,
   t,
   onBenefactors,
+  benefactorWorlds,
 }: {
   id: string;
   heading: string;
@@ -85,8 +86,9 @@ function WorldGrid({
   columns: number;
   locale: Locale;
   t: Strings;
-  /** absent for places that only exist in stories, and when there is no API: no benefactors to show */
-  onBenefactors?: (world: string) => void;
+  onBenefactors: (world: string) => void;
+  /** the worlds the API knows a city for: only their cards offer the benefactors */
+  benefactorWorlds: ReadonlySet<string>;
 }) {
   return (
     <section aria-labelledby={id}>
@@ -122,7 +124,7 @@ function WorldGrid({
                   />
                 </div>
               </a>
-              {onBenefactors && !world.fictional && (
+              {benefactorWorlds.has(world.id) && (
                 <button
                   type="button"
                   onClick={() => onBenefactors(world.id)}
@@ -218,7 +220,12 @@ export function Landing() {
   // null: closed; otherwise open, with the city it was opened for (or none)
   const [donate, setDonate] = useState<{ city: string | null } | null>(null);
   // the city whose benefactors are shown, if any
-  const [benefactors, setBenefactors] = useState<CityRef | null>(null);
+  // `by` stays what it was when the sign closes, so the fading sign does not change or refetch
+  const [benefactors, setBenefactors] = useState<{ open: boolean; by: CityRef }>({
+    open: false,
+    by: { slug: "" },
+  });
+  const openBenefactors = (by: CityRef) => setBenefactors({ open: true, by });
   const [showAll, setShowAll] = useState(false);
   const milestones = useMilestones();
   const withList = API_URL !== "" && milestones.state !== "failed";
@@ -230,8 +237,13 @@ export function Landing() {
   const imagined = Object.values(WORLDS).filter((world) => world.fictional);
   const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
-  // the benefactors need the API; a world's card offers them only with one
+  // the benefactors need the API; a world's card offers them once the list says it has a city for it
   const showBenefactors = API_URL !== "";
+  const benefactorWorlds = new Set(
+    milestones.state === "ready"
+      ? milestones.cities.flatMap((city) => (city.worldId ? [city.worldId] : []))
+      : [],
+  );
   // the world the hero's picture shows, and its button leads into
   const lead = WORLDS[HERO.world];
   const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
@@ -274,7 +286,8 @@ export function Landing() {
         columns={columns}
         locale={locale}
         t={t}
-        onBenefactors={showBenefactors ? (world) => setBenefactors({ world }) : undefined}
+        onBenefactors={(world) => openBenefactors({ world })}
+        benefactorWorlds={benefactorWorlds}
       />
       {imagined.length > 0 && (
         <WorldGrid
@@ -284,6 +297,8 @@ export function Landing() {
           columns={columns}
           locale={locale}
           t={t}
+          onBenefactors={(world) => openBenefactors({ world })}
+          benefactorWorlds={benefactorWorlds}
         />
       )}
 
@@ -321,7 +336,7 @@ export function Landing() {
                         locale={locale}
                         t={t}
                         onDonate={openFor}
-                        onBenefactors={(slug) => setBenefactors({ slug })}
+                        onBenefactors={(slug) => openBenefactors({ slug })}
                       />
                     </li>
                   ))}
@@ -345,7 +360,7 @@ export function Landing() {
                         locale={locale}
                         t={t}
                         onDonate={openFor}
-                        onBenefactors={(slug) => setBenefactors({ slug })}
+                        onBenefactors={(slug) => openBenefactors({ slug })}
                       />
                     </li>
                   ))}
@@ -425,12 +440,12 @@ export function Landing() {
 
       {showBenefactors && (
         <BenefactorsSign
-          open={benefactors !== null}
-          onOpenChange={(open) => !open && setBenefactors(null)}
-          by={benefactors ?? { slug: "" }}
+          open={benefactors.open}
+          onOpenChange={(open) => !open && setBenefactors((b) => ({ ...b, open: false }))}
+          by={benefactors.by}
           onBecome={(city) => {
             // one sign at a time: the donate sign takes the benefactors' place
-            setBenefactors(null);
+            setBenefactors((b) => ({ ...b, open: false }));
             openFor(city);
           }}
         />
