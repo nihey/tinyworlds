@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ANSWER, answerRequest, parseTally, sendAnswer } from "../quiz-api";
 
 const VISIT = "0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10";
-const input = { world: "tinynyc", sightId: "b1", choice: "b2", locale: "pt-BR" as const };
+const input = {
+  world: "tinynyc",
+  sightId: "b1",
+  choice: "b2",
+  choices: ["b3", "b1", "b2", "b4"],
+  locale: "pt-BR" as const,
+};
 const tally = { answers: 2, picks: [{ choice: "b2", count: 2 }] };
 
 /** A fetch that answers this body with this status, and remembers what it was asked. */
@@ -23,6 +29,15 @@ describe("answerRequest", () => {
       query: ANSWER,
       variables: { input: { ...input, visitId: VISIT } },
     });
+  });
+
+  it("says which four names were offered, so only those are counted", () => {
+    expect(answerRequest({ ...input, visitId: VISIT }).variables.input.choices).toEqual([
+      "b3",
+      "b1",
+      "b2",
+      "b4",
+    ]);
   });
 
   it("leaves the visit out when it is not counted", () => {

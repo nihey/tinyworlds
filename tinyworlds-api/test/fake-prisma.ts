@@ -401,18 +401,35 @@ export class FakePrisma {
       }
       return Promise.resolve({ count });
     },
-    /** Only the shape the quiz asks for: by choice, counted, within one world and building. */
+    count: (args: {
+      where: { world: string; sightId: string };
+    }): Promise<number> =>
+      Promise.resolve(
+        this.quizAnswers.filter(
+          (a) =>
+            a.world === args.where.world && a.sightId === args.where.sightId,
+        ).length,
+      ),
+    /** Only the shapes the quiz asks for: by choice, counted, within one building; the most picked first when taking some. */
     groupBy: (args: {
       by: ['choice'];
-      where: { world: string; sightId: string };
+      where: { world: string; sightId: string; choice?: { in: string[] } };
       _count: { _all: true };
+      take?: number;
     }): Promise<{ choice: string; _count: { _all: number } }[]> => {
       const counts = new Map<string, number>();
       for (const a of this.quizAnswers)
-        if (a.world === args.where.world && a.sightId === args.where.sightId)
+        if (
+          a.world === args.where.world &&
+          a.sightId === args.where.sightId &&
+          (!args.where.choice || args.where.choice.in.includes(a.choice))
+        )
           counts.set(a.choice, (counts.get(a.choice) ?? 0) + 1);
+      const rows = [...counts]
+        .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
+        .map(([choice, n]) => ({ choice, _count: { _all: n } }));
       return Promise.resolve(
-        [...counts].map(([choice, n]) => ({ choice, _count: { _all: n } })),
+        args.take === undefined ? rows : rows.slice(0, args.take),
       );
     },
   };

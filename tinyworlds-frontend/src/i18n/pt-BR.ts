@@ -344,7 +344,7 @@ export const ptBR: Strings = {
   quiz: {
     invite: "Adivinhe o prédio: você sabe o nome do que está vendo?",
     title: "Adivinhe o prédio",
-    score: "rodada {round} · {right} certas",
+    score: { one: "rodada {round} · {right} certa", other: "rodada {round} · {right} certas" },
     close: "Parar de jogar",
     ask: {
       building: "Que prédio é este?",

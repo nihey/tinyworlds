@@ -344,7 +344,7 @@ export const esES: Strings = {
   quiz: {
     invite: "Adivina el edificio: ¿sabes el nombre de lo que ves?",
     title: "Adivina el edificio",
-    score: "ronda {round} · {right} aciertos",
+    score: { one: "ronda {round} · {right} acierto", other: "ronda {round} · {right} aciertos" },
     close: "Dejar de jugar",
     ask: {
       building: "¿Qué edificio es este?",

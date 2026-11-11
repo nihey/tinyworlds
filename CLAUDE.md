@@ -290,7 +290,7 @@ type DonationCheckout { url: String! }
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
 input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
-input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  locale: String }
+input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  locale: String }
 type QuizPick { choice: String!  count: Int! }
 type QuizTally { answers: Int!  picks: [QuizPick!]! }       # picks: most picked first
 type Mutation {
@@ -313,7 +313,9 @@ type Mutation {
 (from US$1). `visitId` is the tab's visit (a UUID from session storage); `world` is a world's id
 or `"home"`. In `answerQuiz`, `sightId` is the building asked about and `choice` the sight id
 picked (right when they are equal); a visit's answer to a building is kept once, and without
-`visitId` none is kept but the tally is still answered. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
+`visitId` none is kept but the tally is still answered. `choices` are the names the page offered
+(up to four, the building and the pick among them): `picks` then counts only those, else the 20
+most picked; `answers` is everyone who answered the building. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
 city's benefactors for this gift; without it the gift is counted and not listed. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
 `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
 `POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered

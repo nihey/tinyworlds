@@ -420,8 +420,8 @@ export interface Strings {
     invite: string;
     /** the card's header, in the pixel face */
     title: string;
-    /** "round {round} · {right} right" */
-    score: string;
+    /** "round {round} · {right} right": `one` for one right answer, `other` for none or several */
+    score: { one: string; other: string };
     /** aria-label of the card's close button */
     close: string;
     /** the question, by what the building is */

@@ -507,7 +507,8 @@ button or Esc ends it with the map where it was.
   1–4 pick, Enter or N go on (Enter only when no button or link has the focus: Stop, the close
   button and the article's link keep theirs), Esc stops; a key held down repeats nothing.
 - **The answer** goes out with plain `fetch` (`sendAnswer` in `lib/quiz-api.ts`: the visit from
-  `currentVisit()`, so admins and programs are not counted), never Apollo. No API, an error or
+  `currentVisit()`, so admins and programs are not counted, and the four names offered, which
+  are all the API counts), never Apollo. No API, an error or
   no answer within 5 s is no tally: the round ends without the shares (`quizReducer` keeps a
   tally only for the building it was asked for). Analytics hook: `quiz_start`.
 

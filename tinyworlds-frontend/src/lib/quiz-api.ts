@@ -17,13 +17,15 @@ export interface AnswerInput {
   world: string;
   sightId: string;
   choice: string;
+  /** the four names offered: the API counts only these, so what comes back stays small */
+  choices: string[];
   locale: Locale;
 }
 
 /** The GraphQL request; a visit that is not counted (null) is left out, so nothing is kept. */
 export function answerRequest(input: AnswerInput & { visitId: string | null }): {
   query: string;
-  variables: { input: Record<string, string> };
+  variables: { input: Record<string, string | string[]> };
 } {
   const { visitId, ...rest } = input;
   return { query: ANSWER, variables: { input: visitId ? { ...rest, visitId } : { ...rest } } };

@@ -225,3 +225,14 @@ export function quizKey(
   if (phase === "answered" && (key === "n" || (e.key === "Enter" && !e.onControl))) return "next";
   return null;
 }
+
+/** The running score, "round 3 · 2 right", in the singular for one right answer. */
+export function quizScore(
+  words: { one: string; other: string },
+  round: number,
+  right: number,
+): string {
+  return (right === 1 ? words.one : words.other)
+    .replace("{round}", String(round))
+    .replace("{right}", String(right));
+}

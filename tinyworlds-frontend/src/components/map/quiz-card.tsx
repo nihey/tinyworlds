@@ -3,7 +3,7 @@
 import { ArrowRight, ArrowUpRight, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import { questionKind, tallyShares, type QuizState } from "@/lib/quiz";
+import { questionKind, quizScore, tallyShares, type QuizState } from "@/lib/quiz";
 import { cn } from "@/lib/utils";
 import type { Sight, SightText } from "@/map/sights";
 
@@ -55,9 +55,7 @@ export function QuizCard({ state, sights, article, onPick, onNext, onStop }: Qui
         </span>
         {playing && (
           <span className="ml-auto text-[12px] text-paper-dim tabular-nums">
-            {t.quiz.score
-              .replace("{round}", String(state.round))
-              .replace("{right}", String(state.right))}
+            {quizScore(t.quiz.score, state.round, state.right)}
           </span>
         )}
         <button

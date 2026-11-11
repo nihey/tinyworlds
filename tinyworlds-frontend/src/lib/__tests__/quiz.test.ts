@@ -8,6 +8,7 @@ import {
   questionKind,
   quizKey,
   quizReducer,
+  quizScore,
   roundView,
   savePlayed,
   sightBox,
@@ -312,5 +313,18 @@ describe("quizKey", () => {
     expect(quizKey("answered", key("Escape", { onControl: true }))).toBe("stop");
     expect(quizKey("off", key("Escape"))).toBeNull();
     expect(quizKey("off", key("a"))).toBeNull();
+  });
+});
+
+describe("quizScore", () => {
+  const words = {
+    one: "ronda {round} · {right} acierto",
+    other: "ronda {round} · {right} aciertos",
+  };
+
+  it("says one right answer in the singular, and none or several in the plural", () => {
+    expect(quizScore(words, 1, 1)).toBe("ronda 1 · 1 acierto");
+    expect(quizScore(words, 1, 0)).toBe("ronda 1 · 0 aciertos");
+    expect(quizScore(words, 3, 2)).toBe("ronda 3 · 2 aciertos");
   });
 });
