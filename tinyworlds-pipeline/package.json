@@ -24,6 +24,7 @@
     "@duckdb/node-api": "^2.0.0-r.1",
     "commander": "^15.1.0",
     "geotiff": "^3.0.5",
+    "polygon-clipping": "^0.15.7",
     "sharp": "^0.35.5"
   },
   "devDependencies": {
