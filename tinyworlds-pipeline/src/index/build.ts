@@ -340,7 +340,7 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
     const lon = numberOf(row[2]);
     const lat = numberOf(row[3]);
     const context = contextAt(lon, lat);
-    if (context !== null)
+    if (context !== null && !CITY.search.skip?.test(text(row[0])))
       add({ n: text(row[0]), t: "hood", lon, lat, b: context, r: text(row[1]) === "macrohood" ? 58 : 54 });
   }
 
@@ -361,15 +361,27 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
     add({ n: text(row[0]), t: "park", lon, lat, b: contextOf(lon, lat), r: Math.round(rank) });
   }
 
-  // ---- buildings with a name: the tall ones and the civic ones
+  // ---- buildings with a name: the tall ones and the civic ones (how tall, and which others, is the city's)
+  const named = CITY.search.namedBuildings ?? {};
+  const minHeight = named.minHeight ?? 110;
+  const namedClasses = [
+    "stadium",
+    "museum",
+    "train_station",
+    "cathedral",
+    "grandstand",
+    ...(named.classes ?? []),
+  ]
+    .map((c) => `'${c}'`)
+    .join(", ");
   for (const row of await rows(
     conn,
     `SELECT names."primary", ST_X(ST_Centroid(geometry)), ST_Y(ST_Centroid(geometry)),
             coalesce(height, num_floors * ${CITY.heights.storey}, 0), class, id
      FROM '${raw("building.parquet")}'
      WHERE names."primary" IS NOT NULL
-       AND (height >= 110 OR (height IS NULL AND num_floors >= 24)
-            OR class IN ('stadium', 'museum', 'train_station', 'cathedral', 'grandstand'))
+       AND (height >= ${minHeight} OR (height IS NULL AND num_floors >= ${Math.round(minHeight / 4.6)})
+            OR class IN (${namedClasses}))
      ORDER BY 4 DESC, id`,
   )) {
     const lon = numberOf(row[1]);
@@ -403,7 +415,7 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
     const lon = numberOf(row[2]);
     const lat = numberOf(row[3]);
     const context = onMap(lon, lat) ? contextAt(lon, lat) : null;
-    if (context === null) continue;
+    if (context === null || CITY.search.skip?.test(text(row[0]))) continue;
     const category = text(row[1]);
     add({
       n: text(row[0]),
@@ -535,6 +547,9 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
       path: simplify(points, 0.00008).flatMap(([lon, lat]) => [round5(lon), round5(lat)]),
     });
   }
+  // boats the data has no route for
+  for (const boat of CITY.boats ?? [])
+    ferries.push({ name: boat.name, path: boat.path.flatMap(([lon, lat]) => [round5(lon), round5(lat)]) });
   conn.closeSync();
 
   places.sort(comparePlaces);

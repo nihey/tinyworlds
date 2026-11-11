@@ -14,6 +14,8 @@ chosen with `--city` (default `tinynyc`).
 | `tinyvlc`          | ≈ 1 min             | 0.2 GB               |
 | `tinylas`          | ≈ 1 min             | 0.2 GB               |
 | `tinylax`          | ≈ 4 min             | 0.7 GB, 23,000 files |
+| `tinydal`          | ≈ 1.5 min (+ wiki)  | 0.3 GB, 10,500 files |
+| `tinycvg`          | ≈ 1 min (+ wiki)    | 0.2 GB, 6,300 files  |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 | `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
@@ -57,6 +59,8 @@ src/
 │   ├── tinyvlc.ts (+ .places.ts)   # Valencia
 │   ├── tinylas.ts (+ .places.ts)   # Las Vegas
 │   ├── tinylax.ts (+ .places.ts, .areas.ts, .landmarks.ts)   # Los Angeles: County areas, the Hollywood Sign
+│   ├── tinydal.ts (+ .places.ts, .landmarks.ts)   # Dallas: Reunion Tower's ball, the Margaret Hunt Hill arch
+│   ├── tinycvg.ts (+ .places.ts)   # Cincinnati: the Roebling Bridge's cables, a riverboat on the Ohio
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
 │   ├── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 │   └── tinywesteros.ts (+ .land.ts, .places.ts)  # a whole imagined world as a toy-scale diorama
@@ -121,7 +125,13 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
    - `heights.raster`: `true` where buildings have no mapped heights (add `openBuildings` to
      `sources`, after `overture`);
    - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`,
-     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, `SOCAL`, or a new one);
+     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, `SOCAL`, `TEXAS`, `OHIO_RIVER`, or a new one);
+   - `search.namedBuildings`: which named buildings are listed and light up. New York's default
+     (110 m and a few civic classes) leaves a smaller city with a dozen; Dallas lists from 60 m,
+     Cincinnati from 40 m, both with churches, civic buildings and campuses;
+   - the water: a river inside the land polygons needs `riverBridges` for its bridges to rise
+     (the Ohio); a "reservoir" that is grass most of the year goes in `ground.dryWater` (the
+     Trinity's floodway);
    - `ground`: how the data's land classes read locally (cane fields, dry steppe, market gardens);
    - `heightFixes` / `heightCaps`: the few places where the mapped heights are plainly wrong
      (look at the tallest buildings in a preview before trusting them);
@@ -266,7 +276,7 @@ river, an islet, the Wall).
 
 ## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
 
-A city with `sights` (New York) gets `sights.json` from `index` and `sights.<locale>.json` from
+A city with `sights` (New York, Dallas, Cincinnati) gets `sights.json` from `index` and `sights.<locale>.json` from
 `wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
 one or more search entries point at.
 
@@ -374,6 +384,9 @@ change to the rules below.
   the borough sets of questions with no borough, which are never played). On easy no wrong
   name is in more than about a fifth of a choice's rounds (`--list`, and a count over
   `quiz.en-US.json`, show it).
+- Cincinnati: CVG_QUIZ. Dallas: DAL_QUIZ.
+- **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
+  `wiki` again until it reports none failed.
 
 ## How a tile is drawn (`render/chunk.ts`)
 
@@ -398,7 +411,11 @@ whose shadows reach it, and margins for both.
   fall straight to the right.
 - The view is aligned to the city's street grid (`betaDeg`: Manhattan's avenues at 28.9°,
   Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°, the Los Angeles
-  basin's at −0.1°, measured over 3,000 km of streets) so its streets are exact 2:1 lines.
+  basin's at −0.1°, measured over 3,000 km of streets; Dallas' compass grid at 0.2°, a quarter
+  of its 3,200 km of streets, rather than Uptown's at 45.3°, which would stand every freeway on
+  end; Cincinnati's downtown, Over-the-Rhine and Covington at −11.1°, so the view looks across
+  the river at the skyline) so its streets are exact 2:1 lines. Measure it as the peak of the
+  streets' bearings modulo 90°, weighted by length.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
@@ -430,7 +447,18 @@ whose shadows reach it, and margins for both.
   its pavilions.
 - **Statues** (`City.statues`) are what is not a building and so not in the data: stacked
   prisms (`r`: the Statue of Liberty) or boxes (`hp`, `hq`: the letters of the Hollywood Sign,
-  set from a pixel face in `tinylax.landmarks.ts`), in patina, gold or white.
+  set from a pixel face in `tinylax.landmarks.ts`), in patina, gold or white. Dallas has two:
+  the lower half of Reunion Tower's ball, stepped in under the dome the data draws, and the
+  Margaret Hunt Hill Bridge's arch, boxes stepped along the bridge (`huntHillArch` turns the
+  bridge's bearing into the grid's, so it follows `betaDeg`).
+- **Towers mapped as buildings.** Cincinnati's Roebling Bridge has detailed towers in the
+  building data, not bridge supports, so nothing would string cables between them: the city
+  names the span in `suspensions` (the two tower tops, the cables' height, how far out they are
+  anchored), and the scene strings it like the data's. For it to light up as one bridge, the
+  building's name goes in `sights.bridges` with the roads' other names: a building of a name
+  listed there is filed under it in `owners.json`.
+- **Boats the data has no route for** (`boats`: Cincinnati's riverboat on the Ohio) sail like
+  the ferries, there and back; the route is drawn down the middle of the water by hand.
 - New ground kinds go at the **end** of `G` too and get their place in the paint order from
   `PAINT_RANK` (`G.Snow`, `G.Meadow`, `G.Cobble`, `G.DirtRoad` were added this way), so scenes
   already on disk keep their meaning.
@@ -473,7 +501,10 @@ raster is read as the median inside the footprint and corrected with a curve fit
   surveyed; New York's come from the census.
 - Overture's primary name of a division is sometimes in another script; `overtureAreas` prefers
   the English common name. Which division subtypes are districts and which are outlines differs
-  by country (Valencia's districts are "macrohoods"): set them per city.
+  by country (Valencia's districts are "macrohoods"): set them per city. A city larger than
+  `maxArea` (0.05 square degrees, so no county counts as a town) needs it raised (Dallas). In
+  Dallas the "neighbourhoods" are mostly improvement districts and the zoo's exhibits: its
+  `areas()` renames or drops them, and `search.skip` keeps them (and points of interest that are not what they say) out of the search.
 - A city with no building parts gets an empty `building_part.parquet` whose geometry column has
   lost its type: the scene builder skips the parts pass when the file has no rows.
 - Never insert a ground kind in the middle of `G`: it renumbers the ones after it and every

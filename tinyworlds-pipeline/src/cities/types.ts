@@ -140,6 +140,20 @@ export interface City {
   heightCaps?: { lon: number; lat: number; radius: number; max: number }[];
   statues: Statue[];
   /**
+   * Suspension spans whose towers the data draws as buildings rather than bridge supports, so no
+   * cables would be strung between them (Cincinnati's Roebling Bridge): the two tower tops, the
+   * height the cables leave them at and how far beyond each they are anchored (default 0.42 of
+   * the span), metres. Strung like the data's spans.
+   */
+  suspensions?: { a: [number, number]; b: [number, number]; top: number; side?: number }[];
+  /**
+   * Its bridges cross a river that runs inside the land polygons (the Ohio): count the water
+   * polygons as water when decks rise from the shore, not only the sea.
+   */
+  riverBridges?: boolean;
+  /** Boats on routes the data does not have (a sightseeing riverboat): sailed there and back, like ferries. */
+  boats?: { name: string; path: [number, number][] }[];
+  /**
    * The structures found in the search light up in the viewer (sights.json, and their Wikipedia
    * articles: the `wiki` step). `wikipedia` forces a match by lower-case sight name: an English
    * article title, or null for none.
@@ -147,8 +161,9 @@ export interface City {
   sights?: {
     wikipedia?: Record<string, string | null>;
     /**
-     * A bridge (lower-case name) → the other roads' names some of its pieces are filed under (its
-     * towers, its lower deck, its subway): those pieces within the bridge's extent light up too.
+     * A bridge (lower-case name) → the other names some of its pieces are filed under: other roads'
+     * (its towers, its lower deck, its subway), or a building's (the Roebling Bridge's towers,
+     * mapped as one): those pieces within the bridge's extent light up too.
      */
     bridges?: Record<string, string[]>;
     /**
@@ -179,6 +194,8 @@ export interface City {
     landUse?: Record<string, number>;
     /** Farm tracks are bare earth, not paved paths. */
     dirtTracks?: boolean;
+    /** Water areas, by name, that are dry land most of the time (the Trinity's floodway, between its levees): left out. */
+    dryWater?: string[];
   };
 
   /**
@@ -207,5 +224,17 @@ export interface City {
     stationSuffix: string | null;
     /** Rank of the districts themselves in search (default 100: above everything, as boroughs are). */
     districtRank?: number;
+    /**
+     * Which named buildings are listed (and, in a city with sights, light up): those at least
+     * `minHeight` metres tall (default 110, New York's towers), and those of these classes besides
+     * the stadiums, museums, stations and cathedrals that always are. A smaller city lists more.
+     */
+    namedBuildings?: { minHeight?: number; classes?: string[] };
+    /**
+     * Names of neighbourhoods and points of interest in the data that are not what they say:
+     * improvement districts and a zoo's exhibits filed as neighbourhoods, a Fort Worth museum
+     * placed in Dallas. Left out of the search, and so never light up.
+     */
+    skip?: RegExp;
   };
 }

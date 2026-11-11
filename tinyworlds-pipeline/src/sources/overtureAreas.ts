@@ -12,6 +12,8 @@ export interface OvertureAreasOptions {
   hoods?: ("neighborhood" | "macrohood" | "microhood")[];
   /** District names to leave out: the city itself where its own districts are listed, regions larger than a town. */
   skip?: RegExp;
+  /** Areas larger than this (square degrees) are left out, so no county counts as a town (default 0.05; Dallas is 0.1). */
+  maxArea?: number;
 }
 
 /**
@@ -47,7 +49,7 @@ export function overtureAreas(opts: OvertureAreasOptions = {}): DataSource {
                 ST_X(ST_Centroid(geometry)) AS lon, ST_Y(ST_Centroid(geometry)) AS lat
          FROM '${file}'
          WHERE subtype IN (${list([...districts, ...hoods])}) AND coalesce(is_land, true)
-           AND names."primary" IS NOT NULL AND ST_Area(geometry) < 0.05`,
+           AND names."primary" IS NOT NULL AND ST_Area(geometry) < ${opts.maxArea ?? 0.05}`,
       );
       const inBox = (t: string): string =>
         `${t}lon > ${west} AND ${t}lon < ${east} AND ${t}lat > ${south} AND ${t}lat < ${north}`;

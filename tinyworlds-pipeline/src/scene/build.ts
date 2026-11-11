@@ -475,7 +475,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
 
   // every piece of land (in New York, New Jersey included) on the same grid: bridges rise with their distance from it
   const landMask = new Uint8Array(fog.cols * fog.rows);
-  const stampLand = (bytes: Uint8Array): void => {
+  const stampLand = (bytes: Uint8Array, value = 1): void => {
     const geom = readWkb(bytes);
     if (!geom || geom.kind !== GeomKind.Polygon) return;
     for (const rings of geom.parts) {
@@ -489,7 +489,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         starts.push(xy.length / 2);
       }
       fillPolygon(xy, starts, 0, rings.length, 0, 0, fog.cols, fog.rows, (y, a, b) =>
-        landMask.fill(1, y * fog.cols + a, y * fog.cols + b),
+        landMask.fill(value, y * fog.cols + a, y * fog.cols + b),
       );
     }
   };
@@ -498,6 +498,10 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   const groundKind = u8();
   const lines = new LineSink();
   const volumes = new PolySink();
+  /** Buildings named among a bridge's other names (`sights.bridges`): their volumes, by lower-case name. */
+  const bridgeBuildings = new Map<string, { name: string; vols: number[] }>();
+  for (const names of Object.values(CITY.sights?.bridges ?? {}))
+    for (const name of names) bridgeBuildings.set(name.toLowerCase(), { name, vols: [] });
   const vol = {
     base: f32(),
     top: f32(),
@@ -589,6 +593,18 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       addGround(bytes, landKind(subtype, cls), subtype === "land");
     },
   );
+  // a river inside the land polygons (the Ohio) is land to them: cut the water out again
+  if (CITY.riverBridges)
+    await each(
+      conn,
+      `SELECT ST_AsWKB(geometry) FROM '${raw("water.parquet")}'
+       WHERE ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON')
+         AND coalesce(class, '') NOT IN ('swimming_pool', 'fountain', 'reflecting_pool')`,
+      (row) => {
+        const bytes = blob(row[0]);
+        if (bytes) stampLand(bytes, 0);
+      },
+    );
   const shore: FogGrid = {
     ...fog,
     d: distanceTransform(landMask, fog.cols, fog.rows).map((d) => d * fog.cell),
@@ -623,11 +639,15 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       addGround(blob(row[3]), (cls ? useKind[cls] : undefined) ?? landUseKind(str(row[0]), cls, str(row[2])));
     },
   );
+  const dryWater = new Set(CITY.ground.dryWater ?? []);
   await each(
     conn,
-    `SELECT subtype, class, ST_AsWKB(geometry) FROM '${raw("water.parquet")}'
+    `SELECT subtype, class, ST_AsWKB(geometry), names."primary" FROM '${raw("water.parquet")}'
      WHERE ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON')`,
-    (row) => addGround(blob(row[2]), waterKind(str(row[0]), str(row[1]))),
+    (row) => {
+      const name = str(row[3]);
+      if (!(name && dryWater.has(name))) addGround(blob(row[2]), waterKind(str(row[0]), str(row[1])));
+    },
   );
   lap(`land cover, land use, water: ${ground.count} polygons`);
 
@@ -889,6 +909,9 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     vol.ridge.push2(ridgeX / ridgeLen, ridgeY / ridgeLen);
     vol.center.push2(cx, cy);
     vol.area.push(area);
+    // a building that is part of a bridge (the Roebling Bridge's towers) is filed under its name
+    const bridgeOwner = attrs.name ? bridgeBuildings.get(attrs.name.toLowerCase()) : undefined;
+    if (bridgeOwner) bridgeOwner.vols.push(volumes.count - 1);
     return { h, style };
   };
 
@@ -1341,6 +1364,8 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   // who owns what: a bridge's decks, piers, towers and steel go under its roads' name, so the
   // index can light the bridge up as one thing (owners.json)
   const owners: Owners = { bridges: [], statues: [] };
+  for (const { name, vols } of bridgeBuildings.values())
+    if (vols.length > 0) owners.bridges.push({ name, vols });
   const byBridge = new Map<string, number[]>();
   const own = (name: string, from: number): void => {
     if (!name || volumes.count === from) return;
@@ -1602,20 +1627,31 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     cabBox.push4(minX, minY, maxX, maxY);
     cabKind.push(kind);
   };
-  let spans = 0;
+  /** Two tower tops in grid metres, the height the cables leave them at, how far out they are anchored. */
+  const strung: { a: { p: number; q: number }; b: { p: number; q: number }; top: number; side?: number }[] =
+    [];
   for (let i = 0; i < towers.length; i++) {
     const a = towers[i];
     const pair = towers.filter((t) => Math.abs(t.height - a.height) < 0.5);
     if (pair.length !== 2) continue; // more of one height are a cantilever bridge, above
     const b = pair[0] === a ? pair[1] : pair[0];
     if (towers.indexOf(b) < i) continue;
+    strung.push({ a, b, top: a.height - 2 });
+  }
+  // and the spans whose towers are buildings, which the city names
+  for (const s of CITY.suspensions ?? []) {
+    const [ap, aq] = proj.toGrid(s.a[0], s.a[1]);
+    const [bp, bq] = proj.toGrid(s.b[0], s.b[1]);
+    strung.push({ a: { p: ap, q: aq }, b: { p: bp, q: bq }, top: s.top, side: s.side });
+  }
+  let spans = 0;
+  for (const { a, b, top, side: anchored } of strung) {
     const span = Math.hypot(b.p - a.p, b.q - a.q);
     if (span < 250 || span > 1600) continue;
     spans++;
     const up = (b.p - a.p) / span;
     const uq = (b.q - a.q) / span;
-    const top = a.height - 2;
-    const side = span * 0.42;
+    const side = anchored ?? span * 0.42;
     for (const offset of [-9, 9]) {
       const op = -uq * offset;
       const oq = up * offset;
