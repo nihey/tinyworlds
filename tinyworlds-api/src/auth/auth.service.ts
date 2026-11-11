@@ -183,8 +183,10 @@ export class AuthService {
 
     const owner = linksOf(purpose, account.id);
     const now = Date.now();
+    // cleared by age, not by expiry: a link's tries count towards the account's day
+    // (CODE_TRIES_PER_DAY) long after it expired, and must not leave with it
     await this.prisma.magicLink.deleteMany({
-      where: { ...owner, expiresAt: { lt: new Date(now) } },
+      where: { ...owner, createdAt: { lt: new Date(now - DAY_MS) } },
     });
     const recent = await this.prisma.magicLink.findFirst({
       where: { ...owner, createdAt: { gt: new Date(now - LINK_EVERY_MS) } },
