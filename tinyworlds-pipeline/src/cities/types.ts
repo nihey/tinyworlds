@@ -178,6 +178,12 @@ export interface City {
      * ("the Met", "One WTC"), by lower-case sight name: blanked like its name.
      */
     aliases?: Record<string, string[]>;
+    /**
+     * The sights' context lines are neighbourhoods ("Downtown", "Over-the-Rhine"), not the city's
+     * districts: Guess the building takes a question's area (the borough a player may choose)
+     * from the district it stands in instead, when its context line is not one.
+     */
+    areaByDistrict?: boolean;
   };
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };

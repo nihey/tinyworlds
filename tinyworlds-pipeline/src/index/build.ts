@@ -117,7 +117,7 @@ export function simplify(points: number[][], tolerance: number): number[][] {
 }
 
 /** Which district (borough, zone) a point is in, from a coarse raster of their outlines. */
-function districtLookup(
+export function districtLookup(
   proj: Projection,
   districts: Areas["districts"],
 ): (lon: number, lat: number) => string {

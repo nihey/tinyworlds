@@ -651,3 +651,52 @@ describe("easy's wrong answers do not repeat round after round (review)", () => 
     expect(mostUsed(easy, "all")).toBeLessThanOrEqual(0.5);
   });
 });
+
+describe("a question's area where context lines are neighbourhoods", () => {
+  // Cincinnati's sights say "Downtown" or "Riverfront"; here the river is 400 m east of the start
+  const sights: QuizSight[] = [
+    { ...at("a", "Alder Tower", 0, "building"), b: "Downtown" },
+    { ...at("b", "Birch Tower", 200, "building"), b: "Riverfront" },
+    { ...at("c", "Cedar Tower", 600, "building"), b: "Covington" },
+    { ...at("d", "Dogwood Tower", 800, "building") },
+  ];
+  const en = Object.fromEntries(
+    sights.map((x) => [
+      x.id,
+      {
+        title: x.n,
+        text: `The ${x.n} is a skyscraper with a long history and many visitors who come every single year.`,
+        lang: "en",
+        url: `https://en.wikipedia.org/wiki/${x.id}`,
+      },
+    ]),
+  );
+  const river = at("", "", 400).lon;
+  const areas = (districtAt?: (lon: number, lat: number) => string) =>
+    buildQuiz(
+      sights,
+      { "en-US": en, "pt-BR": {}, "es-ES": {} },
+      [],
+      {},
+      { areas: ["Cincinnati", "Covington"], districtAt },
+    ).files["en-US"].questions.map((q) => [q.id, q.area]);
+
+  it("is the district the sight stands in, unless its context line is one", () => {
+    const districtAt = (lon: number) => (lon < river ? "Cincinnati" : "Covington");
+    expect(areas(districtAt)).toEqual([
+      ["a", "Cincinnati"],
+      ["b", "Cincinnati"],
+      ["c", "Covington"],
+      ["d", "Covington"],
+    ]);
+  });
+
+  it("is only a context line that is one, without districts", () => {
+    expect(areas()).toEqual([
+      ["a", undefined],
+      ["b", undefined],
+      ["c", "Covington"],
+      ["d", undefined],
+    ]);
+  });
+});

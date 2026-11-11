@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CITY, DIRS } from "../config.js";
+import { makeProjection } from "../projection.js";
+import { GEO } from "../scene/build.js";
+import { districtLookup } from "./build.js";
 import { loadWindow, pageViews, titleOf } from "./fame.js";
 import { buildQuiz, QUIZ_LOCALES, type QuizLocale, type QuizSight, type QuizText } from "./quiz.js";
 import { stampIndexes } from "./stamp.js";
@@ -23,6 +26,8 @@ export async function writeQuiz(
     views?: Record<string, number>;
     /** ask for page views again, over the last twelve months as of today */
     forceViews?: boolean;
+    /** the district a point is in; the city's own, from its raw areas, when absent */
+    districtAt?: (lon: number, lat: number) => string;
     log?: (m: string) => void;
   } = {},
 ): Promise<void> {
@@ -45,16 +50,18 @@ export async function writeQuiz(
     return;
   }
 
+  const districts = opts.districtAt ? undefined : cityDistricts();
   const areas = ((readJson("places.json") as { places?: { n: string; t: string }[] } | null)?.places ?? [])
     .filter((p) => p.t === "borough")
-    .map((p) => p.n);
+    .map((p) => p.n)
+    .concat(districts?.names ?? []);
   const views = opts.views ?? (await viewsOf(sights, texts["en-US"], opts.forceViews ?? false, log));
   const { files, report } = buildQuiz(
     sights,
     texts,
     opts.placeWords ?? CITY.sights?.placeWords ?? [],
     opts.aliases ?? CITY.sights?.aliases ?? {},
-    { views, areas },
+    { views, areas, districtAt: opts.districtAt ?? districts?.at },
   );
   for (const locale of QUIZ_LOCALES)
     fs.writeFileSync(path.join(out, `quiz.${locale}.json`), JSON.stringify(files[locale]));
@@ -103,4 +110,20 @@ async function viewsOf(
   );
   const byTitle = await pageViews(http, [...new Set(titles.values())], window, log);
   return Object.fromEntries([...titles].map(([id, title]) => [id, byTitle.get(title) ?? 0]));
+}
+
+/**
+ * The city's own districts, for a city whose sights' context lines are neighbourhoods
+ * (`sights.areaByDistrict`): their names (all of them: Covington's middle is off the map, so it
+ * is no `borough` place, yet its downtown is on it) and which one a point is in. None without
+ * the city's raw data (tests), or for any other city.
+ */
+function cityDistricts(): { names: string[]; at: (lon: number, lat: number) => string } | undefined {
+  if (!CITY.sights?.areaByDistrict) return undefined;
+  try {
+    const { districts } = CITY.areas(DIRS.raw);
+    return { names: districts.map((d) => d.name), at: districtLookup(makeProjection(GEO), districts) };
+  } catch {
+    return undefined;
+  }
 }

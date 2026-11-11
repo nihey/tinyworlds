@@ -585,13 +585,26 @@ export function buildQuiz(
   texts: Record<QuizLocale, Record<string, QuizText>>,
   placeWords: string[],
   aliases: Record<string, string[]> = {},
-  opts: { views?: Record<string, number>; areas?: string[] } = {},
+  opts: {
+    views?: Record<string, number>;
+    areas?: string[];
+    /**
+     * The district a point is in, for a sight whose context line is not one: Cincinnati's sights
+     * say "Downtown" or "Over-the-Rhine", and their area is Cincinnati all the same.
+     */
+    districtAt?: (lon: number, lat: number) => string;
+  } = {},
 ): { files: Record<QuizLocale, { questions: QuizQuestion[] }>; report: QuizReport } {
   const places = new Set<string>();
   for (const words of [...placeWords, ...sights.map((s) => s.b ?? "")])
     for (const w of wordsOf(words)) places.add(w);
   const aliasesOf = new Map(Object.entries(aliases).map(([name, list]) => [name.toLowerCase(), list]));
   const areas = new Set(opts.areas ?? []);
+  const areaOf = (sight: QuizSight): string | undefined => {
+    if (sight.b && areas.has(sight.b)) return sight.b;
+    const district = opts.districtAt?.(sight.lon, sight.lat);
+    return district && areas.has(district) ? district : undefined;
+  };
 
   // one question per article: two sights on one article ("Avenue J", "Avenue J station") are one
   const articles = new Set<string>();
@@ -607,7 +620,7 @@ export function buildQuiz(
       ...sight,
       kind,
       group: groupOf(kind),
-      area: sight.b && areas.has(sight.b) ? sight.b : undefined,
+      area: areaOf(sight),
       views: opts.views?.[sight.id] ?? 0,
     });
   }

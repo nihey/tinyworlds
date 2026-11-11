@@ -136,6 +136,8 @@ export const tinycvg: City = {
   ],
   sights: {
     placeWords: ["Cincinnati", "Ohio", "Kentucky", "Queen City"],
+    // the context lines say "Downtown" or "Over-the-Rhine": a question's area is its town
+    areaByDistrict: true,
     // the other names their openings give, which would give them away
     aliases: {
       "paycor stadium": ["Paul Brown Stadium"],
