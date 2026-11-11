@@ -8,6 +8,15 @@ type Admin {
   id: ID!
 }
 
+"""A name donors asked to show, for admins to review"""
+type BenefactorName {
+  cities: [String!]!
+  donorId: ID!
+  hidden: Boolean!
+  lastGiftAt: DateTime!
+  name: String!
+}
+
 """A benefactor: gave once the city had its goal"""
 type BenefactorRow {
   amountCents: Int!
@@ -283,6 +292,9 @@ type Mutation {
   """Name the donor (or not) for all their gifts to a city"""
   setListing(input: SetListingInput!): Boolean!
 
+  """Hides (or shows again) a donor's name everywhere"""
+  setNameHidden(input: SetNameHiddenInput!): Boolean!
+
   """
   Reports that a visit reached a step towards a donation. Says true; saying a step twice changes nothing.
   """
@@ -324,6 +336,9 @@ type MyGiving {
 }
 
 type Query {
+  """Donors with a name and a listed gift, newest gift first (at most 100)"""
+  benefactorNames: [BenefactorName!]!
+
   """
   A city's stones, founders and benefactors, by slug or by world; null for an unknown or hidden city
   """
@@ -359,6 +374,13 @@ input SetListingInput {
 
   """Whether the donor is named for their gifts to this city"""
   listed: Boolean!
+}
+
+input SetNameHiddenInput {
+  donorId: ID!
+
+  """Whether the name is kept off the lists"""
+  hidden: Boolean!
 }
 
 input TrackFunnelStepInput {

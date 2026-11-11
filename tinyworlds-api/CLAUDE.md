@@ -24,6 +24,7 @@ npm run test:e2e          # boots the app on database tinyworlds_test (needs the
                           # E2E_DATABASE_URL=postgresql://… npm run test:e2e   # on another database
 npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, without Stripe
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
+npm run donors:backfill   # past donations get their donors from Stripe: run once after deploying (safe to repeat)
 ```
 
 ## Structure
@@ -105,13 +106,19 @@ type Query {
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors        # public; null: unknown or hidden city
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
   myGiving: MyGiving!                                                   # donors
+  benefactorNames: [BenefactorName!]!                                   # admins
 }
 type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!   # public
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!                          # public
   setListing(input: SetListingInput!): Boolean!                                    # donors
   setDisplayName(input: SetDisplayNameInput!): String!                             # donors
+  setNameHidden(input: SetNameHiddenInput!): Boolean!                              # admins
 }
+
+# admins: names to review
+type BenefactorName { donorId: ID!  name: String!  hidden: Boolean!  cities: [String!]!  lastGiftAt: DateTime! }  # donors with a name and a listed gift, newest first, at most 100
+input SetNameHiddenInput { donorId: ID!  hidden: Boolean! }   # hides the name on every list; stones and numbers stay
 
 # donors only (a donor's session; an admin's is FORBIDDEN)
 type MyCity { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
@@ -178,7 +185,12 @@ GraphQL types or logs.
 public query (`givenCents`, `founderNumber` = smallest of their gifts' numbers, `stones`,
 `firstStone`, `keystone`), so the two never disagree; it holds nothing about anyone else.
 `setListing` flips `listed` on every gift of the donor's to one city; `setDisplayName` saves the
-cleaned name. Both act only on the session's own donor. Hidden cities still appear on their own
+cleaned name. Both act only on the session's own donor. `names.resolver.ts` (admins, no mark)
+lists names and sets `name_hidden`.
+
+`prisma/backfill-donors.ts` (`backfillDonors`) gives donations that have no donor theirs: it asks
+Stripe for each session, reads the address with `donorEmailOf`, upserts the donor and sets
+`donor_id`. It never touches `listed`, prints counts only, and a second run fills nothing new. Hidden cities still appear on their own
 donors' pages (hiding only keeps a city off the public list).
 
 ## Signing in, for admins and donors (`auth/`)

@@ -195,6 +195,22 @@ export class FakePrisma {
       }
       return Promise.resolve(found);
     },
+    /** The one `where` the backfill asks: gifts with no donor yet. */
+    findMany: (args: { where: { donorId: null } }): Promise<DonationRow[]> =>
+      Promise.resolve(
+        this.donations
+          .filter((d) => d.donorId === args.where.donorId)
+          .map((d) => ({ ...d })),
+      ),
+    update: (args: {
+      where: { id: string };
+      data: { donorId: string };
+    }): Promise<DonationRow> => {
+      const row = this.donations.find((d) => d.id === args.where.id);
+      if (!row) throw new Error('No such donation');
+      row.donorId = args.data.donorId;
+      return Promise.resolve({ ...row });
+    },
     create: (args: {
       data: Omit<DonationRow, 'id' | 'donorId' | 'listed'> &
         Partial<Pick<DonationRow, 'donorId' | 'listed'>>;

@@ -9,6 +9,7 @@ export const STRIPE = Symbol('STRIPE');
 export interface StripeClient {
   checkout: {
     sessions: {
+      retrieve(id: string): Promise<Stripe.Checkout.Session>;
       create(
         params: Stripe.Checkout.SessionCreateParams,
       ): Promise<Pick<Stripe.Checkout.Session, 'url'>>;
