@@ -65,3 +65,16 @@ describe('CreateDonationCheckoutInput.amountCents', () => {
     }
   });
 });
+
+describe('CreateDonationCheckoutInput.benefactorName', () => {
+  it('is optional, trimmed, and at most 40 characters', async () => {
+    expect(await refused({ ...good, benefactorName: '  Ana ' })).toEqual({});
+    expect(await refused({ ...good, benefactorName: null })).toEqual({});
+    expect(
+      Object.keys(await refused({ ...good, benefactorName: 'a'.repeat(41) })),
+    ).toEqual(['benefactorName']);
+    expect(await refused({ ...good, benefactorName: 'a'.repeat(40) })).toEqual(
+      {},
+    );
+  });
+});

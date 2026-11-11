@@ -56,11 +56,33 @@ model Donation {
   locale                String?
   /// The visit the checkout was started from, when the site said: ties the donation to its funnel.
   visitId               String?  @map("visit_id") @db.Uuid
+  /// Who gave, when Stripe said (by email); null for a gift with no usable address.
+  donorId               String?  @map("donor_id") @db.Uuid
+  donor                 Donor?   @relation(fields: [donorId], references: [id], onDelete: SetNull)
+  /// The donor asked to be named for this city's gift (a name, and a city).
+  listed                Boolean  @default(false)
   createdAt             DateTime @default(now()) @map("created_at")
 
   @@index([cityId])
   @@index([createdAt])
+  @@index([donorId])
   @@map("donations")
+}
+
+/// Someone who has given, known by the email Stripe collected. Never exposed in GraphQL.
+model Donor {
+  id          String     @id @default(uuid()) @db.Uuid
+  /// Lower case.
+  email       String     @unique
+  /// How the donor is named on the lists; null until a gift came with a name.
+  displayName String?    @map("display_name")
+  nameHidden  Boolean    @default(false) @map("name_hidden")
+  lastLoginAt DateTime?  @map("last_login_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  donations   Donation[]
+
+  @@map("donors")
 }
 
 /// The steps of a visit towards a donation, in order. The last one, a paid donation, is not an

@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { NAME_MAX } from '../../benefactors/display-name.js';
 import { CITY_NAME_MAX } from '../../cities/city-name.js';
 import { WORLD_PATTERN } from '../donation-facts.js';
 import { LOCALES } from '../locales.js';
@@ -78,4 +79,17 @@ export class CreateDonationCheckoutInput {
   @IsOptional()
   @IsUUID()
   visitId?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'The name to list the gift under, when a city is named (1 to 40 characters, with a letter or a digit)',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MaxLength(NAME_MAX)
+  benefactorName?: string | null;
 }

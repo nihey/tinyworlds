@@ -25,6 +25,8 @@ describe('donationFacts', () => {
       world: 'tinynyc',
       locale: 'pt-BR',
       visitId: null,
+      email: null,
+      benefactorName: null,
     });
   });
 
@@ -95,5 +97,35 @@ describe('donationFacts', () => {
     expect(donationFacts(checkoutSession({ currency: 'BRL' }))).toMatchObject({
       currency: 'brl',
     });
+  });
+});
+
+describe('donationFacts: the donor', () => {
+  it("reads the donor's email from customer_details, in lower case", () => {
+    expect(
+      donationFacts(checkoutSession({ email: ' Ana@Example.COM ' }))?.email,
+    ).toBe('ana@example.com');
+  });
+
+  it('has no email when Stripe gave none or a bad one', () => {
+    const long = `${'a'.repeat(300 - '@example.com'.length)}@example.com`;
+    expect(long).toHaveLength(300);
+    for (const email of [null, 'not-an-email', long])
+      expect(donationFacts(checkoutSession({ email }))?.email).toBeNull();
+  });
+
+  it('reads the listing name from the metadata, cleaned', () => {
+    const read = (benefactor_name?: string) =>
+      donationFacts(
+        checkoutSession({
+          metadata: {
+            app: 'tinyworlds',
+            ...(benefactor_name === undefined ? {} : { benefactor_name }),
+          },
+        }),
+      )?.benefactorName;
+    expect(read('  Ana  ')).toBe('Ana');
+    expect(read()).toBeNull();
+    expect(read('   ')).toBeNull();
   });
 });

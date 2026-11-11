@@ -500,6 +500,8 @@ describe('DonationsService.handleWebhook', () => {
         world: 'tinynyc',
         locale: 'en-US',
         visitId: null,
+        donorId: null,
+        listed: false,
       });
     };
     await service.handleWebhook(body, signature);
@@ -535,5 +537,132 @@ describe('DonationsService.handleWebhook', () => {
     expect(prisma.cities).toMatchObject([
       { slug: 'osaka', raisedCents: 300, donationCount: 1 },
     ]);
+  });
+});
+
+describe('DonationsService: donors', () => {
+  const named = (name?: string) => ({
+    ...forCity('Lisbon'),
+    ...(name === undefined ? {} : { benefactor_name: name }),
+  });
+
+  it('records the donor once per email, and the gift as listed when it carried a name', async () => {
+    const { prisma, deliver } = setup();
+    await deliver({ id: 'cs_1', email: 'ana@example.com', metadata: named() });
+    await deliver({
+      id: 'cs_2',
+      email: 'Ana@example.com',
+      metadata: named('Ana'),
+    });
+    expect(prisma.donors).toHaveLength(1);
+    expect(prisma.donors[0]).toMatchObject({
+      email: 'ana@example.com',
+      displayName: 'Ana',
+    });
+    expect(prisma.donations.map((d) => d.donorId)).toEqual([
+      prisma.donors[0].id,
+      prisma.donors[0].id,
+    ]);
+    expect(prisma.donations.map((d) => d.listed)).toEqual([false, true]);
+  });
+
+  it('never replaces a name the donor already has', async () => {
+    const { prisma, deliver } = setup();
+    await deliver({
+      id: 'cs_1',
+      email: 'ana@example.com',
+      metadata: named('Ana'),
+    });
+    await deliver({
+      id: 'cs_2',
+      email: 'ana@example.com',
+      metadata: named('Fake'),
+    });
+    expect(prisma.donors[0].displayName).toBe('Ana');
+    expect(prisma.donations[1].listed).toBe(true);
+  });
+
+  it('a name with no city lists nothing', async () => {
+    const { prisma, deliver } = setup();
+    await deliver({
+      email: 'ana@example.com',
+      metadata: { app: 'tinyworlds', benefactor_name: 'Ana' },
+    });
+    expect(prisma.donations[0].listed).toBe(false);
+  });
+
+  it('still records a donation with no email, or a bad one, unlisted', async () => {
+    const { prisma, deliver } = setup();
+    await deliver({ id: 'cs_1', metadata: named('Ana') });
+    await deliver({ id: 'cs_2', email: 'nope', metadata: named('Ana') });
+    expect(prisma.donors).toHaveLength(0);
+    expect(prisma.donations).toMatchObject([
+      { donorId: null, listed: false },
+      { donorId: null, listed: false },
+    ]);
+    expect(prisma.cities[0]).toMatchObject({
+      raisedCents: 1000,
+      donationCount: 2,
+    });
+  });
+
+  it('two first donations from one new email at once make one donor', async () => {
+    const { prisma, deliver } = setup();
+    // another delivery commits this email's donor after this transaction's first read: the
+    // donor upsert reads no donor, inserts, and meets the unique email (P2002) -> record() retries
+    prisma.commitDuringNextTransaction = () => {
+      prisma.donors.push({
+        id: 'the-other-donor',
+        email: 'ana@example.com',
+        displayName: null,
+      });
+    };
+    await deliver({ id: 'cs_1', email: 'ana@example.com', metadata: named() });
+    await deliver({ id: 'cs_2', email: 'ana@example.com', metadata: named() });
+    expect(prisma.donations.map((d) => d.stripeSessionId).sort()).toEqual([
+      'cs_1',
+      'cs_2',
+    ]);
+    expect(prisma.donors).toHaveLength(1);
+    expect(prisma.donors[0].id).toBe('the-other-donor');
+    expect(prisma.donations.every((d) => d.donorId === 'the-other-donor')).toBe(
+      true,
+    );
+  });
+});
+
+describe('DonationsService.createCheckout: the listing name', () => {
+  const input = {
+    city: 'Lisbon',
+    world: 'tinynyc',
+    locale: 'en-US',
+    returnUrl: 'https://example.com/tinynyc/',
+  };
+
+  it('sends the cleaned name in the metadata when a city is named', async () => {
+    const { service, stripe } = setup();
+    await service.createCheckout({ ...input, benefactorName: '  Ana  ' });
+    expect(stripe.calls[0].metadata).toMatchObject({ benefactor_name: 'Ana' });
+    expect(stripe.calls[0].payment_intent_data?.metadata).toMatchObject({
+      benefactor_name: 'Ana',
+    });
+  });
+
+  it('sends no name when no city is named', async () => {
+    const { service, stripe } = setup();
+    await service.createCheckout({
+      ...input,
+      city: null,
+      benefactorName: 'Ana',
+    });
+    expect(stripe.calls[0].metadata).not.toHaveProperty('benefactor_name');
+  });
+
+  it('refuses a name with no letter or digit', async () => {
+    const { service, stripe } = setup();
+    await expect(
+      service.createCheckout({ ...input, benefactorName: ' -- ' }),
+    ).rejects.toThrow('benefactorName needs a letter or a digit');
+    expect(stripe.calls).toHaveLength(0);
   });
 });

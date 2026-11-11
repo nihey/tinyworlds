@@ -1,5 +1,6 @@
 import type Stripe from 'stripe';
 import { citySlug, cleanCityName } from '../cities/city-name.js';
+import { cleanDisplayName } from '../benefactors/display-name.js';
 import { isLocale, localeOfLang, type Locale } from './locales.js';
 
 /** How every session of this app is marked. The Stripe account is shared with other products. */
@@ -26,6 +27,22 @@ export interface DonationFacts {
   locale: Locale | null;
   /** The visit the checkout was started from, when the site said. */
   visitId: string | null;
+  /** The donor's address as Stripe collected it: lower case; null when missing or unusable. */
+  email: string | null;
+  /** The name the donor asked to be listed under, cleaned; null when none. */
+  benefactorName: string | null;
+}
+
+/** The longest address there can be. */
+const EMAIL_MAX = 254;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The donor's email from a Checkout session: trimmed, lower case; null if missing or not one. */
+export function donorEmailOf(session: Stripe.Checkout.Session): string | null {
+  const raw = session.customer_details?.email;
+  if (typeof raw !== 'string') return null;
+  const email = raw.trim().toLowerCase();
+  return email.length <= EMAIL_MAX && EMAIL_PATTERN.test(email) ? email : null;
 }
 
 /**
@@ -76,5 +93,7 @@ export function donationFacts(
     visitId: VISIT_PATTERN.test(metadata.visit_id ?? '')
       ? metadata.visit_id.toLowerCase()
       : null,
+    email: donorEmailOf(session),
+    benefactorName: cleanDisplayName(metadata.benefactor_name),
   };
 }

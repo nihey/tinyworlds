@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { citySlug, cleanCityName } from '../cities/city-name.js';
+import { cleanDisplayName } from '../benefactors/display-name.js';
 import type { Env } from '../config/env.js';
 import { FunnelService } from '../funnel/funnel.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -90,12 +91,19 @@ export class DonationsService {
     // a name with no letter or digit in it names no city
     const city = citySlug(typed) ? typed : '';
     const amountCents = input.amountCents ?? null;
+    const benefactorName =
+      input.benefactorName == null
+        ? null
+        : cleanDisplayName(input.benefactorName);
+    if (input.benefactorName != null && benefactorName === null)
+      throw new BadRequestException('benefactorName needs a letter or a digit');
     const visitId = input.visitId?.toLowerCase() ?? null;
     const metadata: Record<string, string> = {
       app: APP_TAG,
       world: input.world,
       locale,
       ...(city ? { city } : {}),
+      ...(city && benefactorName ? { benefactor_name: benefactorName } : {}),
       ...(amountCents !== null ? { amount_cents: String(amountCents) } : {}),
       ...(visitId ? { visit_id: visitId } : {}),
     };
@@ -243,6 +251,21 @@ export class DonationsService {
             })
           : null;
 
+      let donor: { id: string; displayName: string | null } | null = null;
+      if (facts.email) {
+        donor = await tx.donor.upsert({
+          where: { email: facts.email },
+          create: { email: facts.email, displayName: facts.benefactorName },
+          update: {},
+          select: { id: true, displayName: true },
+        });
+        if (facts.benefactorName && donor.displayName === null)
+          await tx.donor.update({
+            where: { id: donor.id },
+            data: { displayName: facts.benefactorName },
+          });
+      }
+
       await tx.donation.create({
         data: {
           stripeSessionId: facts.stripeSessionId,
@@ -254,6 +277,9 @@ export class DonationsService {
           world: facts.world,
           locale: facts.locale,
           visitId: facts.visitId,
+          donorId: donor?.id ?? null,
+          listed:
+            facts.benefactorName !== null && city !== null && donor !== null,
         },
       });
 

@@ -24,6 +24,14 @@ export interface DonationRow {
   world: string | null;
   locale: string | null;
   visitId: string | null;
+  donorId: string | null;
+  listed: boolean;
+}
+
+export interface DonorRow {
+  id: string;
+  email: string;
+  displayName: string | null;
 }
 
 export interface FunnelEventRow {
@@ -73,6 +81,7 @@ const unique = (target: string): Error =>
 export class FakePrisma {
   cities: CityRow[] = [];
   donations: DonationRow[] = [];
+  donors: DonorRow[] = [];
   events: FunnelEventRow[] = [];
   admins: AdminRow[] = [];
   links: MagicLinkRow[] = [];
@@ -171,17 +180,58 @@ export class FakePrisma {
       }
       return Promise.resolve(found);
     },
-    create: (args: { data: Omit<DonationRow, 'id'> }): Promise<DonationRow> => {
+    create: (args: {
+      data: Omit<DonationRow, 'id' | 'donorId' | 'listed'> &
+        Partial<Pick<DonationRow, 'donorId' | 'listed'>>;
+    }): Promise<DonationRow> => {
       if (
         this.donations.some(
           (d) => d.stripeSessionId === args.data.stripeSessionId,
         )
       )
         throw unique('stripe_session_id');
-      const row = { id: randomUUID(), ...args.data };
+      const row: DonationRow = {
+        id: randomUUID(),
+        donorId: null,
+        listed: false,
+        ...args.data,
+      };
       this.donations.push(row);
       return Promise.resolve(row);
     },
+  };
+
+  donor = {
+    /** Like the database: it reads what was committed when the transaction began, inserts, and
+     * a row committed elsewhere since then makes the insert violate the unique email. */
+    upsert: (args: {
+      where: { email: string };
+      create: { email: string; displayName: string | null };
+      update: Record<string, never>;
+    }): Promise<DonorRow> => {
+      const visible = (d: DonorRow) =>
+        !this.inTransaction || this.donorsAtStart.has(d.id);
+      const found = this.donors.find(
+        (d) => d.email === args.where.email && visible(d),
+      );
+      if (found) return Promise.resolve({ ...found });
+      if (this.donors.some((d) => d.email === args.create.email))
+        throw unique('email');
+      const row: DonorRow = { id: randomUUID(), ...args.create };
+      this.donors.push(row);
+      return Promise.resolve({ ...row });
+    },
+    update: (args: {
+      where: { id: string };
+      data: { displayName: string };
+    }): Promise<DonorRow> => {
+      const row = this.donors.find((d) => d.id === args.where.id);
+      if (!row) throw new Error('No such donor');
+      row.displayName = args.data.displayName;
+      return Promise.resolve({ ...row });
+    },
+    findMany: (): Promise<DonorRow[]> =>
+      Promise.resolve(this.donors.map((d) => ({ ...d }))),
   };
 
   funnelEvent = {
@@ -290,18 +340,22 @@ export class FakePrisma {
   };
 
   private inTransaction = false;
+  private donorsAtStart = new Set<string>();
 
   async $transaction<T>(run: (tx: FakePrisma) => Promise<T>): Promise<T> {
     const before = {
       cities: this.cities.map((c) => ({ ...c })),
       donations: this.donations.map((d) => ({ ...d })),
+      donors: this.donors.map((d) => ({ ...d })),
     };
+    this.donorsAtStart = new Set(this.donors.map((d) => d.id));
     this.inTransaction = true;
     try {
       return await run(this);
     } catch (error) {
       this.cities = before.cities;
       this.donations = before.donations;
+      this.donors = before.donors;
       this.committedElsewhere?.();
       throw error;
     } finally {
