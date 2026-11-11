@@ -2,6 +2,8 @@ import type { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { config } from 'dotenv';
 import { validateEnv, type Env } from '../config/env.js';
+import { createLinkReader } from '../links/link-reader.js';
+import { LinksService } from '../links/links.service.js';
 import { WORLD_PATTERN } from '../donations/donation-facts.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { createMailer } from '../mail/mailer.js';
@@ -51,7 +53,7 @@ const announcer = new AnnounceService(
   prisma,
   settings,
   createMailer(env),
-  new BenefactorsService(prisma),
+  new BenefactorsService(prisma, new LinksService(prisma, createLinkReader())),
 );
 let shortfall = false;
 try {

@@ -1,16 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { COUNTED_CURRENCY } from '../donations/currency.js';
+import { LinksService } from '../links/links.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CityBenefactorsInput } from './dto/city-benefactors.input.js';
 import { cleanDisplayName } from './display-name.js';
 import type { BenefactorName } from './models/benefactor-name.model.js';
 import type { CityBenefactors } from './models/city-benefactors.model.js';
 import type { MyGiving } from './models/my-giving.model.js';
+import type { WallBenefactor } from './models/wall.model.js';
 import { cityStanding, type Gift } from './standing.js';
+import { benefactorWall } from './wall.js';
 
 @Injectable()
 export class BenefactorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly links: LinksService,
+  ) {}
 
   /** A city's paid gifts in dollars, oldest first, with a name only where it may be shown. */
   async giftsOf(cityId: string): Promise<Gift[]> {
@@ -44,6 +50,13 @@ export class BenefactorsService {
     });
     if (!city) return null;
     const standing = cityStanding(await this.giftsOf(city.id), city.goalCents);
+    // a named row shows its donor's links; a row is named only where the name may be shown
+    const rows = [...standing.founders, ...standing.benefactors];
+    const links = await this.links.shownFor(
+      rows.flatMap((row) => (row.donorId ? [row.donorId] : [])),
+    );
+    const linksOf = (donorId: string | null) =>
+      (donorId && links.get(donorId)) || [];
     return {
       slug: city.slug,
       name: city.name,
@@ -52,9 +65,60 @@ export class BenefactorsService {
       goalCents: city.goalCents,
       raisedCents: city.raisedCents,
       stones: standing.stones,
-      founders: standing.founders,
-      benefactors: standing.benefactors,
+      founders: standing.founders.map((row) => ({
+        ...row,
+        links: linksOf(row.donorId),
+      })),
+      benefactors: standing.benefactors.map((row) => ({
+        ...row,
+        links: linksOf(row.donorId),
+      })),
     };
+  }
+
+  /**
+   * Everyone who gave to a city that is shown, as one list (`benefactorWall`): named donors
+   * with their links, unnamed gifts as they are. Gifts to no city are on no list.
+   */
+  async wall(): Promise<WallBenefactor[]> {
+    const gifts = await this.prisma.donation.findMany({
+      where: { currency: COUNTED_CURRENCY, city: { hidden: false } },
+      select: {
+        donorId: true,
+        amountCents: true,
+        createdAt: true,
+        listed: true,
+        donor: { select: { displayName: true, nameHidden: true } },
+        city: { select: { slug: true, name: true, worldId: true } },
+      },
+    });
+    const rows = benefactorWall(
+      gifts.flatMap((gift) =>
+        gift.city
+          ? [
+              {
+                donorId: gift.donorId,
+                amountCents: gift.amountCents,
+                at: gift.createdAt,
+                name:
+                  gift.listed &&
+                  gift.donor?.displayName &&
+                  !gift.donor.nameHidden
+                    ? gift.donor.displayName
+                    : null,
+                city: gift.city,
+              },
+            ]
+          : [],
+      ),
+    );
+    const links = await this.links.shownFor(
+      rows.flatMap((row) => (row.donorId ? [row.donorId] : [])),
+    );
+    return rows.map(({ donorId, ...row }) => ({
+      ...row,
+      links: (donorId && links.get(donorId)) || [],
+    }));
   }
 
   /** The donor's own cities (newest gift first), their places in them, and what went to no city. */
@@ -155,17 +219,21 @@ export class BenefactorsService {
         id: true,
         displayName: true,
         nameHidden: true,
+        linksHidden: true,
         donations: {
           where: { listed: true },
           select: { createdAt: true, city: { select: { name: true } } },
         },
       },
     });
+    const links = await this.links.forReview(donors.map((d) => d.id));
     return donors
       .map((d) => ({
         donorId: d.id,
         name: d.displayName ?? '',
         hidden: d.nameHidden,
+        links: links.get(d.id) ?? [],
+        linksHidden: d.linksHidden,
         cities: [
           ...new Set(d.donations.flatMap((g) => (g.city ? [g.city.name] : []))),
         ].sort(),
