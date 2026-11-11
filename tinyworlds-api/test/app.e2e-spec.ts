@@ -1222,6 +1222,85 @@ describe('the API over HTTP', () => {
       });
     });
 
+    describe('names, for admins', () => {
+      const NAMES =
+        '{ benefactorNames { donorId name hidden cities lastGiftAt } }';
+      const HIDE =
+        'mutation ($input: SetNameHiddenInput!) { setNameHidden(input: $input) }';
+      type Names = {
+        data: {
+          benefactorNames: {
+            donorId: string;
+            name: string;
+            hidden: boolean;
+            cities: string[];
+            lastGiftAt: string;
+          }[];
+        };
+      };
+
+      it('an admin lists names and hides one', async () => {
+        await seedLisbon();
+        const listed = (await asAdmin(NAMES)).body as Names;
+        expect(listed.data.benefactorNames).toHaveLength(1);
+        const row = listed.data.benefactorNames[0];
+        expect(row).toMatchObject({
+          name: 'Ana',
+          hidden: false,
+          cities: ['Lisbon'],
+        });
+        expect(JSON.stringify(listed)).not.toContain('example.com');
+
+        const res = await asAdmin(HIDE, {
+          input: { donorId: row.donorId, hidden: true },
+        });
+        expect(answer(res).errors).toBeUndefined();
+        const after = (await asAdmin(NAMES)).body as Names;
+        expect(after.data.benefactorNames[0]).toMatchObject({ hidden: true });
+
+        const founders = (
+          (
+            await graphql(BENEFACTORS, { input: { slug: 'lisbon' } }).expect(
+              200,
+            )
+          ).body as {
+            data: { cityBenefactors: { founders: { name: string | null }[] } };
+          }
+        ).data.cityBenefactors.founders;
+        expect(founders[0].name).toBeNull();
+      });
+
+      it('a donor cannot list or hide names', async () => {
+        await seedLisbon();
+        const from = '203.0.113.90';
+        const before = mailer.sent.length;
+        await post('/api/auth/magic-link', {
+          email: 'ana@example.com',
+          returnUrl: 'https://example.com/',
+          purpose: 'donor',
+        })
+          .set('x-forwarded-for', from)
+          .expect(202);
+        await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+        const res = await post('/api/auth/verify', { token: mailer.token() })
+          .set('x-forwarded-for', from)
+          .expect(200);
+        const { accessToken, donor } = res.body as {
+          accessToken: string;
+          donor: { id: string };
+        };
+        for (const [query, variables] of [
+          [NAMES, undefined],
+          [HIDE, { input: { donorId: donor.id, hidden: true } }],
+        ] as const) {
+          const out = await graphql(query, variables)
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+          expect(answer(out).errors?.[0].extensions.code).toBe('FORBIDDEN');
+        }
+      });
+    });
+
     it('hides a name an admin hid', async () => {
       await seedLisbon();
       await prisma.donor.update({

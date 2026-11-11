@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CityBenefactorsInput } from './dto/city-benefactors.input.js';
 import { cleanDisplayName } from './display-name.js';
+import type { BenefactorName } from './models/benefactor-name.model.js';
 import type { CityBenefactors } from './models/city-benefactors.model.js';
 import type { MyGiving } from './models/my-giving.model.js';
 import { cityStanding, type Gift } from './standing.js';
@@ -140,6 +141,52 @@ export class BenefactorsService {
       where: { donorId, cityId: city.id },
       data: { listed },
     });
+  }
+
+  /** Donors with a name and at least one listed gift, newest listed gift first, at most 100. */
+  async benefactorNames(): Promise<BenefactorName[]> {
+    const donors = await this.prisma.donor.findMany({
+      where: {
+        displayName: { not: null },
+        donations: { some: { listed: true } },
+      },
+      select: {
+        id: true,
+        displayName: true,
+        nameHidden: true,
+        donations: {
+          where: { listed: true },
+          select: { createdAt: true, city: { select: { name: true } } },
+        },
+      },
+    });
+    return donors
+      .map((d) => ({
+        donorId: d.id,
+        name: d.displayName ?? '',
+        hidden: d.nameHidden,
+        cities: [
+          ...new Set(d.donations.flatMap((g) => (g.city ? [g.city.name] : []))),
+        ].sort(),
+        lastGiftAt: new Date(
+          Math.max(...d.donations.map((g) => g.createdAt.getTime())),
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          b.lastGiftAt.getTime() - a.lastGiftAt.getTime() ||
+          (a.donorId < b.donorId ? -1 : 1),
+      )
+      .slice(0, 100);
+  }
+
+  /** Hides a donor's name from every list, or shows it again; changes no stone or number. */
+  async setNameHidden(donorId: string, hidden: boolean): Promise<void> {
+    const { count } = await this.prisma.donor.updateMany({
+      where: { id: donorId },
+      data: { nameHidden: hidden },
+    });
+    if (count === 0) throw new BadRequestException('No such donor');
   }
 
   /** Saves the cleaned name; a name with nothing to show is refused. */

@@ -22,8 +22,18 @@ export class FakeStripe implements StripeClient {
     },
   };
 
+  /** The sessions `retrieve` knows, by id. */
+  sessions = new Map<string, Stripe.Checkout.Session>();
+
   checkout = {
     sessions: {
+      retrieve: (id: string): Promise<Stripe.Checkout.Session> => {
+        if (this.failWith) return Promise.reject(this.failWith);
+        const found = this.sessions.get(id);
+        return found
+          ? Promise.resolve(found)
+          : Promise.reject(new Error(`No such checkout session: ${id}`));
+      },
       create: (
         params: Stripe.Checkout.SessionCreateParams,
       ): Promise<{ url: string | null }> => {
