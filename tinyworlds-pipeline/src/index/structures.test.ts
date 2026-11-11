@@ -26,6 +26,8 @@ interface FakeVol {
   base?: number;
   top?: number;
   roofH?: number;
+  /** Roof enum value: 0 flat, 2 pyramid, 3 dome */
+  roofShape?: number;
 }
 
 /** Just the volumes, packed the way the scene packs them. */
@@ -55,6 +57,13 @@ function fakeScene(vols: FakeVol[]): Scene {
       base: Float32Array.from(vols.map((v) => v.base ?? 0)),
       top: Float32Array.from(vols.map((v) => v.top ?? 30)),
       roofH: Float32Array.from(vols.map((v) => v.roofH ?? 0)),
+      roofShape: Uint8Array.from(vols.map((v) => v.roofShape ?? 0)),
+      center: Float32Array.from(
+        vols.flatMap((_, i) => [
+          (bbox[i * 4] + bbox[i * 4 + 2]) / 2,
+          (bbox[i * 4 + 1] + bbox[i * 4 + 3]) / 2,
+        ]),
+      ),
     },
   } as unknown as Scene;
 }
@@ -111,6 +120,25 @@ describe("makeFinder", () => {
     expect(find(at(0, -300, { t: "bridge", n: "Manhattan Bridge" }))).toBeNull();
   });
 
+  it("takes in the pieces of a bridge filed under other roads' names, near it only", () => {
+    const bridgeScene = fakeScene([
+      { ring: square(0, 0, 10), seed: 1 }, // 0: "Manhattan Bridge Bike Path"
+      { ring: square(10, 0, 10), seed: 2 }, // 1: "Canal Street (lower level)": a tower on the bridge
+      { ring: square(3000, 0, 10), seed: 3 }, // 2: "Canal Street (lower level)" somewhere else
+    ]);
+    const bridgeOwners: Owners = {
+      bridges: [
+        { name: "Manhattan Bridge Bike Path", vols: [0] },
+        { name: "Canal Street (lower level)", vols: [1, 2] },
+      ],
+      statues: [],
+    };
+    const findBridge = makeFinder(bridgeScene, bridgeOwners, proj, [], {
+      "manhattan bridge": ["Canal Street (lower level)"],
+    });
+    expect(findBridge(at(0, -100, { t: "bridge", n: "Manhattan Bridge" }))?.vols).toEqual([0, 1]);
+  });
+
   it("finds the statue from a point beside it", () => {
     expect(find(at(-380, 2))?.key).toBe("statue:0");
   });
@@ -132,5 +160,33 @@ describe("piecesOf", () => {
     expect(piece.rise).toBe(26);
     expect(piece.rings).toHaveLength(1);
     expect(piece.rings[0]).toHaveLength(8);
+  });
+
+  /** The width in map px of a piece's first ring. */
+  const width = (ring: number[]): number => {
+    const xs = ring.filter((_, j) => j % 2 === 0);
+    return Math.max(...xs) - Math.min(...xs);
+  };
+
+  it("narrows a spire towards its tip, as the renderer draws it", () => {
+    const s = fakeScene([{ ring: square(0, 0, 20), seed: 1, top: 100, roofH: 80, roofShape: 2 }]);
+    const pieces = piecesOf(s, [0]);
+    const walls = pieces[0];
+    expect(walls.rise).toBe(100);
+    const tip = pieces[pieces.length - 1];
+    expect(tip.rise).toBe(180);
+    expect(width(tip.rings[0])).toBeLessThan(width(walls.rings[0]) * 0.2);
+    // every step of the roof is no wider than the one below it
+    for (let i = 2; i < pieces.length; i++)
+      expect(width(pieces[i].rings[0])).toBeLessThanOrEqual(width(pieces[i - 1].rings[0]) + 1e-9);
+  });
+
+  it("rounds a dome off: still wide halfway up, narrow at the top", () => {
+    const s = fakeScene([{ ring: square(0, 0, 20), seed: 1, top: 30, roofH: 20, roofShape: 3 }]);
+    const pieces = piecesOf(s, [0]);
+    const full = width(pieces[0].rings[0]);
+    const half = pieces.find((p) => p.lift >= 40)!;
+    expect(width(half.rings[0])).toBeGreaterThan(full * 0.8);
+    expect(pieces[pieces.length - 1].rise).toBe(50);
   });
 });

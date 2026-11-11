@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DuckDBBlobValue, DuckDBInstance } from "@duckdb/node-api";
-import { DIRS } from "../config.js";
+import { CITY, DIRS } from "../config.js";
 import { GeomKind, readWkb } from "../geom/wkb.js";
 import type { Projection } from "../projection.js";
 import { loadScene } from "../render/scene.js";
@@ -70,7 +70,7 @@ export async function writeSights(opts: {
     candidates.push({ n, t, b, r, lon, lat, order, src, seed });
   });
 
-  const find = makeFinder(scene, owners, proj, stands);
+  const find = makeFinder(scene, owners, proj, stands, CITY.sights?.bridges ?? {});
   const drafts = resolveSights(candidates, find, (seed) => ownNames.get(seed));
   const file = toSightFile(drafts, scene);
   fs.writeFileSync(path.join(out, "sights.json"), JSON.stringify(file));

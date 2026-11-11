@@ -264,7 +264,10 @@ one or more search entries point at.
   the categories that are areas (`college_university`, `airport`, `zoo`, `amusement_park`); rail
   and subway stations. Streets, hoods, boroughs and parks never.
 - **Finding the structure** (`makeFinder`): a bridge by its roads' names (the scene's
-  `owners.json`; a name inside "Ed Koch Queensboro Bridge Upper Level" counts), the statue within
+  `owners.json`; a name inside "Ed Koch Queensboro Bridge Upper Level" counts), plus the pieces
+  filed under the other roads' names the city lists for it (`sights.bridges`: the Manhattan
+  Bridge's towers stand under "Canal Street (lower level)", the Williamsburg's under "BMT Jamaica
+  Line") that lie within 40 m of its own pieces' extent; the statue within
   30 m, a stadium's stands from a point anywhere in its grounds (`land_use` class `stadium`), a
   building entry's own building by its seed, else the building whose footprint holds the point,
   within 4 m. A building is all the volumes with its seed (`hashString` of its id, which its parts
@@ -275,16 +278,22 @@ one or more search entries point at.
   its seed moves to the curated entry (One World Trade Center's hand-picked point misses its
   footprint by 5 m).
 - **The outline** (`silhouette`): every volume's footprint swept from its underside to its top
-  (`base` to `top + roofH`, in px), merged and simplified to a pixel, in map px.
+  (`base` to `top + roofH`, in px), merged and simplified to a pixel, in map px. A spire or a
+  dome (`Roof.Pyramid`, `Roof.Dome`) narrows towards the volume's centre as the renderer draws it
+  (`piecesOf`: the walls to `top`, then ten steps of the roof, each as wide as the roof at its
+  foot), so the Chrysler's outline follows its spire, not a box round it.
 - **The scene keeps the owners** of what is not a building (`owners.json` beside it): a bridge's
   decks, piers, towers and cantilever steel under its roads' name, each statue's pieces.
 - **Wikipedia** (`wiki`): the English article whose title matches the sight's name (normalised:
   case, accents, punctuation, a leading "The", a trailing "(…)") among those within 300 m of its
-  point, then its Portuguese and Spanish versions through the language links; for each, the
-  summary's opening, whole sentences up to 220 characters. A doubtful match is none. Every answer
-  is cached in `data/<city>/raw/wikipedia/` (a missing page as `null`), so a rerun asks nothing;
-  `--force` asks again. Requests go one at a time, 100 ms apart, with `WIKI_USER_AGENT` (the
-  project's public page; no person). `sights.wikipedia` in the city forces a title by sight
+  point (an exact title first, then the nearest; a station takes "<name> station", or its bare
+  name only when that says station, terminal, center or hub; a title closed with a span of years,
+  "(1978–2016)", is the building that stood there before, never a match), then its Portuguese
+  and Spanish versions through the language links; for each, the summary's opening, whole
+  sentences up to 220 characters. A doubtful match is none. Every answer is cached in
+  `data/<city>/raw/wikipedia/` (a missing page as `null`), so a rerun asks nothing; `--force`
+  asks again. Requests go one at a time, 200 ms apart (a 429 waits for `Retry-After`, else 2 s
+  doubling, and asks again), with `WIKI_USER_AGENT` (the project's public page; no person). `sights.wikipedia` in the city forces a title by sight
   name, or `null` for none, for the misses and the wrong ones.
 
 ## How a tile is drawn (`render/chunk.ts`)

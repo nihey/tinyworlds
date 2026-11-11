@@ -43,6 +43,8 @@ export function normalizeTitle(s: string): string {
 
 /** Is this article about the place of that name? A trailing "(stadium)" on the title is ignored. */
 export function titleMatches(name: string, title: string): boolean {
+  // "(1978–2016)": the one that stood here before, not the one on the map
+  if (/\(\s*\d{4}\s*[–—-]\s*\d{4}\s*\)\s*$/.test(title)) return false;
   const bare = title.replace(/\s*\([^)]*\)\s*$/, "");
   return normalizeTitle(name) !== "" && normalizeTitle(name) === normalizeTitle(bare);
 }
@@ -172,7 +174,9 @@ export async function articleFor(
         `action=query&list=geosearch&gscoord=${sight.lat}|${sight.lon}&gsradius=${RADIUS}&gslimit=500`,
       ),
     )) as { query?: { geosearch?: { title: string }[] } } | null;
-    title = near?.query?.geosearch?.find((g) => isAbout(sight, g.title))?.title;
+    // an article named exactly as the sight first, then the nearest one that matches
+    const about = (near?.query?.geosearch ?? []).filter((g) => isAbout(sight, g.title));
+    title = (about.find((g) => normalizeTitle(g.title) === normalizeTitle(sight.n)) ?? about[0])?.title;
   }
   if (title === undefined) return none;
 

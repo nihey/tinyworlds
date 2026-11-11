@@ -130,7 +130,14 @@ export interface City {
    * articles: the `wiki` step). `wikipedia` forces a match by lower-case sight name: an English
    * article title, or null for none.
    */
-  sights?: { wikipedia?: Record<string, string | null> };
+  sights?: {
+    wikipedia?: Record<string, string | null>;
+    /**
+     * A bridge (lower-case name) → the other roads' names some of its pieces are filed under (its
+     * towers, its lower deck, its subway): those pieces within the bridge's extent light up too.
+     */
+    bridges?: Record<string, string[]>;
+  };
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };
   trees: {
