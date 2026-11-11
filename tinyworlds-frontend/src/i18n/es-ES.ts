@@ -37,6 +37,7 @@ export const esES: Strings = {
   },
   about: {
     gettingAround: "Cómo moverse",
+    benefactors: "Benefactores",
     drag: "Arrastra para moverte. Para hacer zoom, usa la rueda, pellizca o haz doble clic.",
     keysSearch: "{/} busca calles, barrios y lugares de interés. {0} muestra toda la ciudad.",
     keysToggles: "{B} dibuja {hoods}. {D} activa o desactiva el efecto maqueta; {M}, el minimapa.",
@@ -65,6 +66,7 @@ export const esES: Strings = {
     funded: "Meta alcanzada",
     rankingEmpty: "Todavía no hay donaciones: la primera pone su ciudad en cabeza.",
     donateTo: "Donar para {city}",
+    benefactorsOf: "Benefactores de {city}",
     nextPitch:
       "Las donaciones pagan los servidores y las horas de trabajo que lleva construir cada ciudad. ¿Quieres ver la tuya? Escribe su nombre en la donación.",
     openSource: "Código abierto",
@@ -109,6 +111,12 @@ export const esES: Strings = {
     newCity: "Nueva en la lista: empieza de cero.",
     whole:
       "Sin ciudad elegida, tu donación va al proyecto en general: los servidores y las próximas ciudades.",
+    builtUpkeep: "{city} ya está construida: tu donación va a sus servidores y su mantenimiento.",
+    stones: {
+      one: "Pondrías la piedra {from} de las {count} de {city} y serías uno de sus Benefactores Fundadores.",
+      other:
+        "Pondrías las piedras {from}–{to} de las {count} de {city} y serías uno de sus Benefactores Fundadores.",
+    },
     donations: { none: "Aún sin donaciones", one: "{n} donación", other: "{n} donaciones" },
     status: { funded: "Meta alcanzada, en cola", building: "En construcción", built: "Construida" },
     showAll: "Ver todas las ciudades",

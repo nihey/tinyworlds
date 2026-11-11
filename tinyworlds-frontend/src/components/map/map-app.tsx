@@ -76,6 +76,8 @@ export function MapApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
+  // the city the donate sign opens with chosen (from About's benefactors), if any
+  const [donateCity, setDonateCity] = useState<string | null>(null);
 
   const [prefs, setPrefs] = usePrefs();
   useTheme(prefs.theme);
@@ -379,7 +381,14 @@ export function MapApp() {
             onSearch={() => searchRef.current?.focus()}
             onShare={share}
             onAbout={() => setAboutOpen(true)}
-            onDonate={takesDonations ? () => setDonateOpen(true) : undefined}
+            onDonate={
+              takesDonations
+                ? () => {
+                    setDonateCity(null);
+                    setDonateOpen(true);
+                  }
+                : undefined
+            }
             settingsOpen={settingsOpen}
             onSettingsOpenChange={setSettingsOpen}
             settings={<SettingsPanel prefs={prefs} onChange={setPrefs} hoodLines={hasHoods} />}
@@ -413,12 +422,24 @@ export function MapApp() {
             ? () => {
                 // one sign at a time: the donate sign takes the About sign's place
                 setAboutOpen(false);
+                setDonateCity(null);
+                setDonateOpen(true);
+              }
+            : undefined
+        }
+        onBecome={
+          takesDonations
+            ? (cityName) => {
+                setAboutOpen(false);
+                setDonateCity(cityName);
                 setDonateOpen(true);
               }
             : undefined
         }
       />
-      {takesDonations && <DonateDialog open={donateOpen} onOpenChange={setDonateOpen} />}
+      {takesDonations && (
+        <DonateDialog open={donateOpen} onOpenChange={setDonateOpen} city={donateCity} />
+      )}
       <LoadErrorDialog
         message={errorMessage}
         onDismiss={() => setErrorMessage(null)}

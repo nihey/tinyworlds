@@ -174,6 +174,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
                 <FundingPreview
                   city={standing}
                   isNew={known === null && list === "ready"}
+                  built={known?.status === "BUILT"}
                   amountCents={amountCents}
                   locale={locale}
                   t={t}

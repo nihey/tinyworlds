@@ -68,6 +68,8 @@ export interface Strings {
   };
   about: {
     gettingAround: string;
+    /** the label of the benefactors section, for a city that is built */
+    benefactors: string;
     drag: string;
     keysSearch: string;
     keysToggles: string;
@@ -102,6 +104,8 @@ export interface Strings {
     rankingEmpty: string;
     /** names the button of a row: "{city}" is the city */
     donateTo: string;
+    /** names the flag beside a row: opens the city's benefactors; "{city}" is the city */
+    benefactorsOf: string;
     /** why donate, when there is no list of cities to show */
     nextPitch: string;
     openSource: string;
@@ -162,6 +166,10 @@ export interface Strings {
     /** under the bar of a city nobody has given to yet; and when no city is chosen */
     newCity: string;
     whole: string;
+    /** a built city: where a gift goes; "{city}" is its name */
+    builtUpkeep: string;
+    /** the stones a gift would lay: "{from}", "{to}", "{count}" and "{city}"; `one` when it is a single stone */
+    stones: { one: string; other: string };
     donations: { none: string; one: string; other: string };
     status: { funded: string; building: string; built: string };
     showAll: string;

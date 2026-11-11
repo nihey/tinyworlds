@@ -2,6 +2,9 @@
 
 import { ArrowUpRight, BadgeCheck, Code, Heart } from "lucide-react";
 import { useState } from "react";
+import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
+import { PixelIcon } from "@/components/benefactors/pixel-badge";
+import type { CityRef } from "@/components/benefactors/benefactors-panel";
 import { DonateDialog } from "@/components/donate/donate-dialog";
 import { MilestoneBar } from "@/components/donate/milestone-bar";
 import { MovingPicture } from "@/components/home/moving-picture";
@@ -72,6 +75,8 @@ function WorldGrid({
   worlds,
   columns,
   locale,
+  t,
+  onBenefactors,
 }: {
   id: string;
   heading: string;
@@ -79,6 +84,9 @@ function WorldGrid({
   /** how many cards the widest group has: the grid is laid out for that many */
   columns: number;
   locale: Locale;
+  t: Strings;
+  /** absent for places that only exist in stories, and when there is no API: no benefactors to show */
+  onBenefactors?: (world: string) => void;
 }) {
   return (
     <section aria-labelledby={id}>
@@ -96,7 +104,7 @@ function WorldGrid({
         {worlds.map((world) => {
           const copy = world.copy[locale];
           return (
-            <li key={world.id}>
+            <li key={world.id} className="relative">
               <a
                 href={worldUrl(world.id)}
                 className="group sign block h-full overflow-hidden transition-transform outline-none hover:-translate-y-0.5 focus-visible:shadow-[0_0_0_3px_var(--taxi)]"
@@ -114,6 +122,17 @@ function WorldGrid({
                   />
                 </div>
               </a>
+              {onBenefactors && !world.fictional && (
+                <button
+                  type="button"
+                  onClick={() => onBenefactors(world.id)}
+                  aria-label={t.home.benefactorsOf.replace("{city}", copy.city)}
+                  className="sign absolute top-2.5 right-2.5 flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-paper outline-none transition-[filter] hover:brightness-110 focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
+                >
+                  <PixelIcon art="founding" />
+                  {t.benefactors.benefactors}
+                </button>
+              )}
             </li>
           );
         })}
@@ -129,45 +148,59 @@ interface CityRowProps {
   locale: Locale;
   t: Strings;
   onDonate: (city: string) => void;
+  onBenefactors: (slug: string) => void;
 }
 
-/** One city of the ranking: the whole row opens the donate sign with that city chosen. */
-function CityRow({ city, place, locale, t, onDonate }: CityRowProps) {
+/**
+ * One city of the ranking: the row opens the donate sign with that city chosen, and the flag
+ * beside it opens the city's benefactors. Two sibling buttons, never nested.
+ */
+function CityRow({ city, place, locale, t, onDonate, onBenefactors }: CityRowProps) {
   return (
-    <button
-      type="button"
-      onClick={() => onDonate(city.name)}
-      aria-label={t.home.donateTo.replace("{city}", city.name)}
-      data-rybbit-event="donate_open"
-      data-rybbit-prop-world={SITE_ID}
-      data-rybbit-prop-city={city.name}
-      className="group -mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors outline-none hover:bg-sign-raised focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
-    >
-      {place === undefined ? (
-        <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-taxi" strokeWidth={2.25} />
-      ) : (
-        <span
+    <div className="-mx-2 flex w-[calc(100%+1rem)] items-start rounded-lg pr-1 transition-colors hover:bg-sign-raised">
+      <button
+        type="button"
+        onClick={() => onDonate(city.name)}
+        aria-label={t.home.donateTo.replace("{city}", city.name)}
+        data-rybbit-event="donate_open"
+        data-rybbit-prop-world={SITE_ID}
+        data-rybbit-prop-city={city.name}
+        className="group flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-2.5 text-left outline-none focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
+      >
+        {place === undefined ? (
+          <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-taxi" strokeWidth={2.25} />
+        ) : (
+          <span
+            aria-hidden
+            className={cn(
+              "w-5 shrink-0 text-right text-[15px] leading-5 font-bold tabular-nums",
+              place <= 3 && city.raisedCents > 0 ? "text-taxi" : "text-paper-dim",
+            )}
+          >
+            {place}
+          </span>
+        )}
+        <MilestoneBar
+          city={city}
+          locale={locale}
+          t={t}
+          note={donationsLabel(city.donations, locale, t.donate.donations)}
+        />
+        <Heart
           aria-hidden
-          className={cn(
-            "w-5 shrink-0 text-right text-[15px] leading-5 font-bold tabular-nums",
-            place <= 3 && city.raisedCents > 0 ? "text-taxi" : "text-paper-dim",
-          )}
-        >
-          {place}
-        </span>
-      )}
-      <MilestoneBar
-        city={city}
-        locale={locale}
-        t={t}
-        note={donationsLabel(city.donations, locale, t.donate.donations)}
-      />
-      <Heart
-        aria-hidden
-        className="mt-0.5 size-4 shrink-0 text-paper-dim/60 transition-colors group-hover:fill-taxi group-hover:text-taxi"
-        strokeWidth={2.25}
-      />
-    </button>
+          className="mt-0.5 size-4 shrink-0 text-paper-dim/60 transition-colors group-hover:fill-taxi group-hover:text-taxi"
+          strokeWidth={2.25}
+        />
+      </button>
+      <button
+        type="button"
+        onClick={() => onBenefactors(city.slug)}
+        aria-label={t.home.benefactorsOf.replace("{city}", city.name)}
+        className="mt-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-white/10 focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
+      >
+        <PixelIcon art="founding" />
+      </button>
+    </div>
   );
 }
 
@@ -184,6 +217,8 @@ export function Landing() {
 
   // null: closed; otherwise open, with the city it was opened for (or none)
   const [donate, setDonate] = useState<{ city: string | null } | null>(null);
+  // the city whose benefactors are shown, if any
+  const [benefactors, setBenefactors] = useState<CityRef | null>(null);
   const [showAll, setShowAll] = useState(false);
   const milestones = useMilestones();
   const withList = API_URL !== "" && milestones.state !== "failed";
@@ -195,6 +230,8 @@ export function Landing() {
   const imagined = Object.values(WORLDS).filter((world) => world.fictional);
   const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
+  // the benefactors need the API; a world's card offers them only with one
+  const showBenefactors = API_URL !== "";
   // the world the hero's picture shows, and its button leads into
   const lead = WORLDS[HERO.world];
   const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
@@ -236,6 +273,8 @@ export function Landing() {
         worlds={cities}
         columns={columns}
         locale={locale}
+        t={t}
+        onBenefactors={showBenefactors ? (world) => setBenefactors({ world }) : undefined}
       />
       {imagined.length > 0 && (
         <WorldGrid
@@ -244,6 +283,7 @@ export function Landing() {
           worlds={imagined}
           columns={columns}
           locale={locale}
+          t={t}
         />
       )}
 
@@ -276,7 +316,13 @@ export function Landing() {
                 <ul className="grid gap-x-10 sm:grid-cols-2">
                   {funded.map((city) => (
                     <li key={city.id}>
-                      <CityRow city={city} locale={locale} t={t} onDonate={openFor} />
+                      <CityRow
+                        city={city}
+                        locale={locale}
+                        t={t}
+                        onDonate={openFor}
+                        onBenefactors={(slug) => setBenefactors({ slug })}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -293,7 +339,14 @@ export function Landing() {
                 <ol className="gap-x-10 sm:columns-2">
                   {shown.map((city, i) => (
                     <li key={city.id} className="break-inside-avoid">
-                      <CityRow city={city} place={i + 1} locale={locale} t={t} onDonate={openFor} />
+                      <CityRow
+                        city={city}
+                        place={i + 1}
+                        locale={locale}
+                        t={t}
+                        onDonate={openFor}
+                        onBenefactors={(slug) => setBenefactors({ slug })}
+                      />
                     </li>
                   ))}
                 </ol>
@@ -369,6 +422,19 @@ export function Landing() {
           </p>
         )}
       </footer>
+
+      {showBenefactors && (
+        <BenefactorsSign
+          open={benefactors !== null}
+          onOpenChange={(open) => !open && setBenefactors(null)}
+          by={benefactors ?? { slug: "" }}
+          onBecome={(city) => {
+            // one sign at a time: the donate sign takes the benefactors' place
+            setBenefactors(null);
+            openFor(city);
+          }}
+        />
+      )}
 
       {takesDonations && (
         <DonateDialog

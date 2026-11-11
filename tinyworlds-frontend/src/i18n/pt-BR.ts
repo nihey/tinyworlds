@@ -37,6 +37,7 @@ export const ptBR: Strings = {
   },
   about: {
     gettingAround: "Como navegar",
+    benefactors: "Benfeitores",
     drag: "Arraste para mover. Para dar zoom, use a rolagem, o gesto de pinça ou dois cliques.",
     keysSearch: "{/} busca ruas, bairros e pontos turísticos. {0} mostra a cidade inteira.",
     keysToggles:
@@ -65,6 +66,7 @@ export const ptBR: Strings = {
     funded: "Meta batida",
     rankingEmpty: "Ainda não há doações: a primeira coloca a cidade no topo.",
     donateTo: "Doar para {city}",
+    benefactorsOf: "Benfeitores de {city}",
     nextPitch:
       "As doações pagam os servidores e as horas de trabalho para construir cada cidade. Quer ver a sua? Escreva o nome dela na doação.",
     openSource: "Código aberto",
@@ -109,6 +111,12 @@ export const ptBR: Strings = {
     newCity: "Nova na lista: começa do zero.",
     whole:
       "Sem cidade escolhida, sua doação vai para o projeto como um todo: os servidores e as próximas cidades.",
+    builtUpkeep: "{city} já está construída: seu presente vai para os servidores e a manutenção.",
+    stones: {
+      one: "Você assentaria a pedra {from} das {count} de {city} e seria um dos Benfeitores Fundadores.",
+      other:
+        "Você assentaria as pedras {from}–{to} das {count} de {city} e seria um dos Benfeitores Fundadores.",
+    },
     donations: { none: "Ainda sem doações", one: "{n} doação", other: "{n} doações" },
     status: { funded: "Meta batida, na fila", building: "Em construção", built: "No ar" },
     showAll: "Ver todas as cidades",
