@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "preview": "node scripts/preview.mjs",
+    "email-images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/email-images.mjs",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix && prettier --write .",
     "typecheck": "next typegen && tsc --noEmit",
