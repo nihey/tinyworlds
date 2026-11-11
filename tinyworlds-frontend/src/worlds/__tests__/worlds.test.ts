@@ -25,6 +25,8 @@ describe("resolveWorld", () => {
       "tinylax",
       "tinydal",
       "tinycvg",
+      "tinypit",
+      "tinyphl",
       "tinywinterfell",
       "tinykingslanding",
     ]) {
@@ -44,6 +46,8 @@ describe("resolveWorld", () => {
       "tinylax",
       "tinydal",
       "tinycvg",
+      "tinypit",
+      "tinyphl",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -172,13 +176,15 @@ describe("worlds", () => {
       "Límites de barrios",
     ]);
     // Dallas' and Cincinnati's districts are the cities on the map (Highland Park; Covington and
-    // Newport across the river); their outlines, the neighborhoods
-    for (const id of ["tinydal", "tinycvg"]) {
-      expect(LOCALES.map((locale) => WORLDS[id].copy[locale].borough)).toEqual([
-        "City",
-        "Cidade",
-        "Ciudad",
-      ]);
+    // Newport across the river); Pittsburgh's and Philadelphia's are their parts of town
+    // (Downtown, the North Side; Center City) and the towns round them; all four outline the
+    // neighborhoods
+    for (const id of ["tinydal", "tinycvg", "tinypit", "tinyphl"]) {
+      expect(LOCALES.map((locale) => WORLDS[id].copy[locale].borough)).toEqual(
+        id === "tinypit" || id === "tinyphl"
+          ? ["Area", "Região", "Zona"]
+          : ["City", "Cidade", "Ciudad"],
+      );
       expect(LOCALES.map((locale) => WORLDS[id].copy[locale].hoodLines.label)).toEqual([
         "Neighborhood lines",
         "Linhas dos bairros",
@@ -270,11 +276,20 @@ describe("worlds", () => {
     expect(WORLDS.tinylax.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
     expect(WORLDS.tinydal.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
     expect(WORLDS.tinycvg.copy["en-US"].about.notes[0]).toMatch(/number of floors/);
+    // Pittsburgh has about half its buildings measured, Philadelphia nearly all
+    expect(WORLDS.tinypit.copy["en-US"].about.notes[0]).toMatch(/about half/);
+    expect(WORLDS.tinyphl.copy["en-US"].about.notes[0]).toMatch(/nearly every building/);
   });
 
   it("light up their buildings, and play Guess the building only where they do", () => {
     const lit = Object.values(WORLDS).filter((world) => world.sights);
-    expect(lit.map((world) => world.id)).toEqual(["tinynyc", "tinydal", "tinycvg"]);
+    expect(lit.map((world) => world.id)).toEqual([
+      "tinynyc",
+      "tinydal",
+      "tinycvg",
+      "tinypit",
+      "tinyphl",
+    ]);
     // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
     for (const world of Object.values(WORLDS)) {
       if (world.quiz) expect(world.sights, world.id).toBe(true);

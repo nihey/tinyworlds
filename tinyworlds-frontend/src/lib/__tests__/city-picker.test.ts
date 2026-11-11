@@ -78,7 +78,16 @@ describe("pickerOptions", () => {
 
   it("never offers a city this site already has, going by the worlds registry", () => {
     const offered = pickerOptions([], CITY_CATALOGUE, "", BUILT_CITIES).more.map((c) => c.name);
-    for (const built of ["New York", "Orlando", "Valencia", "Las Vegas", "Los Angeles", "Dallas"])
+    for (const built of [
+      "New York",
+      "Orlando",
+      "Valencia",
+      "Las Vegas",
+      "Los Angeles",
+      "Dallas",
+      "Pittsburgh",
+      "Philadelphia",
+    ])
       expect(offered).not.toContain(built);
     expect(offered).toContain("Barcelona");
     // by another spelling it is recognised as built rather than offered as a new city
@@ -95,6 +104,12 @@ describe("pickerOptions", () => {
     expect(pickerOptions([], CITY_CATALOGUE, "dallas", BUILT_CITIES).typed).toBeNull();
     expect(pickerOptions([], CITY_CATALOGUE, "cincinnati", BUILT_CITIES).more).toEqual([]);
     expect(pickerOptions([], CITY_CATALOGUE, "cincinnati", BUILT_CITIES).typed).toBeNull();
+    // Pittsburgh and Philadelphia came from the catalogue; Philadelphia under its Portuguese and
+    // Spanish names as well
+    for (const name of ["pittsburgh", "philadelphia", "filadélfia", "filadelfia"]) {
+      expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).more, name).toEqual([]);
+      expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).typed, name).toBeNull();
+    }
     // the made-up places are worlds too: not to be funded again, under any of their names
     for (const name of [
       "Winterfell",

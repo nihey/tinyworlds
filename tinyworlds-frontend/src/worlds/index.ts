@@ -5,6 +5,8 @@ import { tinykingslanding } from "./tinykingslanding";
 import { tinylas } from "./tinylas";
 import { tinylax } from "./tinylax";
 import { tinynyc } from "./tinynyc";
+import { tinyphl } from "./tinyphl";
+import { tinypit } from "./tinypit";
 import { tinyorl } from "./tinyorl";
 import { tinyrao } from "./tinyrao";
 import { tinyvlc } from "./tinyvlc";
@@ -28,6 +30,8 @@ export const WORLDS: Record<string, World> = {
   tinylax,
   tinydal,
   tinycvg,
+  tinypit,
+  tinyphl,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,
