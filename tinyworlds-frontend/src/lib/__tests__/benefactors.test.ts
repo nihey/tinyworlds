@@ -53,6 +53,26 @@ describe("stonePreview", () => {
       keystone: false,
     });
   });
+  it("gives the final partial stone to the gift that reaches the goal", () => {
+    expect(stonePreview(0, 10050, 10050)).toEqual({
+      from: 1,
+      to: 101,
+      firstStone: true,
+      keystone: true,
+    });
+    expect(stonePreview(10010, 10050, 40)).toEqual({
+      from: 101,
+      to: 101,
+      firstStone: false,
+      keystone: true,
+    });
+    expect(stonePreview(0, 10050, 10000)).toEqual({
+      from: 1,
+      to: 100,
+      firstStone: true,
+      keystone: false,
+    });
+  });
   it("is null when the goal is reached or the gift is under a stone", () => {
     expect(stonePreview(10000, 10000, 500)).toBeNull();
     expect(stonePreview(150, 10000, 40)).toBeNull();
