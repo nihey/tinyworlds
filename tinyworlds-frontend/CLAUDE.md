@@ -107,6 +107,7 @@ src/
 │   ├── search.ts search-rules.ts   # matching; per-language abbreviations and number forms
 │   ├── engine.ts        # MapEngine
 │   ├── life.ts          # ferries and flights
+│   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
 │   └── __tests__/
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
@@ -326,8 +327,8 @@ frame: components call methods and subscribe with `engine.on("view" | "settle" |
 
 - **Tiles canvas** (`.map-tiles`): the pixel-art tiles, then _scene layers_. Sits under the
   tilt-shift blur and the dusk tint.
-- **Marks canvas** (`.map-marks`): neighbourhood lines, name plates, the search pin. Above the
-  blur, always sharp.
+- **Marks canvas** (`.map-marks`): neighbourhood lines, name plates, the building spotlight, the
+  search pin. Above the blur, always sharp.
 - View = centre in map px + `scale` (CSS px per map px). `scale ≥ 1` draws level 0 with smoothing
   off (chunky pixels, up to `manifest.maxScale`); below 1 it draws level
   `floor(log2(1 / (scale · min(dpr, 2))))` smoothed.
@@ -367,6 +368,33 @@ no depth information: no cars.
 
 Layers are called every frame while life is on; with `prefers-reduced-motion` they are called
 once per redraw with `timeMs = 0`. The live engine is also on `window.tinyworld` for the console.
+
+### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
+
+In a world with `sights: true` (New York), a building found in the search lights up under the
+mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
+outline cut out), a 2 px line of the accent runs round it, and a sign beside its top says what
+it is (type · context line, name), the opening of its Wikipedia article and "Read on Wikipedia".
+
+- **Data.** `sights.json` (outlines in map px) is asked for once the map has settled (or after
+  1.5 s), never before; `sights.<locale>.json` the first time a building lights up, and again
+  when the language changes. A world without `sights` never asks; a missing file is no spotlight
+  and no error (`loadSights`, `loadSightTexts`: a 404 is "none").
+- **Hit-testing** (`sightAt`): the outline holding the pointer, even-odd; of two, the one whose
+  footprint stands nearer the viewer (`front`). Throttled to a frame, like the neighbourhood
+  hover, which it beats where both apply. The cursor is a pointer over a sight (`over-sight`).
+- **Pinning** (`sight-state.ts`, pure): a click (or a tap: a finger has no hover) pins the
+  building, so the sign takes the pointer and its link can be reached; a click elsewhere, the
+  sign's close button or Esc lets it go; a second click on it too. Double-tap zoom is unchanged.
+  The pinned sign is a labelled group, not a dialog, so the map's keys keep working.
+- **The sign** (`SightSign`) is placed through a ref on every `view` event (`placeSign`: right of
+  the anchor, or left where there is no room; out of the way of the map's own signs at the top,
+  the search, the banner and the tools, by moving left of a column or below a sign that spans
+  the screen; always whole on screen); `signContent` builds what it says. A finger's tap also
+  ends any hover a mouse left behind (`tap`), and a mouse leaving the map always ends its own. The article's text carries its own `lang` (English stands in where the visitor's
+  language has none). About credits Wikipedia (CC BY-SA 4.0) in the visitor's language.
+- The outline is the whole building, so a lower one standing in front of it lights up where it
+  overlaps: the viewer has no depth information.
 
 ## Design
 

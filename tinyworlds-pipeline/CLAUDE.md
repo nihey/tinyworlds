@@ -26,7 +26,8 @@ npm run cli -- --city tinyrao scene             # raw data → data/<city>/scene
 npm run cli -- --city tinyrao render            # scene → ../tinyworlds-frontend/public/data/<city>
 npm run cli -- render --around -73.9857,40.7484,1500   # only redraw near a point
 npm run cli -- render --pyramid-only                    # rebuild the coarse levels from level 0
-npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json
+npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json (+ sights.json)
+npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
@@ -85,7 +86,13 @@ src/
 │   ├── plate.ts       # a picture cut from a world's finished tiles (any world, no scene needed)
 │   ├── home-card.ts   # the front page's share card: six cities in leaning slices, from their tiles
 │   ├── bin.ts run.ts worker.ts pyramid.ts encode.ts scene.ts
-└── index/build.ts     # search index, area outlines, ferry routes and flights (from data)
+└── index/
+    ├── build.ts       # search index, area outlines, ferry routes and flights (from data)
+    ├── sights.ts      # which search entries are sights and what they are called; sights.json
+    ├── structures.ts  # the structure an entry stands on, found in the scene
+    ├── silhouette.ts  # a structure's outline as the map draws it (polygon-clipping)
+    ├── write-sights.ts  # the sights pass of `index`
+    └── wiki.ts        # the `wiki` step: each sight's Wikipedia article, cached
 ```
 
 The renderer (`render/`) never imports the city: everything it needs is in the scene (including
@@ -245,6 +252,41 @@ river, an islet, the Wall).
 - The geography is sketched from nothing but the commonly known arrangement of the world and
   roughened by code. Do not trace a map, official or fan-made, into it.
 
+## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
+
+A city with `sights` (New York) gets `sights.json` from `index` and `sights.<locale>.json` from
+`wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
+one or more search entries point at.
+
+- **Which entries.** Curated ones only when flagged `sight: true` (one building, stadium,
+  statue or bridge; never an area: Times Square, Wall Street, Rockefeller Center, the airports
+  stay unflagged); every named building from the building data; the points of interest, except
+  the categories that are areas (`college_university`, `airport`, `zoo`, `amusement_park`); rail
+  and subway stations. Streets, hoods, boroughs and parks never.
+- **Finding the structure** (`makeFinder`): a bridge by its roads' names (the scene's
+  `owners.json`; a name inside "Ed Koch Queensboro Bridge Upper Level" counts), the statue within
+  30 m, a stadium's stands from a point anywhere in its grounds (`land_use` class `stadium`), a
+  building entry's own building by its seed, else the building whose footprint holds the point,
+  within 4 m. A building is all the volumes with its seed (`hashString` of its id, which its parts
+  share) within 300 m. An entry on nothing is no sight.
+- **Naming** (`resolveSights`): the curated entry, else the building's own name (as the type
+  `building`), else the best-ranked entry. A point of interest never renames a building that
+  has a name of its own. When the index drops a building entry as a duplicate of a curated one,
+  its seed moves to the curated entry (One World Trade Center's hand-picked point misses its
+  footprint by 5 m).
+- **The outline** (`silhouette`): every volume's footprint swept from its underside to its top
+  (`base` to `top + roofH`, in px), merged and simplified to a pixel, in map px.
+- **The scene keeps the owners** of what is not a building (`owners.json` beside it): a bridge's
+  decks, piers, towers and cantilever steel under its roads' name, each statue's pieces.
+- **Wikipedia** (`wiki`): the English article whose title matches the sight's name (normalised:
+  case, accents, punctuation, a leading "The", a trailing "(…)") among those within 300 m of its
+  point, then its Portuguese and Spanish versions through the language links; for each, the
+  summary's opening, whole sentences up to 220 characters. A doubtful match is none. Every answer
+  is cached in `data/<city>/raw/wikipedia/` (a missing page as `null`), so a rerun asks nothing;
+  `--force` asks again. Requests go one at a time, 100 ms apart, with `WIKI_USER_AGENT` (the
+  project's public page; no person). `sights.wikipedia` in the city forces a title by sight
+  name, or `null` for none, for the misses and the wrong ones.
+
 ## How a tile is drawn (`render/chunk.ts`)
 
 1. **Ground kinds.** Every ground pixel gets a kind (water, pavement, park, road…). Polygons are
@@ -315,6 +357,7 @@ raster is read as the median inside the footprint and corrected with a curve fit
 | NYC Open Data                       | borough boundaries, 2020 NTAs, 2015 street tree census                        | public domain                                       |
 | Google Open Buildings 2.5D Temporal | building heights estimated from satellite imagery (4 m raster), for `tinyrao` | CC BY 4.0                                           |
 | IBGE, Censo 2022                    | Ribeirão Preto's planning sub-sectors ("bairros" layer)                       | open, attribution                                   |
+| Wikipedia (en, pt, es)              | the openings of the sights' articles, and their links (`wiki`)                | CC BY-SA 4.0                                        |
 
 `data/` (raw downloads and scenes, per city) is gitignored and reproducible.
 
