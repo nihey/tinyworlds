@@ -31,6 +31,7 @@ describe('cityStanding', () => {
     expect(s.founders).toEqual([
       {
         number: 1,
+        donorId: 'd1',
         name: 'Marta',
         amountCents: 1200,
         stones: 12,
@@ -49,6 +50,7 @@ describe('cityStanding', () => {
     );
     expect(s.founders[1]).toEqual({
       number: 2,
+      donorId: 'd2',
       name: 'Bia',
       amountCents: 5000,
       stones: 20,
@@ -132,9 +134,9 @@ describe('cityStanding', () => {
       GOAL,
     );
     expect(s.benefactors).toEqual([
-      { rank: 1, name: 'Xu', amountCents: 12_000 },
-      { rank: 2, name: null, amountCents: 2500 },
-      { rank: 3, name: null, amountCents: 2500 },
+      { rank: 1, donorId: 'dx', name: 'Xu', amountCents: 12_000 },
+      { rank: 2, donorId: null, name: null, amountCents: 2500 },
+      { rank: 3, donorId: null, name: null, amountCents: 2500 },
     ]);
   });
 
@@ -147,7 +149,10 @@ describe('cityStanding', () => {
       ],
       GOAL,
     );
-    expect(s.benefactors).toEqual([{ rank: 1, name: null, amountCents: 1000 }]);
+    // unnamed, so the row does not say whose it is, though the gift has a donor
+    expect(s.benefactors).toEqual([
+      { rank: 1, donorId: null, name: null, amountCents: 1000 },
+    ]);
   });
 
   it('orders by time, not by input order', () => {

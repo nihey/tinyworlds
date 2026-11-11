@@ -2,6 +2,10 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input AddLinkInput {
+  url: String!
+}
+
 """Someone signed in to the admin pages"""
 type Admin {
   email: String!
@@ -37,18 +41,48 @@ input AnswerQuizInput {
   world: String!
 }
 
+"""
+A page a named donor points to, as the page describes itself (read when the link was saved)
+"""
+type BenefactorLink {
+  description: String
+
+  """
+  The site's icon, a copy kept here: a path on this API's host (/api/link-images/<id>)
+  """
+  icon: String
+
+  """
+  The page's picture, likewise; null when it has none, or on a public list while the donor has given less than what shows pictures
+  """
+  image: String
+
+  """The page's title; the link's host and path when it gave none"""
+  title: String!
+  url: String!
+}
+
 """A name donors asked to show, for admins to review"""
 type BenefactorName {
   cities: [String!]!
   donorId: ID!
   hidden: Boolean!
   lastGiftAt: DateTime!
+
+  """
+  The donor's links, hidden or not, each with its picture: what there is to review
+  """
+  links: [BenefactorLink!]!
+  linksHidden: Boolean!
   name: String!
 }
 
 """A benefactor: gave once the city had its goal"""
 type BenefactorRow {
   amountCents: Int!
+
+  """The named benefactor's links; none for one who is not named"""
+  links: [BenefactorLink!]!
   name: String
 
   """By amount given, from 1"""
@@ -199,6 +233,11 @@ type FounderRow {
   """Laid the last stone"""
   keystone: Boolean!
 
+  """
+  The named founder's links (at most three); none for one who is not named
+  """
+  links: [BenefactorLink!]!
+
   """The public name; null when the founder is not named"""
   name: String
 
@@ -309,7 +348,17 @@ type FunnelWorld {
   world: String
 }
 
+"""One of the donor's own links, by its id"""
+input LinkIdInput {
+  id: ID!
+}
+
 type Mutation {
+  """
+  Saves a link to a public https page and reads what the page says of itself
+  """
+  addLink(input: AddLinkInput!): MyLink!
+
   """
   Records which name a visit picked for a building in "Guess the building" (once per visit, building and difficulty) and answers how everyone has answered it at that difficulty.
   """
@@ -320,8 +369,17 @@ type Mutation {
   """
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
 
+  """Reads the page of one of the donor's links again"""
+  refreshLink(input: LinkIdInput!): MyLink!
+
+  """Takes one of the donor's links away"""
+  removeLink(input: LinkIdInput!): Boolean!
+
   """Saves the cleaned name and answers it"""
   setDisplayName(input: SetDisplayNameInput!): String!
+
+  """Hides (or shows again) a donor's links everywhere; their name stays"""
+  setLinksHidden(input: SetLinksHiddenInput!): Boolean!
 
   """Name the donor (or not) for all their gifts to a city"""
   setListing(input: SetListingInput!): Boolean!
@@ -374,9 +432,54 @@ type MyGiving {
   projectCents: Int!
 }
 
+"""One of the signed-in donor's own links"""
+type MyLink {
+  description: String
+
+  """
+  The site's icon, a copy kept here: a path on this API's host (/api/link-images/<id>)
+  """
+  icon: String
+  id: ID!
+
+  """
+  The page's picture, likewise; null when it has none, or on a public list while the donor has given less than what shows pictures
+  """
+  image: String
+
+  """The page's title; the link's host and path when it gave none"""
+  title: String!
+  url: String!
+}
+
+"""The signed-in donor's links, and what shows of them"""
+type MyLinks {
+  """Everything the donor has given, in US cents"""
+  givenCents: Int!
+
+  """An admin has taken the links off the public lists"""
+  hidden: Boolean!
+
+  """In the order they were added"""
+  links: [MyLink!]!
+
+  """How many links a donor may have"""
+  max: Int!
+
+  """
+  From this much given, in US cents, the links' pictures show on the public lists
+  """
+  picturesFromCents: Int!
+}
+
 type Query {
   """Donors with a name and a listed gift, newest gift first (at most 100)"""
   benefactorNames: [BenefactorName!]!
+
+  """
+  Everyone who gave to a city, largest first: named donors with their links, unnamed gifts as "anonymous" (at most 200)
+  """
+  benefactorWall: [WallBenefactor!]!
 
   """
   A city's stones, founders and benefactors, by slug or by world; null for an unknown or hidden city
@@ -401,6 +504,9 @@ type Query {
 
   """The signed-in donor's own giving"""
   myGiving: MyGiving!
+
+  """The signed-in donor's links, and what decides what shows"""
+  myLinks: MyLinks!
 
   """Seconds since this API process started"""
   uptime: Int!
@@ -438,6 +544,13 @@ type QuizTally {
 
 input SetDisplayNameInput {
   name: String!
+}
+
+input SetLinksHiddenInput {
+  donorId: ID!
+
+  """Whether the links are kept off the lists"""
+  hidden: Boolean!
 }
 
 input SetListingInput {
@@ -482,6 +595,37 @@ input TrackPresenceInput {
   The world whose map is open: "tinynyc"
   """
   world: String!
+}
+
+"""
+One entry of the wall of everyone who gave to a city: a named donor, or one unnamed gift
+"""
+type WallBenefactor {
+  """
+  A named donor: everything they are named for, in US cents; an unnamed gift: its own amount
+  """
+  amountCents: Int!
+
+  """
+  Where they gave, the city they gave most to first; one city for an unnamed gift
+  """
+  cities: [WallCity!]!
+  lastGiftAt: DateTime!
+
+  """A named donor's links; none for an unnamed gift"""
+  links: [BenefactorLink!]!
+
+  """The public name; null for an unnamed gift ("anonymous")"""
+  name: String
+}
+
+"""A city someone on the wall gave to"""
+type WallCity {
+  name: String!
+  slug: String!
+
+  """The id of its map once it is built ("tinynyc")"""
+  worldId: String
 }
 
 """How many visits a world has had, and how many are there now"""

@@ -15,6 +15,8 @@ import {
 import type { Env } from '../config/env.js';
 import { BenefactorsService } from '../benefactors/benefactors.service.js';
 import { FunnelService } from '../funnel/funnel.service.js';
+import { createLinkReader } from '../links/link-reader.js';
+import { LinksService } from '../links/links.service.js';
 import { VisitsService } from '../visits/visits.service.js';
 import { DonationsService } from './donations.service.js';
 import { ThanksService } from './thanks.service.js';
@@ -42,7 +44,11 @@ function setup() {
     prisma.asService(),
     config,
     mailer,
-    new BenefactorsService(prisma.asService()),
+    // the thank-you reads gifts, never links
+    new BenefactorsService(
+      prisma.asService(),
+      new LinksService(prisma.asService(), createLinkReader()),
+    ),
     new VisitsService(prisma.asService()),
   );
   const send = vi.spyOn(thanks, 'send');
