@@ -9,7 +9,8 @@ import type { Sight, SightText } from "@/map/sights";
 import { cn } from "@/lib/utils";
 
 /** The map's own signs at the top, which the building's sign must not slide under. */
-const MAP_SIGNS = '.map-root [role="search"], .map-root .other-places, .map-root nav';
+const MAP_SIGNS =
+  '.map-root [role="search"], .map-root .other-places, .map-root .quiz-invite, .map-root .quiz-card, .map-root nav';
 
 interface SightSignProps {
   engine: MapEngine;

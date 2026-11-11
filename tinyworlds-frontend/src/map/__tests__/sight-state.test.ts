@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HOLD_MS,
+  hold,
   hover,
   keepInView,
   leave,
@@ -93,5 +94,30 @@ describe("a sight the view leaves behind", () => {
 
   it("does not ask about anything when nothing is lit", () => {
     expect(keepInView(idle, () => false)).toBe(idle);
+  });
+});
+
+describe("a sight held lit (Guess the building)", () => {
+  const busy: SightState = { hovered: "a", pinned: "c", leftAt: null };
+
+  it("lights only the held sight, as a pinned one", () => {
+    expect(shown(hold(busy, "b"))).toEqual({ id: "b", pinned: true });
+  });
+
+  it("ignores the pointer, the taps, Esc and the view while it holds", () => {
+    const held = hold(busy, "b");
+    expect(hover(held, "c", 5)).toBe(held);
+    expect(hover(held, null, 5)).toBe(held);
+    expect(press(held, "c")).toBe(held);
+    expect(tap(held, null)).toBe(held);
+    expect(leave(held)).toBe(held);
+    expect(release(held)).toBe(held);
+    expect(keepInView(held, () => false)).toBe(held);
+  });
+
+  it("lets go of everything when the hold ends, and the pointer works again", () => {
+    const free = hold(hold(busy, "b"), null);
+    expect(shown(free)).toBeNull();
+    expect(shown(hover(free, "c"))).toEqual({ id: "c", pinned: false });
   });
 });

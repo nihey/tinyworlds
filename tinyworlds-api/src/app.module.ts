@@ -15,6 +15,7 @@ import { FunnelModule } from './funnel/funnel.module.js';
 import { HealthResolver } from './health/health.resolver.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { VisitsModule } from './visits/visits.module.js';
+import { QuizModule } from './quiz/quiz.module.js';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -41,6 +42,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     DonationsModule,
     FunnelModule,
     VisitsModule,
+    QuizModule,
   ],
   providers: [
     {

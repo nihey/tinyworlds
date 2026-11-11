@@ -45,13 +45,17 @@ Each sub-project has its own `CLAUDE.md`.
 
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
-- **The API exists only for donations.** Each proposed city is built when donations for it reach
+- **The API exists for donations** (and keeps the answers of "Guess the building", below). Each proposed city is built when donations for it reach
   its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
   ranking) and start a Stripe Checkout through `createDonationCheckout` for the city and amount
   the donor chose; a Stripe webhook records what was paid. If
   the API is unreachable the viewer falls back to static payment links, so donating never
   depends on it.
+- **Guess the building** (New York): a lit building, its Wikipedia opening with the name
+  blanked, four names to pick from (`quiz.<locale>.json`, made by the pipeline). Each answer
+  goes to `answerQuiz`, once per visit and building, which answers how everyone has answered
+  that building; without the API the game plays on without the shares.
 - **The funnel is the site's own.** Every page says to the API that a visit opened it, and
   then which steps towards a donation that visit took (the donate sign, the checkout, giving
   up); a visit is a tab's stay, named by an id made up in the browser and kept nowhere else
@@ -125,7 +129,8 @@ data/<world>/
 ├── life.json                # ferry routes and flights for the animated layer
 ├── sights.json              # buildings that light up under the pointer (worlds with sights)
 ├── sights/<hash>.webp       # each of them drawn on its own, nothing in front of it
-└── sights.<locale>.json     # their Wikipedia openings: en-US, pt-BR, es-ES
+├── sights.<locale>.json     # their Wikipedia openings: en-US, pt-BR, es-ES
+└── quiz.<locale>.json       # Guess the building's questions (worlds with sights)
 ```
 
 ### Map space and projection
@@ -244,6 +249,26 @@ outlined as the map draws it, and what Wikipedia says of them. Only for a world 
 Optional for the viewer: without them nothing lights up; without a sight's picture it still
 lights up, as far as the map shows it.
 
+### quiz.<locale>.json
+
+The questions of "Guess the building", one file per interface language, made by the
+pipeline's `quiz` step from `sights.json` and `sights.<locale>.json`: each sight with an article,
+its opening with the name blanked out, and three other sights to offer beside it (of the same
+kind, nearest first; the same three in every language, so a building's tallies mean the same
+thing everywhere).
+
+```ts
+// { questions: {
+//   id: string;                          // the sight asked about (sights.json)
+//   decoys: [string, string, string];    // three other sights' ids: the wrong names
+//   parts: string[];                     // the text in pieces; the odd ones (1, 3, …) are blanked.
+//                                        // parts.join("") is the text as sights.<locale>.json has it
+//   lang: string;                        // the text's own language ("en" where the visitor's has none)
+// }[] }
+```
+
+Optional for the viewer: a world without it has no game.
+
 ## API contract (viewer ↔ API)
 
 GraphQL at `/api/graphql` (same origin in production):
@@ -265,10 +290,14 @@ type DonationCheckout { url: String! }
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
 input TrackPresenceInput { visitId: ID!  world: String!  locale: String }
+input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  locale: String }
+type QuizPick { choice: String!  count: Int! }
+type QuizTally { answers: Int!  picks: [QuizPick!]! }       # picks: most picked first
 type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
   trackPresence(input: TrackPresenceInput!): Boolean!               # a map, every 30 s while in view
+  answerQuiz(input: AnswerQuizInput!): QuizTally!           # public, 30 a minute per address
 }
 # donors only (Authorization: Bearer <a donor's session>):
 #   query    myGiving: MyGiving!                         # their cities, stones, badges, listing
@@ -282,7 +311,9 @@ type Mutation {
 
 `amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
 (from US$1). `visitId` is the tab's visit (a UUID from session storage); `world` is a world's id
-or `"home"`. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
+or `"home"`. In `answerQuiz`, `sightId` is the building asked about and `choice` the sight id
+picked (right when they are equal); a visit's answer to a building is kept once, and without
+`visitId` none is kept but the tally is still answered. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
 city's benefactors for this gift; without it the gift is counted and not listed. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
 `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
 `POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered

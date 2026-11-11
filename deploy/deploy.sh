@@ -69,6 +69,10 @@ world_problems() {
   grep -q "\`$world\`" "$ROOT/CLAUDE.md" || echo "not in the worlds table of CLAUDE.md"
   grep -q "$world" "$ROOT/README.md" || echo "not in README.md"
   grep -q "\`$world\`" "$FRONTEND/CLAUDE.md" || echo "not in tinyworlds-frontend/CLAUDE.md"
+  if grep -q "quiz: true" "$FRONTEND/src/worlds/$world.ts" 2>/dev/null &&
+    [[ ! -f "$FRONTEND/public/data/$world/quiz.en-US.json" ]]; then
+    echo "no quiz (run 'npm run cli -- --city $world quiz' in tinyworlds-pipeline)"
+  fi
 }
 
 # Checks every world in the registry; lists everything missing at once, and fails if anything is.
@@ -209,7 +213,8 @@ upload() {
           rsync -az --delete "$data/sights/" "$DEPLOY_HOST:$site/data/sights/" || return
         fi
         local indexes=("$data/places.json" "$data/hoods.json" "$data/life.json") sight
-        for sight in "$data"/sights*.json; do [[ -e "$sight" ]] && indexes+=("$sight"); done
+        # the sights' texts, and Guess the building's questions where the world has them
+        for sight in "$data"/sights*.json "$data"/quiz*.json; do [[ -e "$sight" ]] && indexes+=("$sight"); done
         rsync -az "${indexes[@]}" "$DEPLOY_HOST:$site/data/" || return
         # the manifest last: it names the indexes' version, so visitors ask for them anew
         rsync -a "$data/manifest.json" "$DEPLOY_HOST:$site/data/manifest.json" || return

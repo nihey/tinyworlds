@@ -414,6 +414,38 @@ export interface Strings {
     /** the link to its Wikipedia article */
     readOn: string;
   };
+  /** Guess the building: the sign that starts it and the card a round is played on */
+  quiz: {
+    /** the sign under "more cities" */
+    invite: string;
+    /** the card's header, in the pixel face */
+    title: string;
+    /** "round {round} · {right} right" */
+    score: string;
+    /** aria-label of the card's close button */
+    close: string;
+    /** the question, by what the building is */
+    ask: { building: string; station: string; bridge: string; museum: string };
+    /** under the text: where it comes from, and that it was changed */
+    source: string;
+    /** under the text once it is whole: where it comes from */
+    credit: string;
+    /** what a screen reader says for a blank */
+    blank: string;
+    right: string;
+    /** "Not quite. It's {name}." */
+    wrong: string;
+    /** beside the visitor's own pick */
+    you: string;
+    /** how many have answered this building, with {n} */
+    people: { one: string; other: string };
+    /** when the visitor is the only one so far */
+    first: string;
+    next: string;
+    stop: string;
+    loading: string;
+    empty: string;
+  };
   errors: {
     answered: (url: string, status: number) => string;
     noCanvas: string;

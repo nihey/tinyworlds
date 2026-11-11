@@ -151,6 +151,18 @@ export interface City {
      * towers, its lower deck, its subway): those pieces within the bridge's extent light up too.
      */
     bridges?: Record<string, string[]>;
+    /**
+     * The city's own name in the three languages and its other place words, which "Guess the
+     * building" (the `quiz` step) never blanks out of a text: "New York" in "New York Life
+     * Building" says nothing about which building it is. The sights' context lines (boroughs)
+     * count without being listed.
+     */
+    placeWords?: string[];
+    /**
+     * Other names a sight's articles call it by that would give it away in Guess the building
+     * ("the Met", "One WTC"), by lower-case sight name: blanked like its name.
+     */
+    aliases?: Record<string, string[]>;
   };
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };

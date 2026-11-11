@@ -12,6 +12,7 @@ import type { Locale } from "@/i18n/locale";
 import { WORLD } from "@/worlds";
 import type { Flight, LifeFile } from "./life";
 import { parseSights, parseSightTexts, type Sight, type SightTexts } from "./sights";
+import { parseQuiz, type QuizQuestion } from "./quiz";
 
 const trimSlashes = (value: string | undefined): string => (value ?? "").trim().replace(/\/+$/, "");
 
@@ -109,6 +110,15 @@ export async function loadSightTexts(
   signal?: AbortSignal,
 ): Promise<SightTexts> {
   return parseSightTexts(await getOptionalJson(dataUrl(`sights.${locale}.json`, build), signal));
+}
+
+/** Guess the building's questions in one interface language. None when the file is missing. */
+export async function loadQuiz(
+  build: string,
+  locale: Locale,
+  signal?: AbortSignal,
+): Promise<QuizQuestion[]> {
+  return parseQuiz(await getOptionalJson(dataUrl(`quiz.${locale}.json`, build), signal));
 }
 
 export async function loadHoods(build: string, signal?: AbortSignal): Promise<Hood[]> {

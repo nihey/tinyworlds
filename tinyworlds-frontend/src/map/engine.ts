@@ -5,6 +5,7 @@ import type { Hood, Manifest } from "./manifest";
 import { createProjection, type GeoPoint, type MapPoint, type Projection } from "./projection";
 import {
   HOLD_MS,
+  hold,
   hover,
   keepInView,
   leave,
@@ -499,6 +500,15 @@ export class MapEngine {
   /** Let the pinned sight go (Esc, the sign's close button). */
   releaseSight(): void {
     this.setSightState(release(this.sightState));
+  }
+
+  /**
+   * Hold one sight lit whatever the pointer does (a round of Guess the building), or let it go
+   * (null). While it holds, no other sight lights up, and Esc or the view moving away do not
+   * let it go: only the page does.
+   */
+  holdSight(id: string | null): void {
+    this.setSightState(hold(this.sightState, id));
   }
 
   /** Where a sight's sign hangs, in CSS px on screen. */
