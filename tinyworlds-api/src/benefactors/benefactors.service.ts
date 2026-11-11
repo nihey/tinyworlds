@@ -84,7 +84,7 @@ export class BenefactorsService {
       );
     }
     const cities = await this.prisma.city.findMany({
-      where: { id: { in: [...latest.keys()] }, hidden: false },
+      where: { id: { in: [...latest.keys()] } },
     });
     const when = (id: string) => latest.get(id) ?? 0;
     cities.sort(
