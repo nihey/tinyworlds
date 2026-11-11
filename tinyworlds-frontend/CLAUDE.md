@@ -383,6 +383,10 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 - **Hit-testing** (`sightAt`): the outline holding the pointer, even-odd; of two, the one whose
   footprint stands nearer the viewer (`front`). Throttled to a frame, like the neighbourhood
   hover, which it beats where both apply. The cursor is a pointer over a sight (`over-sight`).
+- **No flicker.** Crossing the street between two towers does not flash the whole map: a sight
+  stays lit for `HOLD_MS` (150 ms) after the pointer leaves it for open ground, another sight
+  takes over at once, and the spotlight fades in over 120 ms when it comes on from nothing (not
+  under `prefers-reduced-motion`). The mouse leaving the map lets go at once.
 - **Pinning** (`sight-state.ts`, pure): a click (or a tap: a finger has no hover) pins the
   building, so the sign takes the pointer and its link can be reached; a click elsewhere, the
   sign's close button or Esc lets it go; a second click on it too. Double-tap zoom is unchanged.

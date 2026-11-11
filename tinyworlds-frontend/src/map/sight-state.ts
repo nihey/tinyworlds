@@ -5,11 +5,32 @@
 export interface SightState {
   hovered: string | null;
   pinned: string | null;
+  /** when the pointer left the hovered sight for open ground (it is held a moment), else null */
+  leftAt: number | null;
 }
 
-/** The pointer is over this sight now (null: over none). Unchanged state comes back as it was. */
-export function hover(s: SightState, id: string | null): SightState {
-  return s.hovered === id ? s : { ...s, hovered: id };
+/**
+ * How long a sight stays lit after the pointer leaves it for open ground (ms): crossing the
+ * street between two towers does not flash the whole map.
+ */
+export const HOLD_MS = 150;
+
+/**
+ * The pointer is over this sight at `now` (null: over none). Another sight takes over at once;
+ * open ground lets the last one go only once it has been open ground for HOLD_MS. Unchanged
+ * state comes back as it was.
+ */
+export function hover(s: SightState, id: string | null, now = 0): SightState {
+  if (id !== null)
+    return s.hovered === id && s.leftAt === null ? s : { ...s, hovered: id, leftAt: null };
+  if (s.hovered === null) return s;
+  if (s.leftAt === null) return { ...s, leftAt: now };
+  return now - s.leftAt >= HOLD_MS ? { ...s, hovered: null, leftAt: null } : s;
+}
+
+/** The mouse left the map: nothing is hovered, at once. */
+export function leave(s: SightState): SightState {
+  return s.hovered === null ? s : { ...s, hovered: null, leftAt: null };
 }
 
 /** A click or a tap on this sight (null: on none). Pressing the pinned sight again lets it go. */
@@ -20,7 +41,7 @@ export function press(s: SightState, id: string | null): SightState {
 
 /** A finger's tap: a press, and the end of any hover a mouse left behind (a finger has none). */
 export function tap(s: SightState, id: string | null): SightState {
-  return press(hover(s, null), id);
+  return press(leave(s), id);
 }
 
 /** Esc or the sign's close button. */

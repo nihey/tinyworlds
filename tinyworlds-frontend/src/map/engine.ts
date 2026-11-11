@@ -3,7 +3,7 @@ import { WORLD } from "@/worlds";
 import { buildHoodShapes, hoodAt, type HoodShape } from "./hoods";
 import type { Hood, Manifest } from "./manifest";
 import { createProjection, type GeoPoint, type MapPoint, type Projection } from "./projection";
-import { hover, press, release, shown, tap, type SightState } from "./sight-state";
+import { HOLD_MS, hover, leave, press, release, shown, tap, type SightState } from "./sight-state";
 import { buildSightShapes, sightAt, type Sight, type SightShape } from "./sights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
 
@@ -109,6 +109,8 @@ function hexToRgb(hex: string): string {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** How long the spotlight takes to come on from nothing (ms). */
+const SPOT_FADE_MS = 120;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 export class MapEngine {
@@ -194,7 +196,11 @@ export class MapEngine {
   private marksDrawn = false;
   private sights: SightShape[] = [];
   private sightIndex = new Map<string, number>();
-  private sightState: SightState = { hovered: null, pinned: null };
+  private sightState: SightState = { hovered: null, pinned: null, leftAt: null };
+  /** lets a held sight go once the pointer has stayed on open ground (sight-state's HOLD_MS) */
+  private holdTimer: ReturnType<typeof setTimeout> | null = null;
+  /** when the spotlight came on from nothing (it fades in), or -1 while it is off */
+  private spotT0 = -1;
   private shownKey = "";
 
   // scene
@@ -266,6 +272,7 @@ export class MapEngine {
     this.destroyed = true;
     cancelAnimationFrame(this.raf);
     if (this.settleTimer) clearTimeout(this.settleTimer);
+    if (this.holdTimer) clearTimeout(this.holdTimer);
     this.resizeObserver.disconnect();
     window.removeEventListener("resize", this.onWindowResize);
     const c = this.canvas;
@@ -449,7 +456,7 @@ export class MapEngine {
   setSights(sights: Sight[]): void {
     this.sights = buildSightShapes(sights);
     this.sightIndex = new Map(this.sights.map((s, i) => [s.id, i]));
-    this.setSightState({ hovered: null, pinned: null });
+    this.setSightState({ hovered: null, pinned: null, leftAt: null });
     this.invalidate();
   }
 
@@ -582,8 +589,9 @@ export class MapEngine {
     this.emitView();
 
     const pinDropping = this.pin !== null && now - this.pin.t0 < 320 && !this.reducedMotion;
-    if (this.moving || fading || lifeRuns || pinDropping || this.dirty) {
-      if (fading || pinDropping) this.dirty = true;
+    const spotFading = this.spotT0 >= 0 && now - this.spotT0 < SPOT_FADE_MS && !this.reducedMotion;
+    if (this.moving || fading || lifeRuns || pinDropping || spotFading || this.dirty) {
+      if (fading || pinDropping || spotFading) this.dirty = true;
       if (!this.raf) this.raf = requestAnimationFrame(this.frame);
     } else {
       this.lastFrame = 0;
@@ -899,17 +907,20 @@ export class MapEngine {
     if (!show) return;
 
     if (this.hoodLines && this.hoods.length > 0) this.drawHoods();
-    if (lit) this.drawSpotlight(lit.id);
+    if (lit) this.drawSpotlight(lit.id, now);
     if (this.pin) this.drawPin(now);
   }
 
   /** The rest of the map dims; the sight keeps its colour inside a thin line of the accent. */
-  private drawSpotlight(id: string): void {
+  private drawSpotlight(id: string, now: number): void {
     const i = this.sightIndex.get(id);
     if (i === undefined) return;
     const sight = this.sights[i];
     const { mctx: ctx, view: v } = this;
     const s = v.scale * v.dpr;
+    // it comes on softly from nothing; from one building to the next it simply moves
+    ctx.globalAlpha =
+      this.reducedMotion || this.spotT0 < 0 ? 1 : clamp((now - this.spotT0) / SPOT_FADE_MS, 0, 1);
     const trace = () => {
       for (const ring of sight.paths) {
         ctx.moveTo(ring[0], ring[1]);
@@ -932,6 +943,7 @@ export class MapEngine {
     ctx.strokeStyle = TAXI;
     ctx.lineWidth = 2 / v.scale; // two CSS px, in map units
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   private drawHoods(): void {
@@ -1099,10 +1111,22 @@ export class MapEngine {
   private setSightState(next: SightState): void {
     if (next === this.sightState) return;
     this.sightState = next;
-    this.canvas.classList.toggle("over-sight", next.hovered !== null);
+    this.canvas.classList.toggle("over-sight", next.hovered !== null && next.leftAt === null);
+    // a sight held after the pointer left it lets go once the hold is over, unless taken again
+    if (this.holdTimer) clearTimeout(this.holdTimer);
+    this.holdTimer =
+      next.leftAt === null
+        ? null
+        : setTimeout(() => {
+            this.holdTimer = null;
+            if (this.sightState.leftAt !== null)
+              this.setSightState(hover(this.sightState, null, performance.now()));
+          }, HOLD_MS);
     const lit = shown(next);
     const key = lit ? `${lit.id}|${lit.pinned}` : "";
     if (key === this.shownKey) return;
+    if (!lit) this.spotT0 = -1;
+    else if (!this.shownKey) this.spotT0 = performance.now();
     this.shownKey = key;
     for (const listener of this.listeners.sight) listener(lit);
     this.invalidate();
@@ -1171,7 +1195,7 @@ export class MapEngine {
             if (this.destroyed || !this.hoverPoint) return;
             const { x, y } = this.hoverPoint;
             const sight = this.sightUnder(x, y);
-            this.setSightState(hover(this.sightState, sight));
+            this.setSightState(hover(this.sightState, sight, performance.now()));
             if (this.hoodLines) this.setHoveredHood(sight ? -1 : this.hoodUnder(x, y));
           });
         }
@@ -1280,7 +1304,7 @@ export class MapEngine {
     this.hoverPoint = null;
     if (this.lastPointerType === "mouse") this.setHoveredHood(-1);
     // the mouse is gone, whatever pressed last (a touch-screen laptop has both)
-    if (e.pointerType === "mouse") this.setSightState(hover(this.sightState, null));
+    if (e.pointerType === "mouse") this.setSightState(leave(this.sightState));
   };
 
   private readonly onWheel = (e: WheelEvent): void => {

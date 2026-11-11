@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { hover, press, release, shown, tap, type SightState } from "../sight-state";
+import { HOLD_MS, hover, leave, press, release, shown, tap, type SightState } from "../sight-state";
 
-const idle: SightState = { hovered: null, pinned: null };
+const idle: SightState = { hovered: null, pinned: null, leftAt: null };
 
 describe("the sight under the pointer", () => {
   it("does not change while the pointer stays on the same sight", () => {
@@ -10,8 +10,22 @@ describe("the sight under the pointer", () => {
     expect(hover(idle, null)).toBe(idle);
   });
 
-  it("clears when the pointer leaves every sight", () => {
-    expect(shown(hover(hover(idle, "a"), null))).toBeNull();
+  it("holds a sight a moment after the pointer leaves it for open ground, then clears", () => {
+    const off = hover(hover(idle, "a", 0), null, 1000);
+    expect(shown(off)).toEqual({ id: "a", pinned: false });
+    expect(shown(hover(off, null, 1000 + HOLD_MS - 1))).toEqual({ id: "a", pinned: false });
+    expect(shown(hover(off, null, 1000 + HOLD_MS))).toBeNull();
+  });
+
+  it("goes straight to the next sight, and crossing a gap does not let go", () => {
+    const off = hover(hover(idle, "a", 0), null, 1000);
+    expect(shown(hover(off, "b", 1050))).toEqual({ id: "b", pinned: false });
+    const back = hover(hover(off, "a", 1050), null, 1300);
+    expect(shown(hover(back, null, 1300 + HOLD_MS - 1))).toEqual({ id: "a", pinned: false });
+  });
+
+  it("clears at once when the mouse leaves the map", () => {
+    expect(shown(leave(hover(idle, "a", 0)))).toBeNull();
   });
 
   it("shows the hovered sight, not pinned", () => {
