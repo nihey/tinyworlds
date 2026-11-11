@@ -48,6 +48,11 @@ input CreateDonationCheckoutInput {
   amountCents: Int
 
   """
+  The name to list the gift under, when a city is named (1 to 40 characters, with a letter or a digit)
+  """
+  benefactorName: String
+
+  """
   The city the donation is for: one from the list or a new one. Leave out for none in particular.
   """
   city: String

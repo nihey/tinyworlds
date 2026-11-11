@@ -21,6 +21,7 @@ npm run lint              # eslint (+ prettier); lint:fix to fix
 npm run typecheck
 npm test                  # unit tests: no database, no network
 npm run test:e2e          # boots the app on database tinyworlds_test (needs the compose Postgres)
+                          # E2E_DATABASE_URL=postgresql://… npm run test:e2e   # on another database
 npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, without Stripe
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
 ```
@@ -73,7 +74,7 @@ is the generated record of the schema.
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String }
-input CreateDonationCheckoutInput { amountCents: Int  city: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
+input CreateDonationCheckoutInput { amountCents: Int  city: String  benefactorName: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
 
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }

@@ -1,7 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
-/** The e2e tests' database: its own, on the Postgres that docker-compose.yml starts. */
+/**
+ * The e2e tests' database: its own, on the Postgres that docker-compose.yml starts. Set
+ * E2E_DATABASE_URL to use another (a checkout that must not share this one).
+ */
 export const E2E_DATABASE_URL =
+  process.env.E2E_DATABASE_URL ??
   'postgresql://tinyworlds:tinyworlds@localhost:5434/tinyworlds_test';
 
 export default defineConfig({

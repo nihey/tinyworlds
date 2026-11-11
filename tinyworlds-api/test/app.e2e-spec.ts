@@ -110,7 +110,9 @@ describe('the API over HTTP', () => {
 
   beforeEach(async () => {
     // not the admins: the session made by the first sign-in serves every test after it
-    await prisma.$executeRawUnsafe('TRUNCATE donations, cities, funnel_events');
+    await prisma.$executeRawUnsafe(
+      'TRUNCATE donations, donors, cities, funnel_events',
+    );
     stripe.calls = [];
     stripe.priceLookups = [];
   });
@@ -186,6 +188,43 @@ describe('the API over HTTP', () => {
       status: 'FUNDED',
     });
     expect(await prisma.donation.count()).toBe(2);
+  });
+
+  it("puts the listing name into the checkout's metadata and records it from the webhook", async () => {
+    const res = await graphql(CHECKOUT, {
+      input: {
+        city: 'Lisbon',
+        benefactorName: 'Ana',
+        world: 'tinynyc',
+        locale: 'en-US',
+        returnUrl: 'https://example.com/tinynyc/',
+      },
+    })
+      .set('x-forwarded-for', '203.0.113.77')
+      .expect(200);
+    expect(answer(res).errors).toBeUndefined();
+    expect(stripe.calls.at(-1)?.metadata).toMatchObject({
+      benefactor_name: 'Ana',
+    });
+    await webhook({
+      id: 'cs_named',
+      email: 'ana@example.com',
+      metadata: {
+        app: 'tinyworlds',
+        city: 'Lisbon',
+        world: 'tinynyc',
+        locale: 'en-US',
+        benefactor_name: 'Ana',
+      },
+    }).expect(200);
+    const donors = await prisma.donor.findMany();
+    expect(donors).toMatchObject([
+      { email: 'ana@example.com', displayName: 'Ana' },
+    ]);
+    const donations = await prisma.donation.findMany();
+    expect(donations).toMatchObject([
+      { stripeSessionId: 'cs_named', listed: true, donorId: donors[0].id },
+    ]);
   });
 
   it('refuses a webhook with a bad signature, and one with none', async () => {

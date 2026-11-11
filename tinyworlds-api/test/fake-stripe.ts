@@ -46,6 +46,8 @@ export interface SessionOptions {
   /** As typed into a payment link's "city" field. */
   cityField?: string;
   clientReferenceId?: string | null;
+  /** The donor's address as Stripe collected it (customer_details.email). */
+  email?: string | null;
 }
 
 /** A Checkout session the way Stripe reports it, cut down to what the API reads. */
@@ -60,6 +62,7 @@ export function checkoutSession(
     payment_status: options.paymentStatus ?? 'paid',
     payment_intent: 'pi_test_1',
     client_reference_id: options.clientReferenceId ?? null,
+    customer_details: { email: options.email ?? null },
     metadata: options.metadata ?? { app: 'tinyworlds' },
     custom_fields:
       options.cityField === undefined
