@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { CITIES } from "./cities/index.js";
 import { CITY, DIRS } from "./config.js";
 import { buildIndex } from "./index/build.js";
+import { buildWiki } from "./index/wiki.js";
 import { makeProjection } from "./projection.js";
 import { binRect } from "./render/bin.js";
 import { renderCard } from "./render/card.js";
@@ -105,6 +106,15 @@ program
   });
 
 program
+  .command("wiki")
+  .description("Match each sight to its Wikipedia article (cached): sights.<locale>.json")
+  .option("--out <dir>", "the data folder holding sights.json (default: the frontend's public/data)")
+  .option("--force", "ask Wikipedia again instead of reading the cache", false)
+  .action(async (opts: { out?: string; force: boolean }) => {
+    await buildWiki(opts);
+  });
+
+program
   .command("card")
   .description("Render the share card (the Open Graph image) into the frontend's public/og")
   .option("--out <file>", "where to write it (default: ../tinyworlds-frontend/public/og/<city>.jpg)")
@@ -125,12 +135,13 @@ program
 
 program
   .command("all")
-  .description("fetch, scene, render and index, in order")
+  .description("fetch, scene, render, index and (where a city has sights) wiki, in order")
   .action(async () => {
     await fetchAll({ force: false });
     await buildScene();
     await renderAll();
     await buildIndex();
+    if (CITY.sights) await buildWiki();
   });
 
 await program.parseAsync();

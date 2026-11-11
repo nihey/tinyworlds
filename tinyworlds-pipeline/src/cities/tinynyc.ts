@@ -54,7 +54,20 @@ export const tinynyc: City = {
   style: NEW_YORK,
   landmarks: LANDMARKS,
   statues: [LIBERTY],
-  sights: {},
+  // the articles a nearby title match misses: another name, or too far from the sight's point
+  sights: {
+    wikipedia: {
+      "george washington bridge": "George Washington Bridge",
+      "guggenheim museum": "Solomon R. Guggenheim Museum",
+      "whitney museum": "Whitney Museum of American Art",
+      "steinway tower": "111 West 57th Street",
+      "the oculus": "World Trade Center station (PATH)",
+      "8 spruce street": "8 Spruce",
+      "53 west 53": "53W53",
+      "520 5th avenue": "520 Fifth Avenue",
+      "atlantic terminal": "Atlantic Terminal", // the station, not the mall above it
+    },
+  },
   roofs: { waterTanks: true },
   trees: { census: "street_trees.csv" },
   flora: "temperate",
