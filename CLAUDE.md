@@ -60,6 +60,9 @@ Each sub-project has its own `CLAUDE.md`.
 - **The front page moves.** Its hero and each world's card play a short silent loop made by
   `tinyworlds-videos` from the world's own tiles, over a still; the loops are the front page's
   own files, so nothing but its build needs deploying for them.
+- **Google's tags wait for consent.** Google Tag Manager (and the Google Analytics in it) is the
+  one thing on the site that sets cookies: visitors in Europe are asked first, and nothing from
+  Google loads before they say yes (`tinyworlds-frontend/CLAUDE.md`, Analytics).
 - **The interface follows the visitor's language** (en-US, pt-BR, es-ES), whatever the city.
   City data (street and place names) stays in the city's own language.
 

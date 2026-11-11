@@ -189,6 +189,16 @@ export interface Strings {
   dialog: { close: string };
   /** On a map: the invitation to the site's other places. "{n}" is how many there are. */
   explore: { more: string };
+  /** the question before Google's tags may set cookies (lib/consent.ts), and the way back to it */
+  consent: {
+    /** what the sign is, for screen readers */
+    label: string;
+    message: string;
+    allow: string;
+    deny: string;
+    /** the link (About, the front page's footer) that puts the question up again */
+    settings: string;
+  };
   /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
    * and the donation funnel. "{email}" is an address, "{minutes}" a number of minutes,

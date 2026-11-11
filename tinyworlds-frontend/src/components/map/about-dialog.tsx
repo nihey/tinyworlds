@@ -1,6 +1,6 @@
 "use client";
 
-import { Code, Heart, LayoutGrid, Mail } from "lucide-react";
+import { Code, Cookie, Heart, LayoutGrid, Mail } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useI18n } from "@/hooks/use-i18n";
+import { consentStore, GTM_ID } from "@/lib/consent";
 import { cn } from "@/lib/utils";
 import { CONTACT_URL, GITHUB_URL, HOME_URL } from "@/site";
 import { WORLD } from "@/worlds";
@@ -150,6 +151,20 @@ export function AboutDialog({
               <Mail aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
               {t.about.contact}
             </a>
+            {GTM_ID && (
+              <button
+                type="button"
+                onClick={() => {
+                  // the question is a sign at the foot of the page: clear the way to it
+                  onOpenChange(false);
+                  consentStore.reopen();
+                }}
+                className={QUIET}
+              >
+                <Cookie aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
+                {t.consent.settings}
+              </button>
+            )}
           </nav>
         </div>
       </DialogContent>

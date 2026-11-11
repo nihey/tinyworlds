@@ -14,6 +14,7 @@ import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/
 import { useTheme } from "@/hooks/use-theme";
 import type { Locale, Strings } from "@/i18n";
 import { RANKING_LIMIT, rankCities } from "@/lib/city-picker";
+import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +29,10 @@ import {
   worldUrl,
 } from "@/site";
 import { WORLDS, type World } from "@/worlds";
+
+/** the footer's quiet links: the address, the cookie settings, the admin pages */
+const FOOTER_LINK =
+  "rounded-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper";
 
 const HEADING =
   "pb-3 text-[11px] font-semibold tracking-[0.16em] uppercase text-[#15171a]/70 dusk:text-paper-dim";
@@ -343,21 +348,22 @@ export function Landing() {
       <footer className="mt-auto space-y-1.5 pt-2 text-xs leading-relaxed text-[#15171a]/65 dusk:text-paper-dim">
         <p>
           {beforeEmail}
-          <a
-            href={CONTACT_URL}
-            className="rounded-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper"
-          >
+          <a href={CONTACT_URL} className={FOOTER_LINK}>
             {CONTACT_EMAIL}
           </a>
           {afterEmail}
         </p>
         <p>{t.home.credits}</p>
+        {GTM_ID && (
+          <p>
+            <button type="button" onClick={() => consentStore.reopen()} className={FOOTER_LINK}>
+              {t.consent.settings}
+            </button>
+          </p>
+        )}
         {admin && (
           <p>
-            <a
-              href={ADMIN_PATH}
-              className="rounded-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper"
-            >
+            <a href={ADMIN_PATH} className={FOOTER_LINK}>
               {t.admin.footerLink}
             </a>
           </p>

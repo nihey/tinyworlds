@@ -56,9 +56,22 @@ NEXT_PUBLIC_WORLD=home NEXT_PUBLIC_SITE_URL=https://example.com npm run build   
 Analytics (`src/components/analytics.tsx`) is optional and env-driven: no tracker URL, site id
 or container id lives in the source. There are two kinds, each loaded only when its variables
 are set: a cookieless tracker that takes a `data-site-id` (Rybbit), and a Google Tag Manager
-container (Google's snippet: the `dataLayer` and `gtag()` queue, then `gtm.js`, both
-`afterInteractive`). Google Analytics is a tag set up inside the container, not in this code,
-and unlike the rest of the site it sets cookies.
+container. Google Analytics is a tag set up inside the container, not in this code, and unlike
+the rest of the site it sets cookies, so the container waits for consent (`lib/consent.ts`,
+`components/consent/google-tag-manager.tsx`):
+
+- A visitor whose browser is on a European time zone (or hides its zone: none, UTC) is asked
+  first, by a sign at the foot of the page, and nothing from Google loads until they say yes.
+  Anyone else gets the container at once. A no, from anyone, is kept and honoured everywhere.
+- The answer lives in `localStorage` (`tinyworlds.consent`, shared by every world). "Cookie
+  settings" (About in a map, the front page's footer) puts the question up again; a no then
+  also tells the running tags and deletes the `_ga` cookies.
+- `loadTagManager` puts Google's consent defaults at the front of the data layer before
+  `gtm.js` loads: analytics cookies denied in the EU, EEA, UK and Switzerland by Google's own
+  idea of where the visitor is (for anyone the time zone missed), allowed elsewhere, ads denied
+  everywhere; then the visitor's yes, then `gtag('js')`.
+- The consent store is a `useSyncExternalStore` whose server snapshot is "not ready": nothing
+  loads and nothing is asked while the page is prerendered or hydrating.
 
 The map rewrites the URL hash whenever a pan settles; it does so through `writeHash()`
 (`src/map/hash.ts`), which calls `History.prototype.replaceState` so trackers that wrap
@@ -102,6 +115,7 @@ src/
 │                        # comes alive: the hero and the cards)
 ├── components/admin/    # the admin pages: admin-app.tsx (signed in or not), sign-in.tsx,
 │                        # funnel-report.tsx (the steps, the cities by visits, the days)
+├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, useAdminSession, …
@@ -112,7 +126,8 @@ src/
                          # (Apollo Client; imported lazily), funnel.ts (the visit and the
                          # steps it reports), admin.ts (pure: the session, the funnel's
                          # arithmetic), admin-api.ts (sign-in and the report; imported lazily),
-                         # site-events.ts (what the page analytics hear)
+                         # site-events.ts (what the page analytics hear), consent.ts (who is
+                         # asked before Google's tags load, and loading them)
 ```
 
 ## Targets: worlds and the front page

@@ -317,6 +317,17 @@
   line-height: 1;
 }
 
+/* the cookie question (components/consent): a sign at the foot of any page, the front page's
+   as well as a map's, so it keeps its own distance from the edges, notches and home bars
+   included, and rises from below */
+.consent-sign {
+  position: fixed;
+  left: max(0.75rem, env(safe-area-inset-left));
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  --sign-from: 8px;
+}
+
 /* the first arrival: signs go up one after another */
 @keyframes sign-in {
   from {

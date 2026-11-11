@@ -149,6 +149,14 @@ export const en: Strings = {
   },
   dialog: { close: "Close" },
   explore: { more: "{n} more cities and worlds to explore" },
+  consent: {
+    label: "Cookies",
+    message:
+      "May we use Google Analytics cookies to learn how visitors find the maps? Nothing is used for ads, and the maps work the same either way.",
+    allow: "Allow",
+    deny: "No, thanks",
+    settings: "Cookie settings",
+  },
   admin: {
     title: "tinyworlds admin",
     signIn: {

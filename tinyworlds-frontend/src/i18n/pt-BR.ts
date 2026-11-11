@@ -150,6 +150,14 @@ export const ptBR: Strings = {
   },
   dialog: { close: "Fechar" },
   explore: { more: "Mais {n} cidades e mundos para explorar" },
+  consent: {
+    label: "Cookies",
+    message:
+      "Podemos usar cookies do Google Analytics para saber como os visitantes chegam aos mapas? Nada é usado para anúncios, e os mapas funcionam do mesmo jeito em qualquer caso.",
+    allow: "Permitir",
+    deny: "Não, obrigado",
+    settings: "Configurações de cookies",
+  },
   admin: {
     title: "administração do tinyworlds",
     signIn: {
