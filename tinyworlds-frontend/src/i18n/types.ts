@@ -173,6 +173,30 @@ export interface Strings {
     /** back from a finished checkout */
     thanks: string;
   };
+  /**
+   * The benefactors sign. "{city}" is a city's name, "{n}" a number; in `more`, "{anonymous}" is
+   * how many of those are anonymous; `founderNo` is the short label of the founding badge.
+   */
+  benefactors: {
+    heading: string;
+    founders: string;
+    benefactors: string;
+    keepingRunning: string;
+    anonymous: string;
+    more: string;
+    stones: { one: string; other: string };
+    firstStone: string;
+    keystone: string;
+    foundingTitle: string;
+    founderNo: string;
+    benefactorTitle: string;
+    legendFirst: string;
+    legendKey: string;
+    legendAnon: string;
+    become: string;
+    failed: string;
+    stoneTitle: string;
+  };
   loadError: {
     title: string;
     body: string;
