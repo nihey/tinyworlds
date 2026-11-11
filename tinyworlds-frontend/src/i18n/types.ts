@@ -473,6 +473,8 @@ export interface Strings {
     /** when the visitor is the only one so far */
     first: string;
     next: string;
+    /** the last round's button: it leads to the score */
+    seeScore: string;
     stop: string;
     loading: string;
     empty: string;

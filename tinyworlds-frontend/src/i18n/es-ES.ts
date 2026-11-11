@@ -386,6 +386,7 @@ export const esES: Strings = {
     people: { one: "{n} persona ha respondido", other: "{n} personas han respondido" },
     first: "Eres la primera persona en responder.",
     next: "Siguiente edificio",
+    seeScore: "Ver el resultado",
     stop: "Parar",
     loading: "Buscando un edificio…",
     empty: "Ahora no hay edificios que adivinar.",
