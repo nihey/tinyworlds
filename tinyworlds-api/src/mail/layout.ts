@@ -56,7 +56,7 @@ export interface ShellOptions {
 /** The whole mail: band, card and footer, with the preheader hidden at the top. */
 export function shell(options: ShellOptions): string {
   const { site, hero } = options;
-  const band = `<tr><td bgcolor="${COLORS.ink}" style="background:${COLORS.ink};border-top:4px solid ${COLORS.taxi};border-radius:12px 12px 0 0;padding:14px 20px 12px;">${table(
+  const band = `<tr><td bgcolor="${COLORS.ink}" style="background:${COLORS.ink};border-top:4px solid ${COLORS.taxi};padding:14px 20px 12px;">${table(
     `<tr><td style="vertical-align:middle;"><img src="${attr(emailImage(site, 'wordmark.png'))}" width="105" height="21" alt="tinyworlds" style="display:block;border:0;outline:none;color:${COLORS.taxi};font:bold 18px/21px ${FONT};"></td>` +
       `<td align="right" style="vertical-align:middle;color:${COLORS.bandLabel};font:600 11px/1.3 ${FONT};letter-spacing:.12em;text-transform:uppercase;">${escapeHtml(options.label)}</td></tr>`,
     '',
@@ -87,7 +87,8 @@ export function shell(options: ShellOptions): string {
     `<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${COLORS.paper};">${escapeHtml(options.preheader)}${filler}</div>`,
     table(
       `<tr><td align="center" style="padding:24px 10px 28px;">${table(
-        `<tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:12px;">${card}</td></tr>` +
+        // the card's corners clip the band and its yellow bar, where the client allows it
+        `<tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:12px;overflow:hidden;">${card}</td></tr>` +
           `<tr><td align="center" style="padding:14px 8px 0;font:12px/1.5 ${FONT};color:${COLORS.dim};">${footer}</td></tr>`,
         'width:100%;max-width:560px;',
         ' width="100%"',
