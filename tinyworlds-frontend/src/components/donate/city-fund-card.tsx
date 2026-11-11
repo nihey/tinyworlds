@@ -97,7 +97,7 @@ export function CityFundCard({
           </>
         )}
       </p>
-      <div className="mt-auto flex gap-2">
+      <div className="mt-auto flex flex-wrap gap-2">
         {city.donations > 0 && (
           <button
             type="button"
@@ -185,7 +185,7 @@ export function BuiltCityCard({
         <span className="font-semibold text-taxi">{t.donate.build.fundedInFull}</span>
         <span>· {donationsLabel(city.donations, locale, t.donate.donations)}</span>
       </p>
-      <div className="mt-auto flex gap-2">
+      <div className="mt-auto flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onBenefactors(city.slug)}

@@ -133,7 +133,8 @@ src/
 │                        # world-card, site-numbers, next-city-tile), and moving-picture.tsx
 │                        # (a still that comes alive: the hero and the cards)
 ├── components/benefactors/ # a city's benefactors (panel, sign, stone grid) and the badges' pixel art
-├── components/me/       # "Your cities" (/me/): your-cities.tsx, name-editor.tsx, me-app.tsx
+├── components/me/       # "Your cities" (/me/): me-app.tsx (signed in or not), me-page.tsx,
+│                        # your-cities.tsx, badges.tsx, keep-exploring.tsx, name-editor.tsx
 ├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
 ├── components/admin/    # the admin pages: admin-app.tsx (signed in or not),
 │                        # funnel-report.tsx (the steps, the cities by visits, the days),
@@ -452,8 +453,8 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   they stay crisp at any size and need no image files. Founding, first stone and keystone.
   Titles and the founder label are in the i18n dictionaries. Mails cannot draw SVG: they show
   PNGs made from the same maps (`public/email/`).
-- **"Your cities"** (`/me/`, below) is where a donor sees their own badges and the listing
-  switch; **`/admin/`** can hide a name (`components/admin/names.tsx`: `benefactorNames`,
+- **"Your cities"** (`/me/`, below) is where a donor sees their own badges, their own stones
+  in each city's foundation and the listing switch; **`/admin/`** can hide a name (`components/admin/names.tsx`: `benefactorNames`,
   `setNameHidden`; it acts at once, since it is reversible, and is loaded apart from the funnel).
 
 ## "Your cities" (`/me/`)
@@ -461,11 +462,33 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
 The donor's own page, `src/app/me/page.home.tsx`: front page's build only, `noindex`, like
 `/admin/`. `MeApp` mirrors `AdminApp` (token out of the hash, `verifyLink(token, "donor")`,
 session in `donorStore`, "unauthorized" → back to sign-in with the `ended` notice) and shows
-`SignIn purpose="donor"` to anyone else. `YourCities` reads `myGiving` (`lib/benefactors-api.ts`,
-a per-session Apollo client, `fetchGiving` / `setListing` / `setDisplayName`): a summary, one
-card per city (badges, given, stones, bar or status, explore link, listing switch) and the
-project line. Turning a listing on with no name opens `NameEditor` first. Linked from the front
-page's header, About in every map (`ME_URL`) and the thank-you toast; links show only with an API.
+`SignIn purpose="donor"` to anyone else, as it always did. Signed in, the page is `MePage`
+(`components/me/me-page.tsx`), as wide as the front page, and **it always has somewhere to go**:
+
+- **The giving** (`YourCities`, from `useGiving`: `myGiving` through `lib/benefactors-api.ts`, a
+  per-session Apollo client, `fetchGiving` / `setListing` / `setDisplayName`).
+  - _Nothing given_ (`cities.length === 0`; gifts to the project alone count as this, with the
+    project line): "No stones laid yet", what will stand here, and the three badges as things
+    to earn (`BadgesToEarn`), dimmed, each with how.
+  - _A donor_: three figures (cities, stones laid, given: `givingSummary`), then a card per
+    city: a thumbnail of its share card once it is built, its badges, the meta line (given,
+    stones, to go or status), **its foundation with the donor's own stones lit** among the
+    others' (`StoneWall` with `mine`; a legend when both kinds are there; no wall for a city
+    where they laid none, having given once it was funded), "Give again" unless it is built,
+    the listing switch and the explore link. Turning a listing on with no name opens
+    `NameEditor` first. Then the project line.
+- **Beside it** (from `lg`; under it below): "Build the next city" in short (`BuildNextShort`:
+  the funded and the best funded as stone cards, four in two columns for someone who has not
+  given, two in one for a donor, and a link to the whole ranking on the front page,
+  `RANKING_PATH`), and for a donor **their badges** (`YourBadges`: `earnedBadges`, each lit
+  where earned and saying where, `earnedWhere`: a city, two, or "3 cities").
+- **Under both**: "Keep exploring" (`KeepExploring`): the eight most visited worlds, cities and
+  imagined places together, as `SmallWorldCard`s, and a link to all of them (`CITIES_PATH`).
+- The page owns the donate sign and the benefactors' sign (one at a time, as the front page
+  does) and calls `useDonationReturn`: a checkout started here comes back here.
+
+Linked from the front page's header, About in every map (`ME_URL`) and the thank-you toast;
+links show only with an API.
 
 ## The engine (`src/map/engine.ts`)
 

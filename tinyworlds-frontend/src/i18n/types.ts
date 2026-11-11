@@ -343,10 +343,6 @@ export interface Strings {
   me: {
     title: string;
     signIn: SignInWords;
-    /** the summary line, joined with " · ": cities and stones as `{ one, other }` ({n}); "{amount}" in the last */
-    summaryCities: { one: string; other: string };
-    summaryStones: { one: string; other: string };
-    summaryGiven: string;
     founderNo: string;
     firstStone: string;
     keystone: string;
@@ -373,7 +369,6 @@ export interface Strings {
     loading: string;
     failed: string;
     retry: string;
-    empty: string;
     /** someone who has not given yet */
     noStones: string;
     noStonesBody: string;
