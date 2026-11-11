@@ -1,6 +1,7 @@
 "use client";
 
 import { Code, Cookie, Heart, LayoutGrid, Mail } from "lucide-react";
+import { BenefactorsPanel } from "@/components/benefactors/benefactors-panel";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useI18n } from "@/hooks/use-i18n";
 import { consentStore, GTM_ID } from "@/lib/consent";
+import { API_URL } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { CONTACT_URL, GITHUB_URL, HOME_URL } from "@/site";
 import { WORLD } from "@/worlds";
@@ -23,6 +25,8 @@ interface AboutDialogProps {
   hoodLines: boolean;
   /** absent when this build takes no donations */
   onDonate?: () => void;
+  /** "Become a benefactor of {city}": opens the donate sign with that city chosen */
+  onBecome?: (cityName: string) => void;
 }
 
 const QUIET =
@@ -68,6 +72,7 @@ export function AboutDialog({
   attribution,
   hoodLines,
   onDonate,
+  onBecome,
 }: AboutDialogProps) {
   const { t, copy } = useI18n();
   const hoods = copy.hoodLines.inSentence;
@@ -134,6 +139,16 @@ export function AboutDialog({
                   </li>
                 )}
               </ul>
+            </section>
+          )}
+
+          {/* a real city's own benefactors, when the API is there; the panel draws nothing for a city that is not built */}
+          {!WORLD.fictional && API_URL !== "" && onBecome && (
+            <section
+              aria-label={t.about.benefactors}
+              className="border-t border-sign-line pt-4 empty:hidden"
+            >
+              <BenefactorsPanel by={{ world: WORLD.id }} onBecome={onBecome} />
             </section>
           )}
 

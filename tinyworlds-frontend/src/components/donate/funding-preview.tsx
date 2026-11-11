@@ -1,5 +1,6 @@
 import { PartyPopper } from "lucide-react";
 import type { Locale, Strings } from "@/i18n";
+import { STONE_CENTS, stonePreview } from "@/lib/benefactors";
 import { previewBar } from "@/lib/city-picker";
 import { formatUsd, type CityMilestone } from "@/lib/donate";
 
@@ -8,6 +9,8 @@ interface FundingPreviewProps {
   city: Pick<CityMilestone, "name" | "raisedCents" | "goalCents">;
   /** nobody has given to it yet: it is not on the list */
   isNew: boolean;
+  /** the city is already built: a gift goes to its upkeep, and may still lay its last stones */
+  built?: boolean;
   amountCents: number;
   locale: Locale;
   t: Strings;
@@ -17,8 +20,25 @@ interface FundingPreviewProps {
  * The chosen city's bar with the donation about to be made already in it: what is there in the
  * solid colour, what this adds in stripes. It moves as the city or the amount changes.
  */
-export function FundingPreview({ city, isNew, amountCents, locale, t }: FundingPreviewProps) {
+export function FundingPreview({
+  city,
+  isNew,
+  built = false,
+  amountCents,
+  locale,
+  t,
+}: FundingPreviewProps) {
   const bar = previewBar(city, amountCents);
+  const stones = stonePreview(city.raisedCents, city.goalCents, amountCents);
+  // a built city with every stone laid has nothing left to fill: the gift keeps it running
+  const upkeep = built && stones === null && city.raisedCents >= city.goalCents;
+  const stonesLine = stones
+    ? (stones.from === stones.to ? t.donate.stones.one : t.donate.stones.other)
+        .replace("{from}", String(stones.from))
+        .replace("{to}", String(stones.to))
+        .replace("{city}", city.name)
+        .replace("{count}", String(Math.ceil(city.goalCents / STONE_CENTS)))
+    : null;
   const [before, after] = t.donate.preview
     .replace("{raised}", formatUsd(city.raisedCents, locale))
     .replace("{goal}", formatUsd(city.goalCents, locale))
@@ -54,13 +74,19 @@ export function FundingPreview({ city, isNew, amountCents, locale, t }: FundingP
         />
       </div>
       <div aria-live="polite" className="empty:hidden">
-        {bar.fills && (
+        {bar.fills && !built && (
           <p className="flex items-start gap-1.5 pt-2 text-[13px] leading-snug font-semibold text-taxi">
             <PartyPopper aria-hidden className="mt-px size-3.5 shrink-0" strokeWidth={2.25} />
             {t.donate.fills}
           </p>
         )}
-        {bar.overCents > 0 && (
+        {stonesLine && <p className="pt-2 text-xs leading-relaxed text-paper">{stonesLine}</p>}
+        {upkeep && (
+          <p className="pt-2 text-xs leading-relaxed text-paper">
+            {t.donate.builtUpkeep.replace("{city}", city.name)}
+          </p>
+        )}
+        {bar.overCents > 0 && !upkeep && (
           <p className="pt-2 text-xs leading-relaxed text-paper">{t.donate.over}</p>
         )}
         {isNew && !bar.fills && bar.overCents === 0 && (

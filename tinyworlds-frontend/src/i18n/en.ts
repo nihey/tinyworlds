@@ -37,6 +37,7 @@ export const en: Strings = {
   },
   about: {
     gettingAround: "Getting around",
+    benefactors: "Benefactors",
     drag: "Drag to move. Scroll, pinch or double-click to zoom.",
     keysSearch: "{/} searches streets, neighbourhoods and landmarks. {0} shows the whole city.",
     keysToggles: "{B} draws {hoods}, {D} switches the miniature blur, {M} the minimap.",
@@ -64,6 +65,7 @@ export const en: Strings = {
     funded: "Funded",
     rankingEmpty: "No donations yet: the first one puts its city at the top.",
     donateTo: "Donate to {city}",
+    benefactorsOf: "Benefactors of {city}",
     nextPitch:
       "Donations pay for the servers and the hours it takes to build each city. Want yours next? Name it in the donation.",
     openSource: "Open source",
@@ -108,6 +110,12 @@ export const en: Strings = {
     newCity: "New on the list: it starts from zero.",
     whole:
       "With no city chosen, your donation goes to the project as a whole: the servers and the cities to come.",
+    builtUpkeep: "{city} is built: your gift goes to its servers and upkeep.",
+    stones: {
+      one: "You’d lay stone {from} of {city}’s {count} and be one of its Founding Benefactors.",
+      other:
+        "You’d lay stones {from}–{to} of {city}’s {count} and be one of its Founding Benefactors.",
+    },
     donations: { none: "No donations yet", one: "{n} donation", other: "{n} donations" },
     status: { funded: "Funded, in the queue", building: "Being built", built: "Built" },
     showAll: "Show all cities",
