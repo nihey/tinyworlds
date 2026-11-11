@@ -1,6 +1,30 @@
-import { describe, expect, it } from "vitest";
-import { dataUrl, parseFlights, resolveDataBase } from "../data";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { dataUrl, loadSights, loadSightTexts, parseFlights, resolveDataBase } from "../data";
 import { parseManifest } from "../manifest";
+
+describe("loading the sights", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const answer = (status: number, body: unknown) =>
+    vi.fn(async (url: string) => {
+      void url;
+      return new Response(JSON.stringify(body), { status });
+    });
+
+  it("reads a data set without sights as none", async () => {
+    vi.stubGlobal("fetch", answer(404, {}));
+    await expect(loadSights("b1")).resolves.toEqual([]);
+    await expect(loadSightTexts("b1", "pt-BR")).resolves.toEqual({});
+  });
+
+  it("asks for the language's own file, with the build id", async () => {
+    const fetchMock = answer(200, {});
+    vi.stubGlobal("fetch", fetchMock);
+    await loadSightTexts("b7", "es-ES");
+    expect(fetchMock.mock.calls[0][0]).toBe("/data/tinynyc/sights.es-ES.json?v=b7");
+  });
+});
 
 describe("resolveDataBase", () => {
   it("defaults to the world's folder under the base path", () => {

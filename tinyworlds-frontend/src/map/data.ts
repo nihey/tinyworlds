@@ -8,8 +8,10 @@ import {
 } from "./manifest";
 
 import { activeStrings } from "@/i18n";
+import type { Locale } from "@/i18n/locale";
 import { WORLD } from "@/worlds";
 import type { Flight, LifeFile } from "./life";
+import { parseSights, parseSightTexts, type Sight, type SightTexts } from "./sights";
 
 const trimSlashes = (value: string | undefined): string => (value ?? "").trim().replace(/\/+$/, "");
 
@@ -85,6 +87,28 @@ export async function loadLife(build: string, signal?: AbortSignal): Promise<Lif
     ferries: Array.isArray(file?.ferries) ? file.ferries.filter((f) => Array.isArray(f?.path)) : [],
     flights: parseFlights(file?.flights),
   };
+}
+
+/** A data file that may not exist: null for a 404, the parsed JSON otherwise. */
+async function getOptionalJson(url: string, signal?: AbortSignal): Promise<unknown> {
+  const res = await fetch(url, { signal });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(activeStrings().errors.answered(url, res.status));
+  return res.json();
+}
+
+/** The structures that light up under the pointer. A data set without them has none. */
+export async function loadSights(build: string, signal?: AbortSignal): Promise<Sight[]> {
+  return parseSights(await getOptionalJson(dataUrl("sights.json", build), signal));
+}
+
+/** What Wikipedia says of the sights, in one interface language. None when the file is missing. */
+export async function loadSightTexts(
+  build: string,
+  locale: Locale,
+  signal?: AbortSignal,
+): Promise<SightTexts> {
+  return parseSightTexts(await getOptionalJson(dataUrl(`sights.${locale}.json`, build), signal));
 }
 
 export async function loadHoods(build: string, signal?: AbortSignal): Promise<Hood[]> {
