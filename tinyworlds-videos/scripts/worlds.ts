@@ -67,6 +67,8 @@ export const HEROES: Record<string, HeroShot> = {
   // downtown stands north-east of the card's spot: the view goes that way
   tinydal: { shrink: 2.2, ...LAP, dx: 250, dy: -30 },
   tinycvg: { shrink: 2, ...LAP },
+  tinypit: { shrink: 2, ...LAP },
+  tinyphl: { shrink: 2, ...LAP },
   tinywinterfell: { shrink: 2, ...LAP },
   tinykingslanding: { shrink: 2, ...LAP },
   // the whole known world, from as far as its card; moved less, to keep the frame's edge out
