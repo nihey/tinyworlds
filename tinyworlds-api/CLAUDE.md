@@ -184,7 +184,12 @@ sign-in).
    admin { id, email } }`, or 401. The code may be typed "482 913" or "482-913"
    (`normalizeCode`). A wrong code counts against the admin's newest live link
    (`attempts`); at `CODE_TRIES` (5) the link is spent. A wrong code, an unknown address and a
-   bad link all answer the same 401. The session is a JWT (HS256, `JWT_SECRET`, 7 days:
+   bad link all answer the same 401, and a refused code try never returns before
+   `REFUSAL_FLOOR_MS` (300; injected as `REFUSAL_FLOOR`) has passed, so timing does not tell an
+   admin's address from another. An account gets `CODE_TRIES_PER_DAY` (20) tries per rolling
+   24 hours across all its links (the sum of their `attempts`; past it a code is refused
+   without being compared, the token still works; parallel requests may overshoot it by a
+   few). The session is a JWT (HS256, `JWT_SECRET`, 7 days:
    `SESSION_DAYS`) that the site keeps in local storage.
 
 The mail is sent through SMTP (`SMTP_*`, `MAIL_FROM`; nodemailer), in the language the admin

@@ -315,6 +315,18 @@ export class FakePrisma {
   }
 
   magicLink = {
+    aggregate: (args: {
+      where: LinkWhere;
+    }): Promise<{ _sum: { attempts: number | null } }> => {
+      const found = this.linksWhere(args.where);
+      return Promise.resolve({
+        _sum: {
+          attempts: found.length
+            ? found.reduce((sum, l) => sum + l.attempts, 0)
+            : null,
+        },
+      });
+    },
     create: (args: {
       data: {
         adminId: string;
