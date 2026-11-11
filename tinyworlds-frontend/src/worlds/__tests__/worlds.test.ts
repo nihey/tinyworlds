@@ -20,7 +20,14 @@ describe("resolveWorld", () => {
     expect(resolveWorld("tinyfte").homeLocale).toBe("es-ES");
     expect(resolveWorld("tinyvlc").id).toBe("tinyvlc");
     expect(resolveWorld("tinyvlc").homeLocale).toBe("es-ES");
-    for (const id of ["tinylas", "tinylax", "tinywinterfell", "tinykingslanding"]) {
+    for (const id of [
+      "tinylas",
+      "tinylax",
+      "tinydal",
+      "tinycvg",
+      "tinywinterfell",
+      "tinykingslanding",
+    ]) {
       expect(resolveWorld(id).id).toBe(id);
       expect(resolveWorld(id).homeLocale).toBe("en-US");
     }
@@ -35,6 +42,8 @@ describe("resolveWorld", () => {
       "tinyvlc",
       "tinylas",
       "tinylax",
+      "tinydal",
+      "tinycvg",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -162,6 +171,20 @@ describe("worlds", () => {
       "Linhas dos bairros",
       "Límites de barrios",
     ]);
+    // Dallas' and Cincinnati's districts are the cities on the map (Highland Park; Covington and
+    // Newport across the river); their outlines, the neighborhoods
+    for (const id of ["tinydal", "tinycvg"]) {
+      expect(LOCALES.map((locale) => WORLDS[id].copy[locale].borough)).toEqual([
+        "City",
+        "Cidade",
+        "Ciudad",
+      ]);
+      expect(LOCALES.map((locale) => WORLDS[id].copy[locale].hoodLines.label)).toEqual([
+        "Neighborhood lines",
+        "Linhas dos bairros",
+        "Límites de barrios",
+      ]);
+    }
     // a castle has areas, a walled capital has quarters; both are outlined as districts
     expect(LOCALES.map((locale) => WORLDS.tinywinterfell.copy[locale].borough)).toEqual([
       "Area",
@@ -245,6 +268,19 @@ describe("worlds", () => {
     expect(WORLDS.tinyvlc.copy["en-US"].about.notes[0]).toMatch(/number of floors/);
     expect(WORLDS.tinylas.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
     expect(WORLDS.tinylax.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
+    expect(WORLDS.tinydal.copy["en-US"].about.notes[0]).toMatch(/come from the map data/);
+    expect(WORLDS.tinycvg.copy["en-US"].about.notes[0]).toMatch(/number of floors/);
+  });
+
+  it("light up their buildings, and play Guess the building only where they do", () => {
+    const lit = Object.values(WORLDS).filter((world) => world.sights);
+    expect(lit.map((world) => world.id)).toEqual(["tinynyc", "tinydal", "tinycvg"]);
+    // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
+    for (const world of Object.values(WORLDS)) {
+      if (world.quiz) expect(world.sights, world.id).toBe(true);
+      if (world.fictional) expect(world.sights ?? false, world.id).toBe(false);
+    }
+    expect(lit.every((world) => world.quiz)).toBe(true);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {

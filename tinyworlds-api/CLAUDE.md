@@ -496,8 +496,8 @@ donation is paid; `hidden` is the way to take one down. Merging two cities means
 donations (`UPDATE donations SET city_id = …`) and adding up the two counters by hand.
 
 `prisma/seed.ts` (`npm run seed`) upserts the starting cities by slug (`seed-cities.ts`): the
-built ones (New York, Ribeirão Preto, Orlando; re-asserted as `BUILT` with their `world_id`) and
-six suggestions at zero. It never touches a city's name, goal or what it has raised, and never
+built ones (every world on the site, from New York to Dallas and Cincinnati; re-asserted as
+`BUILT` with their `world_id`) and six suggestions at zero. It never touches a city's name, goal or what it has raised, and never
 changes a suggestion that is already there. A built city that donors had already put on the list
 as a proposal is therefore promoted in place: it becomes `BUILT` with its world and keeps every
 cent and donation. So **adding a world** on this side is one line in `seed-data.ts`: the
