@@ -3,8 +3,18 @@ import { WORLD } from "@/worlds";
 import { buildHoodShapes, hoodAt, type HoodShape } from "./hoods";
 import type { Hood, Manifest } from "./manifest";
 import { createProjection, type GeoPoint, type MapPoint, type Projection } from "./projection";
-import { HOLD_MS, hover, leave, press, release, shown, tap, type SightState } from "./sight-state";
-import { buildSightShapes, sightAt, type Sight, type SightShape } from "./sights";
+import {
+  HOLD_MS,
+  hover,
+  keepInView,
+  leave,
+  press,
+  release,
+  shown,
+  tap,
+  type SightState,
+} from "./sight-state";
+import { buildSightShapes, sightAt, sightInView, type Sight, type SightShape } from "./sights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
 
 /**
@@ -575,6 +585,7 @@ export class MapEngine {
 
     this.advance(now, dt);
     this.constrain();
+    this.dropSightsOutOfView();
 
     const lifeRuns = this.life && this.sceneLayers.size > 0 && !this.reducedMotion;
     let fading = false;
@@ -1130,6 +1141,18 @@ export class MapEngine {
     this.shownKey = key;
     for (const listener of this.listeners.sight) listener(lit);
     this.invalidate();
+  }
+
+  /** A lit sight the view has left wholly behind lets go: the map shows plain again. */
+  private dropSightsOutOfView(): void {
+    const { pinned, hovered } = this.sightState;
+    if (pinned === null && hovered === null) return;
+    this.setSightState(
+      keepInView(this.sightState, (id) => {
+        const i = this.sightIndex.get(id);
+        return i !== undefined && sightInView(this.sights[i], this.view);
+      }),
+    );
   }
 
   /** The id of the sight under a screen point, or null. */
