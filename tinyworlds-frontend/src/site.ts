@@ -73,6 +73,10 @@ export const worldLoopUrl = (id: string, base = LOOPS_BASE): string => `${base}/
 /** The admin pages: part of the front page's build, linked only for an admin who is signed in. */
 export const ADMIN_PATH = `${BASE_PATH}/admin/`;
 
+/** The front page's list of worlds and its ranking, from another page of its build ("Your cities"). */
+export const CITIES_PATH = `${BASE_PATH}/#cities`;
+export const RANKING_PATH = `${BASE_PATH}/#ranking`;
+
 /** The donor's own page ("Your cities"): part of the front page's build, like the admin pages. */
 export const ME_PATH = `${BASE_PATH}/me/`;
 
@@ -88,3 +92,31 @@ export const HERO = {
   loop: `${LOOPS_BASE}/hero.mp4`,
   still: `${LOOPS_BASE}/hero.jpg`,
 } as const;
+
+/**
+ * The worlds that have a hero film of their own, by id: the build lists what is in
+ * public/loops/ (next.config.ts), so a world added without one is simply not in the hero.
+ */
+export const HERO_FILMS: string[] = (process.env.NEXT_PUBLIC_HERO_FILMS ?? "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+/**
+ * A world's hero film and its first frame. The first world's keeps the name it had when the
+ * hero showed one city only (the showcase film still takes it by that name).
+ */
+export const worldHero = (id: string, base = LOOPS_BASE): { loop: string; still: string } => {
+  const name = id === HERO.world ? "hero" : `hero-${id}`;
+  return { loop: `${base}/${name}.mp4`, still: `${base}/${name}.jpg` };
+};
+
+/**
+ * The worlds the hero goes round: those with a film, in the registry's order. Never none: with
+ * no film listed it is the one world it always was.
+ */
+export function heroSlides(ids: string[], films: string[], lead: string = HERO.world): string[] {
+  const filmed = new Set(films);
+  const slides = ids.filter((id) => filmed.has(id));
+  return slides.length > 0 ? slides : [lead];
+}

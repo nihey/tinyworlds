@@ -295,6 +295,36 @@ export function givingSummary(giving: MyGiving): {
   };
 }
 
+/** The cities each badge was earned in, by name, in the giving's own order. */
+export interface EarnedBadges {
+  founding: string[];
+  firstStone: string[];
+  keystone: string[];
+}
+
+/** Which badges a donor has, and where they earned them. */
+export function earnedBadges(cities: MyCity[]): EarnedBadges {
+  const named = (has: (city: MyCity) => boolean) => cities.filter(has).map((city) => city.name);
+  return {
+    founding: named((city) => city.founderNumber !== null),
+    firstStone: named((city) => city.firstStone),
+    keystone: named((city) => city.keystone),
+  };
+}
+
+/**
+ * Where a badge was earned, for the line beside it: the city, or two of them, and beyond that
+ * how many ("3 cities"; "{n}" in the words). Null for a badge not earned.
+ */
+export function earnedWhere(
+  names: string[],
+  cities: { one: string; other: string },
+): string | null {
+  if (names.length === 0) return null;
+  if (names.length <= 2) return names.join(", ");
+  return cities.other.replace("{n}", String(names.length));
+}
+
 /** The words of the summary line: two plural pairs and the amount. */
 export interface SummaryWords {
   cities: { one: string; other: string };
