@@ -6,6 +6,7 @@ import {
   collapseFounders,
   givingSummary,
   parseGiving,
+  summaryLine,
   parseCityBenefactors,
   stoneLooks,
   stonePreview,
@@ -240,5 +241,26 @@ describe("givingSummary", () => {
       projectCents: 0,
     });
     expect(givingSummary(giving!)).toEqual({ cities: 2, stones: 12, givenCents: 5700 });
+  });
+});
+
+describe("summaryLine", () => {
+  const words = {
+    cities: { one: "{n} city", other: "{n} cities" },
+    stones: { one: "{n} stone laid", other: "{n} stones laid" },
+    given: "{amount} given",
+  };
+  it("uses the plural forms", () => {
+    expect(summaryLine({ cities: 3, stones: 32 }, words, "$47")).toBe(
+      "3 cities · 32 stones laid · $47 given",
+    );
+  });
+  it("uses the singular for one city and one stone", () => {
+    expect(summaryLine({ cities: 1, stones: 1 }, words, "$1")).toBe(
+      "1 city · 1 stone laid · $1 given",
+    );
+  });
+  it("leaves the stones out when none were laid", () => {
+    expect(summaryLine({ cities: 1, stones: 0 }, words, "$15")).toBe("1 city · $15 given");
   });
 });
