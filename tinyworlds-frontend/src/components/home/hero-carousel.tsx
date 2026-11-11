@@ -7,8 +7,9 @@ import { Wordmark } from "@/components/map/wordmark";
 import { ACTION, ACTION_QUIET } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { FADE_MS, mayAdvance, SLIDE_MS, stepSlide } from "@/lib/home";
+import { FADE_MS, lastSeen, mayAdvance, SLIDE_MS, stepSlide } from "@/lib/home";
 import { cn } from "@/lib/utils";
+import { documentPage, watchHidden } from "@/lib/visits";
 import { HERO_FILMS, heroSlides, worldHero, worldUrl } from "@/site";
 import { WORLDS } from "@/worlds";
 
@@ -25,8 +26,9 @@ const ARROW =
  * The top of the front page: every world in turn, alive, with the page's sign over its lower
  * left corner. The sign keeps the site's name and what it is; under them it names the world
  * being shown, and its button leads there. The hero moves on by itself every few seconds, for
- * someone who is watching and not choosing (`mayAdvance`), and never for a visitor who asked
- * for less motion or less data; arrows and a dot per world choose one. With one world to show
+ * someone who is watching (`mayAdvance`), and never for a visitor who asked for less motion or
+ * less data; arrows and a dot per world choose one, and a choice stops it: from then on the
+ * hero is the visitor's, and each world they choose is said to a screen reader. With one world to show
  * it is a picture and a sign, as it was. On a narrow screen the sign hangs from the picture's
  * edge instead of covering it.
  */
@@ -35,8 +37,8 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   const [current, setCurrent] = useState(0);
   // the slide the current one is coming in over; gone once the fade is
   const [leaving, setLeaving] = useState<number | null>(null);
-  // a slide chosen by hand is said to a screen reader; one the timer brought is not
-  const [byHand, setByHand] = useState(false);
+  // the visitor has chosen a slide: the hero stops moving by itself, and says each choice
+  const [chosen, setChosen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [inView, setInView] = useState(true);
@@ -61,29 +63,28 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
     inView,
     hovered,
     focused,
+    chosen,
   });
 
-  const show = (to: number, hand: boolean) => {
+  /** The visitor's choice of a slide: from here on the hero waits for them. */
+  const choose = (to: number) => {
+    setChosen(true);
     if (to === current) return;
-    setByHand(hand);
     setLeaving(calm ? null : current);
     setCurrent(to);
   };
 
-  // what the moment is: a tab behind another, the hero off screen
+  // what the moment is: a tab behind another (it may have been opened there), the hero off screen
   useEffect(() => {
-    const seen = () => setHidden(document.visibilityState === "hidden");
-    document.addEventListener("visibilitychange", seen);
+    const unwatch = watchHidden(documentPage(), setHidden);
     const box = picture.current;
     const watcher = new IntersectionObserver(
-      ([entry]) => setInView(entry?.isIntersecting ?? true),
-      {
-        threshold: 0.4,
-      },
+      (entries) => setInView((was) => lastSeen(entries, was)),
+      { threshold: 0.4 },
     );
     if (box) watcher.observe(box);
     return () => {
-      document.removeEventListener("visibilitychange", seen);
+      unwatch();
       watcher.disconnect();
     };
   }, []);
@@ -96,7 +97,6 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
       new Image().src = worldHero(SLIDES[next]).still;
     }, SLIDE_MS - AHEAD_MS);
     const turn = window.setTimeout(() => {
-      setByHand(false);
       setLeaving(current);
       setCurrent(next);
     }, SLIDE_MS);
@@ -114,8 +114,8 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   }, [leaving, current]);
 
   const onKeys = (event: KeyboardEvent) => {
-    if (event.key === "ArrowLeft") show(stepSlide(current, -1, SLIDES.length), true);
-    else if (event.key === "ArrowRight") show(stepSlide(current, 1, SLIDES.length), true);
+    if (event.key === "ArrowLeft") choose(stepSlide(current, -1, SLIDES.length));
+    else if (event.key === "ArrowRight") choose(stepSlide(current, 1, SLIDES.length));
     else return;
     event.preventDefault();
   };
@@ -135,6 +135,12 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       }}
     >
+      {/* said to a screen reader: the world the visitor chose, never one the timer brought. The
+          region is there, and polite, from the start: one made polite along with its first
+          words would not be heard */}
+      <p aria-live="polite" aria-atomic className="sr-only">
+        {chosen ? copy.city : ""}
+      </p>
       <div
         ref={picture}
         className="relative aspect-[16/11] w-full overflow-hidden rounded-[10px] bg-sign-raised shadow-[0_0_0_1px_rgb(0_0_0/0.6),0_16px_34px_-14px_rgb(0_0_0/0.65)] sm:aspect-[16/9] lg:aspect-[2/1]"
@@ -176,11 +182,7 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
           <p className="pt-2.5 text-xl leading-tight font-semibold text-paper">{t.home.tagline}</p>
           <p className="pt-1.5 text-[15px] leading-relaxed text-paper-dim">{t.home.pitch}</p>
           {/* the world being shown: one line each, so the sign is as tall whatever the world */}
-          <div
-            aria-live={byHand ? "polite" : "off"}
-            aria-atomic
-            className="mt-4 border-t border-sign-line pt-3.5"
-          >
+          <div className="mt-4 border-t border-sign-line pt-3.5">
             {/* the world's wordmark at one size for every world: there is room here for the
                 longest, which `Wordmark` would set smaller */}
             <span
@@ -221,7 +223,7 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
         >
           <button
             type="button"
-            onClick={() => show(stepSlide(current, -1, SLIDES.length), true)}
+            onClick={() => choose(stepSlide(current, -1, SLIDES.length))}
             aria-label={t.home.carousel.previous}
             className={ARROW}
           >
@@ -239,7 +241,7 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
               <button
                 key={id}
                 type="button"
-                onClick={() => show(i, true)}
+                onClick={() => choose(i)}
                 aria-label={t.home.carousel.show.replace("{city}", WORLDS[id].copy[locale].city)}
                 aria-current={i === current ? "true" : undefined}
                 className="group grid h-8 place-items-center px-[5px] outline-none"
@@ -257,7 +259,7 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
           </span>
           <button
             type="button"
-            onClick={() => show(stepSlide(current, 1, SLIDES.length), true)}
+            onClick={() => choose(stepSlide(current, 1, SLIDES.length))}
             aria-label={t.home.carousel.next}
             className={ARROW}
           >

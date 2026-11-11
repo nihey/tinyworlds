@@ -309,7 +309,7 @@ export const ptBR: Strings = {
     retry: "Tentar de novo",
     noStones: "Nenhuma pedra assentada ainda.",
     noStonesBody:
-      "Doe para uma cidade e ela aparece aqui: o que você doou, as pedras que assentou e as medalhas que ganhou.",
+      "As doações feitas com este e-mail aparecem aqui: o que você doou, as pedras que assentou e as medalhas que ganhou.",
     badgesToEarn: "Medalhas a conquistar",
     yourBadges: "Suas medalhas",
     badges: {

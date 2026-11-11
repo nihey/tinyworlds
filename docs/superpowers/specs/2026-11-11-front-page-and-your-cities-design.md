@@ -168,7 +168,9 @@ shared by the front page and `/me/` (`components/donate/`).
 - **Moving on**: every 8 s. Not while the pointer is over the hero or focus is inside it, not
   while the page is hidden or the hero is off screen. Never by itself under
   `prefers-reduced-motion` or `Save-Data` (arrows and dots still work; no fade, stills only).
-  Choosing a slide by hand restarts the wait.
+  Choosing a slide by hand stops it for good (decided after the final review: a
+  finger has no hover, and what moves by itself must be stoppable): from then on the hero is
+  the visitor's, and each world they choose is said to a screen reader.
 - **The sign**: wordmark, tagline and pitch as today; a hairline; the slide's `Wordmark` (its
   suffix in its accent) and its city as a one-line title (cut with an ellipsis if ever too
   long, so the sign never changes height); then "Explore" (a link to the slide's world, whose

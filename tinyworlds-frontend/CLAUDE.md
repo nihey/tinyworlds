@@ -222,12 +222,15 @@ src/
     (`FADE_MS`, the `hero-in` keyframes), only while `mayAdvance` (`lib/home.ts`) says so:
     more than one slide, the hero on screen, the page in view, no pointer on it, no keyboard
     focus in it, and never under `prefers-reduced-motion` or `Save-Data` (then it stands
-    still and only the stills are fetched). Choosing a slide restarts the wait.
+    still and only the stills are fetched). Choosing a slide stops it for good: the hero is the visitor's from then on, which is
+    how a finger (it has no hover) or a screen reader holds it. A tab opened behind another
+    is hidden from the start (`watchHidden`), and of an observer's delivery the last word
+    is the one believed (`lastSeen`).
   - **Choosing**: a pill at the picture's lower right from `lg`, at its top right below (where
     the sign would cover it): previous, a dot per world (the current one in that world's
     colour; a count instead on a phone, where dots are too small to press), next; the arrow
-    keys work inside it. A slide chosen by hand is said to a screen reader (`aria-live`), one
-    the timer brought is not.
+    keys work inside it. Each slide chosen by hand is said to a screen reader, through a
+    polite region that is there from the start; one the timer brought is not.
   - **What is fetched**: the first still at once; each other still a second before its turn
     (`AHEAD_MS`); a film only when its slide is the one showing. Only the current slide and
     the one it is fading in over are in the page.

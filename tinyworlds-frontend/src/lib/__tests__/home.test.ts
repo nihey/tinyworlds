@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { FADE_MS, mayAdvance, SLIDE_MS, stepSlide, tileSpan, type AdvanceState } from "../home";
+import {
+  FADE_MS,
+  lastSeen,
+  mayAdvance,
+  SLIDE_MS,
+  stepSlide,
+  tileSpan,
+  type AdvanceState,
+} from "../home";
 
 describe("stepSlide", () => {
   it("goes round the slides both ways", () => {
@@ -36,6 +44,7 @@ describe("mayAdvance", () => {
     inView: true,
     hovered: false,
     focused: false,
+    chosen: false,
   };
 
   it("moves on while someone is watching and nobody is choosing", () => {
@@ -62,5 +71,34 @@ describe("the carousel's measures", () => {
   it("waits eight seconds on a slide and fades for 600 ms", () => {
     expect(SLIDE_MS).toBe(8000);
     expect(FADE_MS).toBe(600);
+  });
+});
+
+describe("a slide chosen by hand", () => {
+  it("holds the hero: it is the visitor's from then on, pointer or finger or keys", () => {
+    const watching: AdvanceState = {
+      slides: 12,
+      calm: false,
+      saveData: false,
+      hidden: false,
+      inView: true,
+      hovered: false,
+      focused: false,
+      chosen: false,
+    };
+    expect(mayAdvance(watching)).toBe(true);
+    expect(mayAdvance({ ...watching, chosen: true })).toBe(false);
+  });
+});
+
+describe("lastSeen", () => {
+  it("believes the last thing an observer says in one delivery, not the first", () => {
+    expect(lastSeen([{ isIntersecting: false }, { isIntersecting: true }], false)).toBe(true);
+    expect(lastSeen([{ isIntersecting: true }, { isIntersecting: false }], true)).toBe(false);
+  });
+
+  it("keeps what it knew when told nothing", () => {
+    expect(lastSeen([], true)).toBe(true);
+    expect(lastSeen([], false)).toBe(false);
   });
 });

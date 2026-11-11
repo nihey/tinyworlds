@@ -7,6 +7,7 @@ import {
   presenceRequest,
   siteTotals,
   visitsLine,
+  watchHidden,
   visitsRequest,
   type ShownPage,
   type WorldCounts,
@@ -225,5 +226,42 @@ describe("siteTotals", () => {
     ]);
     expect(siteTotals(counts)).toEqual({ visits: 15, live: 2 });
     expect(siteTotals(new Map())).toEqual({ visits: 0, live: 0 });
+  });
+});
+
+describe("watchHidden", () => {
+  function tab(hidden: boolean) {
+    const listeners = new Set<() => void>();
+    return {
+      isHidden: () => hidden,
+      listen: (fn: () => void) => {
+        listeners.add(fn);
+        return () => listeners.delete(fn);
+      },
+      turn: (to: boolean) => {
+        hidden = to;
+        listeners.forEach((fn) => fn());
+      },
+      listening: () => listeners.size,
+    };
+  }
+
+  it("says at once that a page opened behind another is out of view", () => {
+    const said: boolean[] = [];
+    watchHidden(tab(true), (hidden) => said.push(hidden));
+    expect(said).toEqual([true]);
+  });
+
+  it("says so again whenever the page goes out of view or comes back, until told to stop", () => {
+    const said: boolean[] = [];
+    const page = tab(false);
+    const stop = watchHidden(page, (hidden) => said.push(hidden));
+    page.turn(true);
+    page.turn(false);
+    expect(said).toEqual([false, true, false]);
+    stop();
+    expect(page.listening()).toBe(0);
+    page.turn(true);
+    expect(said).toEqual([false, true, false]);
   });
 });
