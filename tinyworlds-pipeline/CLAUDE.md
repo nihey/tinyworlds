@@ -27,6 +27,7 @@ npm run cli -- --city tinyrao render            # scene → ../tinyworlds-fronte
 npm run cli -- render --around -73.9857,40.7484,1500   # only redraw near a point
 npm run cli -- render --pyramid-only                    # rebuild the coarse levels from level 0
 npm run cli -- --city tinyrao index             # places.json, hoods.json, life.json (+ sights.json, sights/)
+                                                # and the indexes' version in manifest.json (`indexes`)
 npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
@@ -92,6 +93,8 @@ src/
     ├── structures.ts  # the structure an entry stands on, found in the scene
     ├── silhouette.ts  # a structure's outline as the map draws it (polygon-clipping)
     ├── write-sights.ts  # the sights pass of `index`
+    ├── sprites.ts     # each sight drawn on its own (sights/<hash>.webp)
+    ├── stamp.ts       # the indexes' version (a hash of them), written into the manifest
     └── wiki.ts        # the `wiki` step: each sight's Wikipedia article, cached
 ```
 

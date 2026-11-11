@@ -10,6 +10,7 @@ import { cityFog, GEO } from "../scene/build.js";
 import { FOG, fogAt } from "../scene/fog.js";
 import { hashString } from "../scene/hash.js";
 import { buildSyntheticIndex } from "../scene/synthetic.js";
+import { stampIndexes } from "./stamp.js";
 import { writeSights } from "./write-sights.js";
 import type { Source } from "./sights.js";
 
@@ -562,4 +563,5 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
     `index: ${places.length} places ${JSON.stringify(byType)}, ${hoods.length} outlined areas, ` +
       `${ferries.length} ferry routes, ${flights.length} flights`,
   );
+  stampIndexes(out, log);
 }

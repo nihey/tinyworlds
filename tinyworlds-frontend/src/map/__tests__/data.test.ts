@@ -131,4 +131,11 @@ describe("parseManifest", () => {
     expect(() => parseManifest({ ...valid, geo: { ...valid.geo, k: 0 } })).toThrow(/geo/);
     expect(() => parseManifest({ ...valid, start: {} })).toThrow(/start/);
   });
+
+  it("versions the indexes on their own when it says so, else with the tiles", () => {
+    expect(parseManifest({ ...valid, build: "t1" }).indexes).toBe("t1");
+    expect(parseManifest({ ...valid, build: "t1", indexes: "i2" }).indexes).toBe("i2");
+    expect(parseManifest({ ...valid, build: "t1", indexes: "" }).indexes).toBe("t1");
+    expect(parseManifest({ ...valid, build: "t1", indexes: 7 }).indexes).toBe("t1");
+  });
 });
