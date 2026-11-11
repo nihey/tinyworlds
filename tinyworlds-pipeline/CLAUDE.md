@@ -19,6 +19,7 @@ chosen with `--city` (default `tinynyc`).
 | `tinypit`          | ≈ 1 min (+ wiki)    | 0.2 GB, 5,200 files  |
 | `tinyphl`          | ≈ 1.5 min (+ wiki)  | 0.1 GB, 5,300 files  |
 | `tinycos`          | ≈ 2 min (+ wiki)    | 0.4 GB, 11,700 files |
+| `tinytkf`          | ≈ 1 min (+ wiki)    | 0.2 GB, 4,200 files  |
 | `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
 | `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
 | `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
@@ -67,6 +68,7 @@ src/
 │   ├── tinypit.ts (+ .places.ts)   # Pittsburgh: the Point, three rivers, the city's 90 neighbourhoods
 │   ├── tinyphl.ts (+ .places.ts)   # Philadelphia: Penn's grid, the Parkway, the city's neighbourhoods
 │   ├── tinycos.ts (+ .places.ts)   # Colorado Springs: parts of town round named points, the Academy, red rocks
+│   ├── tinytkf.ts (+ .places.ts)   # Truckee: the depot, Donner Lake, the Pioneer Monument as a statue
 │   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts;
 │   │                  # aroundPoints(): parts of town the data knows only as named points
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
@@ -99,7 +101,7 @@ src/
 │   ├── raster.ts      # scanline polygon fill, no anti-aliasing
 │   ├── chunk.ts       # ChunkRenderer: one rectangle of the map
 │   ├── ground.ts      # ground kind → textured colour; shorelines; cane fields
-│   ├── sprites.ts     # procedural trees (temperate, tropical, subtropical or boreal colours)
+│   ├── sprites.ts     # procedural trees (temperate, tropical, subtropical, boreal or montane colours)
 │   ├── card.ts        # the 1200 × 630 share card with the pixel wordmark
 │   ├── sign.ts        # the wordmark's pixel face and plate: cards, the front page's card, the videos
 │   ├── plate.ts       # a picture cut from a world's finished tiles (any world, no scene needed)
@@ -137,11 +139,14 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
      estimates that read tall buildings low (Colorado Springs: twelve floors at 22 m): the floors,
      where mapped and taller, decide;
    - `style`: a `StyleProfile` from `scene/styles.ts` (`NEW_YORK`, `PAULISTA`, `FLORIDA`,
-     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, `SOCAL`, `TEXAS`, `OHIO_RIVER`, or a new one);
+     `MEDITERRANEAN`, `PATAGONIA`, `MOJAVE`, `SOCAL`, `TEXAS`, `OHIO_RIVER`, `SIERRA`, or a new
+     one), and `flora`, the trees' colours (`montane`: Truckee's pines and firs, with no snow on
+     them, unlike `boreal`'s);
    - `search.namedBuildings`: which named buildings are listed and light up. New York's default
      (110 m and a few civic classes) leaves a smaller city with a dozen; Dallas lists from 60 m,
-     Cincinnati from 40 m, both with churches, civic buildings and campuses; `skip` leaves out
-     names that say nothing ("Building 4");
+     Cincinnati from 40 m, both with churches, civic buildings and campuses; Truckee, a town of
+     one- and two-storey buildings, from 5 m, with its schools, hospital and post office; `skip`
+     leaves out names that say nothing ("Building 4");
    - the water: a river inside the land polygons needs `riverBridges` for its bridges to rise
      (the Ohio); a "reservoir" that is grass most of the year goes in `ground.dryWater` (the
      Trinity's floodway);
@@ -298,7 +303,7 @@ river, an islet, the Wall).
 
 ## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
 
-A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs) gets `sights.json` from `index` and `sights.<locale>.json` from
+A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee) gets `sights.json` from `index` and `sights.<locale>.json` from
 `wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
 one or more search entries point at.
 
@@ -419,6 +424,9 @@ change to the rules below.
   its articles are on buildings the data names otherwise or not at all (historic houses,
   churches): they were found by listing every article with coordinates in the box (the
   `geosearch` API), matching each to the footprint at its point, and curating those.
+- Truckee: 6 questions (easy 2, medium 2, hard 2; 5 asked in each language, Truckee station's
+  opening being all name), from 8 of its 41 sights on 6 articles: too few for a game, so its
+  viewer has `sights` and no `quiz`. The files are written all the same.
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
 
@@ -452,7 +460,10 @@ whose shadows reach it, and margins for both.
   box's strongest bearing, so the view looks from Mount Washington across the Monongahela at
   the Point; Philadelphia's grid at −8.1°, so City Hall stands at the hub and the Parkway leads
   the eye up to the Art Museum; Colorado Springs' downtown and Old North End at 2.3°, General
-  Palmer's grid, rather than the section-line roads' 0°) so its streets are exact 2:1 lines. Measure it as the peak of the
+  Palmer's grid, rather than the section-line roads' 0°; Truckee's downtown at 71.1°, the grid
+  that follows the railroad, 14% of the core's streets, rather than the compass grid that peaks
+  over the whole box (0.3°, 6%: Donner Pass Road, the lake shore, Glenshire), so the view looks
+  across the river and the tracks at Commercial Row with north near the top) so its streets are exact 2:1 lines. Measure it as the peak of the
   streets' bearings modulo 90°, weighted by length.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
@@ -511,6 +522,11 @@ mapped height → mapped floors × `heights.storey` → the Google Open Building
 raster is read as the median inside the footprint and corrected with a curve fitted against the
 ~4,000 buildings whose floors are mapped (it reads 5.5 m for one storey and saturates near
 95 m). Refit the curve for another city before trusting it there.
+
+The raster covers the Global South, not the United States. There Overture's buildings often
+carry Microsoft's machine-learned heights instead (`sources` names "Microsoft ML Buildings" for
+the height): Truckee's 87% are all of that kind, estimates from imagery, none surveyed, and its
+About notes say so.
 
 Colorado Springs' buildings nearly all come with a height, but an estimated one that reads tall
 buildings low (a dozen floors at 22 m, a six-storey dormitory at 3 m): `heights.floorsFirst`

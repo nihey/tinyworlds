@@ -117,6 +117,9 @@ describe("pickerOptions", () => {
       expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).more, name).toEqual([]);
       expect(pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES).typed, name).toBeNull();
     }
+    // Truckee was typed in by its donor, like Cincinnati: built now, it is not taken as a new city
+    expect(pickerOptions([], CITY_CATALOGUE, "truckee", BUILT_CITIES).more).toEqual([]);
+    expect(pickerOptions([], CITY_CATALOGUE, "truckee", BUILT_CITIES).typed).toBeNull();
     // the made-up places are worlds too: not to be funded again, under any of their names
     for (const name of [
       "Winterfell",

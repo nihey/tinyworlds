@@ -28,6 +28,7 @@ describe("resolveWorld", () => {
       "tinypit",
       "tinyphl",
       "tinycos",
+      "tinytkf",
       "tinywinterfell",
       "tinykingslanding",
     ]) {
@@ -50,6 +51,7 @@ describe("resolveWorld", () => {
       "tinypit",
       "tinyphl",
       "tinycos",
+      "tinytkf",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -193,6 +195,12 @@ describe("worlds", () => {
         "Límites de barrios",
       ]);
     }
+    // Truckee's one district is the town itself, and it outlines nothing
+    expect(LOCALES.map((locale) => WORLDS.tinytkf.copy[locale].borough)).toEqual([
+      "Town",
+      "Município",
+      "Municipio",
+    ]);
     // a castle has areas, a walled capital has quarters; both are outlined as districts
     expect(LOCALES.map((locale) => WORLDS.tinywinterfell.copy[locale].borough)).toEqual([
       "Area",
@@ -283,6 +291,9 @@ describe("worlds", () => {
     expect(WORLDS.tinyphl.copy["en-US"].about.notes[0]).toMatch(/nearly every building/);
     // Colorado Springs' heights are estimates that read tall buildings low: the floors decide
     expect(WORLDS.tinycos.copy["en-US"].about.notes[0]).toMatch(/estimated height.*floors decide/);
+    // Truckee's come with the data too, but every one was estimated from imagery, none measured
+    expect(WORLDS.tinytkf.copy["en-US"].about.notes[0]).toMatch(/estimated from aerial imagery/);
+    expect(WORLDS.tinytkf.copy["en-US"].about.notes[0]).toMatch(/not measured/);
   });
 
   it("light up their buildings, and play Guess the building only where they do", () => {
@@ -294,13 +305,15 @@ describe("worlds", () => {
       "tinypit",
       "tinyphl",
       "tinycos",
+      "tinytkf",
     ]);
     // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
     for (const world of Object.values(WORLDS)) {
       if (world.quiz) expect(world.sights, world.id).toBe(true);
       if (world.fictional) expect(world.sights ?? false, world.id).toBe(false);
     }
-    expect(lit.every((world) => world.quiz)).toBe(true);
+    // every lit city plays but Truckee: a small town with six Wikipedia articles is no game
+    expect(lit.filter((world) => !world.quiz).map((world) => world.id)).toEqual(["tinytkf"]);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {
