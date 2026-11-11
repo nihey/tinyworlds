@@ -985,6 +985,39 @@ describe('the API over HTTP', () => {
       expect(JSON.stringify(res.body)).not.toContain('example.com');
     });
 
+    it('lays no stone, founds nothing and lists no one for a gift in another currency', async () => {
+      await webhook({
+        id: 'cs_eur',
+        amount: 5000,
+        currency: 'eur',
+        email: 'eu@example.com',
+        metadata: {
+          app: 'tinyworlds',
+          city: 'Lisbon',
+          world: 'tinynyc',
+          locale: 'en-US',
+          benefactor_name: 'Eva',
+        },
+      }).expect(200);
+      const res = await graphql(BENEFACTORS, {
+        input: { slug: 'lisbon' },
+      }).expect(200);
+      const city = (
+        res.body as {
+          data: {
+            cityBenefactors: {
+              founders: unknown[];
+              benefactors: unknown[];
+              stones: (number | null)[];
+            };
+          };
+        }
+      ).data.cityBenefactors;
+      expect(city.founders).toEqual([]);
+      expect(city.benefactors).toEqual([]);
+      expect(city.stones.every((s) => s === null)).toBe(true);
+    });
+
     it('finds a built city by its world', async () => {
       await prisma.city.create({
         data: {

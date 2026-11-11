@@ -24,7 +24,8 @@ npm run test:e2e          # boots the app on database tinyworlds_test (needs the
                           # E2E_DATABASE_URL=postgresql://… npm run test:e2e   # on another database
 npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, without Stripe
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
-npm run donors:backfill   # past donations get their donors from Stripe: run once after deploying (safe to repeat: sessions without an email, or whose lookup failed, are asked again)
+npm run donors:backfill   # in the built image (node dist/benefactors/backfill-cli.js): past donations get their donors from Stripe; run once after deploying (safe to repeat: sessions without an email, or whose lookup failed, are asked again)
+npm run donors:backfill:dev   # the same from a checkout, through tsx
 ```
 
 ## Structure
@@ -188,7 +189,7 @@ public query (`givenCents`, `founderNumber` = smallest of their gifts' numbers, 
 cleaned name. Both act only on the session's own donor. `names.resolver.ts` (admins, no mark)
 lists names and sets `name_hidden`.
 
-`prisma/backfill-donors.ts` (`backfillDonors`) gives donations that have no donor theirs: it asks
+`src/benefactors/backfill-cli.ts` (compiled into the image, unlike `prisma/`; calls `backfillDonors`) gives donations that have no donor theirs: it asks
 Stripe for each session, reads the address with `donorEmailOf`, upserts the donor and sets
 `donor_id`. It never touches `listed` and prints counts only. Running it again is safe: donations that
 already have a donor are skipped, but sessions without an email, or whose Stripe lookup failed,
@@ -208,7 +209,8 @@ each, and each gets its own links.
   on every request). An `admins` row is made the first time an address on the list asks for a
   link; it is the account (its id is the session's subject, `last_login_at` its last sign-in).
 - **A donor** is a `donors` row with at least one donation: the webhook makes it (see
-  Benefactors), nothing else does. Signing in sets its `last_login_at`.
+  Benefactors), nothing else does. If the donor step fails, the webhook still records the
+  donation (unlisted, no donor; the backfill fills it in later) and logs the failure without the address. Signing in sets its `last_login_at`.
 
 `magic_links` belong to one account: `admin_id` or `donor_id`, exactly one of them (the check
 `magic_links_one_owner`, in the migration since Prisma has no checks).
@@ -376,7 +378,10 @@ Secrets live in the host's environment, never in the repository. `.env` is gitig
 `Dockerfile` is a two-stage build on `node:22-bookworm-slim`. The container runs as the `node`
 user and starts with `npx prisma migrate deploy && node dist/main.js` (single replica: the
 migrations run before the server). `npm run seed` works inside the image
-(`docker exec <container> npm run seed`). The image has a `HEALTHCHECK` that asks `{ health }`.
+(`docker exec <container> npm run seed`), and so does `npm run donors:backfill` (the image has
+`dist/` and `prisma/` only, so scripts that need `src/` code live in `src/`). Rolling back past the
+`sign_in_codes` migration breaks admin sign-in (old code inserts links without `code_hash`): roll
+the database back too, or roll forward. The image has a `HEALTHCHECK` that asks `{ health }`.
 In production the schema is kept in memory (the user cannot write `schema.gql`).
 
 ## Testing

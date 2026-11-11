@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { COUNTED_CURRENCY } from '../donations/donations.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CityBenefactorsInput } from './dto/city-benefactors.input.js';
 import { cleanDisplayName } from './display-name.js';
@@ -14,7 +15,7 @@ export class BenefactorsService {
   /** A city's paid gifts in dollars, oldest first, with a name only where it may be shown. */
   async giftsOf(cityId: string): Promise<Gift[]> {
     const rows = await this.prisma.donation.findMany({
-      where: { cityId, currency: 'usd' },
+      where: { cityId, currency: COUNTED_CURRENCY },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       include: { donor: { select: { displayName: true, nameHidden: true } } },
     });
@@ -64,7 +65,7 @@ export class BenefactorsService {
         select: { displayName: true },
       }),
       this.prisma.donation.findMany({
-        where: { donorId, currency: 'usd' },
+        where: { donorId, currency: COUNTED_CURRENCY },
         select: {
           cityId: true,
           listed: true,

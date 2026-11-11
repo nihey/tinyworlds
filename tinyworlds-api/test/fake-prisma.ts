@@ -102,6 +102,8 @@ export class FakePrisma {
   links: MagicLinkRow[] = [];
   /** Set to make the next write of a funnel step fail, the way a database that is away does. */
   failEvents: Error | null = null;
+  /** Set to make the donor step of a donation fail, the way a database error would. */
+  failDonors: Error | null = null;
   /**
    * Something another connection commits while the next transaction is under way (right after
    * its first read): a way to stage a race. Being committed elsewhere, it survives that
@@ -240,6 +242,7 @@ export class FakePrisma {
       create: { email: string; displayName: string | null };
       update: Record<string, never>;
     }): Promise<DonorRow> => {
+      if (this.failDonors) throw this.failDonors;
       const visible = (d: DonorRow) =>
         !this.inTransaction || this.donorsAtStart.has(d.id);
       const found = this.donors.find(
@@ -263,6 +266,17 @@ export class FakePrisma {
       if (args.data.lastLoginAt !== undefined)
         row.lastLoginAt = args.data.lastLoginAt;
       return Promise.resolve({ ...row });
+    },
+    /** The one `where` the webhook asks: set a name only where there is none. */
+    updateMany: (args: {
+      where: { id: string; displayName: null };
+      data: { displayName: string };
+    }): Promise<{ count: number }> => {
+      const row = this.donors.find(
+        (d) => d.id === args.where.id && d.displayName === null,
+      );
+      if (row) row.displayName = args.data.displayName;
+      return Promise.resolve({ count: row ? 1 : 0 });
     },
     findUnique: (args: { where: { id: string } }): Promise<DonorRow | null> => {
       const row = this.donors.find((d) => d.id === args.where.id);

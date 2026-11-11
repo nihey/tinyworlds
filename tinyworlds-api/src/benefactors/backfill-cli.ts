@@ -1,16 +1,17 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { config } from 'dotenv';
 import Stripe from 'stripe';
-import { backfillDonors } from '../src/benefactors/backfill.js';
-import { STRIPE_TIMEOUT_MS } from '../src/donations/stripe.provider.js';
-import { PrismaClient } from '../src/generated/prisma/client.js';
-import type { PrismaService } from '../src/prisma/prisma.service.js';
+import { backfillDonors } from './backfill.js';
+import { STRIPE_TIMEOUT_MS } from '../donations/stripe.provider.js';
+import { PrismaClient } from '../generated/prisma/client.js';
+import type { PrismaService } from '../prisma/prisma.service.js';
 
 /**
  * Gives past donations their donors, from the address Stripe holds for each checkout session.
  * Safe to run again; never changes who is listed; prints counts only. Run once after deploying:
  *
- *   npm run donors:backfill
+ *   npm run donors:backfill        (the built image: node dist/benefactors/backfill-cli.js)
+ *   npm run donors:backfill:dev    (a checkout: tsx)
  */
 config({ path: '.env', quiet: true });
 

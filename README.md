@@ -87,8 +87,12 @@ address that has a recorded donation; their page is `/me/` of the front page ("Y
 In production the API always needs `JWT_SECRET`,
 `SMTP_HOST` and `MAIL_FROM`, admins or not, because donors sign in too.
 
-After deploying the benefactors feature, run `npm run donors:backfill` once in the API
-container: it gives past donations their donors from Stripe (safe to run again).
+Deploying the benefactors feature, in this order: check the production env (`JWT_SECRET` of at
+least 32 characters, `SMTP_HOST`, `MAIL_FROM`), deploy the API, run `npm run donors:backfill` once
+in the API container (it runs `node dist/benefactors/backfill-cli.js`: it gives past donations
+their donors from Stripe, safe to run again), then deploy the viewers. Rolling the API back past
+the `sign_in_codes` migration breaks admin sign-in (the old code inserts links without
+`code_hash`): roll the database back too, or roll forward.
 
 Or `./dev.sh [world]` for all three in tmux.
 
