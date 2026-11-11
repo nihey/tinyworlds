@@ -49,15 +49,17 @@ export function NextCityTile({
   const large = tileSpan(cards, Math.min(columns, 3));
   const cities = leading(rankCities(milestones.cities), LEADING);
   const waiting = milestones.state === "loading";
+  const bars = waiting || cities.length > 0;
   return (
     <li className={cn("min-w-0", SPAN_SM[small], SPAN_LG[large])}>
       <div className="sign h-full p-1.5">
         <div
           className={cn(
             "grid h-full items-center gap-x-8 gap-y-5 rounded-[6px] border-[1.5px] border-dashed border-paper/20 px-5 py-5",
-            // the bars stand beside the words where the tile is wide, under them where it is not
-            small > 1 ? "sm:grid-cols-2" : "sm:grid-cols-1",
-            large > 1 ? "lg:grid-cols-2" : "lg:grid-cols-1",
+            // the bars stand beside the words where the tile is wide, under them where it is not;
+            // with no bars to show, the words have the tile to themselves
+            bars && small > 1 ? "sm:grid-cols-2" : "sm:grid-cols-1",
+            bars && large > 1 ? "lg:grid-cols-2" : "lg:grid-cols-1",
           )}
         >
           <div className="min-w-0">
@@ -89,7 +91,7 @@ export function NextCityTile({
           </div>
           {/* each bar keeps the height of one with a status under it, and while the list is on
               its way three empty ones hold their place: the page below does not move */}
-          {(waiting || cities.length > 0) && (
+          {bars && (
             <ol className="min-w-0 space-y-3.5">
               {waiting
                 ? Array.from({ length: LEADING }, (_, i) => (
