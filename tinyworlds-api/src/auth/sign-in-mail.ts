@@ -1,12 +1,18 @@
 import type { Locale } from '../donations/locales.js';
+import { fill, fillHtml, markup } from '../mail/html.js';
+import { buttons, codeBox, heading, paragraph, shell } from '../mail/layout.js';
+import type { Mail } from '../mail/mailer.js';
 import { formatCode, type Purpose } from './auth.service.js';
-import type { Mail } from './mailer.js';
 
 interface Words {
-  /** `{code}` is the code, as '482 913'. */
+  /** `{code}` is the code, as '482 913'. Never changes: people search their mail for it. */
   subject: string;
   /** The line above the code. */
   codeLine: string;
+  /** The line above the button. */
+  orButton: string;
+  /** The line above the link, in the plain-text part. */
+  orLink: string;
   /** `{minutes}` is how long the link is good for. */
   once: string;
   ignore: string;
@@ -15,95 +21,125 @@ interface Words {
 const WORDS: Record<Locale, Words> = {
   'en-US': {
     subject: 'Your tinyworlds code: {code}',
-    codeLine: 'Or type this code on the page:',
-    once: 'Both work once, for {minutes} minutes.',
+    codeLine: 'Type this code on the page you came from:',
+    orButton: 'Or skip the typing:',
+    orLink: 'Or open this link:',
+    // only the newest code: an older mail's button still works until it expires or is used
+    once: 'The code and the button work once, for {minutes} minutes. Asked for another? Only the newest code works.',
     ignore:
-      "If you didn't ask for it, ignore this message: nothing happens without the link or the code.",
+      "Didn't ask for this? Ignore it: nothing happens without the code or the button.",
   },
   'pt-BR': {
     subject: 'Seu código do tinyworlds: {code}',
-    codeLine: 'Ou digite este código na página:',
-    once: 'Os dois funcionam uma única vez, por {minutes} minutos.',
-    ignore:
-      'Se você não pediu este link, ignore esta mensagem: nada acontece sem o link ou o código.',
+    codeLine: 'Digite este código na página de onde você veio:',
+    orButton: 'Ou pule a digitação:',
+    orLink: 'Ou abra este link:',
+    once: 'O código e o botão funcionam uma única vez, por {minutes} minutos. Pediu outro? Só o código mais novo funciona.',
+    ignore: 'Não pediu isto? Ignore: nada acontece sem o código ou o botão.',
   },
   'es-ES': {
     subject: 'Tu código de tinyworlds: {code}',
-    codeLine: 'O escribe este código en la página:',
-    once: 'Los dos funcionan una sola vez, durante {minutes} minutos.',
+    codeLine: 'Escribe este código en la página de la que vienes:',
+    orButton: 'O sáltate el tecleo:',
+    orLink: 'O abre este enlace:',
+    once: 'El código y el botón funcionan una sola vez, durante {minutes} minutos. ¿Pediste otro? Solo funciona el código más reciente.',
     ignore:
-      'Si no lo has pedido, ignora este mensaje: sin el enlace o el código no pasa nada.',
+      '¿No lo has pedido? Ignóralo: sin el código o el botón no pasa nada.',
   },
 };
 
-/** What the mail is for, and the words on its button: an admin signs in, a donor sees their cities. */
+/** Who the mail is for: an admin signs in to the admin pages, a donor sees their cities. */
 const OPENINGS: Record<
   Purpose,
-  Record<Locale, { intro: string; button: string }>
+  Record<Locale, { label: string; heading: string; button: string }>
 > = {
   admin: {
     'en-US': {
-      intro: 'Open this link to sign in to the tinyworlds admin pages:',
-      button: 'Sign in',
+      label: 'Admin sign-in',
+      heading: 'The admin pages are one step away.',
+      button: 'Open the admin pages',
     },
     'pt-BR': {
-      intro: 'Abra este link para entrar na administração do tinyworlds:',
-      button: 'Entrar',
+      label: 'Administração',
+      heading: 'A administração está a um passo.',
+      button: 'Abrir a administração',
     },
     'es-ES': {
-      intro: 'Abre este enlace para entrar en la administración de tinyworlds:',
-      button: 'Entrar',
+      label: 'Administración',
+      heading: 'La administración está a un paso.',
+      button: 'Abrir la administración',
     },
   },
   donor: {
     'en-US': {
-      intro: "Here's how to see the cities you helped build.",
+      label: 'Sign in',
+      heading: 'Your cities are one step away.',
       button: 'See your cities',
     },
     'pt-BR': {
-      intro: 'Veja aqui as cidades que você ajudou a construir.',
+      label: 'Entrar',
+      heading: 'Suas cidades estão a um passo.',
       button: 'Ver suas cidades',
     },
     'es-ES': {
-      intro: 'Así puedes ver las ciudades que ayudaste a construir.',
+      label: 'Entrar',
+      heading: 'Tus ciudades están a un paso.',
       button: 'Ver tus ciudades',
     },
   },
 };
 
-const escapeHtml = (text: string): string =>
-  text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-/** The message that carries a sign-in link, in the language it was asked in. */
-export function signInMail(
-  locale: Locale,
-  link: string,
-  code: string,
-  minutes: number,
+export interface SignInMailFacts {
+  /** The language it was asked in. */
+  locale: Locale;
+  /** The page with the token in its hash. */
+  link: string;
+  /** Six digits. */
+  code: string;
+  /** How long the link and the code are good for. */
+  minutes: number;
   /** Who the mail is for: an admin or a donor. */
-  purpose: Purpose,
-): Omit<Mail, 'to'> {
-  const words = { ...WORDS[locale], ...OPENINGS[purpose][locale] };
-  const once = words.once.replace('{minutes}', String(minutes));
-  const href = escapeHtml(link);
-  const shown = formatCode(code);
+  purpose: Purpose;
+  /** The site's origin (SITE_URL), for the wordmark. */
+  site: string;
+}
+
+/**
+ * The message that carries a sign-in link and its code, in the language it was asked in. The
+ * code comes first, since most people read it off the notification; the button after it.
+ */
+export function signInMail(facts: SignInMailFacts): Omit<Mail, 'to'> {
+  const { locale, link, site } = facts;
+  const words = { ...WORDS[locale], ...OPENINGS[facts.purpose][locale] };
+  const once = fill(words.once, { minutes: facts.minutes });
+  const shown = formatCode(facts.code);
+  const subject = fill(words.subject, { code: shown });
   return {
-    subject: words.subject.replace('{code}', shown),
-    text: `${words.intro}\n\n${link}\n\n${words.codeLine}\n\n${shown}\n\n${once}\n${words.ignore}\n`,
-    html: [
-      '<div style="font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#15171a;max-width:480px">',
-      '<p style="font-size:18px;font-weight:bold;color:#15171a;margin:0 0 12px">tinyworlds</p>',
-      `<p>${escapeHtml(words.intro)}</p>`,
-      `<p><a href="${href}" style="display:inline-block;padding:11px 22px;border-radius:999px;background:#f7c21b;color:#1a1503;font-weight:bold;text-decoration:none">${escapeHtml(words.button)}</a></p>`,
-      `<p style="word-break:break-all;font-size:13px"><a href="${href}" style="color:#15171a">${href}</a></p>`,
-      `<p>${escapeHtml(words.codeLine)}</p>`,
-      `<p style="font-family:Menlo,Consolas,monospace;font-size:32px;letter-spacing:4px;font-weight:bold;color:#15171a">${shown}</p>`,
-      `<p style="font-size:13px;color:#5a5c5e">${escapeHtml(once)}<br>${escapeHtml(words.ignore)}</p>`,
-      '</div>',
-    ].join(''),
+    subject,
+    text: [
+      words.heading,
+      words.codeLine,
+      shown,
+      words.orLink,
+      link,
+      once,
+      words.ignore,
+    ].join('\n\n'),
+    html: shell({
+      locale,
+      title: subject,
+      preheader: `${shown} · ${once}`,
+      site,
+      label: words.label,
+      body: [
+        heading(words.heading),
+        paragraph(markup(fillHtml(words.codeLine))),
+        codeBox(shown),
+        paragraph(markup(fillHtml(words.orButton))),
+        buttons([{ label: words.button, href: link }]),
+        paragraph(markup(fillHtml(once)), true),
+      ].join(''),
+      footer: [words.ignore],
+    }),
   };
 }

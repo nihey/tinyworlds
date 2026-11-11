@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
-import { MAILER } from '../src/auth/mailer.js';
+import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
@@ -89,7 +89,7 @@ describe('the API over HTTP', () => {
       returnUrl: ADMIN_PAGE,
     }).expect(202, { sent: true });
     // the mail goes out after the answer
-    await vi.waitFor(() => expect(mailer.sent).toHaveLength(1));
+    await vi.waitFor(() => expect(mailer.signIns()).toHaveLength(1));
     const res = await post('/api/auth/verify', {
       token: mailer.token(),
     }).expect(200);
@@ -435,8 +435,8 @@ describe('the API over HTTP', () => {
 
     it('open to an admin through a link sent by mail, which works once', async () => {
       const { accessToken, admin } = await signIn();
-      expect(mailer.sent[0].to).toBe(ADMIN);
-      expect(mailer.sent[0].text).toContain(`${ADMIN_PAGE}#token=`);
+      expect(mailer.signIns()[0].to).toBe(ADMIN);
+      expect(mailer.signIns()[0].text).toContain(`${ADMIN_PAGE}#token=`);
 
       const res = await asAdmin('{ me { id email } }');
       expect(answer(res).data.me).toEqual({ id: admin.id, email: ADMIN });
@@ -454,7 +454,7 @@ describe('the API over HTTP', () => {
     it('open to an admin through the code from the mail', async () => {
       // a link a minute: forget the ones the other tests asked for
       await prisma.magicLink.deleteMany();
-      const before = mailer.sent.length;
+      const before = mailer.signIns().length;
       await post('/api/auth/magic-link', {
         email: ADMIN,
         returnUrl: ADMIN_PAGE,
@@ -462,7 +462,7 @@ describe('the API over HTTP', () => {
         .set('x-forwarded-for', '203.0.113.40')
         .expect(202);
       await vi.waitFor(() =>
-        expect(mailer.sent.length).toBeGreaterThan(before),
+        expect(mailer.signIns().length).toBeGreaterThan(before),
       );
       const code = mailer.code();
       const res = await post('/api/auth/verify', {
@@ -481,7 +481,7 @@ describe('the API over HTTP', () => {
 
     it('answer anyone else the same, and mail them nothing', async () => {
       await signIn();
-      const before = mailer.sent.length;
+      const before = mailer.signIns().length;
       await post('/api/auth/magic-link', {
         email: 'someone@example.com',
         returnUrl: ADMIN_PAGE,
@@ -490,7 +490,7 @@ describe('the API over HTTP', () => {
         .set('x-forwarded-for', '203.0.113.30')
         .expect(202, { sent: true });
       await new Promise((resolve) => setTimeout(resolve, 150));
-      expect(mailer.sent).toHaveLength(before);
+      expect(mailer.signIns()).toHaveLength(before);
       expect(await prisma.admin.count()).toBe(1);
     });
 
@@ -561,13 +561,13 @@ describe('the API over HTTP', () => {
       post('/api/auth/verify', body).set('x-forwarded-for', from);
     /** Waits for the mail that should follow an answer, and says it is the latest. */
     const mailFollows = async (before: number) => {
-      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
-      return mailer.sent[before];
+      await vi.waitFor(() => expect(mailer.signIns()).toHaveLength(before + 1));
+      return mailer.signIns()[before];
     };
     /** A donor's session, through the link of a fresh mail. */
     const signInDonor = async (from: string) => {
       await give();
-      const before = mailer.sent.length;
+      const before = mailer.signIns().length;
       await askAsDonor(DONOR, from).expect(202);
       await mailFollows(before);
       const res = await verify({ token: mailer.token() }, from).expect(200);
@@ -576,7 +576,7 @@ describe('the API over HTTP', () => {
 
     it('a donor signs in with the link or the code', async () => {
       await give();
-      let before = mailer.sent.length;
+      let before = mailer.signIns().length;
       await askAsDonor(DONOR, '203.0.113.50').expect(202, { sent: true });
       const mail = await mailFollows(before);
       expect(mail.to).toBe(DONOR);
@@ -599,7 +599,7 @@ describe('the API over HTTP', () => {
 
       // a link a minute: forget this one, and ask again for its code
       await prisma.magicLink.deleteMany();
-      before = mailer.sent.length;
+      before = mailer.signIns().length;
       await askAsDonor(DONOR, '203.0.113.50').expect(202);
       await mailFollows(before);
       const code = mailer.code();
@@ -678,7 +678,7 @@ describe('the API over HTTP', () => {
       const answers = [];
       const codes = new Map<string, string>();
       for (const [i, email] of asked.entries()) {
-        const before = mailer.sent.length;
+        const before = mailer.signIns().length;
         const res = await askAsDonor(email, `203.0.113.6${i}`);
         answers.push({ status: res.status, body: res.body as unknown });
         expect((await mailFollows(before)).to).toBe(email);
@@ -1226,7 +1226,7 @@ describe('the API over HTTP', () => {
       /** Ana's session, signed in the way a person does: ask for a link, open it. */
       const signInAna = async () => {
         const from = `203.0.113.${ip++}`;
-        const before = mailer.sent.length;
+        const before = mailer.signIns().length;
         await post('/api/auth/magic-link', {
           email: 'ana@example.com',
           returnUrl: 'https://example.com/',
@@ -1234,7 +1234,9 @@ describe('the API over HTTP', () => {
         })
           .set('x-forwarded-for', from)
           .expect(202);
-        await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+        await vi.waitFor(() =>
+          expect(mailer.signIns()).toHaveLength(before + 1),
+        );
         const res = await post('/api/auth/verify', { token: mailer.token() })
           .set('x-forwarded-for', from)
           .expect(200);
@@ -1449,7 +1451,7 @@ describe('the API over HTTP', () => {
       it('a donor cannot list or hide names', async () => {
         await seedLisbon();
         const from = '203.0.113.90';
-        const before = mailer.sent.length;
+        const before = mailer.signIns().length;
         await post('/api/auth/magic-link', {
           email: 'ana@example.com',
           returnUrl: 'https://example.com/',
@@ -1457,7 +1459,9 @@ describe('the API over HTTP', () => {
         })
           .set('x-forwarded-for', from)
           .expect(202);
-        await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+        await vi.waitFor(() =>
+          expect(mailer.signIns()).toHaveLength(before + 1),
+        );
         const res = await post('/api/auth/verify', { token: mailer.token() })
           .set('x-forwarded-for', from)
           .expect(200);

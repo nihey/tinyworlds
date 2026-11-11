@@ -59,6 +59,7 @@ function setup(admins: string[] = [ADMIN], floorMs = 0) {
     ADMIN_EMAILS: admins,
     JWT_SECRET: SECRET,
     ALLOWED_ORIGINS: ['https://example.com', 'http://localhost:3000'],
+    SITE_URL: 'https://example.com',
   };
   const prisma = new FakePrisma();
   const mailer = new FakeMailer();
@@ -554,9 +555,7 @@ describe('AuthService, for donors', () => {
     ).toBe(true);
     expect(mailer.sent.map((mail) => mail.to)).toEqual([DONOR]);
     expect(mailer.sent[0].text).toContain(`${HOME}#token=${mailer.token()}`);
-    expect(mailer.sent[0].text).toContain(
-      "Here's how to see the cities you helped build.",
-    );
+    expect(mailer.sent[0].text).toContain('Your cities are one step away.');
     expect(mailer.sent[0].html).toContain('See your cities');
     expect(prisma.links).toMatchObject([{ donorId: donor.id, adminId: null }]);
     expect(prisma.admins).toEqual([]);

@@ -102,6 +102,20 @@ const baseSchema = z.object({
   SMTP_USER: optional,
   SMTP_PASSWORD: optional,
   MAIL_FROM: optional,
+  /**
+   * The site's origin, for every link and picture in a mail. Left out: the first of
+   * ALLOWED_ORIGINS.
+   */
+  SITE_URL: optional.transform((value, ctx) => {
+    if (value === undefined) return undefined;
+    const origin = originOf(value);
+    if (!origin)
+      ctx.addIssue({
+        code: 'custom',
+        message: `"${value}" is not an http(s) origin`,
+      });
+    return origin ?? undefined;
+  }),
 });
 
 /**
@@ -110,28 +124,33 @@ const baseSchema = z.object({
  * server to send the links through. Elsewhere only naming an admin asks for the secret, and the
  * link is written to the log instead of mailed.
  */
-export const envSchema = baseSchema.superRefine((env, ctx) => {
-  const production = env.NODE_ENV === 'production';
-  if (
-    (production || env.ADMIN_EMAILS.length > 0) &&
-    (env.JWT_SECRET ?? '').length < JWT_SECRET_MIN
-  )
-    ctx.addIssue({
-      code: 'custom',
-      path: ['JWT_SECRET'],
-      message: production
-        ? `In production, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters: donors sign in whether or not there are admins`
-        : `With ADMIN_EMAILS set, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters`,
-    });
-  if (!production) return;
-  for (const name of ['SMTP_HOST', 'MAIL_FROM'] as const)
-    if (!env[name])
+export const envSchema = baseSchema
+  .superRefine((env, ctx) => {
+    const production = env.NODE_ENV === 'production';
+    if (
+      (production || env.ADMIN_EMAILS.length > 0) &&
+      (env.JWT_SECRET ?? '').length < JWT_SECRET_MIN
+    )
       ctx.addIssue({
         code: 'custom',
-        path: [name],
-        message: `${name} is required in production: sign-in links go out by email`,
+        path: ['JWT_SECRET'],
+        message: production
+          ? `In production, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters: donors sign in whether or not there are admins`
+          : `With ADMIN_EMAILS set, JWT_SECRET must be at least ${JWT_SECRET_MIN} characters`,
       });
-});
+    if (!production) return;
+    for (const name of ['SMTP_HOST', 'MAIL_FROM'] as const)
+      if (!env[name])
+        ctx.addIssue({
+          code: 'custom',
+          path: [name],
+          message: `${name} is required in production: sign-in links go out by email`,
+        });
+  })
+  .transform((env) => ({
+    ...env,
+    SITE_URL: env.SITE_URL ?? env.ALLOWED_ORIGINS[0],
+  }));
 
 export type Env = z.infer<typeof envSchema>;
 
