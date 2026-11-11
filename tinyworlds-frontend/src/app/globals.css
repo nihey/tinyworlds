@@ -168,6 +168,10 @@
 .dusk .tilt-on .map-tiles {
   filter: var(--dusk-tint) var(--tilt-lift);
 }
+/* over a building that lights up: it can be clicked (a drag still grabs) */
+.map-tiles.over-sight {
+  cursor: pointer;
+}
 .map-tiles.dragging {
   cursor: grabbing;
 }
