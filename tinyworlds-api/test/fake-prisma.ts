@@ -67,6 +67,8 @@ interface LinkWhere {
   usedAt?: null;
   expiresAt?: { lt?: Date; gt?: Date };
   createdAt?: { gt?: Date };
+  attempts?: { lt: number };
+  admin?: { email: string };
 }
 
 type Step = { increment: number } | number | undefined;
@@ -304,7 +306,11 @@ export class FakePrisma {
         (where.expiresAt?.gt === undefined ||
           link.expiresAt > where.expiresAt.gt) &&
         (where.createdAt?.gt === undefined ||
-          link.createdAt > where.createdAt.gt),
+          link.createdAt > where.createdAt.gt) &&
+        (where.attempts === undefined || link.attempts < where.attempts.lt) &&
+        (where.admin === undefined ||
+          this.admins.find((a) => a.id === link.adminId)?.email ===
+            where.admin.email),
     );
   }
 
@@ -332,11 +338,13 @@ export class FakePrisma {
     findFirst: (args: {
       where: LinkWhere;
       orderBy?: { createdAt: 'desc' };
-    }): Promise<MagicLinkRow | null> => {
+    }): Promise<(MagicLinkRow & { admin: AdminRow }) | null> => {
       const found = this.linksWhere(args.where);
       if (args.orderBy)
         found.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      return Promise.resolve(found[0] ?? null);
+      const link = found[0];
+      const admin = link && this.admins.find((a) => a.id === link.adminId);
+      return Promise.resolve(link && admin ? { ...link, admin } : null);
     },
     update: (args: {
       where: { id: string };
@@ -348,18 +356,25 @@ export class FakePrisma {
       return Promise.resolve({ ...link });
     },
     findUnique: (args: {
-      where: { tokenHash: string };
+      where: { tokenHash?: string; id?: string };
     }): Promise<(MagicLinkRow & { admin: AdminRow }) | null> => {
-      const link = this.links.find((l) => l.tokenHash === args.where.tokenHash);
+      const link = this.links.find((l) =>
+        args.where.id !== undefined
+          ? l.id === args.where.id
+          : l.tokenHash === args.where.tokenHash,
+      );
       const admin = link && this.admins.find((a) => a.id === link.adminId);
       return Promise.resolve(link && admin ? { ...link, admin } : null);
     },
     updateMany: (args: {
       where: LinkWhere;
-      data: { usedAt: Date };
+      data: { usedAt?: Date; attempts?: { increment: number } };
     }): Promise<{ count: number }> => {
       const found = this.linksWhere(args.where);
-      for (const link of found) link.usedAt = args.data.usedAt;
+      for (const link of found) {
+        if (args.data.usedAt) link.usedAt = args.data.usedAt;
+        if (args.data.attempts) link.attempts += args.data.attempts.increment;
+      }
       return Promise.resolve({ count: found.length });
     },
     deleteMany: (args: { where: LinkWhere }): Promise<{ count: number }> => {
