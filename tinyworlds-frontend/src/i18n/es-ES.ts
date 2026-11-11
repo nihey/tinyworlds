@@ -161,6 +161,7 @@ export const esES: Strings = {
     settings: "Configuración de cookies",
   },
   signIn: {
+    checkEmail: "Revisa tu correo",
     code: "Código",
     codePlaceholder: "6 dígitos",
     submit: "Entrar",

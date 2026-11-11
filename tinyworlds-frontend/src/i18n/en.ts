@@ -160,6 +160,7 @@ export const en: Strings = {
     settings: "Cookie settings",
   },
   signIn: {
+    checkEmail: "Check your email",
     code: "Code",
     codePlaceholder: "6 digits",
     submit: "Sign in",
