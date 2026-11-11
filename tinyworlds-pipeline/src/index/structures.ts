@@ -20,6 +20,12 @@ const SPREAD = 300;
 const CELL = 256;
 /** How far past a bridge's own pieces a piece filed under another road's name may stand, in metres. */
 const BRIDGE_PAD = 40;
+/**
+ * For a bridge none of whose pieces carry its name (Pittsburgh's Smithfield Street Bridge is
+ * filed under "Smithfield Street"): how far from its entry's point the pieces filed under the
+ * names the city lists for it may stand, in metres.
+ */
+const BRIDGE_REACH = 220;
 
 /** "Ed Koch Queensboro Bridge — Upper Level" → "ed koch queensboro bridge upper level" */
 export const normalizeName = (s: string): string =>
@@ -224,10 +230,23 @@ export function makeFinder(
       const vols = new Set<number>();
       for (const b of owners.bridges)
         if (` ${normalizeName(b.name)} `.includes(name)) for (const v of b.vols) vols.add(v);
-      if (vols.size === 0) return null;
       // pieces filed under other roads' names (a tower under "Canal Street (lower level)"):
       // those that stand within the bridge's own extent
       const aliases = new Set((bridgeAliases[c.n.toLowerCase()] ?? []).map(normalizeName));
+      if (vols.size === 0) {
+        // no piece carries its own name: those of the names listed for it, near its point
+        const reach = span(BRIDGE_REACH);
+        for (const owner of owners.bridges) {
+          if (!aliases.has(normalizeName(owner.name))) continue;
+          for (const v of owner.vols) {
+            const cx = (bbox[v * 4] + bbox[v * 4 + 2]) / 2;
+            const cy = (bbox[v * 4 + 1] + bbox[v * 4 + 3]) / 2;
+            if (Math.hypot(cx - x, cy - y) <= reach) vols.add(v);
+          }
+        }
+        if (vols.size === 0) return null;
+        return { key: `bridge:${normalizeName(c.n)}`, vols: [...vols].sort((a, b) => a - b) };
+      }
       if (aliases.size > 0) {
         let [l, t, r, b] = [Infinity, Infinity, -Infinity, -Infinity];
         for (const v of vols) {
