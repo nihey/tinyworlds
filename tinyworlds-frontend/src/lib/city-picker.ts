@@ -176,6 +176,11 @@ export function previewBar(
 // ---------------------------------------------------------------------------------------------
 
 export interface Ranking {
+  /**
+   * Built, and funded in full by donations: they never leave the ranking. The most raised
+   * first. A city built while short of its goal is not one of them.
+   */
+  built: CityMilestone[];
   /** Reached their goal and wait to be built, or are being built: the most funded first. */
   funded: CityMilestone[];
   /** Still collecting, the most funded first. */
@@ -184,12 +189,18 @@ export interface Ranking {
   anyRaised: boolean;
 }
 
-/** Sorts the cities that are not built yet into the ones that made it and the ones still collecting. */
+/**
+ * Sorts the cities into the ones built with their goal reached, the ones that reached it and
+ * wait, and the ones still collecting.
+ */
 export function rankCities(milestones: CityMilestone[]): Ranking {
   const byFunding = (a: CityMilestone, b: CityMilestone) =>
     b.raisedCents - a.raisedCents || a.name.localeCompare(b.name);
   const open = milestones.filter(selectable);
   return {
+    built: milestones
+      .filter((city) => city.status === "BUILT" && city.raisedCents >= city.goalCents)
+      .sort(byFunding),
     funded: open
       .filter((city) => city.status === "FUNDED" || city.status === "BUILDING")
       .sort(byFunding),
@@ -198,5 +209,12 @@ export function rankCities(milestones: CityMilestone[]): Ranking {
   };
 }
 
-/** How many of the ranking's cities show before "show all". */
-export const RANKING_LIMIT = 10;
+/** How many of the ranking's cities show before "show all": with the last card, three rows of three. */
+export const RANKING_LIMIT = 8;
+/** How many of the built cities show before their own "show all". */
+export const BUILT_LIMIT = 6;
+
+/** The cities nearest to being built: the funded ones, then the best funded. Never a built one. */
+export function leading(ranking: Ranking, n: number): CityMilestone[] {
+  return [...ranking.funded, ...ranking.ranked].slice(0, Math.max(n, 0));
+}
