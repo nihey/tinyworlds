@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowUpRight, BadgeCheck, Code, Heart, UserRound } from "lucide-react";
+import { ArrowUpRight, Code, UserRound } from "lucide-react";
 import { useState } from "react";
 import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import { PixelIcon } from "@/components/benefactors/pixel-badge";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
+import { BuildNext } from "@/components/donate/build-next";
 import { DonateDialog } from "@/components/donate/donate-dialog";
-import { MilestoneBar } from "@/components/donate/milestone-bar";
 import { MovingPicture } from "@/components/home/moving-picture";
 import { Wordmark } from "@/components/map/wordmark";
 import { useAdminSession } from "@/hooks/use-admin-session";
@@ -17,9 +17,8 @@ import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/
 import { useTheme } from "@/hooks/use-theme";
 import { useWorldVisits } from "@/hooks/use-world-visits";
 import type { Locale, Strings } from "@/i18n";
-import { defaultGoal, RANKING_LIMIT, rankCities, withGoal } from "@/lib/city-picker";
 import { consentStore, GTM_ID } from "@/lib/consent";
-import { API_URL, donationsLabel, paymentLinkFor, type CityMilestone } from "@/lib/donate";
+import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { byVisits, visitsLine, type WorldCount, type WorldCounts } from "@/lib/visits";
 import {
@@ -43,14 +42,8 @@ const FOOTER_LINK =
 const HEADING =
   "pb-3 text-[11px] font-semibold tracking-[0.16em] uppercase text-[#15171a]/70 dusk:text-paper-dim";
 
-const SUBHEADING =
-  "flex items-center gap-1.5 pb-1 text-[10.5px] font-semibold tracking-[0.14em] text-paper-dim uppercase";
-
 const ACTION =
   "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-taxi px-5 text-[15px] font-semibold text-taxi-ink transition-[filter,transform] outline-none hover:brightness-110 focus-visible:shadow-[0_0_0_2px_var(--sign),0_0_0_4px_var(--taxi)] active:scale-[0.98]";
-
-const QUIET =
-  "rounded-sm text-xs font-semibold text-paper-dim underline decoration-paper-dim/50 underline-offset-2 outline-none hover:text-paper focus-visible:text-taxi";
 
 /**
  * A world's picture on its card: its share card, which starts to drift once the card is on
@@ -183,69 +176,6 @@ function WorldGrid({
   );
 }
 
-interface CityRowProps {
-  city: CityMilestone;
-  /** its place in the ranking; a city that reached its goal carries a mark instead */
-  place?: number;
-  locale: Locale;
-  t: Strings;
-  onDonate: (city: string) => void;
-  onBenefactors: (slug: string) => void;
-}
-
-/**
- * One city of the ranking: the row opens the donate sign with that city chosen, and the flag
- * beside it opens the city's benefactors. Two sibling buttons, never nested.
- */
-function CityRow({ city, place, locale, t, onDonate, onBenefactors }: CityRowProps) {
-  return (
-    <div className="-mx-2 flex w-[calc(100%+1rem)] items-start rounded-lg pr-1 transition-colors hover:bg-sign-raised">
-      <button
-        type="button"
-        onClick={() => onDonate(city.name)}
-        aria-label={t.home.donateTo.replace("{city}", city.name)}
-        data-rybbit-event="donate_open"
-        data-rybbit-prop-world={SITE_ID}
-        data-rybbit-prop-city={city.name}
-        className="group flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-2.5 text-left outline-none focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
-      >
-        {place === undefined ? (
-          <BadgeCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-taxi" strokeWidth={2.25} />
-        ) : (
-          <span
-            aria-hidden
-            className={cn(
-              "w-5 shrink-0 text-right text-[15px] leading-5 font-bold tabular-nums",
-              place <= 3 && city.raisedCents > 0 ? "text-taxi" : "text-paper-dim",
-            )}
-          >
-            {place}
-          </span>
-        )}
-        <MilestoneBar
-          city={city}
-          locale={locale}
-          t={t}
-          note={donationsLabel(city.donations, locale, t.donate.donations)}
-        />
-        <Heart
-          aria-hidden
-          className="mt-0.5 size-4 shrink-0 text-paper-dim/60 transition-colors group-hover:fill-taxi group-hover:text-taxi"
-          strokeWidth={2.25}
-        />
-      </button>
-      <button
-        type="button"
-        onClick={() => onBenefactors(city.slug)}
-        aria-label={t.home.benefactorsOf.replace("{city}", city.name)}
-        className="mt-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-white/10 focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
-      >
-        <PixelIcon art="founding" />
-      </button>
-    </div>
-  );
-}
-
 /** The front page: what this is, the cities there are, the ones people are funding, and where the code lives. */
 export function Landing() {
   const { t, locale } = useI18n();
@@ -266,14 +196,8 @@ export function Landing() {
     by: { slug: "" },
   });
   const openBenefactors = (by: CityRef) => setBenefactors({ open: true, by });
-  const [showAll, setShowAll] = useState(false);
   const milestones = useMilestones();
-  const withList = API_URL !== "" && milestones.state !== "failed";
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
-  const { funded, ranked, anyRaised } = rankCities(milestones.cities);
-  // what a city needs to be built, as the list says (the API's goal)
-  const goalCents = defaultGoal(milestones.cities);
-  const shown = showAll ? ranked : ranked.slice(0, RANKING_LIMIT);
   // the real cities first, then the places that only exist in stories; each group most visited
   // first, by the first counts that came (the registry's order until then)
   const visits = useWorldVisits(WORLD_IDS);
@@ -372,90 +296,11 @@ export function Landing() {
           <h2 id="ranking" className={HEADING}>
             {t.home.ranking}
           </h2>
-          <div className="sign px-5 py-5 sm:px-6">
-            <p className="max-w-2xl text-[15px] leading-relaxed text-paper">
-              {withList
-                ? `${withGoal(t.donate.goal, goalCents, locale)} ${t.donate.priority}`
-                : t.home.nextPitch}
-            </p>
-            {withList && (
-              <p className="max-w-2xl pt-1.5 text-sm leading-relaxed text-paper-dim">
-                {withGoal(t.donate.over, goalCents, locale)}
-              </p>
-            )}
-            {withList && milestones.state === "loading" && (
-              <p role="status" className="pt-4 text-sm text-paper-dim">
-                {t.donate.loading}
-              </p>
-            )}
-
-            {withList && funded.length > 0 && (
-              <div className="pt-5">
-                <h3 className={SUBHEADING}>
-                  <BadgeCheck aria-hidden className="size-3.5 text-taxi" strokeWidth={2.5} />
-                  {t.home.funded}
-                </h3>
-                <ul className="grid gap-x-10 sm:grid-cols-2">
-                  {funded.map((city) => (
-                    <li key={city.id}>
-                      <CityRow
-                        city={city}
-                        locale={locale}
-                        t={t}
-                        onDonate={openFor}
-                        onBenefactors={(slug) => openBenefactors({ slug })}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {withList && ranked.length > 0 && (
-              <div className="pt-5">
-                {funded.length > 0 && <h3 className={SUBHEADING}>{t.donate.groupFunding}</h3>}
-                {!anyRaised && (
-                  <p className="pb-1 text-sm leading-relaxed text-taxi">{t.home.rankingEmpty}</p>
-                )}
-                {/* down the first column, then the second: the ranking reads top to bottom */}
-                <ol className="gap-x-10 sm:columns-2">
-                  {shown.map((city, i) => (
-                    <li key={city.id} className="break-inside-avoid">
-                      <CityRow
-                        city={city}
-                        place={i + 1}
-                        locale={locale}
-                        t={t}
-                        onDonate={openFor}
-                        onBenefactors={(slug) => openBenefactors({ slug })}
-                      />
-                    </li>
-                  ))}
-                </ol>
-                {ranked.length > RANKING_LIMIT && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAll(!showAll)}
-                    aria-expanded={showAll}
-                    className={cn(QUIET, "mt-2")}
-                  >
-                    {showAll ? t.donate.showFewer : t.donate.showAll}
-                  </button>
-                )}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setDonate({ city: null })}
-              data-rybbit-event="donate_open"
-              data-rybbit-prop-world={SITE_ID}
-              className={`${ACTION} mt-5`}
-            >
-              <Heart aria-hidden className="size-4 fill-current" strokeWidth={2.5} />
-              {t.donate.action}
-            </button>
-          </div>
+          <BuildNext
+            milestones={milestones}
+            onDonate={(city) => setDonate({ city })}
+            onBenefactors={(slug) => openBenefactors({ slug })}
+          />
         </section>
       )}
 
