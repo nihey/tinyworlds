@@ -12,7 +12,18 @@ import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { prefsStore } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
-import { dataUrl, loadHoods, loadLife, loadManifest, loadPlaces } from "@/map/data";
+import { textsFor } from "@/lib/sight-sign";
+import {
+  dataUrl,
+  loadHoods,
+  loadLife,
+  loadManifest,
+  loadPlaces,
+  loadSights,
+  loadSightTexts,
+} from "@/map/data";
+import type { Sight, SightTexts } from "@/map/sights";
+import type { Locale } from "@/i18n/locale";
 import { createLife } from "@/map/life";
 import { MapEngine } from "@/map/engine";
 import { formatHash, parseHash, writeHash } from "@/map/hash";
@@ -26,6 +37,7 @@ import { Minimap } from "./minimap";
 import { placeMeta } from "./place-types";
 import { SearchSign } from "./search-sign";
 import { SettingsPanel } from "./settings-panel";
+import { SightSign } from "./sight-sign";
 import { Splash } from "./splash";
 import { ToolColumn } from "./tool-column";
 
@@ -56,6 +68,10 @@ export function MapApp() {
   const [placesFailed, setPlacesFailed] = useState(false);
   // whether this world has outlines to draw: known once hoods.json is in, and some have none
   const [hasHoods, setHasHoods] = useState(false);
+  // the buildings that light up, the one lit now, and what Wikipedia says in the loaded language
+  const [sights, setSights] = useState<Sight[]>([]);
+  const [lit, setLit] = useState<{ id: string; pinned: boolean } | null>(null);
+  const [sightTexts, setSightTexts] = useState<{ locale: Locale; texts: SightTexts } | null>(null);
   const [query, setQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -118,6 +134,24 @@ export function MapApp() {
             if (!abort.signal.aborted) createLife(live, life);
           })
           .catch(() => {});
+        // the outlines of the buildings that light up: once the map is drawn, never before it
+        if (WORLD.sights) {
+          let asked = false;
+          const ask = () => {
+            if (asked || abort.signal.aborted) return;
+            asked = true;
+            offSettle();
+            loadSights(manifest.build, abort.signal)
+              .then((list) => {
+                if (abort.signal.aborted) return;
+                live.setSights(list);
+                setSights(list);
+              })
+              .catch(() => {});
+          };
+          const offSettle = live.on("settle", ask);
+          setTimeout(ask, 1500);
+        }
       } catch (error) {
         if (abort.signal.aborted) return;
         setFailed(true);
@@ -138,8 +172,30 @@ export function MapApp() {
     setPlaces(null);
     setPlacesFailed(false);
     setHasHoods(false);
+    setSights([]);
+    setLit(null);
     setAttempt((n) => n + 1);
   };
+
+  // the lit building, and its article in the visitor's language (asked for the first time a
+  // building lights up, and again when the language changes)
+  useEffect(() => engine?.on("sight", setLit), [engine]);
+  const sightById = useMemo(() => new Map(sights.map((s) => [s.id, s])), [sights]);
+  const asking = useRef<Locale | null>(null);
+  useEffect(() => {
+    if (!session || !lit || textsFor(sightTexts, locale) === "ready" || asking.current === locale)
+      return;
+    asking.current = locale;
+    loadSightTexts(session.manifest.build, locale)
+      .then((texts) => setSightTexts({ locale, texts }))
+      .catch(() => setSightTexts({ locale, texts: {} }))
+      .finally(() => {
+        if (asking.current === locale) asking.current = null;
+      });
+  }, [session, lit, locale, sightTexts]);
+  const litSight = lit ? sightById.get(lit.id) : undefined;
+  const litText =
+    litSight && sightTexts?.locale === locale ? sightTexts.texts[litSight.id] : undefined;
 
   // settings → engine
   useEffect(() => engine?.setHoodLines(prefs.hoods), [engine, prefs.hoods]);
@@ -255,6 +311,7 @@ export function MapApp() {
         case "Escape":
           setQuery("");
           engine.setPin(null);
+          engine.releaseSight();
           break;
         default:
           return;
@@ -287,6 +344,15 @@ export function MapApp() {
 
       {session && engine && (
         <>
+          {lit && litSight && (
+            <SightSign
+              engine={engine}
+              sight={litSight}
+              text={litText}
+              pinned={lit.pinned}
+              onClose={() => engine.releaseSight()}
+            />
+          )}
           <SearchSign
             index={index}
             unavailable={placesFailed}

@@ -53,6 +53,8 @@ export interface Strings {
     keysTogglesNoHoods: string;
     link: string;
     mapData: string;
+    /** the credit for the buildings' descriptions, with the licence's URL (made a link) */
+    descriptions: string;
     /** quiet links at the foot of the sign: to the front page, to the source, and to the author's inbox */
     allCities: string;
     openSource: string;
@@ -279,6 +281,13 @@ export interface Strings {
   };
   /** "borough" is missing on purpose: what one is called depends on the city (world copy). */
   placeTypes: Record<Exclude<PlaceType, "borough">, string>;
+  /** The sign beside a lit building. */
+  sight: {
+    /** what a building named by its own name is called */
+    building: string;
+    /** the link to its Wikipedia article */
+    readOn: string;
+  };
   errors: {
     answered: (url: string, status: number) => string;
     noCanvas: string;

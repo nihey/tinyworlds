@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hover, press, release, shown, type SightState } from "../sight-state";
+import { hover, press, release, shown, tap, type SightState } from "../sight-state";
 
 const idle: SightState = { hovered: null, pinned: null };
 
@@ -29,6 +29,12 @@ describe("the sight under the pointer", () => {
     expect(shown(press(pinned, null))).toBeNull();
     expect(shown(release(pinned))).toBeNull();
     expect(shown(press(pinned, "a"))).toBeNull();
+  });
+
+  it("lets a finger's tap elsewhere clear a hover the mouse left behind", () => {
+    const hovered = hover(idle, "a"); // a mouse on a touch-screen laptop
+    expect(shown(tap(press(hovered, "a"), null))).toBeNull();
+    expect(shown(tap(hovered, "b"))).toEqual({ id: "b", pinned: true });
   });
 
   it("moves the pin to another sight pressed while one is pinned", () => {

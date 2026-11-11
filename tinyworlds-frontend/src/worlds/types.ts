@@ -63,6 +63,11 @@ export interface World {
    * front page lists it apart from the real cities.
    */
   fictional?: boolean;
+  /**
+   * Its data has sights (sights.json): buildings found in the search light up under the pointer,
+   * with a line from Wikipedia. Without it the viewer never asks for the file.
+   */
+  sights?: boolean;
   /** How queries are read. This follows the language of the map's names, not the interface's. */
   search: SearchRules;
 }
