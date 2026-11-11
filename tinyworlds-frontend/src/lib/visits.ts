@@ -120,6 +120,15 @@ export function documentPage(): ShownPage {
 }
 
 /**
+ * Tells `fn` whether the page is out of view: at once (a tab may be opened behind another),
+ * and whenever that changes. Answers how to stop.
+ */
+export function watchHidden(page: ShownPage, fn: (hidden: boolean) => void): () => void {
+  fn(page.isHidden());
+  return page.listen(() => fn(page.isHidden()));
+}
+
+/**
  * Calls `fn` every `every` ms while the page is in view, never while it is not, and once on
  * coming back if it has not been called for that long; `atOnce` calls it right away too (or as
  * soon as the page comes into view, for one opened out of view). Answers how to stop.

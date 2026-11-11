@@ -309,7 +309,7 @@ export const esES: Strings = {
     retry: "Reintentar",
     noStones: "Aún no has colocado ninguna piedra.",
     noStonesBody:
-      "Dona para una ciudad y aparecerá aquí: lo que donaste, las piedras que colocaste y las insignias que ganaste.",
+      "Las donaciones hechas con este correo aparecen aquí: lo que donaste, las piedras que colocaste y las insignias que ganaste.",
     badgesToEarn: "Insignias por ganar",
     yourBadges: "Tus insignias",
     badges: {

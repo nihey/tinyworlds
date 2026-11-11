@@ -64,8 +64,9 @@ export function MovingPicture({
       .connection;
     if (connection?.saveData) return;
     const watcher = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
+      (entries) => {
+        // the last word of a delivery is how things stand (out of view and back in at once)
+        if (entries.at(-1)?.isIntersecting) {
           // the browser may refuse (no autoplay): the still stays, which is fine
           video.play().catch(() => undefined);
         } else {

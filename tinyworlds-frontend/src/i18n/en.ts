@@ -304,7 +304,7 @@ export const en: Strings = {
     retry: "Try again",
     noStones: "No stones laid yet.",
     noStonesBody:
-      "Give to a city and it shows up here: what you gave, the stones you laid and the badges you earned.",
+      "Gifts made with this email show up here: what you gave, the stones you laid and the badges you earned.",
     badgesToEarn: "Badges to earn",
     yourBadges: "Your badges",
     badges: {

@@ -40,11 +40,15 @@ export interface AdvanceState {
   hovered: boolean;
   /** the focus is inside it */
   focused: boolean;
+  /** the visitor has chosen a slide: the hero is theirs from then on */
+  chosen: boolean;
 }
 
 /**
- * Whether the hero may move on by itself: only for someone who is watching it and is not in
- * the middle of choosing, and never for a visitor who asked for less motion or less data.
+ * Whether the hero may move on by itself: only for someone who is watching it and has not
+ * chosen a slide (nor is in the middle of choosing), and never for a visitor who asked for
+ * less motion or less data. A choice by hand stops it for good: that is how a finger, which
+ * has no hover, or a screen reader holds it, and what moves by itself can always be stopped.
  */
 export function mayAdvance(state: AdvanceState): boolean {
   return (
@@ -54,6 +58,16 @@ export function mayAdvance(state: AdvanceState): boolean {
     !state.hidden &&
     state.inView &&
     !state.hovered &&
-    !state.focused
+    !state.focused &&
+    !state.chosen
   );
+}
+
+/**
+ * Whether something is on screen, by what an `IntersectionObserver` just said. One delivery
+ * can carry several entries (out of view and back in before the page got to listen): the last
+ * is how things stand. Told nothing, it is as it `was`.
+ */
+export function lastSeen(entries: readonly { isIntersecting: boolean }[], was: boolean): boolean {
+  return entries.at(-1)?.isIntersecting ?? was;
 }
