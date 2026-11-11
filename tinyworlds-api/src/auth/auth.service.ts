@@ -42,9 +42,9 @@ export const SESSION_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * The two kinds of account that sign in: an admin (an address on ADMIN_EMAILS) and a donor (an
- * address that has given). They share the links and codes, never the accounts: an address that
- * is both has one of each.
+ * The two kinds of account that sign in: an admin (an address on ADMIN_EMAILS) and a donor (any
+ * address, to see what it gave). They share the links and codes, never the accounts: an address
+ * that is both has one of each.
  */
 export const PURPOSES = ['admin', 'donor'] as const;
 export type Purpose = (typeof PURPOSES)[number];
@@ -111,8 +111,9 @@ export const hashCode = (
 /**
  * Signing in, without passwords, for admins and donors alike: an address asks for a link, the
  * link (and a code) arrives by email, and either is traded for a session (a JWT). An admin is
- * an address on ADMIN_EMAILS; a donor is an address that has given. Nobody else gets a mail,
- * and nothing in an answer says who did.
+ * an address on ADMIN_EMAILS; anyone may sign in as a donor, to see what they gave (perhaps
+ * nothing yet). Only admins' addresses get an admin's mail, and nothing in an answer says whose
+ * they are, nor who has given.
  */
 @Injectable()
 export class AuthService {
@@ -146,17 +147,30 @@ export class AuthService {
 
   /**
    * The account an address signs in to for a purpose, or null: an admin's (made the first time
-   * its address asks), or a donor's, only once it has given.
+   * an address on ADMIN_EMAILS asks), or a donor's, which anyone may have (made the first time
+   * the address asks; the gifts it makes, before or after, are its own).
    */
   private async accountFor(
     email: string,
     purpose: Purpose,
   ): Promise<{ id: string } | null> {
-    if (purpose === 'donor')
-      return this.prisma.donor.findFirst({
-        where: { email, donations: { some: {} } },
-        select: { id: true },
-      });
+    if (purpose === 'donor') {
+      try {
+        return await this.prisma.donor.upsert({
+          where: { email },
+          create: { email },
+          update: {},
+          select: { id: true },
+        });
+      } catch (error) {
+        // two first asks at once: the other one made the account
+        if ((error as { code?: string } | null)?.code !== 'P2002') throw error;
+        return this.prisma.donor.findUnique({
+          where: { email },
+          select: { id: true },
+        });
+      }
+    }
     if (!this.isAdmin(email)) return null;
     return this.prisma.admin.upsert({
       where: { email },
@@ -167,9 +181,9 @@ export class AuthService {
   }
 
   /**
-   * Mails a sign-in link to the address if it has an account of the kind asked for, and does
-   * nothing otherwise: the caller is told the same either way, so the API never says who the
-   * admins are, nor who has given. True when a mail went out.
+   * Mails a sign-in link to the address if it has (or, as a donor, may have) an account of the
+   * kind asked for, and does nothing otherwise: the caller is told the same either way, so the
+   * API never says who the admins are. True when a mail went out.
    */
   async sendLink(
     address: string,
