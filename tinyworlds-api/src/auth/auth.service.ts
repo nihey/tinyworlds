@@ -18,7 +18,7 @@ import type { Env } from '../config/env.js';
 import type { Locale } from '../donations/locales.js';
 import { acceptReturnUrl } from '../donations/return-url.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { MAILER, type Mailer } from './mailer.js';
+import { MAILER, type Mailer } from '../mail/mailer.js';
 import { sessionSecret } from './session-secret.js';
 import { signInMail } from './sign-in-mail.js';
 
@@ -226,13 +226,14 @@ export class AuthService {
       await this.mailer.send({
         to: email,
         // in the fragment: it never reaches a server's log, nor the page's analytics
-        ...signInMail(
+        ...signInMail({
           locale,
-          `${target}#token=${token}`,
+          link: `${target}#token=${token}`,
           code,
-          LINK_MINUTES,
+          minutes: LINK_MINUTES,
           purpose,
-        ),
+          site: this.config.get('SITE_URL', { infer: true }),
+        }),
       });
     } catch (error) {
       // the account's id, never its address

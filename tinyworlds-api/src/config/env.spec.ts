@@ -39,6 +39,22 @@ describe('validateEnv', () => {
     ).toThrow(/not an http\(s\) origin/);
   });
 
+  it("takes the mails' site from SITE_URL, or else the first allowed origin", () => {
+    expect(
+      validateEnv({
+        ...base,
+        ALLOWED_ORIGINS: 'https://example.com/tinynyc/, http://localhost:3000',
+      }).SITE_URL,
+    ).toBe('https://example.com');
+    expect(
+      validateEnv({ ...base, SITE_URL: ' https://www.example.com/me/ ' })
+        .SITE_URL,
+    ).toBe('https://www.example.com');
+    expect(() => validateEnv({ ...base, SITE_URL: 'example.com' })).toThrow(
+      /SITE_URL/,
+    );
+  });
+
   it('refuses to start without the Stripe settings', () => {
     for (const key of [
       'STRIPE_SECRET_KEY',

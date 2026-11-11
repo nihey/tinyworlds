@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { Env } from '../config/env.js';
+import { MailModule } from '../mail/mail.module.js';
 import { AdminResolver } from './admin.resolver.js';
 import { AuthController } from './auth.controller.js';
 import {
@@ -13,7 +14,6 @@ import {
 } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
-import { mailerProvider } from './mailer.js';
 import { sessionSecret } from './session-secret.js';
 
 /**
@@ -23,6 +23,7 @@ import { sessionSecret } from './session-secret.js';
  */
 @Module({
   imports: [
+    MailModule,
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -37,7 +38,6 @@ import { sessionSecret } from './session-secret.js';
     AuthService,
     { provide: REFUSAL_FLOOR, useValue: REFUSAL_FLOOR_MS },
     JwtStrategy,
-    mailerProvider,
     AdminResolver,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
