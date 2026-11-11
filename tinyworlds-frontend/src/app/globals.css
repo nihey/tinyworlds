@@ -398,3 +398,75 @@
     transition: none;
   }
 }
+
+/* ---- a list that drifts by (components/home/drift.tsx): the benefactors down the sides ----- */
+
+.drift {
+  overflow: hidden;
+}
+.drift-track {
+  display: flex;
+}
+.drift-y > .drift-track {
+  flex-direction: column;
+}
+.drift-x > .drift-track {
+  width: max-content;
+  height: 100%;
+}
+.drift-x > .drift-track > * {
+  height: 100%;
+}
+/* two copies of the list: half the track is one whole copy, so the loop has no seam */
+.drift[data-drifting] > .drift-track {
+  animation: linear infinite;
+  will-change: transform;
+}
+.drift-y[data-drifting] > .drift-track {
+  animation-name: drift-up;
+}
+.drift-x[data-drifting] > .drift-track {
+  animation-name: drift-left;
+}
+.drift:hover > .drift-track,
+.drift:focus-within > .drift-track {
+  animation-play-state: paused;
+}
+/* what drifts comes out of the fog and goes back into it */
+.drift-y[data-drifting] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 1.75rem,
+    #000 calc(100% - 1.75rem),
+    transparent
+  );
+}
+.drift-x[data-drifting] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 1.5rem,
+    #000 calc(100% - 1.5rem),
+    transparent
+  );
+}
+@keyframes drift-up {
+  to {
+    transform: translateY(-50%);
+  }
+}
+@keyframes drift-left {
+  to {
+    transform: translateX(-50%);
+  }
+}
+/* standing still, a list longer than its window is scrolled by hand */
+@media (prefers-reduced-motion: reduce) {
+  .drift-y {
+    overflow-y: auto;
+  }
+  .drift-x {
+    overflow-x: auto;
+  }
+}

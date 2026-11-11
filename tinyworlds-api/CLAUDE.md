@@ -7,7 +7,9 @@ It also keeps the **donation funnel** (which steps towards a donation each visit
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
 by email; each world's **visits**, and how many are there now, are public, for the front page's
 cards. **Donors** sign in the same way, to see the cities they helped build; they are thanked by
-mail once Stripe confirms a gift, and told by mail once a city they gave to is built. And it
+mail once Stripe confirms a gift, and told by mail once a city they gave to is built. A donor
+may show up to three **links** beside their name: the API reads each page once and keeps small
+copies of its pictures. And it
 keeps the answers of **Guess the building**, the map's quiz on its famous buildings. Other
 visitors have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
@@ -65,11 +67,22 @@ src/
 │   └── visits.resolver.ts dto/ models/   # worldVisits, trackPresence: both public
 ├── benefactors/
 │   ├── standing.ts                 # pure: a city's gifts → stones, founders, benefactors
+│   ├── wall.ts                     # pure: every city's gifts → the wall (named donors once, unnamed gifts each)
 │   ├── display-name.ts             # cleanDisplayName: what a listed name may be
-│   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors
+│   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors, wall
 │   ├── announce.service.ts built-mail.ts   # a built city's donors told, once; the mail
 │   ├── announce-cli.ts backfill-cli.ts     # the commands compiled into the image
 │   └── benefactors.resolver.ts my-giving.resolver.ts dto/ models/   # the public query; the donor's own
+├── links/                          # the links donors show beside their names
+│   ├── link-url.ts                 # pure: cleanLinkUrl, isPublicUrl (https, a public host name, no port, no user)
+│   ├── public-address.ts           # pure: isPublicAddress (nothing private, local or reserved)
+│   ├── safe-fetch.ts               # the guarded GET: public addresses only, every redirect checked, size and time limits
+│   ├── page-meta.ts                # pure: a page's head → title, description, picture, icons
+│   ├── ico.ts link-images.ts       # an .ico's largest picture; picture and icon drawn again as small WebP (sharp)
+│   ├── link-reader.ts              # LINK_READER: url → what a link's card shows (tests replace it)
+│   ├── links.service.ts            # mine, add, remove, refresh; shownFor (the lists), forReview, setHidden, imageBytes
+│   ├── links.resolver.ts links-admin.resolver.ts dto/ models/   # donors' own; the admins' switch
+│   └── link-images.controller.ts   # GET /api/link-images/:id (REST: a page shows it with <img>)
 ├── cities/
 │   ├── city-name.ts                # cleanCityName, citySlug: what makes two spellings one city
 │   ├── cities.service.ts           # the public list and its order
@@ -87,15 +100,16 @@ src/
     └── stripe-webhook.controller.ts
 prisma/     schema.prisma, migrations/, seed.ts (the script), seed-cities.ts (what it does), seed-data.ts,
             import-funnel.ts (the script), funnel-rows.ts (what a line of its input is)
-test/       fake-prisma.ts, fake-stripe.ts, fake-mailer.ts, app.e2e-spec.ts, migrations.e2e-spec.ts, global-setup.ts
+test/       fake-prisma.ts, fake-stripe.ts, fake-mailer.ts, fake-link-reader.ts, app.e2e-spec.ts, migrations.e2e-spec.ts, global-setup.ts
 scripts/    send-webhook.mjs, rybbit-funnel.sql
 ```
 
 ## Contract
 
 Everything is under `/api`, so the site and the API can share a host. GraphQL at
-`POST /api/graphql`; REST for three routes only: `POST /api/stripe/webhook` (Stripe needs the
-raw body) and signing in, `POST /api/auth/magic-link` and `POST /api/auth/verify`. `schema.gql`
+`POST /api/graphql`; REST for four routes only: `POST /api/stripe/webhook` (Stripe needs the
+raw body), signing in, `POST /api/auth/magic-link` and `POST /api/auth/verify`, and
+`GET /api/link-images/:id` (a link's icon or picture, for `<img>`). `schema.gql`
 is the generated record of the schema.
 
 ```graphql
@@ -104,10 +118,13 @@ type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  g
 input CreateDonationCheckoutInput { amountCents: Int  city: String  benefactorName: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
 input CityBenefactorsInput { slug: String  world: String }   # exactly one, else BAD_REQUEST
-type FounderRow { number: Int!  name: String  amountCents: Int!  stones: Int!  firstStone: Boolean!  keystone: Boolean! }
-type BenefactorRow { rank: Int!  name: String  amountCents: Int! }
+type BenefactorLink { url: String!  title: String!  description: String  icon: String  image: String }   # icon, image: /api/link-images/<id>
+type FounderRow { number: Int!  name: String  amountCents: Int!  stones: Int!  firstStone: Boolean!  keystone: Boolean!  links: [BenefactorLink!]! }
+type BenefactorRow { rank: Int!  name: String  amountCents: Int!  links: [BenefactorLink!]! }
 type CityBenefactors { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
   stones: [Int]!  founders: [FounderRow!]!  benefactors: [BenefactorRow!]! }
+type WallCity { slug: String!  name: String!  worldId: String }
+type WallBenefactor { name: String  amountCents: Int!  cities: [WallCity!]!  links: [BenefactorLink!]!  lastGiftAt: DateTime! }
 
 enum FunnelStep { VISIT DONATE_OPENED CHECKOUT_STARTED CHECKOUT_CANCELLED }
 input TrackFunnelStepInput { visitId: ID!  step: FunnelStep!  world: String!  locale: String }
@@ -131,9 +148,10 @@ type DonationFunnel { from: DateTime!  to: DateTime!  timeZone: String!  totals:
 type Query {
   health: String!  uptime: Int!  cityMilestones: [CityMilestone!]!      # public; uptime: seconds since the process started
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors        # public; null: unknown or hidden city
+  benefactorWall: [WallBenefactor!]!                                    # public; everyone who gave to a city, at most 200
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!                # public; the worlds asked, in that order
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
-  myGiving: MyGiving!                                                   # donors
+  myGiving: MyGiving!  myLinks: MyLinks!                                # donors
   benefactorNames: [BenefactorName!]!                                   # admins
 }
 type Mutation {
@@ -143,12 +161,18 @@ type Mutation {
   answerQuiz(input: AnswerQuizInput!): QuizTally!                                  # public
   setListing(input: SetListingInput!): Boolean!                                    # donors
   setDisplayName(input: SetDisplayNameInput!): String!                             # donors
+  addLink(input: AddLinkInput!): MyLink!                                           # donors; reads the page
+  refreshLink(input: LinkIdInput!): MyLink!                                        # donors; reads it again
+  removeLink(input: LinkIdInput!): Boolean!                                        # donors
   setNameHidden(input: SetNameHiddenInput!): Boolean!                              # admins
+  setLinksHidden(input: SetLinksHiddenInput!): Boolean!                            # admins
 }
 
 # admins: names to review
-type BenefactorName { donorId: ID!  name: String!  hidden: Boolean!  cities: [String!]!  lastGiftAt: DateTime! }  # donors with a name and a listed gift, newest first, at most 100
-input SetNameHiddenInput { donorId: ID!  hidden: Boolean! }   # hides the name on every list; stones and numbers stay
+type BenefactorName { donorId: ID!  name: String!  hidden: Boolean!  cities: [String!]!  lastGiftAt: DateTime!
+  links: [BenefactorLink!]!  linksHidden: Boolean! }  # donors with a name and a listed gift, newest first, at most 100; every link, with its picture
+input SetNameHiddenInput { donorId: ID!  hidden: Boolean! }   # hides the name on every list (its links with it); stones and numbers stay
+input SetLinksHiddenInput { donorId: ID!  hidden: Boolean! }  # hides the links on every list; the name stays
 
 # donors only (a donor's session; an admin's is FORBIDDEN)
 type MyCity { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
@@ -156,6 +180,10 @@ type MyCity { slug: String!  name: String!  status: CityStatus!  worldId: String
 type MyGiving { displayName: String  cities: [MyCity!]!  projectCents: Int! }   # cities: latest gift first
 input SetListingInput { city: String!  listed: Boolean! }   # city by slug; every gift of the donor's there; true needs a name
 input SetDisplayNameInput { name: String! }                 # cleaned (cleanDisplayName), BAD_REQUEST if nothing is left; answers it
+type MyLink { id: ID!  url: String!  title: String!  description: String  icon: String  image: String }   # image: always, when the page has one
+type MyLinks { links: [MyLink!]!  max: Int!  givenCents: Int!  picturesFromCents: Int!  hidden: Boolean! }   # in the order added
+input AddLinkInput { url: String! }                         # cleaned (cleanLinkUrl); BAD_REQUEST: not a public https page, not given yet, there already, or three
+input LinkIdInput { id: ID! }                               # one of the donor's own links
 ```
 
 **Admins' unless marked.** `JwtAuthGuard` is global (`AuthModule`): every resolver and route
@@ -226,6 +254,64 @@ are asked about again on each run.
 
 Hidden cities still appear on their own donors' pages (hiding only keeps a city off the public
 list).
+
+**The wall** (`benefactorWall`, public, 60 a minute per address) is everyone who gave to a city
+that is shown, as one list for the front page (`wall.ts`, pure): a named donor **once**, their
+named gifts added up over every city they are named in (the city they gave most to first),
+with their links; every unnamed gift on its own, name `null`, with what it gave and its one
+city, as on a city's own list. Largest first, then the latest; at most `WALL_MAX` (200). Gifts
+to no city, to a hidden city or in another currency are on no list. An unnamed entry says
+nothing of whose it is: a donor named in one city and not in another is two entries.
+
+## Links (`links/`)
+
+A donor who has given (in dollars) may show up to `LINKS_MAX` (3) links beside their name.
+`donor_links` holds them (unique on `donor_id, url`), `link_images` the copies of their
+pictures, `donors.links_hidden` an admin's switch.
+
+- **What a link may be** (`cleanLinkUrl`): `https://host/path?query`. What people type is met
+  halfway ("example.com/me" and "http://…" become https, the fragment is dropped); anything
+  that is not a public web page is refused: another scheme, an address (`127.0.0.1`,
+  `[::1]`), a port, a user, a bare or private name (`localhost`, `postgres`, `x.local`,
+  `x.internal`), more than `URL_MAX` (300) characters.
+- **The page is read once**, when the link is saved (`addLink`), and again only when the donor
+  asks (`refreshLink`); both are limited to `READS_PER_MINUTE` (10) per address. `LinkReader`
+  (`link-reader.ts`) asks for the page, reads its head (`readPageMeta`: Open Graph's title,
+  description and picture first, then Twitter's, then the page's own; the icons, the most
+  promising first, `/favicon.ico` last), then its picture and the first icon that can be
+  drawn, all before one deadline (`READ_MS`, 9 s). It never throws: a page that is away, or
+  that will not talk to a program, is `reached: false` and the link is kept under its own
+  name ("example.com/ana"), often still with its site's icon. A refresh of a page that does
+  not answer changes nothing (a 503, "The page did not answer"). Texts are cleaned
+  (`cleanText`: NFC, control and invisible characters out, 80 and 200 code points).
+- **Fetching a stranger's address safely** (`safe-fetch.ts`; the API runs beside its database).
+  Only `isPublicUrl` addresses are asked (https, default port, a public host name, no user),
+  **every redirect included** (three at most); the connection is made through `guardedLookup`,
+  which hands the socket the host's addresses only when **all** of them are public
+  (`isPublicAddress`: no loopback, private, shared, link-local (the metadata service),
+  documentation, multicast or reserved range, nor the IPv6 ranges that carry an IPv4 address),
+  so a name cannot be public when checked and private when connected to. No more than it was
+  told is read, counted unpacked (a page is cut at 600 kB, a picture over 5 MB or an icon over
+  500 kB refused), and it gives up at the deadline. Nothing of anyone's goes out: no cookie, a
+  generic user agent.
+- **Pictures are drawn again here** (`link-images.ts`, sharp): the page's picture cut to a share
+  card's shape (480 × 252, never enlarged; under 120 × 60 is not a picture), the icon within
+  64 px (an `.ico` through `ico.ts`, which the image library does not read), both WebP with
+  nothing of the source but its pixels. A source of more than 25 million pixels is refused
+  unread. So what the site shows is never a file a linked page sent, and a visitor's browser
+  never asks a linked site for anything.
+- **`GET /api/link-images/:id`** (public) serves one: `image/webp`, `nosniff`, and
+  `Cache-Control: public, max-age=31536000, immutable`, because an id's bytes never change: a
+  new reading makes new rows, so new ids (404 for the old ones). GraphQL names an image by
+  that path (`icon`, `image`); the site puts the API's origin in front.
+- **Where they show** (`shownFor`, read by `cityBenefactors` and the wall): on a row that is
+  named, which the caller decides (`standing.ts` rows carry `donorId` for this, never exposed);
+  so never beside an unnamed gift, and not under a name an admin hid. None for a donor whose
+  `links_hidden` is set. A link's `image` is there only once the donor has given
+  `PICTURES_FROM_CENTS` (US$10) **in all** (every gift in dollars, to a city or not); `myLinks`
+  gives the donor's own page every picture, with `givenCents` and `picturesFromCents` to say
+  what is missing. Links go up at once, as names do; `benefactorNames` shows admins every link
+  with its picture, hidden or not, and `setLinksHidden` takes a donor's links off every list.
 
 ## Signing in, for admins and donors (`auth/`)
 
@@ -539,6 +625,9 @@ go up. `npm run seed` also works by hand inside the image
 `dist/` and `prisma/` only, so scripts that need `src/` code live in `src/`). Rolling back past the
 `sign_in_codes` migration breaks admin sign-in (old code inserts links without `code_hash`): roll
 the database back too, or roll forward. The image has a `HEALTHCHECK` that asks `{ health }`.
+`sharp` (the links' pictures) comes with its own prebuilt library for the image's platform:
+nothing to install in the Dockerfile. Reading a donor's link needs the container to reach the
+internet, as Stripe and the mail server already do.
 In production the schema is kept in memory (the user cannot write `schema.gql`).
 
 ## Testing
@@ -546,7 +635,11 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
 - Unit tests (`src/**/*.spec.ts`) build the service by hand over `test/fake-prisma.ts` (a few
   arrays with unique columns and rollback), `test/fake-mailer.ts` (keeps the mail, and reads the
   token out of a sign-in link) and `test/fake-stripe.ts` (records the sessions asked
-  for and the prices looked up; `price_en` belongs to `prod_en`). The fake mailer keeps every
+  for and the prices looked up; `price_en` belongs to `prod_en`). The links' pieces are tested
+  on their own: `safe-fetch.spec.ts` against a server it starts on this machine (its `test`
+  setting swaps https and the address guard for a rule of the test's, every hop still
+  checked), the guard itself with made-up lookups, and the pictures with real ones made by
+  sharp. No test asks the internet for a page. The fake mailer keeps every
   mail; `signIns()` are the ones with a sign-in link (`token()` and `code()` read the latest of
   those), since thank-yous go out on their own after a donation. `failWith` fails every mail,
   or the ones a function of the attempt's number picks (`attempts` counts them), which is how
@@ -556,7 +649,9 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
 - `npm run test:e2e` boots the whole app with the fake Stripe on its own database
   (`tinyworlds_test`, created on the compose Postgres if missing), and goes through HTTP: the
   global prefix, validation, the raw-body webhook, throttling by forwarded address, CORS,
-  signing in through a mailed link (the mail is kept by the fake mailer), the funnel's SQL
+  signing in through a mailed link (the mail is kept by the fake mailer), links (their pages
+  come from `test/fake-link-reader.ts`: a page in its table answers, any other is away), the
+  wall, the funnel's SQL
   and each world's visits on a real database (the visits tests move the API's clock, `Date`
   only, past the counts kept in memory). The admin signs in once for the whole file, so `admins` is not emptied
   between tests; `magic_links` is (with `donors`), so a test may ask for a fresh link. The

@@ -85,7 +85,7 @@ the Wall to Asshai as one toy-scale diorama (unofficial; places from *A Song of 
 |------|------|
 | `tinyworlds-pipeline/` | TypeScript CLI: downloads the data, builds the scene, renders the tiles and indexes |
 | `tinyworlds-frontend/` | Next.js 16 static site: the map viewer (one build per city) and the front page |
-| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, each world's visits, the donation funnel for admins, and the mails to donors |
+| `tinyworlds-api/` | NestJS + GraphQL + Prisma: donations, per-city funding milestones, each world's visits, the donation funnel for admins, benefactors and the links they show, and the mails to donors |
 | `tinyworlds-videos/` | HyperFrames: the front page's loops, city flyovers, the showcase film and a tour of tinywesteros, all from the real tiles and viewer |
 | `deploy/` | nginx config and the deploy script (which also tells a newly built city's donors) |
 
@@ -142,6 +142,12 @@ in the API container (it runs `node dist/benefactors/backfill-cli.js`: it gives 
 their donors from Stripe, safe to run again), then deploy the viewers. Rolling the API back past
 the `sign_in_codes` migration breaks admin sign-in (the old code inserts links without
 `code_hash`): roll the database back too, or roll forward.
+
+Benefactors' links (up to three beside a donor's name, and everyone who gave on the front page)
+need nothing set: the API's migration adds their tables, and a push to main deploys the API
+before the viewers, as the new queries want. The API reads each linked page itself, so its
+container must be able to reach the internet (as it already does for Stripe and the mail
+server); the pictures it keeps are in its database. Admins review and hide links on `/admin/`.
 
 Or `./dev.sh [world]` for all three in tmux.
 

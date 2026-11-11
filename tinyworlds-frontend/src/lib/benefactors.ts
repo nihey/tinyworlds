@@ -1,4 +1,5 @@
 import type { CityStatus } from "./donate";
+import { parseLinks, type BenefactorLink, type MyLinks } from "./links";
 
 /**
  * Stones and benefactors, without the sign: parsing the API's answer, what a gift would lay, how
@@ -17,12 +18,16 @@ export interface FounderRow {
   stones: number;
   firstStone: boolean;
   keystone: boolean;
+  /** a named founder's links; none on an unnamed row */
+  links: BenefactorLink[];
 }
 
 export interface BenefactorRow {
   rank: number;
   name: string | null;
   amountCents: number;
+  /** as on a founder's row */
+  links: BenefactorLink[];
 }
 
 export interface CityBenefactors {
@@ -45,7 +50,7 @@ const isRec = (v: unknown): v is Rec => typeof v === "object" && v !== null && !
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
 const isName = (v: unknown): v is string | null => v === null || typeof v === "string";
 
-function parseFounder(v: unknown): FounderRow | null {
+function parseFounder(v: unknown, origin: string | null): FounderRow | null {
   if (!isRec(v)) return null;
   if (!isInt(v.number) || !isName(v.name) || !isInt(v.amountCents) || !isInt(v.stones)) return null;
   if (typeof v.firstStone !== "boolean" || typeof v.keystone !== "boolean") return null;
@@ -56,13 +61,20 @@ function parseFounder(v: unknown): FounderRow | null {
     stones: v.stones,
     firstStone: v.firstStone,
     keystone: v.keystone,
+    // links go with a name: an unnamed row shows none, whatever the answer says
+    links: v.name === null ? [] : parseLinks(v.links, origin),
   };
 }
 
-function parseBenefactor(v: unknown): BenefactorRow | null {
+function parseBenefactor(v: unknown, origin: string | null): BenefactorRow | null {
   if (!isRec(v)) return null;
   if (!isInt(v.rank) || !isName(v.name) || !isInt(v.amountCents)) return null;
-  return { rank: v.rank, name: v.name, amountCents: v.amountCents };
+  return {
+    rank: v.rank,
+    name: v.name,
+    amountCents: v.amountCents,
+    links: v.name === null ? [] : parseLinks(v.links, origin),
+  };
 }
 
 function parseAll<T>(list: unknown, one: (v: unknown) => T | null): T[] | null {
@@ -86,8 +98,14 @@ function parseStones(list: unknown): (number | null)[] | null {
   return out;
 }
 
-/** The API's `cityBenefactors` answer, or null when it is not what the contract says. */
-export function parseCityBenefactors(value: unknown): CityBenefactors | null {
+/**
+ * The API's `cityBenefactors` answer, or null when it is not what the contract says. `origin`
+ * is where the API serves the links' pictures from (`apiOrigin`); without it they show none.
+ */
+export function parseCityBenefactors(
+  value: unknown,
+  origin: string | null = null,
+): CityBenefactors | null {
   if (!isRec(value)) return null;
   const { slug, name, status, worldId, goalCents, raisedCents } = value;
   if (typeof slug !== "string" || typeof name !== "string") return null;
@@ -95,8 +113,8 @@ export function parseCityBenefactors(value: unknown): CityBenefactors | null {
   if (worldId !== null && typeof worldId !== "string") return null;
   if (!isInt(goalCents) || !isInt(raisedCents)) return null;
   const stones = parseStones(value.stones);
-  const founders = parseAll(value.founders, parseFounder);
-  const benefactors = parseAll(value.benefactors, parseBenefactor);
+  const founders = parseAll(value.founders, (v) => parseFounder(v, origin));
+  const benefactors = parseAll(value.benefactors, (v) => parseBenefactor(v, origin));
   if (!stones || !founders || !benefactors) return null;
   return {
     slug,
@@ -244,6 +262,8 @@ export interface MyGiving {
   cities: MyCity[];
   /** gifts that named no city */
   projectCents: number;
+  /** the links shown beside the name; null when the API said nothing of them */
+  links: MyLinks | null;
 }
 
 function parseMyCity(v: unknown): MyCity | null {
@@ -273,13 +293,21 @@ function parseMyCity(v: unknown): MyCity | null {
   };
 }
 
-/** The API's `myGiving` answer, or null when it is not what the contract says. */
-export function parseGiving(value: unknown): MyGiving | null {
+/**
+ * The API's `myGiving` answer, or null when it is not what the contract says. `links` is what
+ * `parseMyLinks` made of the `myLinks` asked with it.
+ */
+export function parseGiving(value: unknown, links: MyLinks | null = null): MyGiving | null {
   if (!isRec(value)) return null;
   if (!isName(value.displayName) || !isInt(value.projectCents)) return null;
   const cities = parseAll(value.cities, parseMyCity);
   if (!cities) return null;
-  return { displayName: value.displayName, cities, projectCents: value.projectCents };
+  return { displayName: value.displayName, cities, projectCents: value.projectCents, links };
+}
+
+/** Whether the donor is named anywhere: their links show where their name does. */
+export function namedSomewhere(giving: MyGiving): boolean {
+  return giving.displayName !== null && giving.cities.some((city) => city.listed);
 }
 
 /** The figures at the top of the page: how many cities, how many stones, how much given to them. */

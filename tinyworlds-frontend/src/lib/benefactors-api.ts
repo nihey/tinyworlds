@@ -8,6 +8,7 @@ import {
   type MyGiving,
 } from "./benefactors";
 import { API_TIMEOUT, API_URL, withTimeout } from "./donate";
+import { apiOrigin, parseMyLink, parseMyLinks, type MyLink } from "./links";
 import { SignInError } from "./sign-in-api";
 
 /**
@@ -22,7 +23,18 @@ function apollo(): ApolloClient {
   return client;
 }
 
+const LINK_FIELDS = gql`
+  fragment LinkFields on BenefactorLink {
+    url
+    title
+    description
+    icon
+    image
+  }
+`;
+
 const CITY_BENEFACTORS = gql`
+  ${LINK_FIELDS}
   query CityBenefactors($input: CityBenefactorsInput!) {
     cityBenefactors(input: $input) {
       slug
@@ -39,11 +51,17 @@ const CITY_BENEFACTORS = gql`
         stones
         firstStone
         keystone
+        links {
+          ...LinkFields
+        }
       }
       benefactors {
         rank
         name
         amountCents
+        links {
+          ...LinkFields
+        }
       }
     }
   }
@@ -67,7 +85,7 @@ export async function fetchCityBenefactors(
   );
   const answer = result.data?.cityBenefactors;
   if (answer === null) return null;
-  const parsed = parseCityBenefactors(answer);
+  const parsed = parseCityBenefactors(answer, apiOrigin());
   if (!parsed) throw new Error("the benefactors answer is not what the contract says");
   return parsed;
 }
@@ -125,8 +143,56 @@ const MY_GIVING = gql`
         listed
       }
     }
+    myLinks {
+      max
+      givenCents
+      picturesFromCents
+      hidden
+      links {
+        id
+        url
+        title
+        description
+        icon
+        image
+      }
+    }
   }
 `;
+
+const MY_LINK = `
+  id
+  url
+  title
+  description
+  icon
+  image
+`;
+
+const ADD_LINK = gql`
+  mutation AddLink($input: AddLinkInput!) {
+    addLink(input: $input) {
+      ${MY_LINK}
+    }
+  }
+`;
+
+const REFRESH_LINK = gql`
+  mutation RefreshLink($input: LinkIdInput!) {
+    refreshLink(input: $input) {
+      ${MY_LINK}
+    }
+  }
+`;
+
+const REMOVE_LINK = gql`
+  mutation RemoveLink($input: LinkIdInput!) {
+    removeLink(input: $input)
+  }
+`;
+
+/** Reading a page takes the API a few seconds: a link's own calls are given longer. */
+const LINK_TIMEOUT = 20_000;
 
 const SET_LISTING = gql`
   mutation SetListing($input: SetListingInput!) {
@@ -144,14 +210,17 @@ const SET_DISPLAY_NAME = gql`
 export async function fetchGiving(session: AdminSession): Promise<MyGiving> {
   try {
     const result = await withTimeout(
-      donorApollo(session.accessToken).query<{ myGiving: unknown }>({
+      donorApollo(session.accessToken).query<{ myGiving: unknown; myLinks: unknown }>({
         query: MY_GIVING,
         fetchPolicy: "no-cache",
         context: { fetchOptions: { signal: AbortSignal.timeout(DONOR_TIMEOUT) } },
       }),
       DONOR_TIMEOUT,
     );
-    const giving = parseGiving(result.data?.myGiving);
+    const giving = parseGiving(
+      result.data?.myGiving,
+      parseMyLinks(result.data?.myLinks, apiOrigin()),
+    );
     if (!giving) throw new SignInError("failed");
     return giving;
   } catch (error) {
@@ -193,6 +262,63 @@ export async function setDisplayName(session: AdminSession, name: string): Promi
     const kept = result.data?.setDisplayName;
     if (typeof kept !== "string") throw new SignInError("failed");
     return kept;
+  } catch (error) {
+    throw donorFailure(error);
+  }
+}
+
+/**
+ * Saves a link beside the donor's name; the API reads its page before it answers, with what it
+ * found. Rejects with a `SignInError` ("failed" also when the API refused the link).
+ */
+export async function addLink(session: AdminSession, url: string): Promise<MyLink> {
+  try {
+    const result = await withTimeout(
+      donorApollo(session.accessToken).mutate<{ addLink: unknown }>({
+        mutation: ADD_LINK,
+        variables: { input: { url } },
+        context: { fetchOptions: { signal: AbortSignal.timeout(LINK_TIMEOUT) } },
+      }),
+      LINK_TIMEOUT,
+    );
+    const link = parseMyLink(result.data?.addLink, apiOrigin());
+    if (!link) throw new SignInError("failed");
+    return link;
+  } catch (error) {
+    throw donorFailure(error);
+  }
+}
+
+/** Has the API read a link's page again; answers the new reading. Rejects with a `SignInError`. */
+export async function refreshLink(session: AdminSession, id: string): Promise<MyLink> {
+  try {
+    const result = await withTimeout(
+      donorApollo(session.accessToken).mutate<{ refreshLink: unknown }>({
+        mutation: REFRESH_LINK,
+        variables: { input: { id } },
+        context: { fetchOptions: { signal: AbortSignal.timeout(LINK_TIMEOUT) } },
+      }),
+      LINK_TIMEOUT,
+    );
+    const link = parseMyLink(result.data?.refreshLink, apiOrigin());
+    if (!link) throw new SignInError("failed");
+    return link;
+  } catch (error) {
+    throw donorFailure(error);
+  }
+}
+
+/** Takes one of the donor's links away. Rejects with a `SignInError`. */
+export async function removeLink(session: AdminSession, id: string): Promise<void> {
+  try {
+    await withTimeout(
+      donorApollo(session.accessToken).mutate({
+        mutation: REMOVE_LINK,
+        variables: { input: { id } },
+        context: { fetchOptions: { signal: AbortSignal.timeout(DONOR_TIMEOUT) } },
+      }),
+      DONOR_TIMEOUT,
+    );
   } catch (error) {
     throw donorFailure(error);
   }

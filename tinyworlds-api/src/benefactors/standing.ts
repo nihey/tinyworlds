@@ -23,6 +23,8 @@ export interface GiftPlace {
 
 export interface FounderRow {
   number: number;
+  /** Whose row this is when it is named, so the lists can show their links; null when it is not. */
+  donorId: string | null;
   name: string | null;
   amountCents: number;
   stones: number;
@@ -32,6 +34,8 @@ export interface FounderRow {
 
 export interface BenefactorRow {
   rank: number;
+  /** As on a founder's row: the named donor, or null. */
+  donorId: string | null;
   name: string | null;
   amountCents: number;
 }
@@ -111,6 +115,7 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
       if (!row) {
         row = {
           number: rowNumber,
+          donorId: named ? gift.donorId : null,
           name: gift.name,
           amountCents: 0,
           stones: 0,
@@ -137,7 +142,12 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
 
   const groups = new Map<
     string,
-    { name: string | null; amountCents: number; first: Gift }
+    {
+      donorId: string | null;
+      name: string | null;
+      amountCents: number;
+      first: Gift;
+    }
   >();
   for (const p of placed) {
     if (p.start < goalCents) continue;
@@ -149,6 +159,7 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
     if (group) group.amountCents += gift.amountCents;
     else
       groups.set(key, {
+        donorId: named ? gift.donorId : null,
         name: named ? gift.name : null,
         amountCents: gift.amountCents,
         first: gift,
@@ -158,6 +169,7 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
     .sort((a, b) => b.amountCents - a.amountCents || byTime(a.first, b.first))
     .map((g, i) => ({
       rank: i + 1,
+      donorId: g.donorId,
       name: g.name,
       amountCents: g.amountCents,
     }));

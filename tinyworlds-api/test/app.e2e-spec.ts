@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
+import sharp from 'sharp';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
@@ -9,8 +10,11 @@ import { BenefactorsService } from '../src/benefactors/benefactors.service.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
+import type { Drawn } from '../src/links/link-images.js';
+import { LINK_READER } from '../src/links/link-reader.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { CACHE_MS, LIVE_MS } from '../src/visits/visits.service.js';
+import { FakeLinkReader } from './fake-link-reader.js';
 import { FakeMailer } from './fake-mailer.js';
 import { checkoutSession, FakeStripe, signedEvent } from './fake-stripe.js';
 
@@ -64,6 +68,7 @@ describe('the API over HTTP', () => {
   let prisma: PrismaService;
   let stripe: FakeStripe;
   let mailer: FakeMailer;
+  let reader: FakeLinkReader;
   /** The admin's session, once signed in: sign-in links are limited to one a minute. */
   let session: { accessToken: string; admin: { id: string } } | null = null;
 
@@ -108,11 +113,14 @@ describe('the API over HTTP', () => {
   beforeAll(async () => {
     stripe = new FakeStripe();
     mailer = new FakeMailer();
+    reader = new FakeLinkReader();
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(STRIPE)
       .useValue(stripe)
       .overrideProvider(MAILER)
       .useValue(mailer)
+      .overrideProvider(LINK_READER)
+      .useValue(reader)
       .compile();
     app = moduleRef.createNestApplication({ rawBody: true });
     configureHttp(app);
@@ -125,8 +133,9 @@ describe('the API over HTTP', () => {
     // not the admins: the session made by the first sign-in serves every test after it. Links
     // go with the donors they may belong to (and so a test may ask for a fresh one)
     await prisma.$executeRawUnsafe(
-      'TRUNCATE donations, donors, cities, funnel_events, magic_links, quiz_answers',
+      'TRUNCATE donations, donors, cities, funnel_events, magic_links, quiz_answers, donor_links, link_images',
     );
+    reader.reset();
     stripe.calls = [];
     stripe.priceLookups = [];
   });
@@ -1522,6 +1531,588 @@ describe('the API over HTTP', () => {
             .expect(200);
           expect(answer(out).errors?.[0].extensions.code).toBe('FORBIDDEN');
         }
+      });
+    });
+
+    describe('links', () => {
+      const LINK = 'url title description icon image';
+      const MY_LINKS = `{ myLinks { max givenCents picturesFromCents hidden links { id ${LINK} } } }`;
+      const ADD = `mutation ($input: AddLinkInput!) { addLink(input: $input) { id ${LINK} } }`;
+      const REMOVE =
+        'mutation ($input: LinkIdInput!) { removeLink(input: $input) }';
+      const REFRESH = `mutation ($input: LinkIdInput!) { refreshLink(input: $input) { id ${LINK} } }`;
+      const HIDE_LINKS =
+        'mutation ($input: SetLinksHiddenInput!) { setLinksHidden(input: $input) }';
+      const WALL = `{ benefactorWall { name amountCents lastGiftAt
+        cities { slug name worldId } links { ${LINK} } } }`;
+      const ROWS = `query ($input: CityBenefactorsInput!) { cityBenefactors(input: $input) {
+        founders { number name links { ${LINK} } }
+        benefactors { rank name links { ${LINK} } } } }`;
+      const SHOP = 'https://shop.example.com/';
+
+      interface Link {
+        id: string;
+        url: string;
+        title: string;
+        description: string | null;
+        icon: string | null;
+        image: string | null;
+      }
+      interface Row {
+        name: string | null;
+        links: Omit<Link, 'id'>[];
+      }
+      interface Linked {
+        data: {
+          myLinks: {
+            max: number;
+            givenCents: number;
+            picturesFromCents: number;
+            hidden: boolean;
+            links: Link[];
+          };
+          addLink: Link;
+          refreshLink: Link;
+          removeLink: boolean;
+          cityBenefactors: { founders: Row[]; benefactors: Row[] };
+          benefactorWall: (Row & {
+            amountCents: number;
+            cities: { slug: string; name: string; worldId: string | null }[];
+          })[];
+        };
+        errors?: { message: string; extensions: { code: string } }[];
+      }
+      const linked = (res: { body: unknown }) => res.body as Linked;
+
+      let card: Drawn;
+      let icon: Drawn;
+      let ip = 120;
+      beforeAll(async () => {
+        const webp = async (width: number, height: number): Promise<Drawn> => ({
+          bytes: await sharp({
+            create: {
+              width,
+              height,
+              channels: 3,
+              background: { r: 247, g: 194, b: 27 },
+            },
+          })
+            .webp()
+            .toBuffer(),
+          width,
+          height,
+        });
+        card = await webp(480, 252);
+        icon = await webp(64, 64);
+      });
+      beforeEach(() => {
+        reader.pages.set(SHOP, {
+          title: 'A tiny shop',
+          description: 'Prints and postcards',
+          icon,
+          picture: card,
+        });
+      });
+
+      /** A donor's session, the way a person gets one; each from an address of its own. */
+      const signInDonor = async (email: string) => {
+        const from = `203.0.113.${ip++}`;
+        const before = mailer.signIns().length;
+        await post('/api/auth/magic-link', {
+          email,
+          returnUrl: 'https://example.com/',
+          purpose: 'donor',
+        })
+          .set('x-forwarded-for', from)
+          .expect(202);
+        await vi.waitFor(() =>
+          expect(mailer.signIns()).toHaveLength(before + 1),
+        );
+        const res = await post('/api/auth/verify', { token: mailer.token() })
+          .set('x-forwarded-for', from)
+          .expect(200);
+        const { accessToken, donor } = res.body as {
+          accessToken: string;
+          donor: { id: string };
+        };
+        const ask = (query: string, variables?: Record<string, unknown>) =>
+          graphql(query, variables)
+            .set('Authorization', `Bearer ${accessToken}`)
+            .set('x-forwarded-for', from)
+            .expect(200);
+        return { ask, id: donor.id };
+      };
+      const rowsOf = async (slug = 'lisbon') =>
+        linked(await graphql(ROWS, { input: { slug } }).expect(200)).data
+          .cityBenefactors;
+      const wall = async () =>
+        linked(await graphql(WALL).expect(200)).data.benefactorWall;
+
+      it('a donor adds a link, and its page is read once', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const added = linked(
+          await ana.ask(ADD, { input: { url: 'shop.example.com#top' } }),
+        );
+        expect(added.errors).toBeUndefined();
+        expect(added.data.addLink).toMatchObject({
+          url: SHOP,
+          title: 'A tiny shop',
+          description: 'Prints and postcards',
+          icon: expect.stringMatching(
+            /^\/api\/link-images\/[0-9a-f-]{36}$/,
+          ) as string,
+          image: expect.stringMatching(
+            /^\/api\/link-images\/[0-9a-f-]{36}$/,
+          ) as string,
+        });
+        expect(reader.asked).toEqual([SHOP]);
+
+        const mine = linked(await ana.ask(MY_LINKS)).data.myLinks;
+        expect(mine).toEqual({
+          max: 3,
+          givenCents: 4200,
+          picturesFromCents: 1000,
+          hidden: false,
+          links: [added.data.addLink],
+        });
+        // reading the list reads no page
+        expect(reader.asked).toEqual([SHOP]);
+      });
+
+      it("serves the copies it keeps of a link's pictures, for good", async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const { icon: iconPath, image } = linked(
+          await ana.ask(ADD, { input: { url: SHOP } }),
+        ).data.addLink;
+        const res = await request(app.getHttpServer())
+          .get(image as string)
+          .buffer(true)
+          .parse((response, done) => {
+            const chunks: Buffer[] = [];
+            response.on('data', (chunk: Buffer) => chunks.push(chunk));
+            response.on('end', () => done(null, Buffer.concat(chunks)));
+          })
+          .expect(200);
+        expect(res.headers['content-type']).toBe('image/webp');
+        expect(res.headers['cache-control']).toBe(
+          'public, max-age=31536000, immutable',
+        );
+        expect(res.headers['x-content-type-options']).toBe('nosniff');
+        expect((res.body as Buffer).equals(card.bytes)).toBe(true);
+        await request(app.getHttpServer())
+          .get(iconPath as string)
+          .expect(200);
+
+        await request(app.getHttpServer())
+          .get('/api/link-images/3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b')
+          .expect(404);
+        await request(app.getHttpServer())
+          .get('/api/link-images/not-an-id')
+          .expect(400);
+      });
+
+      it('keeps a link whose page is away, under its own name', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const added = linked(
+          await ana.ask(ADD, {
+            input: { url: 'https://www.example.org/in/ana/' },
+          }),
+        );
+        expect(added.data.addLink).toMatchObject({
+          url: 'https://www.example.org/in/ana/',
+          title: 'example.org/in/ana',
+          description: null,
+          icon: null,
+          image: null,
+        });
+      });
+
+      it.each([
+        ['another scheme', 'javascript:alert(1)'],
+        ['an address', 'https://127.0.0.1/'],
+        ['a private address', 'http://10.0.0.1/admin'],
+        ['the metadata service', 'http://169.254.169.254/latest/'],
+        ['a service on the same network', 'https://postgres/'],
+        ['a port', 'https://example.com:5432/'],
+        ['nothing', ' '],
+      ])('refuses %s, and asks for nothing', async (_what, url) => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const res = linked(await ana.ask(ADD, { input: { url } }));
+        expect(res.errors?.[0].extensions.code).toBe('BAD_REQUEST');
+        expect(reader.asked).toEqual([]);
+        expect(await prisma.donorLink.count()).toBe(0);
+      });
+
+      it('lets a donor have three links, each once', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        for (const n of [1, 2, 3]) {
+          const res = linked(
+            await ana.ask(ADD, { input: { url: `https://example.com/${n}` } }),
+          );
+          expect(res.errors).toBeUndefined();
+        }
+        const again = linked(
+          await ana.ask(ADD, { input: { url: 'http://example.com/2#x' } }),
+        );
+        expect(again.errors?.[0]).toMatchObject({
+          message: 'That link is already there',
+          extensions: { code: 'BAD_REQUEST' },
+        });
+        const fourth = linked(
+          await ana.ask(ADD, { input: { url: 'https://example.com/4' } }),
+        );
+        expect(fourth.errors?.[0]).toMatchObject({
+          message: 'No more than 3 links',
+          extensions: { code: 'BAD_REQUEST' },
+        });
+        // neither was read: the answer was known before asking
+        expect(reader.asked).toHaveLength(3);
+        const { links } = linked(await ana.ask(MY_LINKS)).data.myLinks;
+        expect(links.map((link) => link.url)).toEqual([
+          'https://example.com/1',
+          'https://example.com/2',
+          'https://example.com/3',
+        ]);
+      });
+
+      it('keeps the third link the third when two are added at once', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        for (const n of [1, 2])
+          await ana.ask(ADD, { input: { url: `https://example.com/${n}` } });
+        const both = await Promise.all(
+          ['a', 'b'].map((n) =>
+            ana.ask(ADD, { input: { url: `https://example.com/${n}` } }),
+          ),
+        );
+        expect(
+          both.filter((res) => linked(res).errors === undefined),
+        ).toHaveLength(1);
+        expect(await prisma.donorLink.count()).toBe(3);
+      });
+
+      it('is for those who have given', async () => {
+        const nobody = await signInDonor('new@example.com');
+        const res = linked(await nobody.ask(ADD, { input: { url: SHOP } }));
+        expect(res.errors?.[0]).toMatchObject({
+          message: 'Links are for those who have given',
+          extensions: { code: 'BAD_REQUEST' },
+        });
+        expect(reader.asked).toEqual([]);
+        expect(linked(await nobody.ask(MY_LINKS)).data.myLinks).toMatchObject({
+          givenCents: 0,
+          links: [],
+        });
+      });
+
+      it('is for donors: not for a visitor, not for an admin', async () => {
+        for (const [query, variables] of [
+          [MY_LINKS, undefined],
+          [ADD, { input: { url: SHOP } }],
+          [REMOVE, { input: { id: '3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b' } }],
+          [REFRESH, { input: { id: '3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b' } }],
+        ] as const) {
+          const anyone = await graphql(query, variables).expect(200);
+          expect(answer(anyone).errors?.[0].extensions.code).toBe(
+            'UNAUTHENTICATED',
+          );
+          const admin = await asAdmin(query, variables);
+          expect(answer(admin).errors?.[0].extensions.code).toBe('FORBIDDEN');
+        }
+        expect(reader.asked).toEqual([]);
+      });
+
+      it("shows a donor's links where their name shows, and nowhere else", async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        await ana.ask(ADD, { input: { url: SHOP } });
+        // Bo gave without a name: a link of his shows nowhere
+        const bo = await signInDonor('bo@example.com');
+        await bo.ask(ADD, { input: { url: 'https://bo.example.com/' } });
+
+        const { founders } = await rowsOf();
+        expect(founders).toEqual([
+          {
+            number: 1,
+            name: 'Ana',
+            links: [
+              {
+                url: SHOP,
+                title: 'A tiny shop',
+                description: 'Prints and postcards',
+                icon: expect.stringContaining('/api/link-images/') as string,
+                image: expect.stringContaining('/api/link-images/') as string,
+              },
+            ],
+          },
+          { number: 2, name: null, links: [] },
+        ]);
+
+        // unlisted, Ana is one more unnamed row: her link goes with her name
+        await ana.ask(
+          'mutation { setListing(input: { city: "lisbon", listed: false }) }',
+        );
+        const unlisted = await rowsOf();
+        expect(unlisted.founders.every((row) => row.name === null)).toBe(true);
+        expect(
+          [...unlisted.founders, ...unlisted.benefactors].flatMap(
+            (row) => row.links,
+          ),
+        ).toEqual([]);
+      });
+
+      it("shows a link's picture from ten dollars given", async () => {
+        await gift('cs_cy1', 600, 'cy@example.com', 'Cy', 'Porto');
+        const cy = await signInDonor('cy@example.com');
+        await cy.ask(ADD, { input: { url: SHOP } });
+        const under = (await rowsOf('porto')).founders[0];
+        expect(under.links[0]).toMatchObject({
+          title: 'A tiny shop',
+          icon: expect.any(String) as string,
+          image: null,
+        });
+        // their own page shows it all the same, with what is missing
+        const mine = linked(await cy.ask(MY_LINKS)).data.myLinks;
+        expect(mine).toMatchObject({
+          givenCents: 600,
+          picturesFromCents: 1000,
+        });
+        expect(mine.links[0].image).toEqual(expect.any(String));
+
+        // four dollars more, to nothing in particular: it is what they gave in all that counts
+        await gift('cs_cy2', 400, 'cy@example.com', undefined, '');
+        const over = (await rowsOf('porto')).founders[0];
+        expect(over.links[0].image).toBe(mine.links[0].image);
+        expect((await wall())[0].links[0].image).toBe(mine.links[0].image);
+      });
+
+      it('an admin sees the links to review, and hides them without the name', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        await ana.ask(ADD, { input: { url: SHOP } });
+
+        const NAMES = `{ benefactorNames { donorId name linksHidden links { ${LINK} } } }`;
+        type Names = {
+          data: {
+            benefactorNames: {
+              donorId: string;
+              name: string;
+              linksHidden: boolean;
+              links: Omit<Link, 'id'>[];
+            }[];
+          };
+        };
+        const [row] = ((await asAdmin(NAMES)).body as Names).data
+          .benefactorNames;
+        expect(row).toMatchObject({
+          name: 'Ana',
+          linksHidden: false,
+          links: [{ url: SHOP, title: 'A tiny shop' }],
+        });
+
+        const hidden = await asAdmin(HIDE_LINKS, {
+          input: { donorId: row.donorId, hidden: true },
+        });
+        expect(answer(hidden).errors).toBeUndefined();
+        expect((await rowsOf()).founders[0]).toEqual({
+          number: 1,
+          name: 'Ana',
+          links: [],
+        });
+        expect((await wall()).flatMap((entry) => entry.links)).toEqual([]);
+        // the admin still sees what is hidden, and the donor is told
+        const [after] = ((await asAdmin(NAMES)).body as Names).data
+          .benefactorNames;
+        expect(after).toMatchObject({ linksHidden: true });
+        expect(after.links).toHaveLength(1);
+        expect(linked(await ana.ask(MY_LINKS)).data.myLinks).toMatchObject({
+          hidden: true,
+        });
+
+        await asAdmin(HIDE_LINKS, {
+          input: { donorId: row.donorId, hidden: false },
+        });
+        expect((await rowsOf()).founders[0].links).toHaveLength(1);
+
+        // a donor cannot hide anyone's links, their own included
+        const refused = await ana.ask(HIDE_LINKS, {
+          input: { donorId: row.donorId, hidden: true },
+        });
+        expect(answer(refused).errors?.[0].extensions.code).toBe('FORBIDDEN');
+      });
+
+      it('shows no link under a name an admin hid', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        await ana.ask(ADD, { input: { url: SHOP } });
+        await prisma.donor.update({
+          where: { email: 'ana@example.com' },
+          data: { nameHidden: true },
+        });
+        const rows = await rowsOf();
+        expect(
+          [...rows.founders, ...rows.benefactors].flatMap((row) => row.links),
+        ).toEqual([]);
+        expect((await wall()).every((entry) => entry.name === null)).toBe(true);
+        expect((await wall()).flatMap((entry) => entry.links)).toEqual([]);
+      });
+
+      it('takes a link away with its pictures, and only its own donor may', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const { id, image } = linked(
+          await ana.ask(ADD, { input: { url: SHOP } }),
+        ).data.addLink;
+
+        const bo = await signInDonor('bo@example.com');
+        const notHis = linked(await bo.ask(REMOVE, { input: { id } }));
+        expect(notHis.errors?.[0].extensions.code).toBe('BAD_REQUEST');
+        const notHisEither = linked(await bo.ask(REFRESH, { input: { id } }));
+        expect(notHisEither.errors?.[0].extensions.code).toBe('BAD_REQUEST');
+        expect(await prisma.donorLink.count()).toBe(1);
+
+        const gone = linked(await ana.ask(REMOVE, { input: { id } }));
+        expect(gone.data.removeLink).toBe(true);
+        expect(linked(await ana.ask(MY_LINKS)).data.myLinks.links).toEqual([]);
+        expect((await rowsOf()).founders[0].links).toEqual([]);
+        await request(app.getHttpServer())
+          .get(image as string)
+          .expect(404);
+        expect(await prisma.linkImage.count()).toBe(0);
+      });
+
+      it('reads a page again when its donor asks, and keeps the old reading when it is away', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const first = linked(await ana.ask(ADD, { input: { url: SHOP } })).data
+          .addLink;
+
+        reader.pages.set(SHOP, { title: 'A bigger shop', icon });
+        const again = linked(
+          await ana.ask(REFRESH, { input: { id: first.id } }),
+        ).data.refreshLink;
+        expect(again).toMatchObject({
+          id: first.id,
+          title: 'A bigger shop',
+          description: null,
+          image: null,
+        });
+        // a new reading, a new address: what a browser kept of the old one is never wrong
+        expect(again.icon).not.toBe(first.icon);
+        await request(app.getHttpServer())
+          .get(first.icon as string)
+          .expect(404);
+        await request(app.getHttpServer())
+          .get(again.icon as string)
+          .expect(200);
+
+        reader.pages.delete(SHOP);
+        const away = linked(
+          await ana.ask(REFRESH, { input: { id: first.id } }),
+        );
+        expect(away.errors?.[0].message).toBe('The page did not answer');
+        expect(linked(await ana.ask(MY_LINKS)).data.myLinks.links[0]).toEqual(
+          again,
+        );
+      });
+
+      it('reads a page again no more than ten times a minute for one address', async () => {
+        await seedLisbon();
+        const ana = await signInDonor('ana@example.com');
+        const { id } = linked(await ana.ask(ADD, { input: { url: SHOP } })).data
+          .addLink;
+        for (let n = 0; n < 10; n++) {
+          const res = linked(await ana.ask(REFRESH, { input: { id } }));
+          expect(res.errors).toBeUndefined();
+        }
+        const eleventh = linked(await ana.ask(REFRESH, { input: { id } }));
+        expect(eleventh.errors?.[0].message).toMatch(/Too Many Requests/);
+        // the page was read to add the link, ten times more, and not an eleventh
+        expect(reader.asked).toHaveLength(11);
+      });
+
+      describe('the wall', () => {
+        it('lists everyone who gave to a city: the named once, the unnamed as they gave', async () => {
+          await seedLisbon();
+          await gift('cs_4', 700, 'ana@example.com', 'Ana', 'Porto');
+          await gift('cs_5', 2500, 'cy@example.com', undefined, 'Porto');
+          await prisma.city.update({
+            where: { slug: 'porto' },
+            data: { status: 'BUILT', worldId: 'tinyopo' },
+          });
+          const ana = await signInDonor('ana@example.com');
+          await ana.ask(ADD, { input: { url: SHOP } });
+
+          const res = await graphql(WALL).expect(200);
+          const lisbon = { slug: 'lisbon', name: 'Lisbon', worldId: null };
+          const porto = { slug: 'porto', name: 'Porto', worldId: 'tinyopo' };
+          expect(linked(res).data.benefactorWall).toEqual([
+            {
+              name: null,
+              amountCents: 8800,
+              cities: [lisbon],
+              links: [],
+              lastGiftAt: expect.any(String) as string,
+            },
+            {
+              name: 'Ana',
+              amountCents: 4900,
+              cities: [lisbon, porto],
+              links: [
+                {
+                  url: SHOP,
+                  title: 'A tiny shop',
+                  description: 'Prints and postcards',
+                  icon: expect.any(String) as string,
+                  image: expect.any(String) as string,
+                },
+              ],
+              lastGiftAt: expect.any(String) as string,
+            },
+            {
+              name: null,
+              amountCents: 2500,
+              cities: [porto],
+              links: [],
+              lastGiftAt: expect.any(String) as string,
+            },
+          ]);
+          // nobody's address, and nothing that says whose an unnamed gift is
+          expect(JSON.stringify(res.body)).not.toContain('@');
+          expect(JSON.stringify(res.body)).not.toContain('donorId');
+        });
+
+        it('leaves out hidden cities, other currencies and gifts to no city', async () => {
+          await gift('cs_h', 900, 'ana@example.com', 'Ana', 'Nowhere');
+          await prisma.city.update({
+            where: { slug: 'nowhere' },
+            data: { hidden: true },
+          });
+          await gift('cs_p', 300, 'ana@example.com', undefined, '');
+          await webhook({
+            id: 'cs_eur',
+            amount: 5000,
+            currency: 'eur',
+            email: 'eu@example.com',
+            metadata: {
+              app: 'tinyworlds',
+              city: 'Lisbon',
+              world: 'tinynyc',
+              locale: 'en-US',
+              benefactor_name: 'Eva',
+            },
+          }).expect(200);
+          expect(await wall()).toEqual([]);
+        });
+
+        it('is empty before anyone has given', async () => {
+          expect(await wall()).toEqual([]);
+        });
       });
     });
 

@@ -1,5 +1,6 @@
 import { Field, Int, ObjectType } from '@nestjs/graphql';
 import { CityStatus } from '../../generated/prisma/enums.js';
+import { BenefactorLink } from '../../links/models/benefactor-link.model.js';
 
 @ObjectType({
   description:
@@ -26,6 +27,12 @@ export class FounderRow {
 
   @Field(() => Boolean, { description: 'Laid the last stone' })
   keystone: boolean;
+
+  @Field(() => [BenefactorLink], {
+    description:
+      "The named founder's links (at most three); none for one who is not named",
+  })
+  links: BenefactorLink[];
 }
 
 @ObjectType({ description: 'A benefactor: gave once the city had its goal' })
@@ -38,6 +45,11 @@ export class BenefactorRow {
 
   @Field(() => Int)
   amountCents: number;
+
+  @Field(() => [BenefactorLink], {
+    description: "The named benefactor's links; none for one who is not named",
+  })
+  links: BenefactorLink[];
 }
 
 @ObjectType({ description: "A city's stones, founders and benefactors" })

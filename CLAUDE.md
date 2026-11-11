@@ -38,7 +38,7 @@ such strings before every commit.
 tinyworlds/
 ├── tinyworlds-pipeline/   # TypeScript ESM CLI: open data → isometric pixel-art tiles + indexes
 ├── tinyworlds-frontend/   # Next.js 16 static export: the map viewer (one build per world), the front page, `/admin/` and `/me/`
-├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins), benefactors and donors' own page (`/me/`), and the mails (sign-in, thank-you, a city is built)
+├── tinyworlds-api/        # NestJS + GraphQL + Prisma: donations, per-city funding milestones, the donation funnel (admins), benefactors, their links and donors' own page (`/me/`), and the mails (sign-in, thank-you, a city is built)
 ├── tinyworlds-videos/     # HyperFrames: the front page's card loops and hero, city flyovers, the showcase film, a tour of tinywesteros
 ├── deploy/                # nginx config, deploy script, .env.example
 ├── dev.sh                 # tmux launcher
@@ -82,6 +82,16 @@ Each sub-project has its own `CLAUDE.md`.
   by amount, one stone per US$1) are shown on a sign from the front page and from About in a map; a built
   city, which the Donate sign does not offer, reaches Donate only through that sign. Names are the donor's choice, per city; admins can hide one on `/admin/`. Emails never
   appear in the API's answers, and no answer says whether an address has donated.
+- **Benefactors' links, and everyone on the front page.** A donor who has given may add up to
+  three links to their own pages on "Your cities". The API reads each page once, when it is
+  saved (title, description, picture, icon), and keeps small copies of the pictures, so a
+  visitor's browser never asks a linked site for anything. The links show wherever the donor's
+  name does, never beside an unnamed gift; their pictures show once the donor has given US$10
+  in all. Admins see every link on `/admin/` and can hide a donor's links (hiding the name
+  hides them too). The front page lists **everyone who gave to a city** (`benefactorWall`):
+  down both sides of the page where the screen has room, as a strip under the figures where
+  it has not; a named donor once, with what they are named for and their links, every unnamed
+  gift as "Anonymous" with what it gave and where.
 - **Donors get two mails.** Once Stripe confirms a gift, the API thanks the donor by mail
   (how much closer their city is, its stones with theirs lit, how many people explore the
   cities, where they are listed); and once a city is built, `deploy/deploy.sh <world>` runs the
@@ -114,6 +124,9 @@ Each sub-project has its own `CLAUDE.md`.
   (`tinyworlds-api/CLAUDE.md`). Signing in is REST, as the global stack has it.
 - **Funnel steps go out with plain `fetch`**, not Apollo Client: every page sends one, and
   Apollo is only downloaded when the donate sign or the admin page asks for it.
+- **A link's pictures are served by REST** (`GET /api/link-images/<id>`): a page shows them
+  with `<img>`, and they are kept in the database, not in a bucket (a few kilobytes each,
+  drawn again by the API as WebP; there is no S3 in this project).
 
 ## Adding a world
 
@@ -305,11 +318,15 @@ GraphQL at `/api/graphql` (same origin in production):
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
 type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
+type BenefactorLink { url: String!  title: String!  description: String  icon: String  image: String }
+type WallCity { slug: String!  name: String!  worldId: String }
+type WallBenefactor { name: String  amountCents: Int!  cities: [WallCity!]!  links: [BenefactorLink!]!  lastGiftAt: DateTime! }
 type Query {
   health: String!
   uptime: Int!                                                       # seconds since the API process started
   cityMilestones: [CityMilestone!]!
   cityBenefactors(input: CityBenefactorsInput!): CityBenefactors   # public; null for an unknown or hidden city
+  benefactorWall: [WallBenefactor!]!                               # public; everyone who gave to a city, largest first, at most 200
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!          # public; the worlds asked, in that order
 }
 input WorldVisitsInput { worlds: [String!]! }                        # 1 to 50 world ids
@@ -334,10 +351,14 @@ type Mutation {
 #   query    myGiving: MyGiving!                         # their cities, stones, badges, listing
 #   mutation setListing(input: { city: String!, listed: Boolean! }): Boolean!
 #   mutation setDisplayName(input: { name: String! }): String!   # answers the cleaned name
+#   query    myLinks: MyLinks!                           # their links (each with its id), max, givenCents, picturesFromCents, hidden
+#   mutation addLink(input: { url: String! }): MyLink!   # reads the page; refreshLink(input: { id }) reads it again
+#   mutation removeLink(input: { id: ID! }): Boolean!
 # admins only (Authorization: Bearer <an admin's session>):
 #   me, donationFunnel
-#   query    benefactorNames: [BenefactorName!]!         # newest listed gift first, at most 100
+#   query    benefactorNames: [BenefactorName!]!         # newest listed gift first, at most 100; each with its links
 #   mutation setNameHidden(input: { donorId: ID!, hidden: Boolean! }): Boolean!
+#   mutation setLinksHidden(input: { donorId: ID!, hidden: Boolean! }): Boolean!
 ```
 
 `amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
@@ -348,7 +369,11 @@ picked (right when they are equal); a visit's answer to a building is kept once,
 (up to four, the building and the pick among them): `picks` then counts only those, else the 20
 most picked; `answers` is everyone who answered the building. `level` is the game's difficulty
 (each offers other wrong answers): answers are kept and tallied per level, `HARD` when absent. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
-city's benefactors for this gift; without it the gift is counted and not listed. REST: `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
+city's benefactors for this gift; without it the gift is counted and not listed. A founder's
+and a benefactor's row of `cityBenefactors` carries `links: [BenefactorLink!]!` too (none on an
+unnamed row). A link's `icon` and `image` are paths on the API's own host
+(`/api/link-images/<id>`, WebP, kept for good by a browser); `image` is null on the public
+lists until the donor has given US$10 in all. REST: `GET /api/link-images/<id>`, `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
 `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
 `POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered
 `{ accessToken, expiresAt, admin | donor: { id, email } }`. `purpose` is `"admin"` (the default)

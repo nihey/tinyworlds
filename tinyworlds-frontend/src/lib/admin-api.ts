@@ -8,6 +8,7 @@ import {
   type DonationFunnel,
 } from "./admin";
 import { API_URL, withTimeout } from "./donate";
+import { apiOrigin } from "./links";
 import { SignInError as AdminApiError } from "./sign-in-api";
 
 /**
@@ -131,6 +132,14 @@ const NAMES = gql`
       hidden
       cities
       lastGiftAt
+      linksHidden
+      links {
+        url
+        title
+        description
+        icon
+        image
+      }
     }
   }
 `;
@@ -147,7 +156,7 @@ export async function fetchNames(session: AdminSession): Promise<BenefactorName[
       TIMEOUT,
     );
     if (!Array.isArray(result.data?.benefactorNames)) throw new AdminApiError("failed");
-    return parseNames(result.data.benefactorNames);
+    return parseNames(result.data.benefactorNames, apiOrigin());
   } catch (error) {
     throw failure(error);
   }
@@ -175,6 +184,33 @@ export async function setNameHidden(
       TIMEOUT,
     );
     if (result.data?.setNameHidden !== true) throw new AdminApiError("failed");
+  } catch (error) {
+    throw failure(error);
+  }
+}
+
+const SET_LINKS_HIDDEN = gql`
+  mutation SetLinksHidden($input: SetLinksHiddenInput!) {
+    setLinksHidden(input: $input)
+  }
+`;
+
+/** Takes a donor's links off every list, or puts them back; the name is left as it is. */
+export async function setLinksHidden(
+  session: AdminSession,
+  donorId: string,
+  hidden: boolean,
+): Promise<void> {
+  try {
+    const result = await withTimeout(
+      apollo(session.accessToken).mutate<{ setLinksHidden: boolean }>({
+        mutation: SET_LINKS_HIDDEN,
+        variables: { input: { donorId, hidden } },
+        context: { fetchOptions: { signal: AbortSignal.timeout(TIMEOUT) } },
+      }),
+      TIMEOUT,
+    );
+    if (result.data?.setLinksHidden !== true) throw new AdminApiError("failed");
   } catch (error) {
     throw failure(error);
   }

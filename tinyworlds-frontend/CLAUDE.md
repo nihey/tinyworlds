@@ -131,19 +131,24 @@ src/
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
 ├── components/styles.ts # the buttons the front page and "Your cities" share, as class lists
 ├── components/home/     # the front page: landing.tsx and its pieces (section-head,
-│                        # world-card, site-numbers, next-city-tile), and moving-picture.tsx
-│                        # (a still that comes alive: the hero and the cards)
-├── components/benefactors/ # a city's benefactors (panel, sign, stone grid) and the badges' pixel art
+│                        # world-card, site-numbers, next-city-tile), moving-picture.tsx
+│                        # (a still that comes alive: the hero and the cards),
+│                        # benefactor-wall.tsx (everyone who gave: columns down the sides,
+│                        # or a strip) and drift.tsx (a list that drifts by)
+├── components/benefactors/ # a city's benefactors (panel, sign, stone grid), the badges' pixel
+│                        # art, and benefactor-link.tsx (one of a benefactor's links)
 ├── components/me/       # "Your cities" (/me/): me-app.tsx (signed in or not), me-page.tsx,
-│                        # your-cities.tsx, badges.tsx, keep-exploring.tsx, name-editor.tsx
+│                        # your-cities.tsx, your-links.tsx, badges.tsx, keep-exploring.tsx,
+│                        # name-editor.tsx
 ├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
 ├── components/admin/    # the admin pages: admin-app.tsx (signed in or not),
 │                        # funnel-report.tsx (the steps, the cities by visits, the days),
-│                        # names.tsx (donors' names: hide and show)
+│                        # names.tsx (donors' names and their links: hide and show)
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
-│                        # useFunnelVisit, usePresence, useWorldVisits, useAdminSession, …
+│                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
+│                        # useAdminSession, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
@@ -155,7 +160,9 @@ src/
                          # link, code; lazy),
                          # admin-api.ts (the report; lazy), site-events.ts (what the page
                          # analytics hear), consent.ts (who is asked before Google's tags
-                         # load, and loading them)
+                         # load, and loading them), links.ts (pure: a benefactor's links as
+                         # the API says them, what a link may be), wall.ts (everyone who
+                         # gave: the request, its answer, the two sides)
 ```
 
 ## Targets: worlds and the front page
@@ -171,7 +178,8 @@ src/
   `WORLD` is only a stand-in (the default world) that nothing shows: use `site.ts` there.
 - **The front page, top to bottom** (`components/home/landing.tsx`): links to its own sections
   (`#cities`, `#imagined`, `#ranking`, `#open-source`; hidden below `sm`) and "Your cities" as a
-  button; the hero; a strip of figures; the cities, then the imagined places, as cards; "Build
+  button; the hero; a strip of figures; the benefactors as a strip (only where the screen has
+  no room for them beside the page: below); the cities, then the imagined places, as cards; "Build
   the next city" (Donations, below); open source as one strip; the footer. Each section's title
   (`section-head.tsx`) sits on the fog with a line saying what the section is, and carries the
   section's id.
@@ -189,6 +197,29 @@ src/
   cities can still be given to (the funded and the ranked of `rankCities`). A figure takes its
   place when its number arrives and is left out if it never does; the strip is as tall from the
   first paint as it will be with all four, so nothing below it moves.
+- **Everyone who gave to a city is on the front page** (`benefactor-wall.tsx`, with an API;
+  `useWall` asks `benefactorWall` once, with a plain `fetch`). A plaque each, the largest gifts
+  first: a name, the sum in the accent, the cities (each opens that city's benefactors; two
+  by name, then "+2 more"), and a named benefactor's links (below). An unnamed gift is
+  "Anonymous" with what it gave and where. Last comes an empty lot, "Your name here", which
+  opens the donate sign (only where donations are taken).
+  - **From 90rem wide** (`WallColumns`): a column fixed down each side of the page, beside its
+    64rem column (10.5 to 15.5rem wide, a little into the page's own margin), the wall dealt
+    left and right in turn (`wallSides`). A link is a card: its picture, when it has one to
+    show, across the plaque, then icon, title and host.
+  - **Narrower** (`WallStrip`): one row under the figures, every plaque one height (84 px: a
+    name, the sum and cities on one line, the links on one line; the first picture at the
+    plaque's side). Its room is there from the first paint, with empty plaques while the list
+    is on its way, so the page below does not move; a failed answer leaves the invitation
+    alone. Only one of the two is ever in the page (`useMediaQuery`), so no picture is
+    fetched twice.
+  - **They drift** (`drift.tsx`, `.drift` in `globals.css`) only when there is more than fits:
+    the list is then in the page twice, the second copy `inert` and hidden from screen
+    readers, and the track moves by exactly one copy (16 px a second up a column, 26 along
+    the strip), so the loop has no seam; it comes out of the fog and goes back into it (a
+    mask). It stands still under the pointer and while anything in it has the focus, and
+    never moves under `prefers-reduced-motion`: there it is one list, scrolled by hand. The
+    columns are not scroll containers otherwise, so the wheel over them scrolls the page.
 - **"Which city should I build next?"** (`next-city-tile.tsx`, where donations are taken): a
   tile after the cities' cards, in what is left of their last row or in a row of its own
   (`tileSpan` in `lib/home.ts`, at each breakpoint), with the three cities nearest to being
@@ -460,6 +491,19 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
 - **"Your cities"** (`/me/`, below) is where a donor sees their own badges, their own stones
   in each city's foundation and the listing switch; **`/admin/`** can hide a name (`components/admin/names.tsx`: `benefactorNames`,
   `setNameHidden`; it acts at once, since it is reversible, and is loaded apart from the funnel).
+- **A benefactor's links** (`benefactors/benefactor-link.tsx`, `lib/links.ts`): up to three
+  pages a named donor points to, each with what the API read of it (title, description, the
+  site's icon, the page's picture). They show under the name in a city's sign (`look="row"`:
+  a small picture in the icon's place) and on the front page's plaques (`look="card"`), never
+  on an unnamed row (the parsers drop them there, whatever the answer says). A link opens in
+  a new tab with `rel="sponsored nofollow noopener"`: a gift put it there. Icons sit on a
+  white tile, since many are dark marks drawn for a light browser tab. **Nothing is loaded
+  from a linked site**: `icon` and `image` are paths on the API (`/api/link-images/<id>`),
+  `assetUrl` puts the API's origin (`apiOrigin`: `NEXT_PUBLIC_API_URL` may be a path) in
+  front and refuses anything that is not such a path, and a link whose address is not https
+  is not shown at all. The picture is there only when the API sends it (the donor has given
+  US$10 in all). On `/admin/`, each name comes with its links, pictures and all, and a second
+  switch hides the links alone (`setLinksHidden`).
 
 ## "Your cities" (`/me/`)
 
@@ -481,6 +525,16 @@ session in `donorStore`, "unauthorized" → back to sign-in with the `ended` not
     where they laid none, having given once it was funded), "Give again" unless it is built,
     the listing switch and the explore link. Turning a listing on with no name opens
     `NameEditor` first. Then the project line.
+- **Under it, for a donor: "Your links"** (`YourLinks`, from the `myLinks` asked with the
+  giving; `giving.links`, null if the API said nothing of them). A field takes an address as
+  people type it ("yoursite.com"); `cleanLinkUrl` (the API's rule, mirrored) and the links
+  already there are checked before anything is sent, then `addLink` has the API read the page
+  ("Reading the page…", a few seconds) and the link appears with what was found. Each link
+  has "Read again" (`refreshLink`; a page that does not answer leaves it as it was, and says
+  so) and "Remove". The section says what shows: that links go where the name goes (when the
+  donor is named nowhere, `namedSomewhere`), that an admin hid them, and whether their
+  pictures show ("Give $4 more and your links show their pictures too", `centsToPictures`;
+  until then a link's picture is dimmed here, with "Shown from $10 given").
 - **Beside it** (from `lg`; under it below): "Build the next city" in short (`BuildNextShort`:
   the funded and the best funded as stone cards, four in two columns for someone who has not
   given, two in one for a donor, and a link to the whole ranking on the front page,

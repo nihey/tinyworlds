@@ -13,6 +13,7 @@ import {
 import { API_URL, formatUsd } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { statusLabel } from "../donate/milestone-bar";
+import { BenefactorLinks } from "./benefactor-link";
 import { PixelBadge, PixelIcon } from "./pixel-badge";
 import { StoneGrid } from "./stone-grid";
 
@@ -23,8 +24,9 @@ type Load =
 
 const LABEL =
   "block pt-4 pb-1.5 text-[11px] font-semibold tracking-[0.14em] text-paper-dim uppercase";
-const ROW =
-  "grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-white/10 py-2 text-sm";
+/** a line of the founders' list, and the columns inside it: badge, name, sum */
+const LINE = "border-t border-white/10 py-2 text-sm";
+const COLUMNS = "grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-2.5";
 const STAR =
   "-mx-2 rounded-lg bg-[linear-gradient(90deg,rgb(247_194_27/0.09),transparent_75%)] px-2";
 
@@ -50,23 +52,27 @@ function FounderLine({
 }) {
   const star = f.firstStone || f.keystone;
   return (
-    <div className={cn(ROW, star && STAR)}>
-      <span>
-        <PixelBadge
-          art="founding"
-          label={String(f.number).padStart(2, "0")}
-          title={t.benefactors.foundingTitle.replace("{n}", String(f.number))}
-        />
-      </span>
-      <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-        <span className="min-w-0 truncate">{nameOf(f.name, t)}</span>
-        {f.firstStone && <PixelBadge art="firstStone" label={t.benefactors.firstStone} />}
-        {f.keystone && <PixelBadge art="keystone" label={t.benefactors.keystone} />}
+    <div className={cn(LINE, star && STAR)}>
+      <div className={COLUMNS}>
+        <span>
+          <PixelBadge
+            art="founding"
+            label={String(f.number).padStart(2, "0")}
+            title={t.benefactors.foundingTitle.replace("{n}", String(f.number))}
+          />
+        </span>
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+          <span className="min-w-0 truncate">{nameOf(f.name, t)}</span>
+          {f.firstStone && <PixelBadge art="firstStone" label={t.benefactors.firstStone} />}
+          {f.keystone && <PixelBadge art="keystone" label={t.benefactors.keystone} />}
+        </div>
+        <div className="text-right leading-[1.3]">
+          <b className="block text-sm font-semibold">{formatUsd(f.amountCents, locale)}</b>
+          <span className="text-xs text-paper-dim">{stonesText(t, f.stones)}</span>
+        </div>
       </div>
-      <div className="text-right leading-[1.3]">
-        <b className="block text-sm font-semibold">{formatUsd(f.amountCents, locale)}</b>
-        <span className="text-xs text-paper-dim">{stonesText(t, f.stones)}</span>
-      </div>
+      {/* under the name, in its column */}
+      <BenefactorLinks links={f.links} look="row" className="pt-2 pb-0.5 pl-[58px]" />
     </div>
   );
 }
@@ -134,7 +140,7 @@ function Body({ city, onBecome }: { city: CityBenefactors; onBecome: (cityName: 
               <div key={f.number} className="contents">
                 <FounderLine f={f} t={t} locale={locale} />
                 {hidden && hidden.after === f.number && (
-                  <div className={ROW}>
+                  <div className={cn(LINE, COLUMNS)}>
                     <span className="font-pixel text-xs text-paper-dim">··</span>
                     <span className="text-paper-dim">
                       {moreLine(hidden.count, hidden.anonymous, {
@@ -166,18 +172,17 @@ function Body({ city, onBecome }: { city: CityBenefactors; onBecome: (cityName: 
           </span>
           <ul>
             {city.benefactors.map((b) => (
-              <li
-                key={b.rank}
-                title={t.benefactors.benefactorTitle}
-                className="flex items-baseline gap-2.5 border-t border-white/10 py-[7px] text-sm"
-              >
-                <span className="w-[26px] shrink-0 font-pixel text-xs text-paper-dim">
-                  {b.rank}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{nameOf(b.name, t)}</span>
-                <span className="text-[13px] whitespace-nowrap text-paper-dim">
-                  {formatUsd(b.amountCents, locale)}
-                </span>
+              <li key={b.rank} className="border-t border-white/10 py-[7px] text-sm">
+                <div title={t.benefactors.benefactorTitle} className="flex items-baseline gap-2.5">
+                  <span className="w-[26px] shrink-0 font-pixel text-xs text-paper-dim">
+                    {b.rank}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{nameOf(b.name, t)}</span>
+                  <span className="text-[13px] whitespace-nowrap text-paper-dim">
+                    {formatUsd(b.amountCents, locale)}
+                  </span>
+                </div>
+                <BenefactorLinks links={b.links} look="row" className="pt-2 pb-0.5 pl-9" />
               </li>
             ))}
           </ul>
