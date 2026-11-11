@@ -25,7 +25,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "seed": "tsx prisma/seed.ts",
-    "donors:backfill": "tsx prisma/backfill-donors.ts",
+    "donors:backfill": "node dist/benefactors/backfill-cli.js",
+    "donors:backfill:dev": "tsx src/benefactors/backfill-cli.ts",
     "funnel:import": "tsx prisma/import-funnel.ts",
     "webhook:send": "node scripts/send-webhook.mjs"
   },

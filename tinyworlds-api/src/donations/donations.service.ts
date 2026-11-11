@@ -10,6 +10,7 @@ import Stripe from 'stripe';
 import { citySlug, cleanCityName } from '../cities/city-name.js';
 import { cleanDisplayName } from '../benefactors/display-name.js';
 import type { Env } from '../config/env.js';
+import { failureOf } from '../auth/auth.service.js';
 import { FunnelService } from '../funnel/funnel.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -29,7 +30,7 @@ const PAID_EVENTS = new Set([
 ]);
 
 /** Only US dollars fill a city's bar: the goal is in dollars. */
-const COUNTED_CURRENCY = 'usd';
+export const COUNTED_CURRENCY = 'usd';
 
 const isUniqueViolation = (error: unknown): boolean =>
   (error as { code?: string } | null)?.code === 'P2002';
@@ -204,9 +205,10 @@ export class DonationsService {
    * it has raised, and a PROPOSED city that reaches its goal becomes FUNDED.
    */
   async record(facts: DonationFacts): Promise<void> {
+    let current = facts;
     for (let attempt = 0; ; attempt++) {
       try {
-        const recorded = await this.insert(facts);
+        const recorded = await this.insert(current);
         if (recorded)
           this.logger.log(
             `Donation ${facts.stripeSessionId}: ${facts.amountCents} ${facts.currency}` +
@@ -214,7 +216,18 @@ export class DonationsService {
           );
         return;
       } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
+        if (!isUniqueViolation(error)) {
+          // The donor or the listing must never cost a donation: record it unlisted, without a
+          // donor, and let the backfill give it one later. Never log the address.
+          if (current.email || current.benefactorName) {
+            this.logger.error(
+              `Donation ${facts.stripeSessionId}: the donor step failed (${failureOf(error)}); recording it unlisted`,
+            );
+            current = { ...current, email: null, benefactorName: null };
+            continue;
+          }
+          throw error;
+        }
         // Lost a race. Either the same event arrived twice at once (the donation is there
         // now: done), or two donors named the same new city at the same moment (try again:
         // the city exists this time).
@@ -259,9 +272,10 @@ export class DonationsService {
           update: {},
           select: { id: true, displayName: true },
         });
+        // only the first name delivered sticks, even when two arrive at once
         if (facts.benefactorName && donor.displayName === null)
-          await tx.donor.update({
-            where: { id: donor.id },
+          await tx.donor.updateMany({
+            where: { id: donor.id, displayName: null },
             data: { displayName: facts.benefactorName },
           });
       }

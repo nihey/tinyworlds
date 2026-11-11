@@ -18,21 +18,21 @@ const WORDS: Record<Locale, Words> = {
     codeLine: 'Or type this code on the page:',
     once: 'Both work once, for {minutes} minutes.',
     ignore:
-      "If you didn't ask for it, ignore this message: nothing happens without the link.",
+      "If you didn't ask for it, ignore this message: nothing happens without the link or the code.",
   },
   'pt-BR': {
     subject: 'Seu código do tinyworlds: {code}',
     codeLine: 'Ou digite este código na página:',
     once: 'Os dois funcionam uma única vez, por {minutes} minutos.',
     ignore:
-      'Se você não pediu este link, ignore esta mensagem: nada acontece sem ele.',
+      'Se você não pediu este link, ignore esta mensagem: nada acontece sem o link ou o código.',
   },
   'es-ES': {
     subject: 'Tu código de tinyworlds: {code}',
     codeLine: 'O escribe este código en la página:',
     once: 'Los dos funcionan una sola vez, durante {minutes} minutos.',
     ignore:
-      'Si no lo has pedido, ignora este mensaje: sin el enlace no pasa nada.',
+      'Si no lo has pedido, ignora este mensaje: sin el enlace o el código no pasa nada.',
   },
 };
 

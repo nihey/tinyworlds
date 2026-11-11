@@ -629,6 +629,25 @@ describe('DonationsService: donors', () => {
       true,
     );
   });
+  it('records the donation, unlisted and without a donor, when the donor step fails', async () => {
+    const { prisma, deliver } = setup();
+    const error = new Error('connection to ana@example.com lost');
+    prisma.failDonors = error;
+    const logged = vi.spyOn(Logger.prototype, 'error');
+    await deliver({
+      id: 'cs_1',
+      email: 'ana@example.com',
+      metadata: named('Ana'),
+    });
+    expect(prisma.donors).toHaveLength(0);
+    expect(prisma.donations).toMatchObject([{ donorId: null, listed: false }]);
+    expect(prisma.cities[0]).toMatchObject({
+      raisedCents: 500,
+      donationCount: 1,
+    });
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('example.com');
+    logged.mockRestore();
+  });
 });
 
 describe('DonationsService.createCheckout: the listing name', () => {

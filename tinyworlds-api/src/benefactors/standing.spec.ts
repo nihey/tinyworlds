@@ -94,6 +94,24 @@ describe('cityStanding', () => {
     expect(s.stones.slice(15, 22).every((x) => x === 1)).toBe(true);
   });
 
+  it("keeps an unnamed founding gift apart from the same donor's later named one", () => {
+    const s = cityStanding(
+      [gift('a', 500, 1, null, 'd1'), gift('b', 700, 2, 'Ana', 'd1')],
+      GOAL,
+    );
+    expect(s.founders).toHaveLength(2);
+    expect(s.founders[0]).toMatchObject({
+      number: 1,
+      name: null,
+      amountCents: 500,
+    });
+    expect(s.founders[1]).toMatchObject({
+      number: 2,
+      name: 'Ana',
+      amountCents: 700,
+    });
+  });
+
   it('never joins anonymous gifts', () => {
     const s = cityStanding(
       [gift('a', 500, 1, null, 'd1'), gift('b', 500, 2, null, 'd1')],
