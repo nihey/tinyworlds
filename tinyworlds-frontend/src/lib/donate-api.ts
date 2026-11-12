@@ -31,6 +31,7 @@ const MILESTONES = gql`
       raisedCents
       goalCents
       donations
+      benefactorCount
       status
       worldId
     }

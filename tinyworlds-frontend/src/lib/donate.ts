@@ -77,6 +77,8 @@ export interface CityMilestone {
   raisedCents: number;
   goalCents: number;
   donations: number;
+  /** how many people gave to it (a donor once, however many gifts); absent from an older API */
+  benefactorCount?: number;
   status: CityStatus;
   /** the world a built city lives at: "/<worldId>/" */
   worldId: string | null;
@@ -96,6 +98,9 @@ export function parseMilestones(value: unknown): CityMilestone[] {
       raisedCents: Math.max(0, Number(item.raisedCents) || 0),
       goalCents: Math.max(0, Number(item.goalCents) || 0),
       donations: Math.max(0, Number(item.donations) || 0),
+      ...(typeof item.benefactorCount === "number"
+        ? { benefactorCount: Math.max(0, Math.floor(item.benefactorCount) || 0) }
+        : {}),
       status:
         status === "FUNDED" || status === "BUILDING" || status === "BUILT" ? status : "PROPOSED",
       worldId:

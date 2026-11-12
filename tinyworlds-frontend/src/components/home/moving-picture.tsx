@@ -24,6 +24,11 @@ interface MovingPictureProps {
   active?: boolean;
   /** sizes the frame: the picture fills it */
   className?: string;
+  /**
+   * Which side of the picture a frame of another shape keeps: its middle, or its right (a
+   * share card's wordmark is at its bottom left, and a tall frame would cut through it).
+   */
+  focus?: "center" | "right";
   style?: CSSProperties;
 }
 
@@ -42,7 +47,9 @@ export function MovingPicture({
   active = true,
   className,
   style,
+  focus = "center",
 }: MovingPictureProps) {
+  const fit = focus === "right" ? "object-cover object-right" : "object-cover";
   const frame = useRef<HTMLDivElement>(null);
   const picture = useRef<HTMLImageElement>(null);
   const film = useRef<HTMLVideoElement>(null);
@@ -98,7 +105,7 @@ export function MovingPicture({
           decoding="async"
           fetchPriority={eager ? "high" : undefined}
           onError={() => setMissing(true)}
-          className="absolute inset-0 size-full object-cover"
+          className={cn("absolute inset-0 size-full", fit)}
         />
       ) : (
         <div role="img" aria-label={alt} className="absolute inset-0 grid place-items-center">
@@ -119,7 +126,8 @@ export function MovingPicture({
           tabIndex={-1}
           onPlaying={() => setPlaying(true)}
           className={cn(
-            "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-300",
+            "pointer-events-none absolute inset-0 size-full transition-opacity duration-300",
+            fit,
             playing ? "opacity-100" : "opacity-0",
           )}
         />

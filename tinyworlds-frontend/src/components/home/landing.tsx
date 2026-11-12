@@ -22,6 +22,7 @@ import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/
 import { useTheme } from "@/hooks/use-theme";
 import { useWall } from "@/hooks/use-wall";
 import { useWorldVisits } from "@/hooks/use-world-visits";
+import { broughtByWorld, type BroughtWorld } from "@/lib/brought-by";
 import { rankCities } from "@/lib/city-picker";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,7 @@ function WorldGrid({
   columns,
   onBenefactors,
   benefactorWorlds,
+  brought,
   visits,
   next,
 }: {
@@ -72,6 +74,8 @@ function WorldGrid({
   onBenefactors: (world: string) => void;
   /** the worlds the API knows a city for: only their cards offer the benefactors */
   benefactorWorlds: ReadonlySet<string>;
+  /** the worlds whose benefactors brought them to the map, and who they were */
+  brought: ReadonlyMap<string, BroughtWorld>;
   /** each world's visits; undefined when the build has no API, and the cards say none */
   visits?: WorldCounts | null;
   /** the tile after the cards: the list it draws its cities from, and how to open the donate sign */
@@ -97,6 +101,7 @@ function WorldGrid({
               onBenefactors={
                 benefactorWorlds.has(world.id) ? () => onBenefactors(world.id) : undefined
               }
+              brought={brought.get(world.id)}
             />
           </li>
         ))}
@@ -163,6 +168,8 @@ export function Landing() {
       ? milestones.cities.flatMap((city) => (city.worldId ? [city.worldId] : []))
       : [],
   );
+  // the cities on the map because people paid for them: their cards praise who did
+  const brought = broughtByWorld(milestones.cities);
   // how many cities can still be given to: one of the page's figures, once the list is there
   const ranking = rankCities(milestones.cities);
   const funding =
@@ -238,6 +245,7 @@ export function Landing() {
         columns={columns}
         onBenefactors={(world) => openBenefactors({ world })}
         benefactorWorlds={benefactorWorlds}
+        brought={brought}
         visits={shownVisits}
         next={
           takesDonations ? { milestones, onDonate: () => setDonate({ city: null }) } : undefined
@@ -252,6 +260,7 @@ export function Landing() {
           columns={columns}
           onBenefactors={(world) => openBenefactors({ world })}
           benefactorWorlds={benefactorWorlds}
+          brought={brought}
           visits={shownVisits}
         />
       )}

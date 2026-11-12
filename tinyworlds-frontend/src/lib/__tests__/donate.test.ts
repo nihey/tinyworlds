@@ -162,6 +162,17 @@ describe("parseMilestones", () => {
     });
   });
 
+  it("keeps how many people gave to a city, when the API says", () => {
+    const [counted, older] = parseMilestones([
+      { id: "1", slug: "lisbon", name: "Lisbon", donations: 3, benefactorCount: 2 },
+      { id: "2", slug: "porto", name: "Porto", donations: 3 },
+    ]);
+    expect(counted.benefactorCount).toBe(2);
+    // an older API does not say: the count is left out, not made up
+    expect(older).not.toHaveProperty("benefactorCount");
+    expect(parseMilestones([{ name: "Faro", benefactorCount: -4 }])[0].benefactorCount).toBe(0);
+  });
+
   it("answers an empty list for anything that is not one", () => {
     expect(parseMilestones(null)).toEqual([]);
     expect(parseMilestones({ cityMilestones: [] })).toEqual([]);

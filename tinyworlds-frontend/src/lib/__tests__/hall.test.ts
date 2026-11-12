@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { cityAsked, hallCities, hasPeople, parseCityHall, parseHall, type HallData } from "../hall";
+import {
+  cityAsked,
+  hallCities,
+  hallTotals,
+  hasPeople,
+  parseCityHall,
+  parseHall,
+  type HallData,
+} from "../hall";
 import { buildEndpoint } from "../hall-build";
 import { hallCityUrl } from "../../site";
 
@@ -78,6 +86,16 @@ describe("parseCityHall", () => {
     });
   });
 
+  it("keeps how many people gave to the city, when the API says", () => {
+    expect(
+      parseCityHall({ data: { cityBenefactors: { ...city, benefactorCount: 1 } } }, API)
+        ?.benefactorCount,
+    ).toBe(1);
+    expect(parseCityHall({ data: { cityBenefactors: city } }, API)).not.toHaveProperty(
+      "benefactorCount",
+    );
+  });
+
   it("says null for a city the API does not know, and throws on anything else", () => {
     expect(parseCityHall({ data: { cityBenefactors: null } }, API)).toBeNull();
     expect(() => parseCityHall({ data: {} }, API)).toThrow();
@@ -102,7 +120,12 @@ describe("hallCities", () => {
     ],
     cities: [
       milestone("lisbon", "Lisbon", { raisedCents: 5100 }),
-      milestone("porto", "Porto", { raisedCents: 3200, status: "BUILT", worldId: "tinyopo" }),
+      milestone("porto", "Porto", {
+        raisedCents: 3200,
+        status: "BUILT",
+        worldId: "tinyopo",
+        benefactorCount: 2,
+      }),
       milestone("faro", "Faro"),
     ] as HallData["cities"],
   };
@@ -119,6 +142,7 @@ describe("hallCities", () => {
         people: 4,
         // the first three who are named there, as the wall has them
         names: ["Ana", "Bo", "Cy"],
+        broughtBy: null,
       },
       {
         slug: "porto",
@@ -129,8 +153,18 @@ describe("hallCities", () => {
         goalCents: 3000,
         people: 2,
         names: ["Ana"],
+        // built because it met its goal: its benefactors brought it
+        broughtBy: { people: 2, cents: 3200 },
       },
     ]);
+  });
+
+  it("counts a city's people as the API does, when it says", () => {
+    const cities = data.cities.map((city) =>
+      city.slug === "lisbon" ? { ...city, benefactorCount: 3 } : city,
+    );
+    // the wall has four entries for Lisbon; the API knows one of them gave twice, unnamed
+    expect(hallCities({ ...data, cities })[0]).toMatchObject({ slug: "lisbon", people: 3 });
   });
 
   it("still lists a city the list of cities does not have", () => {
@@ -143,6 +177,29 @@ describe("hallCities", () => {
 
   it("is empty before anyone has given", () => {
     expect(hallCities({ wall: [], cities: data.cities })).toEqual([]);
+  });
+});
+
+describe("hallTotals", () => {
+  const data: HallData = {
+    wall: [
+      { name: "Ana", amountCents: 4900, cities: [lisbon, porto], links: [] },
+      { name: null, amountCents: 2500, cities: [porto], links: [] },
+    ],
+    cities: [
+      milestone("lisbon", "Lisbon", { raisedCents: 3600 }),
+      milestone("porto", "Porto", { raisedCents: 3800, status: "BUILT", worldId: "tinyopo" }),
+      // built by hand, before anyone gave: not one of theirs
+      milestone("new-york", "New York", { status: "BUILT", worldId: "tinynyc" }),
+    ] as HallData["cities"],
+  };
+
+  it("is everything given, everyone on the wall, and the cities they built", () => {
+    expect(hallTotals(data)).toEqual({ cents: 7400, people: 2, built: 1 });
+  });
+
+  it("is nothing before anyone has given", () => {
+    expect(hallTotals({ wall: [], cities: [] })).toEqual({ cents: 0, people: 0, built: 0 });
   });
 });
 
