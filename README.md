@@ -157,6 +157,11 @@ deployed: `npm run hall:announce` says who would be told and sends nothing,
 `npm run hall:announce -- --test-to you@example.com` sends you one to look at, and
 `npm run hall:announce -- --send` mails each donor once.
 
+The owner's own note to donors works the same way (`npm run owner:note`, then `-- --test-to`,
+then `-- --send`, which also reaches whoever has given since the last run): a thank-you from
+the owner, with their WhatsApp. It needs `OWNER_NAME`, `OWNER_MAIL_FROM` and `OWNER_WHATSAPP`
+in the API's environment, and says so when one is missing.
+
 Or `./dev.sh [world]` for all three in tmux.
 
 ### Environment
@@ -175,6 +180,7 @@ variables:
 | `ADMIN_EMAILS` | api | empty | who may sign in to the admin pages |
 | `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | the sessions' secret and the mail server that sends the mails (sign-in links, thank-yous, a city is built); `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM` are required in production |
 | `SITE_URL` | api | first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail |
+| `OWNER_NAME`, `OWNER_MAIL_FROM`, `OWNER_WHATSAPP` | api | empty | the site's owner, for the note they send each donor once (`npm run owner:note`): how they sign, the address it comes from, their WhatsApp number with its country code |
 | `ANNOUNCE_HOST`, `API_SERVICE` | deploy | empty | how `deploy.sh` announces a built city: an ssh target whose key may only announce, or the API's container (or Swarm service) on the server, reached with a shell |
 
 ## Adding a city
