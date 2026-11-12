@@ -83,6 +83,23 @@ export const ME_PATH = `${BASE_PATH}/me/`;
 /** The same page, from inside a world's build: the front page's address, then "me/". */
 export const ME_URL = `${HOME_URL.replace(/\/+$/, "")}/me/`;
 
+/**
+ * The hall of fame: everyone who gave, and a page for each city. Part of the front page's
+ * build, so from inside a world it is the front page's address, then "hall-of-fame/".
+ */
+export const HALL_URL = IS_HOME
+  ? `${BASE_PATH}/hall-of-fame/`
+  : `${HOME_URL.replace(/\/+$/, "")}/hall-of-fame/`;
+
+/**
+ * A city's own hall of fame. A page is built for each city whose slug is plain (a-z, 0-9, "-");
+ * any other (a name in another script) is shown by the hall of fame itself, asked by `?city=`.
+ * (The web server sends a plain slug that has no page yet, a city named since the build, the
+ * same way: deploy/nginx.conf.)
+ */
+export const hallCityUrl = (slug: string, hall = HALL_URL): string =>
+  /^[a-z0-9-]+$/.test(slug) ? `${hall}${slug}/` : `${hall}?city=${encodeURIComponent(slug)}`;
+
 /** The front page's own share card (public/og/tinyworlds.jpg, made by the pipeline's `home-card`). */
 export const HOME_CARD_PATH = `${BASE_PATH}/og/tinyworlds.jpg`;
 

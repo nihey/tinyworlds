@@ -1,8 +1,13 @@
 "use client";
 
-import { Heart } from "lucide-react";
+import { ArrowUpRight, Heart } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
-import { BenefactorLinks, LinkIcon, LinkPicture } from "@/components/benefactors/benefactor-link";
+import {
+  BenefactorLinks,
+  LINK_REL,
+  LinkIcon,
+  LinkPicture,
+} from "@/components/benefactors/benefactor-link";
 import { Drift } from "@/components/home/drift";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -11,7 +16,7 @@ import { formatUsd } from "@/lib/donate";
 import { hostOf } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import { citiesShown, wallSides, type WallCity, type WallEntry } from "@/lib/wall";
-import { SITE_ID } from "@/site";
+import { HALL_URL, SITE_ID } from "@/site";
 
 /**
  * From this width there is room beside the page for a column of benefactors on each side;
@@ -125,26 +130,60 @@ function Invite({ onDonate, className }: { onDonate: () => void; className?: str
   );
 }
 
-/** One side's column: its plaques one under the other, the invitation last. */
+/** The words over the benefactors, on the fog: whose they are, in the page's ink. */
+const TITLE = "font-semibold text-[#15171a] dusk:text-paper";
+
+/** The way to the hall of fame, where everyone has a page: beside the title, or across from it. */
+function HallLink({ className }: { className?: string }) {
+  const { t } = useI18n();
+  return (
+    <a
+      href={HALL_URL}
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-sm text-sm font-semibold text-[#15171a]/70 underline-offset-4 outline-none hover:text-[#15171a] hover:underline focus-visible:underline dusk:text-paper-dim dusk:hover:text-paper",
+        className,
+      )}
+    >
+      {t.hall.open}
+      <ArrowUpRight aria-hidden className="size-3.5" strokeWidth={2.25} />
+    </a>
+  );
+}
+
+/**
+ * One side's column: what it is, then its plaques one under the other, the invitation last.
+ * The words stand level with the page's own links across the top and the plaques begin level
+ * with the hero, so the columns read as part of the page. The left one says whose plaques
+ * these are; the right one, across the page from it, leads to the hall of fame.
+ */
 function Column({
   entries,
   onCity,
   onDonate,
+  side,
   className,
-}: Omit<WallProps, "load"> & { entries: WallEntry[]; className: string }) {
+}: Omit<WallProps, "load"> & { entries: WallEntry[]; side: "left" | "right"; className: string }) {
   const { t } = useI18n();
   if (entries.length === 0 && !onDonate) return null;
   return (
     <aside
       aria-label={t.benefactors.wall.label}
       className={cn(
-        // beside the page's column (64rem wide, centred), a little into its own margin
-        "fixed inset-y-0 w-[clamp(10.5rem,calc(50%-32rem-0.75rem),15.5rem)] py-6",
+        // beside the page's column (64rem wide, centred), a little into its own margin; as far
+        // down as the page's links (2.25rem) and the gap under them, then the plaques
+        "fixed inset-y-0 flex w-[clamp(10.5rem,calc(50%-32rem-0.75rem),15.5rem)] flex-col gap-4 py-6",
         className,
       )}
     >
+      <div className="flex h-9 shrink-0 items-center">
+        {side === "left" ? (
+          <h2 className={cn(TITLE, "text-[15px]")}>{t.benefactors.wall.label}</h2>
+        ) : (
+          <HallLink className="ml-auto" />
+        )}
+      </div>
       {/* room at the sides, so the plaques' edges and shadows are not cut by the window */}
-      <Drift axis="y" speed={COLUMN_SPEED} className="-mx-3 h-full px-3">
+      <Drift axis="y" speed={COLUMN_SPEED} className="-mx-3 min-h-0 flex-1 px-3">
         <ul className="flex flex-col gap-3 pb-3">
           {entries.map((entry, i) => (
             <li key={i} className="sign px-3 py-3">
@@ -177,12 +216,14 @@ export function WallColumns({ load, onCity, onDonate }: WallProps) {
   return (
     <>
       <Column
+        side="left"
         entries={left}
         onCity={onCity}
         onDonate={onDonate}
         className="right-[calc(50%+32rem-0.25rem)]"
       />
       <Column
+        side="right"
         entries={right}
         onCity={onCity}
         onDonate={onDonate}
@@ -205,7 +246,7 @@ function StripPlaque({ entry, onCity }: { entry: WallEntry; onCity: (slug: strin
       <a
         href={pictured.url}
         target="_blank"
-        rel="sponsored nofollow noopener"
+        rel={LINK_REL}
         tabIndex={-1}
         aria-hidden
         className="shrink-0"
@@ -225,7 +266,7 @@ function StripPlaque({ entry, onCity }: { entry: WallEntry; onCity: (slug: strin
                 key={link.url}
                 href={link.url}
                 target="_blank"
-                rel="sponsored nofollow noopener"
+                rel={LINK_REL}
                 aria-label={t.benefactors.linkLabel
                   .replace("{title}", link.title)
                   .replace("{host}", hostOf(link.url))}
@@ -258,7 +299,17 @@ export function WallStrip({ load, onCity, onDonate }: WallProps) {
   // nothing to show and nothing to invite to: no room is kept for it
   if (!waiting && load.entries.length === 0 && !onDonate) return null;
   return (
-    <section aria-label={t.benefactors.wall.label} className="min-[90rem]:hidden">
+    <section aria-labelledby="our-benefactors" className="min-[90rem]:hidden">
+      {/* there from the first paint, like the row's own room */}
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pb-2.5">
+        <h2 id="our-benefactors" className={cn(TITLE, "text-[17px] leading-tight")}>
+          {t.benefactors.wall.label}
+        </h2>
+        <p className="text-sm leading-snug text-[#15171a]/70 max-sm:hidden dusk:text-paper-dim">
+          {t.benefactors.wall.line}
+        </p>
+        <HallLink className="ml-auto" />
+      </div>
       {!wide && (
         // room around the row (taken back by the margins), so the plaques' edges and the
         // shadows under them are not cut by the window
