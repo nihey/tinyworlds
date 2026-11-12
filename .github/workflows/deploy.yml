@@ -10,7 +10,8 @@ name: Deploy
 on:
   push:
     branches: [main]
-  # once a day: catches up with a run that failed, and with a deploy made by hand from a branch
+  # once a day: catches up with a run that failed, and with a deploy made by hand from a branch,
+  # and bakes the day's hall of fame into the front page
   schedule:
     - cron: "23 7 * * *"
   workflow_dispatch:
@@ -81,4 +82,9 @@ jobs:
           SITE_DEPLOY_WEBHOOK: ${{ secrets.SITE_DEPLOY_WEBHOOK }}
           # optional: telling a newly built city's donors, through a key that may only do that
           ANNOUNCE_HOST: ${{ secrets.ANNOUNCE_HOST }}
-        run: deploy/deploy.sh release ${{ inputs.everything && '--everything' || '' }}
+        # the daily run also builds the front page again: its hall of fame is baked in from what
+        # the API says when it is built, so names and links added since reach its HTML within a day
+        run: >-
+          deploy/deploy.sh release
+          ${{ inputs.everything && '--everything' || '' }}
+          ${{ github.event_name == 'schedule' && '--fresh-home' || '' }}

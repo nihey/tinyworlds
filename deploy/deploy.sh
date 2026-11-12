@@ -15,11 +15,14 @@
 #                                        N), or one at a time with --serial
 #   deploy/deploy.sh check               only the checks `all` starts with
 #
-#   deploy/deploy.sh release [--everything]
+#   deploy/deploy.sh release [--everything] [--fresh-home]
 #                                        what main has and the server does not: the API (when
 #                                        tinyworlds-api changed), then every viewer without data
 #                                        (when the frontend or deploy/ did). What GitHub Actions
-#                                        runs on every push to main.
+#                                        runs on every push to main. --fresh-home also builds the
+#                                        front page again when nothing changed: its hall of fame
+#                                        is baked in from what the API says when it is built
+#                                        (the daily run does this).
 #
 # `all` first checks that every world in the registry (tinyworlds-frontend/src/worlds/index.ts)
 # is complete: its map data (on the server, for --no-data), its share card, its pipeline city and
@@ -54,7 +57,7 @@ usage() {
 usage: deploy/deploy.sh <world | home> [--no-data | --index | --data]
        deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data | --index | --data]
        deploy/deploy.sh check
-       deploy/deploy.sh release [--everything]
+       deploy/deploy.sh release [--everything] [--fresh-home]
 EOF
   exit 2
 }
@@ -519,7 +522,7 @@ deploy_api() {
 # deployed/viewers say: the API first, then the viewers, which may count on it. A part whose
 # deploy fails keeps its old record, so the next release tries it again.
 release() {
-  local everything="$1" head api_at viewers_at at api=0 viewers=0
+  local everything="$1" fresh_home="$2" head api_at viewers_at at api=0 viewers=0
   if ! tree_is_main; then
     echo "Not releasing: this tree is not a commit of origin/main as it is" \
       "(fetch, check out main, and leave the viewer and deploy/ unchanged)." >&2
@@ -554,6 +557,15 @@ release() {
     fi
     # it records deployed/viewers itself, once every viewer is up
     "$ROOT/deploy/deploy.sh" all --no-data
+  elif [[ -n "$fresh_home" ]]; then
+    # the hall of fame is baked into the front page from what the API says when it is built: a
+    # name or a link added since is on the page at once (it asks the API when it opens), and in
+    # its HTML, for what reads a page without running it, once the front page is built again
+    if [[ ! -d "$FRONTEND/node_modules" ]]; then
+      (cd "$FRONTEND" && npm ci --no-audit --no-fund)
+    fi
+    echo "  front page: built again, so its hall of fame is today's"
+    "$ROOT/deploy/deploy.sh" home
   fi
 }
 
@@ -573,13 +585,15 @@ fi
 
 if [[ "$TARGET" == "release" ]]; then
   EVERYTHING=""
+  FRESH_HOME=""
   for arg in "$@"; do
     case "$arg" in
       --everything) EVERYTHING=1 ;;
+      --fresh-home) FRESH_HOME=1 ;;
       *) usage ;;
     esac
   done
-  release "$EVERYTHING"
+  release "$EVERYTHING" "$FRESH_HOME"
   exit
 fi
 
