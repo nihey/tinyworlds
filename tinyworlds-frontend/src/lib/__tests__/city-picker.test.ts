@@ -26,6 +26,7 @@ const city = (over: Partial<CityMilestone> & { name: string }): CityMilestone =>
   donations: 0,
   status: "PROPOSED",
   worldId: null,
+  waiting: 0,
   ...over,
 });
 

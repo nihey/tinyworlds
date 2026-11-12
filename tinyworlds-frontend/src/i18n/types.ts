@@ -485,6 +485,76 @@ export interface Strings {
     };
   };
   /**
+   * The lists a visitor joins to hear when a city is built ("Tell me"): the buttons, the join sign
+   * (`join`, with its own sign-in words), "Your lists" on /me/ (`me`), the page a mail's leave link
+   * opens (`leave`) and the admin table (`admin`). "{city}" is a city's name, "{email}" an address,
+   * "{n}" a number.
+   */
+  lists: {
+    tellMe: string;
+    toldYou: string;
+    /** "{city}": names the Tell me button for screen readers */
+    tellMeAria: string;
+    /** "{city}": names the button that leaves */
+    leaveAria: string;
+    /** the hint of "You'll be told" for a donor of the city: their donor mail covers it */
+    donorCovered: string;
+    newCities: string;
+    newCitiesOn: string;
+    waitingOne: string;
+    /** "{n}" */
+    waitingMany: string;
+    join: {
+      /** "{city}" */
+      cityTitle: string;
+      newTitle: string;
+      body: string;
+      action: string;
+      /** "{city}" */
+      doneCity: string;
+      doneNew: string;
+      /** "{email}", "{city}" */
+      doneBody: string;
+      /** "{email}" */
+      doneBodyNew: string;
+      /** "{city}" */
+      help: string;
+      close: string;
+      failed: string;
+      signIn: SignInWords;
+    };
+    me: {
+      title: string;
+      /** "New cities" */
+      newCities: string;
+      /** "{city}": names a row's Leave button */
+      leave: string;
+      leaveLabel: string;
+      empty: string;
+      pressTellMe: string;
+    };
+    leave: {
+      title: string;
+      working: string;
+      left: string;
+      leftAll: string;
+      /** the link is not one of ours */
+      bad: string;
+      failed: string;
+      leaveAll: string;
+      joinAgain: string;
+      backHome: string;
+    };
+    admin: {
+      heading: string;
+      note: string;
+      city: string;
+      waiting: string;
+      newCities: string;
+      empty: string;
+    };
+  };
+  /**
    * The admin pages (the front page's build, at /admin/): signing in by a link sent by email,
    * and the donation funnel. "{email}" is an address, "{minutes}" a number of minutes,
    * "{share}" a percentage, "{zone}" a time zone.

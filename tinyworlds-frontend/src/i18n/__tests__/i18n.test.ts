@@ -65,6 +65,22 @@ describe("dictionaries", () => {
     }
   });
 
+  it("keep the placeholders of the lists", () => {
+    for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
+      const { lists } = dictionary;
+      expect(placeholders(lists.tellMeAria), locale).toEqual(["{city}"]);
+      expect(placeholders(lists.leaveAria), locale).toEqual(["{city}"]);
+      expect(placeholders(lists.waitingMany), locale).toEqual(["{n}"]);
+      expect(placeholders(lists.join.cityTitle), locale).toEqual(["{city}"]);
+      expect(placeholders(lists.join.doneCity), locale).toEqual(["{city}"]);
+      expect(placeholders(lists.join.doneBody), locale).toEqual(["{city}", "{email}"]);
+      expect(placeholders(lists.join.doneBodyNew), locale).toEqual(["{email}"]);
+      expect(placeholders(lists.join.help), locale).toEqual(["{city}"]);
+      expect(placeholders(lists.join.signIn.sent), locale).toEqual(["{email}"]);
+      expect(placeholders(lists.me.leaveLabel), locale).toEqual(["{city}"]);
+    }
+  });
+
   it("keep the placeholders of the donate sign", () => {
     for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
       expect(placeholders(dictionary.donate.body), locale).toEqual(["{wordmark}"]);

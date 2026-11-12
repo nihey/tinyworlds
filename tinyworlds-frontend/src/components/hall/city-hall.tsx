@@ -98,7 +98,10 @@ export function CityHall({ slug, initial }: { slug: string; initial: CityBenefac
                       {t.hall.cityHeading.replace("{city}", city.name)}
                     </h1>
                     {(() => {
-                      const status = statusLabel({ ...city, id: city.slug, donations: 0 }, t);
+                      const status = statusLabel(
+                        { ...city, id: city.slug, donations: 0, waiting: 0 },
+                        t,
+                      );
                       return (
                         status && (
                           <span className="rounded-full bg-taxi px-[7px] py-[3px] text-[11px] font-bold tracking-[0.08em] text-taxi-ink uppercase">

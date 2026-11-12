@@ -116,6 +116,7 @@ function Body({ city, onBecome }: { city: CityBenefactors; onBecome: (cityName: 
       raisedCents: city.raisedCents,
       goalCents: city.goalCents,
       donations: 0,
+      waiting: 0,
       status: city.status,
       worldId: city.worldId,
     },

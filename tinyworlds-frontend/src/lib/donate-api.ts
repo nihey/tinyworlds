@@ -33,6 +33,7 @@ const MILESTONES = gql`
       donations
       status
       worldId
+      waiting
     }
   }
 `;
