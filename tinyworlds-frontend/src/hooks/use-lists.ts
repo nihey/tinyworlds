@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import type { Locale } from "@/i18n/locale";
-import type { ListKey, MyLists } from "@/lib/lists";
+import {
+  beginOp,
+  finishOp,
+  isBusy,
+  NO_OPS,
+  restartOps,
+  type ListKey,
+  type MyLists,
+  type Ops,
+} from "@/lib/lists";
 import { useI18n } from "./use-i18n";
 import { donorStore } from "./use-donor-session";
 
@@ -19,6 +28,7 @@ interface State {
 
 const IDLE: State = { lists: null, busy: false };
 let state: State = IDLE;
+let ops: Ops = NO_OPS;
 let token: string | null = null;
 let unwatch: (() => void) | null = null;
 const listeners = new Set<() => void>();
@@ -28,28 +38,40 @@ function set(next: State): void {
   for (const listener of listeners) listener();
 }
 
-/** An answer only counts if the session it was asked under is still the one signed in. */
-function settle(forToken: string, next: Partial<State>): void {
-  if (token === forToken) set({ ...state, ...next });
+/**
+ * Runs one call under `forToken`: pending while in flight, and its answer written only as
+ * `finishOp` allows. A call of a session that has gone changes nothing.
+ */
+async function run(
+  forToken: string,
+  kind: "load" | "change",
+  call: () => Promise<MyLists>,
+): Promise<boolean> {
+  const begun = beginOp(ops);
+  ops = begun.ops;
+  set({ ...state, busy: isBusy(ops) });
+  let answer: MyLists | null = null;
+  let error: unknown = null;
+  try {
+    answer = await call();
+  } catch (e) {
+    error = e;
+  }
+  if (token !== forToken) return false;
+  const done = finishOp(ops, begun.ticket, kind, answer !== null);
+  ops = done.ops;
+  set({ lists: done.apply ? answer : state.lists, busy: isBusy(ops) });
+  if (error) {
+    // "unauthorized": the API no longer knows the session, so the donor is signed out
+    if ((error as { kind?: string } | null)?.kind === "unauthorized") donorStore.set(null);
+  }
+  return answer !== null;
 }
 
-/** "unauthorized": the API no longer knows the session, so the donor is signed out. */
-function failed(forToken: string, error: unknown): void {
-  const kind = (error as { kind?: string } | null)?.kind;
-  if (kind === "unauthorized" && token === forToken) donorStore.set(null);
-}
-
-async function load(forToken: string): Promise<void> {
+function load(forToken: string): void {
   const session = donorStore.getSnapshot();
   if (!session || session.accessToken !== forToken) return;
-  set({ ...state, busy: true });
-  try {
-    const { fetchMyLists } = await import("@/lib/lists-api");
-    settle(forToken, { lists: await fetchMyLists(session), busy: false });
-  } catch (error) {
-    settle(forToken, { busy: false });
-    failed(forToken, error);
-  }
+  void run(forToken, "load", async () => (await import("@/lib/lists-api")).fetchMyLists(session));
 }
 
 /** Follows the donor session: a new one is fetched for, none clears. */
@@ -57,8 +79,9 @@ function sync(): void {
   const next = donorStore.getSnapshot()?.accessToken ?? null;
   if (next === token) return;
   token = next;
+  ops = restartOps(ops);
   set(IDLE);
-  if (next) void load(next);
+  if (next) load(next);
 }
 
 function subscribe(listener: () => void): () => void {
@@ -73,33 +96,19 @@ function subscribe(listener: () => void): () => void {
       unwatch?.();
       unwatch = null;
       token = null;
+      ops = restartOps(ops);
       state = IDLE;
     }
   };
 }
 
-async function change(
-  call: "joinList" | "leaveList",
-  key: ListKey,
-  locale: Locale,
-): Promise<boolean> {
+function change(call: "joinList" | "leaveList", key: ListKey, locale: Locale): Promise<boolean> {
   const session = donorStore.getSnapshot();
-  if (!session) return false;
-  const forToken = session.accessToken;
-  set({ ...state, busy: true });
-  try {
+  if (!session) return Promise.resolve(false);
+  return run(session.accessToken, "change", async () => {
     const api = await import("@/lib/lists-api");
-    const lists =
-      call === "joinList"
-        ? await api.joinList(session, key, locale)
-        : await api.leaveList(session, key);
-    settle(forToken, { lists, busy: false });
-    return true;
-  } catch (error) {
-    settle(forToken, { busy: false });
-    failed(forToken, error);
-    return false;
-  }
+    return call === "joinList" ? api.joinList(session, key, locale) : api.leaveList(session, key);
+  });
 }
 
 export function useLists(): {
@@ -121,7 +130,7 @@ export function useLists(): {
   const leave = useCallback((key: ListKey) => change("leaveList", key, locale), [locale]);
   const refresh = useCallback(() => {
     sync();
-    if (token) void load(token);
+    if (token) load(token);
   }, []);
   return { lists: current.lists, busy: current.busy, join, leave, refresh };
 }

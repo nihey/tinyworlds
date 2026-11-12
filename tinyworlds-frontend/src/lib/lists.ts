@@ -112,3 +112,44 @@ export function takePendingJoin(now: number = Date.now()): ListKey | null {
   }
   return null;
 }
+
+// ---------------------------------------------------------------------------------------------
+// which of the lists' calls in flight may write, and whether any is pending
+// ---------------------------------------------------------------------------------------------
+
+/** `version` counts the answers that were written; `pending` the calls in flight. */
+export interface Ops {
+  version: number;
+  pending: number;
+}
+
+export const NO_OPS: Ops = { version: 0, pending: 0 };
+
+/** A call starts: it is pending, and remembers which version it saw. */
+export function beginOp(ops: Ops): { ops: Ops; ticket: number } {
+  return { ops: { ...ops, pending: ops.pending + 1 }, ticket: ops.version };
+}
+
+/**
+ * A call ends. A join or leave answer is written when it succeeded; a load's only if nothing was
+ * written since it began (an older reading must not undo a newer answer). Every write bumps
+ * the version.
+ */
+export function finishOp(
+  ops: Ops,
+  ticket: number,
+  kind: "load" | "change",
+  ok: boolean,
+): { ops: Ops; apply: boolean } {
+  const apply = ok && (kind === "change" || ops.version === ticket);
+  return {
+    ops: { version: apply ? ops.version + 1 : ops.version, pending: Math.max(0, ops.pending - 1) },
+    apply,
+  };
+}
+
+/** True while any call is in flight: every card reads this. */
+export const isBusy = (ops: Ops): boolean => ops.pending > 0;
+
+/** A new session starts clean, and nothing begun under the old one can write. */
+export const restartOps = (ops: Ops): Ops => ({ version: ops.version + 1, pending: 0 });

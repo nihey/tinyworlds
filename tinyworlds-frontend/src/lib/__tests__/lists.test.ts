@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseMilestones } from "../donate";
 import {
+  beginOp,
   cityListState,
+  finishOp,
+  isBusy,
+  NO_OPS,
   listParam,
   NEW_CITIES,
   parseMyLists,
@@ -140,5 +144,39 @@ describe("parseMilestones and waiting", () => {
   it("defaults to 0 when an older API leaves it out", () => {
     expect(parseMilestones([base])[0].waiting).toBe(0);
     expect(parseMilestones([{ ...base, waiting: -2 }])[0].waiting).toBe(0);
+  });
+});
+
+describe("calls in flight", () => {
+  it("drops an older load's answer after a newer write", () => {
+    const load = beginOp(NO_OPS);
+    const join = beginOp(load.ops);
+    const joined = finishOp(join.ops, join.ticket, "change", true);
+    expect(joined.apply).toBe(true);
+    const late = finishOp(joined.ops, load.ticket, "load", true);
+    expect(late.apply).toBe(false);
+    expect(late.ops.version).toBe(joined.ops.version);
+  });
+
+  it("writes a load that nothing overtook, and a failed one never", () => {
+    const load = beginOp(NO_OPS);
+    expect(finishOp(load.ops, load.ticket, "load", true).apply).toBe(true);
+    expect(finishOp(load.ops, load.ticket, "load", false).apply).toBe(false);
+  });
+
+  it("writes a join's answer even if a load was written meanwhile", () => {
+    const join = beginOp(NO_OPS);
+    const load = beginOp(join.ops);
+    const loaded = finishOp(load.ops, load.ticket, "load", true);
+    expect(finishOp(loaded.ops, join.ticket, "change", true).apply).toBe(true);
+  });
+
+  it("stays busy until the last of two overlapping calls ends", () => {
+    const a = beginOp(NO_OPS);
+    const b = beginOp(a.ops);
+    expect(isBusy(b.ops)).toBe(true);
+    const first = finishOp(b.ops, a.ticket, "load", true);
+    expect(isBusy(first.ops)).toBe(true);
+    expect(isBusy(finishOp(first.ops, b.ticket, "change", true).ops)).toBe(false);
   });
 });
