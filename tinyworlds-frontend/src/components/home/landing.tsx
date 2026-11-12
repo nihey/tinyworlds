@@ -12,6 +12,7 @@ import { NextCityTile } from "@/components/home/next-city-tile";
 import { SectionHead } from "@/components/home/section-head";
 import { SiteNumbers } from "@/components/home/site-numbers";
 import { WorldCard } from "@/components/home/world-card";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { ACTION_QUIET } from "@/components/styles";
 import { useAdminSession } from "@/hooks/use-admin-session";
 import { useI18n } from "@/hooks/use-i18n";
@@ -22,7 +23,6 @@ import { useTheme } from "@/hooks/use-theme";
 import { useWall } from "@/hooks/use-wall";
 import { useWorldVisits } from "@/hooks/use-world-visits";
 import { rankCities } from "@/lib/city-picker";
-import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { byVisits, siteTotals, type WorldCounts } from "@/lib/visits";
@@ -37,7 +37,7 @@ import {
 } from "@/site";
 import { WORLDS, type World } from "@/worlds";
 
-/** the footer's quiet links: the address, the cookie settings, the admin pages */
+/** the footer's quiet links: the address, the terms and the privacy policy, the cookie settings, the admin pages */
 const FOOTER_LINK =
   "rounded-sm font-semibold text-[#15171a] underline decoration-[#15171a]/40 underline-offset-2 outline-none hover:decoration-[#15171a] focus-visible:decoration-2 dusk:text-paper dusk:decoration-paper-dim/60 dusk:hover:decoration-paper";
 
@@ -300,13 +300,9 @@ export function Landing() {
           {afterEmail}
         </p>
         <p>{t.home.credits}</p>
-        {GTM_ID && (
-          <p>
-            <button type="button" onClick={() => consentStore.reopen()} className={FOOTER_LINK}>
-              {t.consent.settings}
-            </button>
-          </p>
-        )}
+        <p className="flex flex-wrap gap-x-4 gap-y-1.5">
+          <LegalLinks className={FOOTER_LINK} cookies />
+        </p>
         {admin && (
           <p>
             <a href={ADMIN_PATH} className={FOOTER_LINK}>

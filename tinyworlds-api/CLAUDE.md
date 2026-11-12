@@ -13,6 +13,11 @@ copies of its pictures. And it
 keeps the answers of **Guess the building**, the map's quiz on its famous buildings. Other
 visitors have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
+**What this API keeps is told to visitors** in the site's privacy policy
+(`tinyworlds-frontend/src/legal/privacy.ts`, at `/privacy/`): a new column or table that holds
+something about a person, a new place data is sent, or a change in how long anything is kept
+changes that text too (and its date, `LEGAL_UPDATED`).
+
 ## Commands
 
 ```bash

@@ -3,7 +3,9 @@
 import { UserRound } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { DonateDialog } from "@/components/donate/donate-dialog";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { Wordmark } from "@/components/map/wordmark";
+import { FOG_LINK } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
@@ -13,7 +15,8 @@ import { HOME_URL, ME_PATH, SITE_ID } from "@/site";
 
 /**
  * What every page of the hall of fame stands in: the site's name (the way back to the front
- * page), the way to "Your cities", the page's language, title and theme, and the donate sign,
+ * page), the way to "Your cities", the page's language, title and theme, a footer with the
+ * terms and the privacy policy, and the donate sign,
  * which the page opens for a city or for none. `children` is given the means to open it, or
  * nothing where donations are not taken.
  */
@@ -58,6 +61,10 @@ export function HallFrame({
       </div>
 
       {children(takesDonations ? (city) => setDonate({ city }) : undefined)}
+
+      <footer className="mt-auto flex flex-wrap gap-x-4 gap-y-1.5 text-xs leading-relaxed">
+        <LegalLinks className={FOG_LINK} cookies />
+      </footer>
 
       {takesDonations && (
         <DonateDialog

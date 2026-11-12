@@ -552,6 +552,13 @@ export const ptBR: Strings = {
     street: "Rua",
     place: "Lugar",
   },
+  legal: {
+    terms: "Termos de Uso",
+    privacy: "Política de Privacidade",
+    updated: "Atualizado em {date}",
+    contents: "Nesta página",
+    summary: "Em resumo",
+  },
   errors: {
     answered: (url, status) => `${url} respondeu ${status}`,
     noCanvas: "Este navegador não consegue desenhar o mapa (falta o canvas 2D).",
