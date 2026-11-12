@@ -79,6 +79,12 @@ export class CityBenefactors {
   })
   stones: (number | null)[];
 
+  @Field(() => Int, {
+    description:
+      'How many people gave to it: a donor once, however many gifts; a gift with no address as one',
+  })
+  benefactorCount: number;
+
   @Field(() => [FounderRow])
   founders: FounderRow[];
 

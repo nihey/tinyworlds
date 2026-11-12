@@ -21,7 +21,7 @@ import { FakeMailer } from './fake-mailer.js';
 import { checkoutSession, FakeStripe, signedEvent } from './fake-stripe.js';
 
 const MILESTONES =
-  '{ cityMilestones { slug name raisedCents goalCents donations status worldId } }';
+  '{ cityMilestones { slug name raisedCents goalCents donations benefactorCount status worldId } }';
 const CHECKOUT =
   'mutation ($input: CreateDonationCheckoutInput!) { createDonationCheckout(input: $input) { url } }';
 const TRACK =
@@ -195,10 +195,16 @@ describe('the API over HTTP', () => {
         raisedCents: 4000,
         goalCents: 10_000,
         donations: 1,
+        benefactorCount: 1,
         status: 'PROPOSED',
         worldId: null,
       },
-      { slug: 'new-york', status: 'BUILT', worldId: 'tinynyc' },
+      {
+        slug: 'new-york',
+        status: 'BUILT',
+        worldId: 'tinynyc',
+        benefactorCount: 0,
+      },
     ]);
 
     await webhook({
@@ -217,6 +223,79 @@ describe('the API over HTTP', () => {
       status: 'FUNDED',
     });
     expect(await prisma.donation.count()).toBe(2);
+  });
+
+  it('counts the people who gave to a city: a donor once, a gift without an address as one', async () => {
+    const lisbon = {
+      app: 'tinyworlds',
+      city: 'Lisbon',
+      world: 'tinynyc',
+      locale: 'en-US',
+    };
+    const before = mailer.sent.length;
+    await webhook({
+      id: 'cs_p1',
+      amount: 1000,
+      email: 'ana@example.com',
+      metadata: lisbon,
+    }).expect(200);
+    await webhook({
+      id: 'cs_p2',
+      amount: 500,
+      email: 'ANA@example.com',
+      metadata: lisbon,
+    }).expect(200);
+    await webhook({
+      id: 'cs_p3',
+      amount: 700,
+      email: 'bo@example.com',
+      metadata: lisbon,
+    }).expect(200);
+    await webhook({
+      id: 'cs_p4',
+      amount: 300,
+      email: null,
+      metadata: lisbon,
+    }).expect(200);
+    await webhook({
+      id: 'cs_p5',
+      amount: 200,
+      email: null,
+      metadata: lisbon,
+    }).expect(200);
+    // another currency counts toward nothing, so its donor is no one's benefactor here
+    await webhook({
+      id: 'cs_p6',
+      amount: 900,
+      email: 'eva@example.com',
+      currency: 'eur',
+      metadata: lisbon,
+    }).expect(200);
+    await webhook({
+      id: 'cs_p7',
+      amount: 400,
+      email: 'ana@example.com',
+      metadata: { ...lisbon, city: 'Porto' },
+    }).expect(200);
+    // the thank-yous go out on their own: wait for them, so they do not land in a later test
+    await vi.waitFor(() =>
+      expect(mailer.sent.length).toBeGreaterThanOrEqual(before + 5),
+    );
+
+    const res = await graphql(MILESTONES).expect(200);
+    const bySlug = new Map(
+      answer(res).data.cityMilestones.map((city) => [city.slug, city]),
+    );
+    expect(bySlug.get('lisbon')).toMatchObject({
+      raisedCents: 2700,
+      donations: 5,
+      // Ana, Bo, and the two gifts that came without an address
+      benefactorCount: 4,
+    });
+    expect(bySlug.get('porto')).toMatchObject({
+      donations: 1,
+      benefactorCount: 1,
+    });
   });
 
   it("puts the listing name into the checkout's metadata and records it from the webhook", async () => {
@@ -1113,7 +1192,7 @@ describe('the API over HTTP', () => {
 
   describe('benefactors', () => {
     const BENEFACTORS = `query ($input: CityBenefactorsInput!) { cityBenefactors(input: $input) {
-      slug name status worldId goalCents raisedCents stones
+      slug name status worldId goalCents raisedCents stones benefactorCount
       founders { number name amountCents stones firstStone keystone }
       benefactors { rank name amountCents } } }`;
     const gift = (
@@ -1150,6 +1229,7 @@ describe('the API over HTTP', () => {
         data: {
           cityBenefactors: {
             slug: string;
+            benefactorCount: number;
             founders: unknown[];
             benefactors: unknown[];
             stones: (number | null)[];
@@ -1158,6 +1238,8 @@ describe('the API over HTTP', () => {
       };
       const city = body.data.cityBenefactors;
       expect(city.slug).toBe('lisbon');
+      // Ana gave twice: two people
+      expect(city.benefactorCount).toBe(2);
       expect(city.founders).toEqual([
         {
           number: 1,
@@ -1206,6 +1288,7 @@ describe('the API over HTTP', () => {
             cityBenefactors: {
               founders: unknown[];
               benefactors: unknown[];
+              benefactorCount: number;
               stones: (number | null)[];
             };
           };
@@ -1213,6 +1296,7 @@ describe('the API over HTTP', () => {
       ).data.cityBenefactors;
       expect(city.founders).toEqual([]);
       expect(city.benefactors).toEqual([]);
+      expect(city.benefactorCount).toBe(0);
       expect(city.stones.every((s) => s === null)).toBe(true);
     });
 
