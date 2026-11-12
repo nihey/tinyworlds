@@ -244,7 +244,7 @@ export const en: Strings = {
     loading: "Loading the hall of fame…",
     failed: "The hall of fame couldn’t be loaded.",
     linksNote:
-      "Benefactors add their own links on Your cities. They are plain links, followed by search engines.",
+      "Benefactors add their own links on Your cities. They are dofollow links: search engines follow them.",
   },
   loadError: {
     title: "The map didn’t load",

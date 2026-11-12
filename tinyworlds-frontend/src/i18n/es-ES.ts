@@ -249,7 +249,7 @@ export const esES: Strings = {
     loading: "Cargando el salón de la fama…",
     failed: "No se pudo cargar el salón de la fama.",
     linksNote:
-      "Los benefactores añaden sus propios enlaces en Tus ciudades. Son enlaces normales, que los buscadores siguen.",
+      "Los benefactores añaden sus propios enlaces en Tus ciudades. Son enlaces dofollow: los buscadores los siguen.",
   },
   loadError: {
     title: "El mapa no se ha cargado",

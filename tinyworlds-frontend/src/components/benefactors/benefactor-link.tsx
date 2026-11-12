@@ -3,7 +3,7 @@
 import { Link2 } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import { hostOf, type BenefactorLink } from "@/lib/links";
+import { LINK_REL, hostOf, type BenefactorLink } from "@/lib/links";
 import { cn } from "@/lib/utils";
 
 /**
@@ -59,15 +59,8 @@ export function LinkPicture({ src, className }: { src: string; className?: strin
 }
 
 /**
- * What a benefactor's link says of itself to a search engine: nothing. No `nofollow`, no
- * `sponsored`, no `ugc`: the benefactors are told their links are followed, so they are plain
- * links (`noopener` only keeps the page opened from reaching back into this one).
- */
-export const LINK_REL = "noopener";
-
-/**
  * One of a benefactor's links: the site's icon, the page's title and where it leads. It opens
- * in a new tab and is a plain link, one a search engine follows (`LINK_REL`). As a
+ * in a new tab and says `dofollow`, a link a search engine follows (`LINK_REL`). As a
  * `card` its picture, when it has one to show, lies across the top; as a `row` the picture is
  * a small one in the icon's place.
  */

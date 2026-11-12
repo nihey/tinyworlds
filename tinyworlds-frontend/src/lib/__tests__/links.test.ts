@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LINKS_MAX,
+  LINK_REL,
   URL_MAX,
   assetUrl,
   centsToPictures,
@@ -188,5 +189,16 @@ describe("centsToPictures", () => {
     expect(centsToPictures({ givenCents: 600, picturesFromCents: 1000 })).toBe(400);
     expect(centsToPictures({ givenCents: 1000, picturesFromCents: 1000 })).toBe(0);
     expect(centsToPictures({ givenCents: 4200, picturesFromCents: 1000 })).toBe(0);
+  });
+});
+
+describe("what a benefactor's link says to a search engine", () => {
+  it("says dofollow, as the benefactors are told", () => {
+    expect(LINK_REL.split(" ")).toContain("dofollow");
+  });
+
+  it("never says the link is not to be followed, or that it was paid for", () => {
+    for (const mark of ["nofollow", "sponsored", "ugc"])
+      expect(LINK_REL.split(" ")).not.toContain(mark);
   });
 });

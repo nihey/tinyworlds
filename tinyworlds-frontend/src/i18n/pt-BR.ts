@@ -249,7 +249,7 @@ export const ptBR: Strings = {
     loading: "Carregando o hall da fama…",
     failed: "Não foi possível carregar o hall da fama.",
     linksNote:
-      "Os benfeitores adicionam seus próprios links em Suas cidades. São links comuns, seguidos pelos buscadores.",
+      "Os benfeitores adicionam seus próprios links em Suas cidades. São links dofollow: os buscadores os seguem.",
   },
   loadError: {
     title: "O mapa não carregou",

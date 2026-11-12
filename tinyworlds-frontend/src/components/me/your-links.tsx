@@ -8,6 +8,7 @@ import type { AdminSession } from "@/lib/admin";
 import { namedSomewhere, type MyGiving } from "@/lib/benefactors";
 import { formatUsd } from "@/lib/donate";
 import {
+  LINK_REL,
   URL_MAX,
   centsToPictures,
   cleanLinkUrl,
@@ -163,7 +164,7 @@ export function YourLinks({
                   <a
                     href={link.url}
                     target="_blank"
-                    rel="noopener"
+                    rel={LINK_REL}
                     className="flex items-center gap-1.5 rounded-sm text-sm font-semibold text-paper outline-none hover:text-taxi focus-visible:text-taxi focus-visible:underline"
                   >
                     {link.image && <LinkIcon src={link.icon} className="size-4 rounded-[4px]" />}

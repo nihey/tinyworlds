@@ -95,8 +95,8 @@ Each sub-project has its own `CLAUDE.md`.
 - **The hall of fame** (`/hall-of-fame/`, part of the front page's build): everyone who gave,
   with their links, then the cities, each leading to **a hall of its own**
   (`/hall-of-fame/<city's slug>/`): its foundation, its founders and its benefactors as cards.
-  Unlike `/me/` and `/admin/` these pages are for search engines too. **The links are plain
-  links**: no `nofollow`, no `sponsored`, and the benefactors are told so, which is why the
+  Unlike `/me/` and `/admin/` these pages are for search engines too. **The links say
+  `dofollow`**, never `nofollow` or `sponsored`, and the benefactors are told so, which is why the
   pages are **baked** with what the API says when the front page is built (the names and the
   links are in the HTML itself) and ask the API again once open. The daily deploy run builds
   the front page again, so what is baked is at most a day old. A city named since the build
