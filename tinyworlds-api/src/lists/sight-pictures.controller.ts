@@ -6,9 +6,11 @@ import {
   Optional,
   NotFoundException,
   Param,
+  Res,
   StreamableFile,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Response } from 'express';
 import { Public } from '../auth/public.decorator.js';
 import type { Env } from '../config/env.js';
 import { WORLD_PATTERN } from '../donations/donation-facts.js';
@@ -37,11 +39,11 @@ export class SightPicturesController {
   ) {}
 
   @Get(':world/:file')
-  @Header('Cache-Control', 'public, max-age=31536000, immutable')
   @Header('X-Content-Type-Options', 'nosniff')
   async picture(
     @Param('world') world: string,
     @Param('file') file: string,
+    @Res({ passthrough: true }) res: Pick<Response, 'set'>,
   ): Promise<StreamableFile> {
     if (!WORLD_PATTERN.test(world) || !PICTURE_FILE.test(file)) {
       throw new NotFoundException();
@@ -59,6 +61,8 @@ export class SightPicturesController {
       const oldest = this.kept.keys().next().value;
       if (oldest !== undefined) this.kept.delete(oldest);
     }
+    // only a picture is kept for good: a 404 (a world not deployed yet) must not be
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
     return new StreamableFile(bytes, {
       type: 'image/png',
       length: bytes.length,

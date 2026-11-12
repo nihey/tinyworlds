@@ -2871,4 +2871,18 @@ describe('the API over HTTP', () => {
       expect((await announce('tinylis')).kind).toBe('sent');
     });
   });
+
+  describe('sight pictures', () => {
+    it('answers 404 without a lasting cache header when the site has no such file', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/sight-pictures/tinynone/abc123.png')
+        .expect(404);
+      expect(String(res.headers['cache-control'] ?? '')).not.toContain(
+        'immutable',
+      );
+      await request(app.getHttpServer())
+        .get('/api/sight-pictures/tinynone/not-a-hash.webp')
+        .expect(404);
+    });
+  });
 });
