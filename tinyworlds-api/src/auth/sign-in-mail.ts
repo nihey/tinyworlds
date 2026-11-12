@@ -101,13 +101,13 @@ const JOINING: Record<
   },
   'pt-BR': {
     label: 'Confirmar e-mail',
-    city: 'Você está a um passo da lista de {city}.',
+    city: 'Falta só um passo para você entrar na lista de {city}.',
     fresh: 'Você está a um passo de saber das novas cidades.',
-    button: 'Confirmar e entrar',
+    button: 'Confirmar e entrar na lista',
   },
   'es-ES': {
     label: 'Confirmar correo',
-    city: 'Estás a un paso de la lista de {city}.',
+    city: 'Te falta un paso para entrar en la lista de {city}.',
     fresh: 'Estás a un paso de enterarte de las nuevas ciudades.',
     button: 'Confirmar y apuntarme',
   },

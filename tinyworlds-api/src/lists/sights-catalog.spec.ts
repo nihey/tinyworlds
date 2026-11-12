@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { Env } from '../config/env.js';
 import { SightsCatalog } from './sights-catalog.js';
@@ -61,6 +62,14 @@ function world(
   return files;
 }
 
+/** The catalog's warnings, kept from the test output and asserted where they are expected. */
+const warnings = () =>
+  vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('SightsCatalog', () => {
   it("famous buildings are the quiz's easiest level, with their text, map link and picture", async () => {
     const { fetcher } = fake(world('tinycos'));
@@ -120,6 +129,7 @@ describe('SightsCatalog', () => {
   });
 
   it('unreadable files answer null, and are asked again next time', async () => {
+    const warned = warnings();
     const files = world('tinycos');
     files['tinycos/data/sights.json'] = 'boom';
     const { fetcher, calls } = fake(files);
@@ -128,6 +138,52 @@ describe('SightsCatalog', () => {
     const first = calls.length;
     expect(await catalog.famous('tinycos', 'en-US')).toBeNull();
     expect(calls.length).toBeGreaterThan(first);
+    expect(warned).toHaveBeenCalledWith(
+      "could not read tinycos's buildings: status 500",
+    );
+  });
+
+  it('no sights.json: no buildings, not unread', async () => {
+    const warned = warnings();
+    // an imagined world, or a city shipped without lit buildings: none of the three files
+    const { fetcher, calls } = fake({});
+    const catalog = new SightsCatalog(config, fetcher);
+    expect(await catalog.famous('tinywinterfell', 'en-US')).toEqual([]);
+    expect(await catalog.pickIn('tinywinterfell', 'en-US', 3)).toEqual({
+      sights: [],
+      unread: false,
+      quiz: false,
+    });
+    // a good reading, kept like any other: not asked again
+    expect(calls).toHaveLength(3);
+    expect(warned).not.toHaveBeenCalled();
+  });
+
+  it('no sights.json: whether there is a quiz is still its own file', async () => {
+    const { fetcher } = fake({
+      'tinyodd/data/quiz.en-US.json': { questions: [] },
+    });
+    const catalog = new SightsCatalog(config, fetcher);
+    expect(await catalog.pickIn('tinyodd', 'en-US', 3)).toEqual({
+      sights: [],
+      unread: false,
+      quiz: true,
+    });
+  });
+
+  it('sights.json without its texts, or texts without it, is unread', async () => {
+    const warned = warnings();
+    const noTexts = world('tinycos');
+    delete noTexts['tinycos/data/sights.en-US.json'];
+    const noSights = world('tinydal');
+    delete noSights['tinydal/data/sights.json'];
+    const catalog = new SightsCatalog(
+      config,
+      fake({ ...noTexts, ...noSights }).fetcher,
+    );
+    expect(await catalog.famous('tinycos', 'en-US')).toBeNull();
+    expect(await catalog.famous('tinydal', 'en-US')).toBeNull();
+    expect(warned).toHaveBeenCalledTimes(2);
   });
 
   it('caches a good reading', async () => {
@@ -154,6 +210,7 @@ describe('SightsCatalog', () => {
   });
 
   it('pickAcross takes distinct worlds and reports the unread ones', async () => {
+    const warned = warnings();
     const files = {
       ...world('tinycos'),
       ...world('tinydal'),
@@ -162,14 +219,17 @@ describe('SightsCatalog', () => {
     };
     const catalog = new SightsCatalog(config, fake(files).fetcher);
     const { sights, unread } = await catalog.pickAcross(
-      ['tinycos', 'tinydal', 'tinypit', 'tinybad'],
+      // tinywinterfell has no lit buildings: nothing to pick there, and nothing unread
+      ['tinycos', 'tinydal', 'tinypit', 'tinybad', 'tinywinterfell'],
       'en-US',
       2,
       () => 0.5,
     );
     expect(sights).toHaveLength(2);
     expect(new Set(sights.map((s) => s.world)).size).toBe(2);
+    expect(sights.map((s) => s.world)).not.toContain('tinywinterfell');
     expect(unread).toEqual(['tinybad']);
+    expect(warned).toHaveBeenCalledTimes(1);
   });
 
   it('pickAcross fills from repeat worlds only when there are fewer worlds than the count', async () => {
@@ -180,16 +240,21 @@ describe('SightsCatalog', () => {
   });
 
   it('pickIn answers some of a world, or says it is unread', async () => {
-    const files = world('tinytkf', { quiz: false });
+    const warned = warnings();
+    const files = {
+      ...world('tinytkf', { quiz: false }),
+      'tinybad/data/sights.json': 'boom',
+    };
     const catalog = new SightsCatalog(config, fake(files).fetcher);
     expect((await catalog.pickIn('tinytkf', 'en-US', 2)).sights).toHaveLength(
       2,
     );
-    expect(await catalog.pickIn('tinynope', 'en-US', 2)).toEqual({
+    expect(await catalog.pickIn('tinybad', 'en-US', 2)).toEqual({
       sights: [],
       unread: true,
       quiz: false,
     });
+    expect(warned).toHaveBeenCalledTimes(1);
   });
 
   it('pickIn says whether the world has a quiz: a quiz file that is a 404 is none', async () => {

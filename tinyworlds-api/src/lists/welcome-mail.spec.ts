@@ -61,6 +61,15 @@ describe('welcomeMail', () => {
       expect(mail.html).toContain(`lang="${locale}"`);
       expect(mail.text.match(/Tokyo/g)!.length).toBeGreaterThanOrEqual(3);
     }
+    const pt = welcomeMail(facts({ locale: 'pt-BR' }));
+    // "prédios", as the quiz says ("Adivinhe o prédio") and the sign does
+    expect(pt.text).toContain(
+      'Enquanto isso: três prédios que já estão no mapa',
+    );
+    const es = welcomeMail(facts({ locale: 'es-ES' }));
+    expect(es.text).toContain(
+      'Recibes esto porque pediste que te avisáramos cuando se construyera Tokyo.',
+    );
   });
 
   it('new cities: says so, and has no Help-build button', () => {
@@ -73,6 +82,10 @@ describe('welcomeMail', () => {
     expect(en.text).toContain("We'll write each time a new city is built.");
     expect(en.text).toContain('when new cities are built.');
     expect(en.html).toContain('#cities');
+    const es = welcomeMail(facts({ locale: 'es-ES', list: { kind: 'new' } }));
+    expect(es.text).toContain(
+      'Recibes esto porque pediste que te avisáramos cuando se construyeran nuevas ciudades.',
+    );
   });
 
   it('each building has its picture with alt text, city, name, line and See it on the map link', () => {

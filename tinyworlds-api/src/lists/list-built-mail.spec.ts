@@ -128,7 +128,7 @@ describe('listBuiltMail', () => {
       'pt-BR':
         'Você está recebendo isto porque pediu para saber quando novas cidades ficarem prontas.',
       'es-ES':
-        'Recibes esto porque pediste saber cuándo se construyen nuevas ciudades.',
+        'Recibes esto porque pediste que te avisáramos cuando se construyeran nuevas ciudades.',
     };
     for (const locale of LOCALES) {
       const mail = listBuiltMail(facts({ locale, reason: { kind: 'new' } }));

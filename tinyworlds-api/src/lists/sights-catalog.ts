@@ -57,7 +57,8 @@ function shuffled<T>(items: T[], random: () => number): T[] {
 
 /**
  * The buildings a mail can show, read from the site's own data files. Never throws: a file that
- * cannot be read is `null` (and asked again next time), and is logged with the world.
+ * cannot be read is `null` (and asked again next time), and is logged with the world. A world
+ * with no `sights.json` and no texts for it (404 both) simply has no buildings: not unread.
  */
 @Injectable()
 export class SightsCatalog {
@@ -90,7 +91,10 @@ export class SightsCatalog {
     return (await this.reading(world, locale))?.sights ?? null;
   }
 
-  /** A world's famous buildings and whether it has a quiz; null when its files cannot be read. */
+  /**
+   * A world's famous buildings and whether it has a quiz; null when its files cannot be read (a
+   * failure other than a 404, or `sights.json` without its texts or they without it).
+   */
   private async reading(
     world: string,
     locale: Locale,
@@ -111,6 +115,13 @@ export class SightsCatalog {
           `${base}/sights.${locale}.json`,
         ),
       ]);
+      // a world without lit buildings (an imagined one, or a city shipped without them) has
+      // neither file: that is a good reading, with no buildings; one without the other is not
+      if (!sights && !texts) {
+        const none = { sights: [], quiz: quiz !== null };
+        this.cache.set(key, { at: Date.now(), reading: none });
+        return none;
+      }
       if (!sights || !texts) throw new Error('sights files missing');
       const easiest = quiz
         ? new Set(quiz.questions.filter((q) => q.level === 1).map((q) => q.id))

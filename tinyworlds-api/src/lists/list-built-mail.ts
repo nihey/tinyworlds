@@ -119,7 +119,7 @@ const WORDS: Record<Locale, Words> = {
     and: '{a} y {b}',
     why: 'Recibes esto porque pediste saber cuándo llegaría {city} al mapa.',
     whyNew:
-      'Recibes esto porque pediste saber cuándo se construyen nuevas ciudades.',
+      'Recibes esto porque pediste que te avisáramos cuando se construyeran nuevas ciudades.',
     leave: 'Salir de esta lista',
     alt: '{city} en tinyworlds',
   },

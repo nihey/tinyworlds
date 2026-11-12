@@ -5,6 +5,7 @@ import type { Env } from '../config/env.js';
 import { isLocale, type Locale } from '../donations/locales.js';
 import { CityStatus } from '../generated/prisma/enums.js';
 import {
+  isRecipientRefused,
   isServerFailure,
   MAILER,
   type Mail,
@@ -25,6 +26,11 @@ export interface ListCityAnnouncement {
   /** Donor ids whose mail failed, and those not tried once the mail server failed. */
   failed: string[];
   unsent: string[];
+  /**
+   * Donor ids whose address the mail server refused for good (`isRecipientRefused`): counted as
+   * told, so they are not tried again and do not keep the list open.
+   */
+  refused: string[];
   /** Everyone was told: the city counts as announced to its lists, and its list has ended. */
   closed: boolean;
 }
@@ -43,9 +49,10 @@ export function describeListAnnouncement(done: ListAnnouncement): string[] {
   for (const c of done.cities) {
     const where = `${c.city} (${c.world}), its lists`;
     const missed = [...c.failed, ...c.unsent];
+    const refused = c.refused.length ? `, ${c.refused.length} refused` : '';
     if (missed.length) {
       lines.push(
-        `${where}: ${c.mailed} mailed, ${c.failed.length} failed` +
+        `${where}: ${c.mailed} mailed, ${c.failed.length} failed${refused}` +
           (c.unsent.length
             ? `, ${c.unsent.length} not tried once the mail server failed.`
             : '.'),
@@ -53,12 +60,18 @@ export function describeListAnnouncement(done: ListAnnouncement): string[] {
         'Its list stays open: the next run mails them, and nobody twice.',
       );
     } else if (c.closed) {
-      lines.push(`${where}: ${c.mailed} mailed, 0 failed. Its list is closed.`);
+      lines.push(
+        `${where}: ${c.mailed} mailed, 0 failed${refused}. Its list is closed.`,
+      );
     } else {
       lines.push(
-        `${where}: ${c.mailed} mailed, 0 failed. Another run was mailing some of them: its list stays open until a run finds everyone told.`,
+        `${where}: ${c.mailed} mailed, 0 failed${refused}. Another run was mailing some of them: its list stays open until a run finds everyone told.`,
       );
     }
+    if (c.refused.length)
+      lines.push(
+        `Refused by the mail server, counted as told and not tried again (donor ids): ${c.refused.join(', ')}`,
+      );
   }
   if (done.unread.length)
     lines.push(
@@ -67,9 +80,14 @@ export function describeListAnnouncement(done: ListAnnouncement): string[] {
   return lines;
 }
 
-/** True when someone waiting was not mailed: a failure, or a mail not tried. */
+/**
+ * True when someone waiting was not mailed: a failure, a mail not tried, or an address refused
+ * (said once: a refused person counts as told, so the next run does not say it again).
+ */
 export const listsFellShort = (done: ListAnnouncement): boolean =>
-  done.cities.some((c) => c.failed.length + c.unsent.length > 0);
+  done.cities.some(
+    (c) => c.failed.length + c.unsent.length + c.refused.length > 0,
+  );
 
 /** A city whose lists are told in this run. */
 interface Built {
@@ -108,8 +126,10 @@ const SIGHTS_ONE = 3;
  *
  * Each person is claimed before their mail goes out (their `list_notices` rows, unique on donor
  * and city), so two runs at once cannot both mail them, and given back when it fails, so the
- * next run tries again; a mail server that is away stops the run. A city whose run left nobody
- * untold is closed: `lists_announced_at` is set and its list ends.
+ * next run tries again; a mail server that is away stops the run. An address the mail server
+ * refuses for good keeps its claim: it counts as told, logged by donor id, so it cannot keep its
+ * city open. A city whose run left nobody untold is closed: `lists_announced_at` is set and its
+ * list ends.
  */
 @Injectable()
 export class ListAnnounceService {
@@ -136,6 +156,7 @@ export class ListAnnounceService {
           mailed: 0,
           failed: [],
           unsent: [],
+          refused: [],
           closed: false,
         },
       ]),
@@ -153,6 +174,14 @@ export class ListAnnounceService {
         await this.mailer.send(letter.mail);
         for (const id of letter.cityIds) of(id).mailed++;
       } catch (error) {
+        if (isRecipientRefused(error)) {
+          // it would be refused on every run: the claim stays, and it counts as told
+          for (const id of letter.cityIds) of(id).refused.push(letter.donorId);
+          this.logger.error(
+            `The list mail about ${letter.cityIds.map((id) => of(id).world).join(', ')} to donor ${letter.donorId} was refused by the mail server for good: ${failureOf(error)}. Counted as told, not tried again`,
+          );
+          continue;
+        }
         await this.release(letter);
         for (const id of letter.cityIds) of(id).failed.push(letter.donorId);
         // the donor's id, never their address

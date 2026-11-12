@@ -409,9 +409,12 @@ row (an address confirmed by signing in), and nothing more.
   files, as a browser reads them: `SITE_URL/<world>/data/quiz.<locale>.json`, `sights.json`,
   `sights.<locale>.json` (5 s each). The famous ones are the quiz's easiest level (for a world
   without a quiz, every sight with an article), each with its sprite and its Wikipedia opening
-  cut at a word to 160 characters. A reading is kept for an hour per world and language. The
-  catalog never throws: a world whose files cannot be read (anything but a quiz file that is a
-  404) is **unread**, logged with its name and asked again next time. `pickAcross` takes one
+  cut at a word to 160 characters. A reading is kept for an hour per world and language. A
+  world with neither `sights.json` nor its texts (404 both: an imagined world, or a city shipped
+  without lit buildings) simply has none, a good reading kept like any other. The catalog never
+  throws: a world whose files cannot be read (a failure other than a 404, or `sights.json`
+  without its texts, or they without it) is **unread**, logged with its name and asked again
+  next time; only those are named as unread in the announce command's output. `pickAcross` takes one
   building from each of several worlds (the welcome); `pickIn` some of one world, and whether
   it has a quiz (a quiz file that is a 404 is none; an unread world has none).
 - **Their pictures** (`GET /api/sight-pictures/:world/<hash>.png`, public): the sprite
@@ -607,13 +610,31 @@ address.
   ("{name} is built. Come and see it."). (7) **Each person is claimed before their mail goes
   out**: their `list_notices` rows, in one `createMany`; a unique violation (P2002) means
   another run is mailing them, and they are skipped. A mail that fails gives the claim back
-  (the rows are deleted) and the next run tries that person, and only them, again; a mail
-  server that is away (`isServerFailure`) stops the run, and everyone after is counted as not
-  tried. (8) A city whose run left nobody failed, untried or skipped is **closed**:
-  `lists_announced_at` is set and its list's rows are deleted (the list ends; new cities goes
-  on). The output says, city by city, how many were mailed, the donor ids not mailed, whether
-  the list is closed, and names the worlds whose buildings could not be read (their mails went
-  without them: printed, not a failure); counts and ids, never an address.
+  (the rows are deleted) and the next run tries that person, and only them, again (a 4xx
+  answer, a connection that fails); a mail server that is away (`isServerFailure`) stops the
+  run, and everyone after is counted as not tried. An address the mail server **refuses for
+  good** (`isRecipientRefused`: a 5xx answer to RCPT TO; a 5xx to the sender or to the message
+  would come for every mail, so it is not one) keeps its claim and counts as told: logged by
+  donor id, never tried again, and it does not keep the city open. (8) A city whose run left
+  nobody failed, untried or skipped is **closed**: `lists_announced_at` is set and its list's
+  rows are deleted (the list ends; new cities goes on). The output says, city by city, how many
+  were mailed, the donor ids not mailed or refused, whether the list is closed, and names the
+  worlds whose buildings could not be read (their mails went without them: printed, not a
+  failure); counts and ids, never an address. A run that failed or refused someone exits 1 (a
+  refusal once: the next run does not see it again).
+- **Closing a city's list by hand**, when the runs keep leaving someone untold (an address that
+  fails every time without a 5xx, say): it ends the city's list as a run that told everyone
+  would, and whoever the runs did not reach is never mailed about it.
+
+  ```sql
+  UPDATE cities SET lists_announced_at = now()
+    WHERE slug = '<slug>' AND lists_announced_at IS NULL;
+  DELETE FROM list_members
+    WHERE city_id = (SELECT id FROM cities WHERE slug = '<slug>');
+  ```
+
+  New cities' members are not touched (their list goes on); nobody is told of the city after
+  this, and the announce command no longer looks at it.
 - **Welcome to a list** (`lists/welcome-mail.ts`, `ListsService.welcome`): the first time a
   donor joins any list, once ever (`donors.welcomed_at`, claimed before sending and given back
   if it fails), after the join is answered: "We'll write the day {city} is built." (or "…each

@@ -69,6 +69,24 @@ export function isServerFailure(error: unknown): boolean {
   return typeof code === 'string' && SERVER_FAILURES.has(code);
 }
 
+/**
+ * The mail server refused the recipient for good: a 5xx answer to RCPT TO (nodemailer's
+ * `EENVELOPE`, every recipient rejected, and a mail here has one). That address will never take
+ * the mail, so trying it again on every run would only fail again. A 4xx answer is for now, and
+ * a 5xx to the sender (MAIL FROM) or to the message (DATA) would come for every mail alike: none
+ * of those is a refusal of the one address.
+ */
+export function isRecipientRefused(error: unknown): boolean {
+  if (isServerFailure(error)) return false;
+  const { command, responseCode } = (error ?? {}) as Record<string, unknown>;
+  return (
+    command === 'RCPT TO' &&
+    typeof responseCode === 'number' &&
+    responseCode >= 500 &&
+    responseCode < 600
+  );
+}
+
 /** What the mailer is made from. */
 export type MailEnv = Pick<
   Env,

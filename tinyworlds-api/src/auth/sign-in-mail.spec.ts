@@ -112,12 +112,12 @@ describe('signInMail', () => {
         button: 'Confirm and join',
       },
       'pt-BR': {
-        heading: 'Você está a um passo da lista de Lisbon.',
+        heading: 'Falta só um passo para você entrar na lista de Lisbon.',
         fresh: 'Você está a um passo de saber das novas cidades.',
-        button: 'Confirmar e entrar',
+        button: 'Confirmar e entrar na lista',
       },
       'es-ES': {
-        heading: 'Estás a un paso de la lista de Lisbon.',
+        heading: 'Te falta un paso para entrar en la lista de Lisbon.',
         fresh: 'Estás a un paso de enterarte de las nuevas ciudades.',
         button: 'Confirmar y apuntarme',
       },

@@ -61,7 +61,7 @@ const WORDS: Record<Locale, Words> = {
     text: 'Seu e-mail está confirmado. Quando {city} estiver no mapa, você receberá um e-mail avisando, e é só isso que esta lista envia.',
     textNew:
       'Seu e-mail está confirmado. Cada vez que uma nova cidade estiver no mapa, você receberá um e-mail avisando, e é só isso que esta lista envia.',
-    while: 'Enquanto isso: três construções que já estão no mapa',
+    while: 'Enquanto isso: três prédios que já estão no mapa',
     see: 'Ver no mapa',
     explore: 'Explorar as cidades',
     help: 'Ajudar a construir {city}',
@@ -83,9 +83,9 @@ const WORDS: Record<Locale, Words> = {
     see: 'Verlo en el mapa',
     explore: 'Explorar las ciudades',
     help: 'Ayudar a construir {city}',
-    why: 'Recibes esto porque pediste saber cuándo se construye {city}.',
+    why: 'Recibes esto porque pediste que te avisáramos cuando se construyera {city}.',
     whyNew:
-      'Recibes esto porque pediste saber cuándo se construyen nuevas ciudades.',
+      'Recibes esto porque pediste que te avisáramos cuando se construyeran nuevas ciudades.',
     leave: 'Salir de esta lista',
   },
 };

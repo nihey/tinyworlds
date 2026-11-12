@@ -3248,6 +3248,7 @@ describe('the API over HTTP', () => {
               mailed: 2,
               failed: [],
               unsent: [],
+              refused: [],
               closed: true,
             },
           ],

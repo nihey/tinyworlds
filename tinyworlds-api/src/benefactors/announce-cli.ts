@@ -29,7 +29,8 @@ import { BenefactorsService } from './benefactors.service.js';
  * mail per person for all the worlds of the run (ListAnnounceService), with buildings read from
  * the site's own files. Prints what happened, world by world, with counts and donor ids, never
  * an address. Exits 1 when a world fell short (a mail that did not go out, or an announcement
- * that failed) or the lists did (someone not mailed: the next run tries them), 0 otherwise: an
+ * that failed) or the lists did (someone not mailed: the next run tries them; or an address the
+ * mail server refused for good, said once, as it counts as told), 0 otherwise: an
  * unknown world, a city not marked BUILT yet, one announced before, or buildings that could not
  * be read (printed), are not errors. The environment is the API's own, checked the same way;
  * without a mail server (development) the mails go to the log.

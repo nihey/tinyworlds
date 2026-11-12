@@ -16,7 +16,7 @@ import {
   type ListAnnouncement,
   listsFellShort,
 } from './list-announce.service.js';
-import type { MailSight, SightsCatalog } from './sights-catalog.js';
+import { type MailSight, SightsCatalog } from './sights-catalog.js';
 
 const SITE = 'https://example.com';
 const SECRET = 'a secret';
@@ -50,11 +50,13 @@ const sightOf = (world: string, locale: Locale, n: number): MailSight => ({
   },
 });
 
-function setup() {
+const config = {
+  get: (key: string) => ({ JWT_SECRET: SECRET, SITE_URL: SITE })[key],
+} as unknown as ConfigService<Env, true>;
+
+/** `catalog`: a real one in place of the stand-in, for a test about what the site's files say. */
+function setup(options: { catalog?: SightsCatalog } = {}) {
   const prisma = new FakePrisma();
-  const config = {
-    get: (key: string) => ({ JWT_SECRET: SECRET, SITE_URL: SITE })[key],
-  } as unknown as ConfigService<Env, true>;
   const mailer = new FakeMailer();
   /** Worlds whose files the site cannot give. */
   const unread = new Set<string>();
@@ -79,7 +81,7 @@ function setup() {
       });
     },
   );
-  const catalog = { pickIn } as unknown as SightsCatalog;
+  const catalog = options.catalog ?? ({ pickIn } as unknown as SightsCatalog);
   const service = new ListAnnounceService(
     prisma.asService(),
     config,
@@ -145,6 +147,14 @@ const city = (s: Setup, slug: string) =>
 const away = () =>
   Object.assign(new Error('Connection timeout'), { code: 'ECONNECTION' });
 
+/** The mail server's answer to the recipient, as nodemailer reports it: 4xx for now, 5xx for good. */
+const refusedWith = (responseCode: number) =>
+  Object.assign(new Error("Can't send mail - all recipients were rejected"), {
+    code: 'EENVELOPE',
+    command: 'RCPT TO',
+    responseCode,
+  });
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -167,6 +177,7 @@ describe('ListAnnounceService', () => {
           mailed: 3,
           failed: [],
           unsent: [],
+          refused: [],
           closed: true,
         },
       ],
@@ -227,6 +238,7 @@ describe('ListAnnounceService', () => {
         mailed: 1,
         failed: [],
         unsent: [],
+        refused: [],
         closed: true,
       },
     ]);
@@ -296,6 +308,7 @@ describe('ListAnnounceService', () => {
         mailed: 1,
         failed: [],
         unsent: [],
+        refused: [],
         closed: true,
       },
     ]);
@@ -323,6 +336,7 @@ describe('ListAnnounceService', () => {
           mailed: 2,
           failed: [],
           unsent: [],
+          refused: [],
           closed: true,
         },
         {
@@ -331,6 +345,7 @@ describe('ListAnnounceService', () => {
           mailed: 3,
           failed: [],
           unsent: [],
+          refused: [],
           closed: true,
         },
       ],
@@ -375,7 +390,7 @@ describe('ListAnnounceService', () => {
     expect(s.prisma.listMembers.map((m) => m.cityId)).toEqual([null]);
   });
 
-  it('a failed mail is tried again on the next run, and only that one', async () => {
+  it('an address the mail server refuses for good (5xx) counts as told, and the city closes', async () => {
     const s = setup();
     member(s, ANA, s.lisbon, 'en-US', 1);
     member(s, BO, s.lisbon, 'en-US', 2);
@@ -383,8 +398,57 @@ describe('ListAnnounceService', () => {
     const logged = vi
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => undefined);
-    s.mailer.failWith = (attempt) =>
-      attempt === 2 ? new Error('550 mailbox unavailable') : null;
+    s.mailer.failWith = (attempt) => (attempt === 2 ? refusedWith(550) : null);
+
+    const done = await s.service.announce(['tinylis']);
+    expect(done.cities).toEqual([
+      {
+        world: 'tinylis',
+        city: 'Lisbon',
+        mailed: 2,
+        failed: [],
+        unsent: [],
+        refused: [BO],
+        closed: true,
+      },
+    ]);
+    // the run goes on after it
+    expect(s.mailer.sent.map((mail) => mail.to)).toEqual([
+      'ana@example.com',
+      'cy@example.com',
+    ]);
+    // logged by donor id, never by address
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(String(logged.mock.calls[0][0])).toContain(BO);
+    expect(String(logged.mock.calls[0][0])).toContain('refused');
+    expect(String(logged.mock.calls[0][0])).not.toContain('@');
+    // their claim is kept: nobody tries them again, and the list ends
+    expect(s.prisma.listNotices.map((n) => n.donorId).sort()).toEqual(
+      [ANA, BO, CY].sort(),
+    );
+    expect(city(s, 'lisbon').listsAnnouncedAt).toBeInstanceOf(Date);
+    expect(s.prisma.listMembers).toHaveLength(0);
+    // said once, so the deploy warns once
+    expect(listsFellShort(done)).toBe(true);
+    expect(describeListAnnouncement(done)).toEqual([
+      'Lisbon (tinylis), its lists: 2 mailed, 0 failed, 1 refused. Its list is closed.',
+      `Refused by the mail server, counted as told and not tried again (donor ids): ${BO}`,
+    ]);
+
+    const again = await s.service.announce(['tinylis']);
+    expect(again).toEqual({ cities: [], unread: [] });
+    expect(s.mailer.attempts).toBe(3);
+  });
+
+  it('a mail that fails for now (a 4xx answer) is tried again on the next run, and only that one', async () => {
+    const s = setup();
+    member(s, ANA, s.lisbon, 'en-US', 1);
+    member(s, BO, s.lisbon, 'en-US', 2);
+    member(s, CY, s.lisbon, 'en-US', 3);
+    const logged = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+    s.mailer.failWith = (attempt) => (attempt === 2 ? refusedWith(450) : null);
 
     const first = await s.service.announce(['tinylis']);
     expect(first.cities).toEqual([
@@ -394,6 +458,7 @@ describe('ListAnnounceService', () => {
         mailed: 2,
         failed: [BO],
         unsent: [],
+        refused: [],
         closed: false,
       },
     ]);
@@ -416,6 +481,7 @@ describe('ListAnnounceService', () => {
         mailed: 1,
         failed: [],
         unsent: [],
+        refused: [],
         closed: true,
       },
     ]);
@@ -444,6 +510,7 @@ describe('ListAnnounceService', () => {
         mailed: 1,
         failed: [BO],
         unsent: [CY],
+        refused: [],
         closed: false,
       },
       {
@@ -452,6 +519,7 @@ describe('ListAnnounceService', () => {
         mailed: 0,
         failed: [],
         unsent: [CY],
+        refused: [],
         closed: false,
       },
     ]);
@@ -525,6 +593,34 @@ describe('ListAnnounceService', () => {
     expect(listsFellShort(done)).toBe(false);
   });
 
+  it('a world without lit buildings is not named unread; one whose files fail is', async () => {
+    const warned = vi
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    // the site as it is: tinylis's sights.json fails, tinywinterfell has none of the files
+    const fetcher = ((url: string) =>
+      Promise.resolve(
+        new Response('', {
+          status: url === `${SITE}/tinylis/data/sights.json` ? 500 : 404,
+        }),
+      )) as unknown as typeof fetch;
+    const s = setup({ catalog: new SightsCatalog(config, fetcher) });
+    member(s, ANA, s.lisbon, 'en-US', 1);
+    member(s, DORA, null, 'en-US', 2);
+
+    const done = await s.service.announce(['tinylis', 'tinywinterfell']);
+    expect(done.unread).toEqual(['tinylis']);
+    expect(done.cities.map((c) => [c.city, c.closed])).toEqual([
+      ['Lisbon', true],
+      ['Winterfell', true],
+    ]);
+    expect(describeListAnnouncement(done).at(-1)).toBe(
+      'Could not read the buildings of tinylis: its mails went without them.',
+    );
+    expect(warned).toHaveBeenCalledTimes(1);
+    expect(String(warned.mock.calls[0][0])).toContain('tinylis');
+  });
+
   it('someone another run is mailing is skipped, and the city stays open for it', async () => {
     const s = setup();
     member(s, ANA, s.lisbon, 'en-US', 1);
@@ -554,6 +650,7 @@ describe('ListAnnounceService', () => {
         mailed: 2,
         failed: [],
         unsent: [],
+        refused: [],
         closed: false,
       },
     ]);
@@ -603,7 +700,16 @@ describe('describeListAnnouncement', () => {
 
   it('says what was sent, with counts and donor ids only', () => {
     const all: ListAnnouncement = {
-      cities: [{ ...lisbon, mailed: 3, failed: [], unsent: [], closed: true }],
+      cities: [
+        {
+          ...lisbon,
+          mailed: 3,
+          failed: [],
+          unsent: [],
+          refused: [],
+          closed: true,
+        },
+      ],
       unread: [],
     };
     expect(describeListAnnouncement(all)).toEqual([
@@ -620,6 +726,7 @@ describe('describeListAnnouncement', () => {
           mailed: 1,
           failed: ['d2'],
           unsent: ['d3', 'd4'],
+          refused: [],
           closed: false,
         },
       ],
@@ -644,7 +751,14 @@ describe('describeListAnnouncement', () => {
     expect(
       describeListAnnouncement({
         cities: [
-          { ...lisbon, mailed: 2, failed: [], unsent: [], closed: false },
+          {
+            ...lisbon,
+            mailed: 2,
+            failed: [],
+            unsent: [],
+            refused: [],
+            closed: false,
+          },
         ],
         unread: [],
       }),
@@ -656,13 +770,21 @@ describe('describeListAnnouncement', () => {
   it('names the worlds whose buildings could not be read', () => {
     const done: ListAnnouncement = {
       cities: [
-        { ...lisbon, mailed: 1, failed: [], unsent: [], closed: true },
+        {
+          ...lisbon,
+          mailed: 1,
+          failed: [],
+          unsent: [],
+          refused: [],
+          closed: true,
+        },
         {
           world: 'tinyrom',
           city: 'Rome',
           mailed: 1,
           failed: [],
           unsent: [],
+          refused: [],
           closed: true,
         },
       ],
