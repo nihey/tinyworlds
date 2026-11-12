@@ -26,7 +26,15 @@ import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { cn } from "@/lib/utils";
 import { byVisits, siteTotals, type WorldCounts } from "@/lib/visits";
-import { ADMIN_PATH, CONTACT_EMAIL, CONTACT_URL, GITHUB_URL, ME_PATH, SITE_ID } from "@/site";
+import {
+  ADMIN_PATH,
+  CONTACT_EMAIL,
+  CONTACT_URL,
+  GITHUB_URL,
+  HALL_URL,
+  ME_PATH,
+  SITE_ID,
+} from "@/site";
 import { WORLDS, type World } from "@/worlds";
 
 /** the footer's quiet links: the address, the cookie settings, the admin pages */
@@ -182,6 +190,13 @@ export function Landing() {
               <li>
                 <a href="#ranking" className={TOP_LINK}>
                   {t.home.ranking}
+                </a>
+              </li>
+            )}
+            {withApi && (
+              <li>
+                <a href={HALL_URL} className={TOP_LINK}>
+                  {t.hall.open}
                 </a>
               </li>
             )}

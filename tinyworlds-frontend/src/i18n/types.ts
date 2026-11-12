@@ -280,10 +280,50 @@ export interface Strings {
      */
     wall: {
       label: string;
+      /** under the title, where it has room: what the list is */
+      line: string;
       anonymous: string;
       moreCities: string;
       invite: { title: string; body: string };
     };
+  };
+  /**
+   * The hall of fame (the front page's build, at /hall-of-fame/): everyone who gave, and a page
+   * for each city. "{city}" is a city's name, "{n}" a count, "{raised}" and "{goal}" sums.
+   */
+  hall: {
+    /** the document's title and description, and the page's heading and the line under it */
+    title: string;
+    description: string;
+    heading: string;
+    line: string;
+    /** the link to it, from the front page and from a city's benefactors */
+    open: string;
+    openCity: string;
+    /** the overall page's two parts */
+    everyone: string;
+    byCity: string;
+    byCityLine: string;
+    /** on a city's tile: how many are in its hall */
+    people: { one: string; other: string };
+    built: string;
+    funding: string;
+    /** nobody has given yet; and the button that opens the donate sign */
+    empty: string;
+    join: string;
+    /** a city's page: the document's title, the heading, the line by its status */
+    cityTitle: string;
+    cityHeading: string;
+    cityBuilt: string;
+    cityFunding: string;
+    explore: string;
+    /** no such city, and the way back */
+    unknown: string;
+    back: string;
+    loading: string;
+    failed: string;
+    /** what the page says of the links, under the lists */
+    linksNote: string;
   };
   loadError: {
     title: string;

@@ -12,7 +12,9 @@ import {
 } from "@/lib/benefactors";
 import { API_URL, formatUsd } from "@/lib/donate";
 import { cn } from "@/lib/utils";
+import { hallCityUrl } from "@/site";
 import { statusLabel } from "../donate/milestone-bar";
+import { QUIET } from "../styles";
 import { BenefactorLinks } from "./benefactor-link";
 import { PixelBadge, PixelIcon } from "./pixel-badge";
 import { StoneGrid } from "./stone-grid";
@@ -34,6 +36,28 @@ function stonesText(t: Strings, n: number): string {
   return (n === 1 ? t.benefactors.stones.one : t.benefactors.stones.other).replace(
     "{n}",
     String(n),
+  );
+}
+
+/** What the stones' looks mean: an unnamed founder's, the first stone, the last. */
+export function StoneLegend({ t }: { t: Strings }) {
+  return (
+    <div className="flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-paper-dim">
+      <span className="inline-flex items-center gap-1.5">
+        <svg aria-hidden width="9" height="9" className="shrink-0">
+          <rect width="9" height="9" rx="2" fill="#5a5d61" />
+        </svg>
+        {t.benefactors.legendAnon}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <PixelIcon art="firstStone" />
+        {t.benefactors.legendFirst}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <PixelIcon art="keystone" />
+        {t.benefactors.legendKey}
+      </span>
+    </div>
   );
 }
 
@@ -115,22 +139,13 @@ function Body({ city, onBecome }: { city: CityBenefactors; onBecome: (cityName: 
       <p className="mt-1.5 text-sm text-paper-dim tabular-nums">{summary}</p>
 
       <StoneGrid stones={city.stones} founders={city.founders} t={t} />
-      <div className="flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-paper-dim">
-        <span className="inline-flex items-center gap-1.5">
-          <svg aria-hidden width="9" height="9" className="shrink-0">
-            <rect width="9" height="9" rx="2" fill="#5a5d61" />
-          </svg>
-          {t.benefactors.legendAnon}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <PixelIcon art="firstStone" />
-          {t.benefactors.legendFirst}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <PixelIcon art="keystone" />
-          {t.benefactors.legendKey}
-        </span>
-      </div>
+      <StoneLegend t={t} />
+      {/* the same people on a page of their own, with room for what they point to */}
+      <p className="pt-3">
+        <a href={hallCityUrl(city.slug)} className={QUIET}>
+          {t.hall.openCity.replace("{city}", city.name)}
+        </a>
+      </p>
 
       {city.founders.length > 0 && (
         <>
