@@ -131,7 +131,7 @@ is the generated record of the schema.
 
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
-type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String }
+type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  benefactorCount: Int!  status: CityStatus!  worldId: String }
 input CreateDonationCheckoutInput { amountCents: Int  city: String  benefactorName: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
 input CityBenefactorsInput { slug: String  world: String }   # exactly one, else BAD_REQUEST
@@ -139,7 +139,7 @@ type BenefactorLink { url: String!  title: String!  description: String  icon: S
 type FounderRow { number: Int!  name: String  amountCents: Int!  stones: Int!  firstStone: Boolean!  keystone: Boolean!  links: [BenefactorLink!]! }
 type BenefactorRow { rank: Int!  name: String  amountCents: Int!  links: [BenefactorLink!]! }
 type CityBenefactors { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
-  stones: [Int]!  founders: [FounderRow!]!  benefactors: [BenefactorRow!]! }
+  benefactorCount: Int!  stones: [Int]!  founders: [FounderRow!]!  benefactors: [BenefactorRow!]! }
 type WallCity { slug: String!  name: String!  worldId: String }
 type WallBenefactor { name: String  amountCents: Int!  cities: [WallCity!]!  links: [BenefactorLink!]!  lastGiftAt: DateTime! }
 
@@ -212,7 +212,11 @@ answer is `UNAUTHENTICATED`; with a session of the other kind it is `FORBIDDEN`,
 refuse the other kind, should one ever reach them).
 
 - `cityMilestones`: hidden cities left out; cities still to be built first (most raised first,
-  ties by name), built ones last.
+  ties by name), built ones last. `benefactorCount` is how many people gave to each, of the
+  gifts that count toward it (in dollars): a donor once however many gifts, a gift without a
+  donor (no address) as one (`benefactorCounts`, pure, in `cities.service.ts`; one `groupBy`
+  of the donations by city and donor). `cityBenefactors` answers the same count for its city.
+  The site praises a city with it once its benefactors brought it to the map.
 - `createDonationCheckout`: `city` is free text up to 60 characters (an existing name or a new
   one; omit for none), `world` matches `/^[a-z0-9]{3,20}$/`, `locale` is `en-US | pt-BR | es-ES`,
   `returnUrl` is a page on one of `ALLOWED_ORIGINS` with no query or hash, `visitId` (optional)

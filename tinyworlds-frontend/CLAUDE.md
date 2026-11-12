@@ -145,9 +145,11 @@ src/
 │                        # benefactor-wall.tsx (everyone who gave: columns down the sides,
 │                        # or a strip) and drift.tsx (a list that drifts by)
 ├── components/benefactors/ # a city's benefactors (panel, sign, stone grid), the badges' pixel
-│                        # art, and benefactor-link.tsx (one of a benefactor's links)
-├── components/hall/     # the hall of fame: hall-of-fame.tsx (everyone, then the cities),
-│                        # city-hall.tsx (one city's), hall-cards.tsx, hall-frame.tsx
+│                        # art, benefactor-link.tsx (one of a benefactor's links) and
+│                        # brought-by.tsx (the gold plaque of a city its benefactors brought)
+├── components/hall/     # the hall of fame: hall-of-fame.tsx (figures, the cities brought by
+│                        # their benefactors, everyone, the other cities), city-hall.tsx (one
+│                        # city's), hall-cards.tsx, hall-frame.tsx
 ├── components/me/       # "Your cities" (/me/): me-app.tsx (signed in or not), me-page.tsx,
 │                        # your-cities.tsx, your-links.tsx, badges.tsx, keep-exploring.tsx,
 │                        # name-editor.tsx
@@ -176,8 +178,9 @@ src/
                          # load, and loading them), links.ts (pure: a benefactor's links as
                          # the API says them, what a link may be), wall.ts (everyone who
                          # gave: the request, its answer, the two sides), hall.ts (the hall
-                         # of fame's questions and answers), hall-build.ts (the same, asked
-                         # by the build to bake the pages)
+                         # of fame's questions and answers, its cities and figures),
+                         # hall-build.ts (the same, asked by the build to bake the pages),
+                         # brought-by.ts (pure: which cities their benefactors brought)
 ```
 
 ## Targets: worlds and the front page
@@ -206,6 +209,15 @@ src/
   "Benefactors" for a world the API knows a city for. Under the pointer the card lifts and is
   ringed in the world's own colour. `SmallWorldCard` is the same in a few words (picture, name,
   visits), for "Your cities".
+- **A city its benefactors brought is praised on its card** (`brought`, from
+  `broughtByWorld(milestones)` in `landing.tsx`): a gold bar along the card's top and, under
+  its words, the plaque (`BroughtByPlaque`: the founders' pixel flag, "Brought to you by 2
+  benefactors, who donated $35", the people and the sum in taxi yellow), which lies over the
+  card's link as the Benefactors button does, leads to the city's hall of fame and takes that
+  button's place. `broughtBy` (`lib/brought-by.ts`, pure) decides which: a city that is BUILT,
+  with its world, whose gifts met its goal; the people are the API's `benefactorCount` (a
+  donor once), or the gifts where an older API does not say. The sentence agrees with how many
+  they are in each language (`hall.broughtBy`, with `hall.people` inside it).
 - **The figures under the hero** (`site-numbers.tsx`, with an API): how many worlds (the
   registry's count, at once), every visit they have had and how many are exploring now
   (`siteTotals` over `worldVisits`; the latter only above `LIVE_SHOWN_ABOVE`), and how many
@@ -572,12 +584,21 @@ Two routes of the front page's build (`page.home.tsx`, like `/me/` and `/admin/`
 everyone, search engines included: no `noindex`, each with its own title, description and
 canonical address.
 
-- **`/hall-of-fame/`** (`components/hall/hall-of-fame.tsx`): "Our Benefactors", everyone on
-  the wall as cards (`PersonCard`: name, sum, the cities, each a link to that city's hall,
-  and their links with pictures), then "City by city": a tile per city someone gave to
-  (`hallCities`: how many are in its hall, where it stands, the first names), each leading to
-  its own page; last, "Fund a city" and what the links are.
-- **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): the city's foundation (the
+- **`/hall-of-fame/`** (`components/hall/hall-of-fame.tsx`): the title, then three figures on
+  a sign with the gold bar (`HallFigures`, `hallTotals`: everything given to the cities,
+  everyone on the wall, the cities built with their gifts); "Built by benefactors", a gallery
+  of the cities their benefactors brought to the map (`BuiltCityCard`: the city's picture,
+  name, plaque and first names; the card leads to its hall, "Explore" over it to the map);
+  "Our Benefactors", everyone on the wall as cards, ranked from the largest gift
+  (`PersonCard`: place, name, sum, the cities, each a link to that city's hall, and their
+  links with pictures); then "More cities": a tile for every other city someone gave to
+  (`CityTile`: how many are in its hall, where it stands with a bar while it is funded, the
+  first names). `hallCities` gives each city its people (the API's count when it says, else
+  the wall's entries) and its `broughtBy`. Last, "Fund a city" and what the links are.
+- **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): a built city's picture
+  (beside the words on a wide screen, kept to its right side so the frame does not cut
+  through its wordmark: `MovingPicture`'s `focus`, above them on a narrow one), for a city its
+  benefactors brought their plaque in place of "raised of goal", the city's foundation (the
   sign's `StoneGrid` and legend), "Become a benefactor" and "Explore" for a built one, then
   its founders (`FounderCard`: number, badges, stones, sum, links) and its benefactors
   (`BenefactorCard`), all of them, as cards.
