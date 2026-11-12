@@ -540,6 +540,13 @@ export const en: Strings = {
     street: "Street",
     place: "Place",
   },
+  legal: {
+    terms: "Terms of Service",
+    privacy: "Privacy Policy",
+    updated: "Last updated {date}",
+    contents: "On this page",
+    summary: "In short",
+  },
   errors: {
     answered: (url, status) => `${url} answered ${status}`,
     noCanvas: "This browser can't draw the map (no 2D canvas).",

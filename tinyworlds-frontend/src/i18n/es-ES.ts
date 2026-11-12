@@ -549,6 +549,13 @@ export const esES: Strings = {
     street: "Calle",
     place: "Lugar",
   },
+  legal: {
+    terms: "Condiciones de uso",
+    privacy: "Política de privacidad",
+    updated: "Actualizado el {date}",
+    contents: "En esta página",
+    summary: "En resumen",
+  },
   errors: {
     answered: (url, status) => `${url} respondió ${status}`,
     noCanvas: "Este navegador no puede dibujar el mapa (falta el canvas 2D).",

@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useI18n } from "@/hooks/use-i18n";
 import { bannerShown, consentStore, GTM_ID, loadTagManager, mayLoad } from "@/lib/consent";
+import { PRIVACY_URL } from "@/site";
 
 /** The visitor's consent for Google's tags (`lib/consent.ts`). */
 export function useConsent() {
@@ -44,7 +45,15 @@ function ConsentBanner() {
       aria-label={t.consent.label}
       className="sign sign-in consent-sign z-40 mx-auto max-w-[27rem] p-4"
     >
-      <p className="text-[13px] leading-relaxed text-paper">{t.consent.message}</p>
+      <p className="text-[13px] leading-relaxed text-paper">
+        {t.consent.message}{" "}
+        <a
+          href={PRIVACY_URL}
+          className="rounded-sm font-semibold underline decoration-paper-dim/60 underline-offset-2 outline-none hover:decoration-taxi focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
+        >
+          {t.legal.privacy}
+        </a>
+      </p>
       <div className="mt-3 flex gap-2 sm:justify-end">
         <button
           type="button"

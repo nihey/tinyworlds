@@ -92,6 +92,17 @@ export const HALL_URL = IS_HOME
   : `${HOME_URL.replace(/\/+$/, "")}/hall-of-fame/`;
 
 /**
+ * The terms of service and the privacy policy: pages of the front page's build, so from inside
+ * a world they are the front page's address, then "terms/" or "privacy/".
+ */
+const LEGAL_BASE = IS_HOME ? BASE_PATH : HOME_URL.replace(/\/+$/, "");
+export const TERMS_URL = `${LEGAL_BASE}/terms/`;
+export const PRIVACY_URL = `${LEGAL_BASE}/privacy/`;
+
+/** The code's licence (MIT), which the terms point to. */
+export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
+
+/**
  * A city's own hall of fame. A page is built for each city whose slug is plain (a-z, 0-9, "-");
  * any other (a name in another script) is shown by the hall of fame itself, asked by `?city=`.
  * (The web server sends a plain slug that has no page yet, a city named since the build, the
