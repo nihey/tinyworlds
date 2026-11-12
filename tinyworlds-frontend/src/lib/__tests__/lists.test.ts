@@ -305,7 +305,7 @@ describe("joinWords", () => {
   it("says what each list sends: one mail for a city, one per new city for new cities", () => {
     expect(joinWords(en, lisbon).body).toBe(en.lists.join.body);
     expect(joinWords(en, { kind: "new" }).body).toBe(
-      "One email each time a new city is on the map. First we check the address is yours: we'll send a code, no password.",
+      "One email each time a new city is on the map. We promise we'll never spam you. First we check the address is yours: we'll send a code, no password.",
     );
     for (const [locale, t] of Object.entries(DICTIONARIES))
       expect(joinWords(t, { kind: "new" }).body, locale).not.toBe(joinWords(t, lisbon).body);

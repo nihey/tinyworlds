@@ -424,9 +424,9 @@ export const en: Strings = {
     join: {
       cityTitle: "Hear when {city} is built",
       newTitle: "Hear when new cities are built",
-      body: "One email the day it's on the map. First we check the address is yours: we'll send a code, no password.",
+      body: "One email the day it's on the map. We promise we'll never spam you. First we check the address is yours: we'll send a code, no password.",
       bodyNew:
-        "One email each time a new city is on the map. First we check the address is yours: we'll send a code, no password.",
+        "One email each time a new city is on the map. We promise we'll never spam you. First we check the address is yours: we'll send a code, no password.",
       action: "Send me a code",
       doneCity: "You're on {city}'s list",
       doneNew: "You're on the list for new cities",
@@ -440,7 +440,7 @@ export const en: Strings = {
       signedIn: "You're signed in. Your lists are on Your cities.",
       signIn: {
         heading: "Hear when a city is built",
-        body: "One email the day it's on the map. First we check the address is yours: we'll send a code, no password.",
+        body: "One email the day it's on the map. We promise we'll never spam you. First we check the address is yours: we'll send a code, no password.",
         email: "Email address",
         placeholder: "you@example.com",
         action: "Send me a code",

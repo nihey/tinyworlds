@@ -438,9 +438,9 @@ export const ptBR: Strings = {
     join: {
       cityTitle: "Saiba quando {city} for construída",
       newTitle: "Saiba quando novas cidades forem construídas",
-      body: "Um e-mail no dia em que ela entrar no mapa. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
+      body: "Um e-mail no dia em que ela entrar no mapa. Prometemos que nunca vamos te mandar spam. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
       bodyNew:
-        "Um e-mail cada vez que uma nova cidade entrar no mapa. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
+        "Um e-mail cada vez que uma nova cidade entrar no mapa. Prometemos que nunca vamos te mandar spam. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
       action: "Enviar um código",
       doneCity: "Você está na lista de {city}",
       doneNew: "Você está na lista das novas cidades",
@@ -454,7 +454,7 @@ export const ptBR: Strings = {
       signedIn: "Você entrou. Suas listas estão em Suas cidades.",
       signIn: {
         heading: "Saiba quando uma cidade for construída",
-        body: "Um e-mail no dia em que ela entrar no mapa. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
+        body: "Um e-mail no dia em que ela entrar no mapa. Prometemos que nunca vamos te mandar spam. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
         email: "E-mail",
         placeholder: "voce@example.com",
         action: "Enviar um código",

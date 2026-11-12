@@ -435,9 +435,9 @@ export const esES: Strings = {
     join: {
       cityTitle: "Entérate cuando {city} esté construida",
       newTitle: "Entérate cuando se construyan nuevas ciudades",
-      body: "Un correo el día en que esté en el mapa. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
+      body: "Un correo el día en que esté en el mapa. Prometemos que nunca te enviaremos spam. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
       bodyNew:
-        "Un correo cada vez que una nueva ciudad llegue al mapa. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
+        "Un correo cada vez que una nueva ciudad llegue al mapa. Prometemos que nunca te enviaremos spam. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
       action: "Enviarme un código",
       doneCity: "Estás en la lista de {city}",
       doneNew: "Estás en la lista de las nuevas ciudades",
@@ -451,7 +451,7 @@ export const esES: Strings = {
       signedIn: "Has iniciado sesión. Tus listas están en Tus ciudades.",
       signIn: {
         heading: "Entérate cuando se construya una ciudad",
-        body: "Un correo el día en que esté en el mapa. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
+        body: "Un correo el día en que esté en el mapa. Prometemos que nunca te enviaremos spam. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
         email: "Correo electrónico",
         placeholder: "tu@example.com",
         action: "Enviarme un código",
