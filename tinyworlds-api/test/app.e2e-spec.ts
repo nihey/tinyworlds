@@ -816,6 +816,36 @@ describe('the API over HTTP', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
+    it('magic-link with a list, then verify, then myLists shows the list', async () => {
+      await prisma.city.create({
+        data: { slug: 'lisbon', name: 'Lisbon', goalCents: 3000 },
+      });
+      const from = `203.0.113.${ip++}`;
+      const before = mailer.signIns().length;
+      await post('/api/auth/magic-link', {
+        email: 'vera@example.com',
+        returnUrl: 'https://example.com/',
+        purpose: 'donor',
+        list: 'lisbon',
+      })
+        .set('x-forwarded-for', from)
+        .expect(202, { sent: true });
+      await vi.waitFor(() => expect(mailer.signIns()).toHaveLength(before + 1));
+      expect(mailer.signIns().at(-1)?.text).toContain('Lisbon');
+      const res = await post('/api/auth/verify', { token: mailer.token() })
+        .set('x-forwarded-for', from)
+        .expect(200);
+      const mine = await asDonor(
+        (res.body as { accessToken: string }).accessToken,
+        MY_LISTS,
+      );
+      expect(
+        (
+          mine.body as { data: { myLists: { cities: { slug: string }[] } } }
+        ).data.myLists.cities.map((c) => c.slug),
+      ).toEqual(['lisbon']);
+    });
+
     it('POST /api/lists/unsubscribe with a good token leaves the list; with a bad one it answers 200 and changes nothing', async () => {
       const lisbon = await prisma.city.create({
         data: { slug: 'lisbon', name: 'Lisbon', goalCents: 3000 },

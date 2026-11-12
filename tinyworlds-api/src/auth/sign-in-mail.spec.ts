@@ -1,4 +1,5 @@
 import { LOCALES } from '../donations/locales.js';
+import { escapeHtml } from '../mail/html.js';
 import { signInMail } from './sign-in-mail.js';
 
 describe('signInMail', () => {
@@ -99,5 +100,46 @@ describe('signInMail', () => {
     const { html } = mail({ link: 'https://example.com/"><b>&' });
     expect(html).not.toContain('"><b>');
     expect(html).toContain('&quot;&gt;&lt;b&gt;&amp;');
+  });
+
+  it('a joining mail says which list, in each language; the subject is unchanged', () => {
+    const city = { kind: 'city', name: 'Lisbon' } as const;
+    const fresh = { kind: 'new' } as const;
+    const words = {
+      'en-US': {
+        heading: "One step and you're on the list for Lisbon.",
+        fresh: "One step and you'll hear about new cities.",
+        button: 'Confirm and join',
+      },
+      'pt-BR': {
+        heading: 'Você está a um passo da lista de Lisbon.',
+        fresh: 'Você está a um passo de saber das novas cidades.',
+        button: 'Confirmar e entrar',
+      },
+      'es-ES': {
+        heading: 'Estás a un paso de la lista de Lisbon.',
+        fresh: 'Estás a un paso de enterarte de las nuevas ciudades.',
+        button: 'Confirmar y apuntarme',
+      },
+    };
+    for (const locale of LOCALES) {
+      const plain = mail({ locale, purpose: 'donor' });
+      const joining = mail({ locale, purpose: 'donor', list: city });
+      const anyNew = mail({ locale, purpose: 'donor', list: fresh });
+      expect(joining.subject).toBe(plain.subject);
+      expect(anyNew.subject).toBe(plain.subject);
+      expect(joining.text).toContain(words[locale].heading);
+      expect(joining.html).toContain(escapeHtml(words[locale].heading));
+      expect(joining.html).toContain(escapeHtml(words[locale].button));
+      expect(joining.text).toContain(link);
+      expect(anyNew.text).toContain(words[locale].fresh);
+      expect(anyNew.text).not.toContain('Lisbon');
+      expect(plain.text).not.toContain(words[locale].heading);
+    }
+    expect(mail({ purpose: 'donor', list: city }).html).toContain(
+      'Confirm your email',
+    );
+    // only a donor's mail joins anything
+    expect(mail({ purpose: 'admin', list: city }).text).not.toContain('Lisbon');
   });
 });

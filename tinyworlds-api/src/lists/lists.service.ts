@@ -5,14 +5,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { failureOf } from '../auth/auth.service.js';
+import { failureOf } from '../auth/failure.js';
 import { sessionSecret } from '../auth/session-secret.js';
 import type { Env } from '../config/env.js';
 import type { Locale } from '../donations/locales.js';
 import { CityStatus } from '../generated/prisma/enums.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { type ListKey, NEW_CITIES } from './list-key.js';
+import { type ListKey, listKeyOf, NEW_CITIES } from './list-key.js';
 import { leaveToken, readLeaveToken } from './leave-token.js';
 import { SightsCatalog } from './sights-catalog.js';
 import { welcomeMail } from './welcome-mail.js';
@@ -124,6 +124,43 @@ export class ListsService {
     // the welcome goes out after the answer, and never holds it up
     if (isNew) setImmediate(() => void this.welcome(donorId, city, locale));
     return answer;
+  }
+
+  /**
+   * What a list is, for a mail that offers to join it: new cities, or a city's name; null for a
+   * city that is built, hidden or unknown (a list nobody can join).
+   */
+  async describe(
+    raw: string,
+  ): Promise<{ kind: 'new' } | { kind: 'city'; name: string } | null> {
+    const key = listKeyOf(raw);
+    if (key.kind === 'new') return { kind: 'new' };
+    const [found] = await this.prisma.city.findMany({
+      where: { slug: key.slug, hidden: false },
+      select: { name: true, status: true },
+    });
+    return found && found.status !== CityStatus.BUILT
+      ? { kind: 'city', name: found.name }
+      : null;
+  }
+
+  /**
+   * Joins the list a sign-in link carried, once the link is used. Never throws and never says
+   * why: a list that cannot be joined any more (built since, hidden) is simply not joined.
+   */
+  async joinAfterSignIn(
+    donorId: string,
+    raw: string,
+    locale: Locale,
+  ): Promise<void> {
+    try {
+      if (!(await this.describe(raw))) return;
+      await this.join(donorId, listKeyOf(raw), locale);
+    } catch (error) {
+      this.logger.error(
+        `Donor ${donorId} could not join a list on signing in: ${failureOf(error)}`,
+      );
+    }
   }
 
   /**

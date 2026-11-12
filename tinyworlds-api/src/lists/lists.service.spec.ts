@@ -263,4 +263,36 @@ describe('ListsService', () => {
       );
     });
   });
+
+  it('describes a list that can be joined, and nothing else', async () => {
+    const s = setup();
+    s.prisma.seedCity({ slug: 'paris', name: 'Paris', status: 'BUILT' });
+    s.prisma.seedCity({ slug: 'secret', name: 'Secret', hidden: true });
+    expect(await s.service.describe('lisbon')).toEqual({
+      kind: 'city',
+      name: 'Lisbon',
+    });
+    expect(await s.service.describe('*')).toEqual({ kind: 'new' });
+    expect(await s.service.describe('')).toEqual({ kind: 'new' });
+    for (const raw of ['paris', 'secret', 'nowhere'])
+      expect(await s.service.describe(raw)).toBeNull();
+  });
+
+  it('joinAfterSignIn joins, skips what describe refuses, and never throws', async () => {
+    const s = setup();
+    s.prisma.seedCity({ slug: 'paris', name: 'Paris', status: 'BUILT' });
+    await s.service.joinAfterSignIn(DORA, 'lisbon', 'pt-BR');
+    await s.service.joinAfterSignIn(DORA, 'paris', 'en-US');
+    await s.service.joinAfterSignIn(DORA, 'nowhere', 'en-US');
+    expect(s.prisma.listMembers).toHaveLength(1);
+    expect(s.prisma.listMembers[0]).toMatchObject({
+      donorId: DORA,
+      cityId: s.lisbon.id,
+      locale: 'pt-BR',
+    });
+    vi.spyOn(s.service, 'join').mockRejectedValue(new Error('down'));
+    await expect(
+      s.service.joinAfterSignIn(EVA, '*', 'en-US'),
+    ).resolves.toBeUndefined();
+  });
 });

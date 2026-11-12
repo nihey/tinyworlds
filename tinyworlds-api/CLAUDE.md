@@ -349,7 +349,12 @@ each, and each gets its own links.
    page a donor asked from). The mail goes out after the answer (`setImmediate`), so neither
    the answer nor its timing tells an admin's address from any other (nor, since anyone may
    sign in as one, says who has given). One link
-   a minute per account (`LINK_EVERY_MS`), five requests a minute per address.
+   a minute per account (`LINK_EVERY_MS`), five requests a minute per address. A donor's request
+   may carry `list` (a city's slug, or `*` for new cities): kept on the link
+   (`join_list`, `join_locale`) only if `ListsService.describe` knows it (a built, hidden or
+   unknown city is dropped, the mail is then a plain sign-in; admins' links ignore it), and
+   the mail then says which list. Opening the link or typing its code, whichever device, joins
+   it (`joinAfterSignIn`, awaited before the session is answered, never failing the sign-in).
 2. The mail carries the link and a **6-digit code** (`CODE_DIGITS`; in the subject, `482 913`).
    The token is 32 random bytes; only its SHA-256 is stored (`magic_links`). The code is never
    stored either: only `HMAC-SHA256(JWT_SECRET, tokenHash:code)` (`hashCode`), compared with

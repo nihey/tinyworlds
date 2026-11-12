@@ -43,7 +43,13 @@ export class AuthController {
     const target = this.auth.linkTarget(body.returnUrl);
     setImmediate(() => {
       this.auth
-        .sendLink(body.email, target, body.locale ?? 'en-US', body.purpose)
+        .sendLink(
+          body.email,
+          target,
+          body.locale ?? 'en-US',
+          body.purpose,
+          body.list,
+        )
         .catch((error: unknown) =>
           this.logger.error(
             `A sign-in link could not be made: ${failureOf(error)}`,

@@ -88,6 +88,34 @@ const OPENINGS: Record<
   },
 };
 
+/** A donor's mail that also puts them on a list: `{city}` is the city's name. */
+const JOINING: Record<
+  Locale,
+  { label: string; city: string; fresh: string; button: string }
+> = {
+  'en-US': {
+    label: 'Confirm your email',
+    city: "One step and you're on the list for {city}.",
+    fresh: "One step and you'll hear about new cities.",
+    button: 'Confirm and join',
+  },
+  'pt-BR': {
+    label: 'Confirmar e-mail',
+    city: 'Você está a um passo da lista de {city}.',
+    fresh: 'Você está a um passo de saber das novas cidades.',
+    button: 'Confirmar e entrar',
+  },
+  'es-ES': {
+    label: 'Confirmar correo',
+    city: 'Estás a un paso de la lista de {city}.',
+    fresh: 'Estás a un paso de enterarte de las nuevas ciudades.',
+    button: 'Confirmar y apuntarme',
+  },
+};
+
+/** The list a donor's mail joins them to, once the link or the code is used. */
+export type SignInList = { kind: 'new' } | { kind: 'city'; name: string };
+
 export interface SignInMailFacts {
   /** The language it was asked in. */
   locale: Locale;
@@ -101,6 +129,8 @@ export interface SignInMailFacts {
   purpose: Purpose;
   /** The site's origin (SITE_URL), for the wordmark. */
   site: string;
+  /** A donor's mail only: the list it joins them to, which changes its opening, not its subject. */
+  list?: SignInList;
 }
 
 /**
@@ -110,6 +140,15 @@ export interface SignInMailFacts {
 export function signInMail(facts: SignInMailFacts): Omit<Mail, 'to'> {
   const { locale, link, site } = facts;
   const words = { ...WORDS[locale], ...OPENINGS[facts.purpose][locale] };
+  if (facts.purpose === 'donor' && facts.list) {
+    const joining = JOINING[locale];
+    words.label = joining.label;
+    words.button = joining.button;
+    words.heading =
+      facts.list.kind === 'city'
+        ? fill(joining.city, { city: facts.list.name })
+        : joining.fresh;
+  }
   const once = fill(words.once, { minutes: facts.minutes });
   const shown = formatCode(facts.code);
   const subject = fill(words.subject, { code: shown });
