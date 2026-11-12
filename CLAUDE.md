@@ -95,9 +95,17 @@ Each sub-project has its own `CLAUDE.md`.
   under "Our Benefactors": down both sides of the page where the screen has room, as a strip
   under the figures where it has not; a named donor once, with what they are named for and
   their links, every unnamed gift as "Anonymous" with what it gave and where.
-- **The hall of fame** (`/hall-of-fame/`, part of the front page's build): everyone who gave,
-  with their links, then the cities, each leading to **a hall of its own**
-  (`/hall-of-fame/<city's slug>/`): its foundation, its founders and its benefactors as cards.
+- **Cities brought by their benefactors are praised.** A city that is on the map because its
+  gifts met its goal (built, with `raisedCents` at least `goalCents`; one built by hand before
+  anyone gave is not) carries a gold plaque: "Brought to you by 2 benefactors, who donated
+  $35", how many people gave to it (`benefactorCount`: a donor once, however many gifts) and
+  what they gave. It is on its card on the front page (with a gold bar along the card's top,
+  leading to its hall of fame), in the hall's gallery and on the city's own hall.
+- **The hall of fame** (`/hall-of-fame/`, part of the front page's build): what everyone gave
+  in three figures, the cities their benefactors brought to the map (each with its picture and
+  plaque), everyone who gave, ranked, with their links, then the other cities; each city leads
+  to **a hall of its own** (`/hall-of-fame/<city's slug>/`): its picture, its foundation, its
+  founders and its benefactors as cards.
   Unlike `/me/` and `/admin/` these pages are for search engines too. **The links say
   `dofollow`**, never `nofollow` or `sponsored`, and the benefactors are told so, which is why the
   pages are **baked** with what the API says when the front page is built (the names and the
@@ -338,7 +346,7 @@ GraphQL at `/api/graphql` (same origin in production):
 
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
-type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! status: CityStatus! worldId: String }
+type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! benefactorCount: Int! status: CityStatus! worldId: String }
 type BenefactorLink { url: String!  title: String!  description: String  icon: String  image: String }
 type WallCity { slug: String!  name: String!  worldId: String }
 type WallBenefactor { name: String  amountCents: Int!  cities: [WallCity!]!  links: [BenefactorLink!]!  lastGiftAt: DateTime! }
@@ -392,7 +400,9 @@ most picked; `answers` is everyone who answered the building. `level` is the gam
 (each offers other wrong answers): answers are kept and tallied per level, `HARD` when absent. `benefactorName` (1 to 40 characters, cleaned by the API) asks to be named on the
 city's benefactors for this gift; without it the gift is counted and not listed. A founder's
 and a benefactor's row of `cityBenefactors` carries `links: [BenefactorLink!]!` too (none on an
-unnamed row). A link's `icon` and `image` are paths on the API's own host
+unnamed row). `benefactorCount`, on a milestone and on `cityBenefactors`, is how many people
+gave to the city in dollars: a donor once, however many gifts, and a gift that came without an
+address as one; `donations` counts the gifts. A link's `icon` and `image` are paths on the API's own host
 (`/api/link-images/<id>`, WebP, kept for good by a browser); `image` is null on the public
 lists until the donor has given US$10 in all. REST: `GET /api/link-images/<id>`, `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
 `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
