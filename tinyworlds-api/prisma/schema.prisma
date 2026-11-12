@@ -82,6 +82,9 @@ model Donor {
   nameHidden  Boolean     @default(false) @map("name_hidden")
   /// An admin took the donor's links off every list; the name stays.
   linksHidden Boolean     @default(false) @map("links_hidden")
+  /// When the donor was mailed that they are in the hall of fame (src/benefactors/hall-cli.ts);
+  /// null until then. Set once, by the run that sends: a second run mails them nothing.
+  hallMailedAt DateTime?  @map("hall_mailed_at")
   lastLoginAt DateTime?   @map("last_login_at")
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")

@@ -7,6 +7,7 @@ import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 import { AnnounceService } from '../src/benefactors/announce.service.js';
 import { BenefactorsService } from '../src/benefactors/benefactors.service.js';
+import { announceHall, hallLetters } from '../src/benefactors/hall-announce.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
@@ -2269,6 +2270,184 @@ describe('the API over HTTP', () => {
         expect(answer(res).errors?.[0].extensions.code).toBe('BAD_REQUEST');
       }
       expect(await prisma.quizAnswer.count()).toBe(0);
+    });
+  });
+
+  describe('telling donors they are in the hall of fame', () => {
+    const SITE = 'https://example.com';
+    const gift = (
+      id: string,
+      amount: number,
+      email: string | null,
+      locale: string,
+      name?: string,
+      city = 'Lisbon',
+      currency = 'usd',
+    ) =>
+      webhook({
+        id,
+        amount,
+        email,
+        currency,
+        metadata: {
+          app: 'tinyworlds',
+          world: 'tinynyc',
+          locale,
+          ...(city ? { city } : {}),
+          ...(name ? { benefactor_name: name } : {}),
+        },
+      }).expect(200);
+    /** The mails of this test so far. */
+    let start = 0;
+    beforeEach(() => {
+      start = mailer.sent.length;
+    });
+    afterEach(() => {
+      mailer.failWith = null;
+    });
+    /** The hall of fame mails this test sent: the ones that lead there. */
+    const hallMails = () =>
+      mailer.sent
+        .slice(start)
+        .filter((mail) => mail.html.includes(`${SITE}/hall-of-fame/`));
+    /** Ana, named in Lisbon and unnamed in Porto; Bo, unnamed; a gift with no address. */
+    const give = async () => {
+      const before = mailer.sent.length;
+      await gift('cs_h1', 1200, 'ana@example.com', 'en-US', 'Ana');
+      await gift('cs_h2', 800, 'ana@example.com', 'pt-BR', undefined, 'Porto');
+      await gift('cs_h3', 500, 'bo@example.com', 'es-ES');
+      await gift('cs_h4', 700, null, 'en-US');
+      // their thank-yous go out on their own: wait for them, so they are not counted later
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 3));
+      start = mailer.sent.length;
+    };
+    const told = async () =>
+      (
+        await prisma.donor.findMany({
+          where: { hallMailedAt: { not: null } },
+          select: { email: true },
+          orderBy: { email: 'asc' },
+        })
+      ).map((donor) => donor.email);
+
+    it('says who would be told, and sends nothing', async () => {
+      await give();
+      const letters = await hallLetters(prisma, SITE);
+      expect(
+        letters.map(({ locale, cities, named, mail }) => ({
+          to: mail.to,
+          locale,
+          cities,
+          named,
+        })),
+      ).toEqual([
+        // the language of her latest gift; named in one of her two cities
+        { to: 'ana@example.com', locale: 'pt-BR', cities: 2, named: true },
+        { to: 'bo@example.com', locale: 'es-ES', cities: 1, named: false },
+      ]);
+      expect(hallMails()).toEqual([]);
+      expect(await told()).toEqual([]);
+    });
+
+    it('mails each donor once, with their cities and how they show in each', async () => {
+      await give();
+      const run = await announceHall(prisma, mailer, SITE);
+      expect(run).toMatchObject({ letters: 2, failed: [], unsent: [] });
+      expect(run.sent).toHaveLength(2);
+
+      const [ana, bo] = hallMails();
+      expect(ana.to).toBe('ana@example.com');
+      expect(ana.subject).toBe('Você está no Hall da Fama do tinyworlds');
+      // the city she gave most to first; named in one, not in the other
+      expect(ana.text).toContain(
+        `Lisbon como Ana: ${SITE}/hall-of-fame/lisbon/\n\nPorto como “Anônimo”: ${SITE}/hall-of-fame/porto/`,
+      );
+      // US$20 in all: her links show their pictures
+      // (the sum is written the Brazilian way, with a space that does not break)
+      expect(ana.text).toMatch(/Você doou US\$\s10 ou mais/);
+      expect(bo.to).toBe('bo@example.com');
+      expect(bo.subject).toBe('Estás en el Salón de la Fama de Lisbon');
+      expect(bo.text).toContain('Lisbon como «Anónimo»');
+      expect(bo.text).toMatch(/Hasta ahora has donado 5\sUS\$/);
+      // each mail is about its own donor only
+      expect(ana.text).not.toContain('bo@');
+      expect(bo.html).not.toContain('Ana');
+      expect(await told()).toEqual(['ana@example.com', 'bo@example.com']);
+
+      // a second run tells nobody again
+      const again = await announceHall(prisma, mailer, SITE);
+      expect(again).toMatchObject({ letters: 0, sent: [] });
+      expect(hallMails()).toHaveLength(2);
+
+      // someone who gives later is told by the next run, and only them
+      const before = mailer.sent.length;
+      await gift('cs_h5', 300, 'cy@example.com', 'en-US', 'Cy');
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+      const later = await announceHall(prisma, mailer, SITE);
+      expect(later.sent).toHaveLength(1);
+      expect(hallMails().at(-1)).toMatchObject({
+        to: 'cy@example.com',
+        subject: "You're in Lisbon's Hall of Fame",
+      });
+    });
+
+    it('tells nobody who is in no hall: a hidden city, another currency, no city', async () => {
+      const before = mailer.sent.length;
+      await gift('cs_x1', 900, 'hid@example.com', 'en-US', 'Hid', 'Nowhere');
+      await prisma.city.update({
+        where: { slug: 'nowhere' },
+        data: { hidden: true },
+      });
+      await gift(
+        'cs_x2',
+        5000,
+        'eur@example.com',
+        'en-US',
+        'Eva',
+        'Lisbon',
+        'eur',
+      );
+      await gift('cs_x3', 400, 'pro@example.com', 'en-US', undefined, '');
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 3));
+      expect(await hallLetters(prisma, SITE)).toEqual([]);
+      const run = await announceHall(prisma, mailer, SITE);
+      expect(run).toEqual({ letters: 0, sent: [], failed: [], unsent: [] });
+    });
+
+    it('gives a donor back when their mail fails, so the next run tries again', async () => {
+      await give();
+      const lines: string[] = [];
+      mailer.failWith = new Error('550 mailbox unavailable');
+      const run = await announceHall(prisma, mailer, SITE, (line) =>
+        lines.push(line),
+      );
+      expect(run.sent).toEqual([]);
+      expect(run.failed).toHaveLength(2);
+      expect(run.unsent).toEqual([]);
+      expect(await told()).toEqual([]);
+      // the failures are told by donor id, never by address
+      expect(lines).toHaveLength(2);
+      expect(lines.join('\n')).not.toContain('@');
+
+      mailer.failWith = null;
+      const again = await announceHall(prisma, mailer, SITE);
+      expect(again.sent).toHaveLength(2);
+      expect(hallMails()).toHaveLength(2);
+    });
+
+    it('stops at the first failure when the mail server is away', async () => {
+      await give();
+      mailer.failWith = Object.assign(new Error('connect ECONNREFUSED'), {
+        code: 'ECONNECTION',
+      });
+      const tries = mailer.attempts;
+      const run = await announceHall(prisma, mailer, SITE);
+      expect(run.sent).toEqual([]);
+      expect(run.failed).toHaveLength(1);
+      expect(run.unsent).toHaveLength(1);
+      // the second donor was never tried
+      expect(mailer.attempts).toBe(tries + 1);
+      expect(await told()).toEqual([]);
     });
   });
 

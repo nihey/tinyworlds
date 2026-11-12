@@ -125,6 +125,11 @@ export const paragraph = (content: Markup, muted = false): string =>
     ? `<p style="margin:0 0 10px;font:12.5px/1.5 ${FONT};color:${COLORS.dim};">${content.html}</p>`
     : `<p style="margin:0 0 12px;font:14px/1.55 ${FONT};color:${COLORS.ink};">${content.html}</p>`;
 
+/** A link inside a paragraph: bold and underlined, in the card's ink. */
+export const link = (label: string, href: string): Markup => ({
+  html: `<a href="${attr(href)}" style="color:${COLORS.ink};font-weight:700;text-decoration:underline;">${escapeHtml(label)}</a>`,
+});
+
 export interface Button {
   label: string;
   href: string;
