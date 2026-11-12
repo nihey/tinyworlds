@@ -31,4 +31,9 @@ export class CityMilestone {
     description: 'The id of its map once it is built, e.g. "tinynyc"',
   })
   worldId: string | null;
+
+  @Field(() => Int, {
+    description: 'How many people are waiting to hear when it is built',
+  })
+  waiting: number;
 }

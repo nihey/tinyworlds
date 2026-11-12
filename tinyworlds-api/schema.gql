@@ -131,6 +131,9 @@ type CityMilestone {
   slug: String!
   status: CityStatus!
 
+  """How many people are waiting to hear when it is built"""
+  waiting: Int!
+
   """
   The id of its map once it is built, e.g. "tinynyc"
   """
@@ -145,6 +148,12 @@ enum CityStatus {
   BUILT
   FUNDED
   PROPOSED
+}
+
+type CityWaiting {
+  name: String!
+  slug: String!
+  waiting: Int!
 }
 
 input CreateDonationCheckoutInput {
@@ -348,9 +357,42 @@ type FunnelWorld {
   world: String
 }
 
+input LeaveListWithTokenInput {
+  """Leave every list, not only the one the link is for"""
+  all: Boolean
+  token: String!
+}
+
 """One of the donor's own links, by its id"""
 input LinkIdInput {
   id: ID!
+}
+
+"""A city whose list the donor is on"""
+type ListCity {
+  goalCents: Int!
+  name: String!
+  raisedCents: Int!
+  slug: String!
+  status: CityStatus!
+
+  """How many people are on its list"""
+  waiting: Int!
+}
+
+"""How many people are on each list"""
+type ListCounts {
+  """Most waited for first"""
+  cities: [CityWaiting!]!
+  newCities: Int!
+}
+
+input ListInput {
+  """The city, by its slug; omitted: every new city"""
+  city: String
+
+  """The language of the mails (joining only); default en-US"""
+  locale: String
 }
 
 type Mutation {
@@ -368,6 +410,17 @@ type Mutation {
   Starts a donation at Stripe and answers the page to send the donor to. The amount is the one given, from US$1; without one it is chosen on Stripe's page.
   """
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
+
+  """Joins a list to hear when a city is built (once)"""
+  joinList(input: ListInput!): MyLists!
+
+  """Leaves a list"""
+  leaveList(input: ListInput!): MyLists!
+
+  """
+  Leaves the list a mail's link is for (or all of them). True for any link of ours, even used twice; false for one that is not.
+  """
+  leaveListWithToken(input: LeaveListWithTokenInput!): Boolean!
 
   """Reads the page of one of the donor's links again"""
   refreshLink(input: LinkIdInput!): MyLink!
@@ -472,6 +525,19 @@ type MyLinks {
   picturesFromCents: Int!
 }
 
+"""The lists a donor is on"""
+type MyLists {
+  cities: [ListCity!]!
+
+  """
+  Slugs of the unbuilt cities the donor gave to: they are told without a list
+  """
+  donated: [String!]!
+
+  """On the list of every new city"""
+  newCities: Boolean!
+}
+
 type Query {
   """Donors with a name and a listed gift, newest gift first (at most 100)"""
   benefactorNames: [BenefactorName!]!
@@ -499,6 +565,9 @@ type Query {
   """Liveness check for the app"""
   health: String!
 
+  """How many are on each list"""
+  listCounts: ListCounts!
+
   """The admin this session belongs to"""
   me: Admin!
 
@@ -507,6 +576,9 @@ type Query {
 
   """The signed-in donor's links, and what decides what shows"""
   myLinks: MyLinks!
+
+  """The lists the signed-in donor is on"""
+  myLists: MyLists!
 
   """Seconds since this API process started"""
   uptime: Int!

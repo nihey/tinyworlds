@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module.js';
 import { AnnounceService } from '../src/benefactors/announce.service.js';
 import { BenefactorsService } from '../src/benefactors/benefactors.service.js';
 import { announceHall, hallLetters } from '../src/benefactors/hall-announce.js';
+import { ListsService } from '../src/lists/lists.service.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
@@ -134,7 +135,7 @@ describe('the API over HTTP', () => {
     // not the admins: the session made by the first sign-in serves every test after it. Links
     // go with the donors they may belong to (and so a test may ask for a fresh one)
     await prisma.$executeRawUnsafe(
-      'TRUNCATE donations, donors, cities, funnel_events, magic_links, quiz_answers, donor_links, link_images',
+      'TRUNCATE donations, donors, cities, funnel_events, magic_links, quiz_answers, donor_links, link_images, list_members, list_notices',
     );
     reader.reset();
     stripe.calls = [];
@@ -772,6 +773,171 @@ describe('the API over HTTP', () => {
       }
       expect(refusals[0].status).toBe(401);
       expect(refusals[1]).toEqual(refusals[0]);
+    });
+  });
+
+  describe('lists to hear when a city is built', () => {
+    const MY_LISTS =
+      '{ myLists { newCities donated cities { slug name status raisedCents goalCents waiting } } }';
+    const JOIN =
+      'mutation ($input: ListInput!) { joinList(input: $input) { newCities cities { slug waiting } } }';
+    const LEAVE =
+      'mutation ($input: ListInput!) { leaveList(input: $input) { newCities cities { slug waiting } } }';
+    const LEAVE_TOKEN =
+      'mutation ($input: LeaveListWithTokenInput!) { leaveListWithToken(input: $input) }';
+    const LIST_COUNTS =
+      '{ listCounts { newCities cities { slug name waiting } } }';
+    const WAITING = '{ cityMilestones { slug waiting } }';
+    let ip = 130;
+
+    /** A donor's session, signed in the way a person does. */
+    const signInDonor = async (email: string) => {
+      const from = `203.0.113.${ip++}`;
+      const before = mailer.signIns().length;
+      await post('/api/auth/magic-link', {
+        email,
+        returnUrl: 'https://example.com/',
+        purpose: 'donor',
+      })
+        .set('x-forwarded-for', from)
+        .expect(202);
+      await vi.waitFor(() => expect(mailer.signIns()).toHaveLength(before + 1));
+      const res = await post('/api/auth/verify', { token: mailer.token() })
+        .set('x-forwarded-for', from)
+        .expect(200);
+      return res.body as { accessToken: string; donor: { id: string } };
+    };
+    const asDonor = (
+      token: string,
+      query: string,
+      variables?: Record<string, unknown>,
+    ) =>
+      graphql(query, variables)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+    it('a donor joins, sees, and leaves a list over GraphQL', async () => {
+      await prisma.city.create({
+        data: { slug: 'lisbon', name: 'Lisbon', goalCents: 3000 },
+      });
+      const { accessToken: token, donor } =
+        await signInDonor('lia@example.com');
+      const lisbon = { input: { city: 'lisbon' } };
+
+      await asDonor(token, JOIN, lisbon);
+      const twice = answer(await asDonor(token, JOIN, lisbon)) as unknown as {
+        data: { joinList: { cities: { slug: string; waiting: number }[] } };
+      };
+      expect(twice.data.joinList.cities).toEqual([
+        { slug: 'lisbon', waiting: 1 },
+      ]);
+      // twice is once: the database's own unique index says so
+      expect(await prisma.listMember.count()).toBe(1);
+      await asDonor(token, JOIN, { input: {} });
+      expect(await prisma.listMember.count()).toBe(2);
+
+      const mine = (await asDonor(token, MY_LISTS)).body as {
+        data: { myLists: Record<string, unknown> };
+      };
+      expect(mine.data.myLists).toEqual({
+        newCities: true,
+        donated: [],
+        cities: [
+          {
+            slug: 'lisbon',
+            name: 'Lisbon',
+            status: 'PROPOSED',
+            raisedCents: 0,
+            goalCents: 3000,
+            waiting: 1,
+          },
+        ],
+      });
+
+      // a built city has no list to join
+      await prisma.city.create({
+        data: {
+          slug: 'paris',
+          name: 'Paris',
+          goalCents: 3000,
+          status: 'BUILT',
+        },
+      });
+      const refused = await asDonor(token, JOIN, { input: { city: 'paris' } });
+      expect(answer(refused).errors?.[0].extensions.code).toBe('BAD_REQUEST');
+
+      // a leave link signed for the list works, twice, and one made up does not
+      const lisbonId = (
+        await prisma.city.findUniqueOrThrow({ where: { slug: 'lisbon' } })
+      ).id;
+      const signed = app
+        .get(ListsService)
+        .leaveUrls(donor.id, lisbonId)
+        .leaveUrl.split('#t=')[1];
+      for (let i = 0; i < 2; i++) {
+        const left = await graphql(LEAVE_TOKEN, { input: { token: signed } });
+        expect(
+          (left.body as { data: { leaveListWithToken: boolean } }).data
+            .leaveListWithToken,
+        ).toBe(true);
+      }
+      expect(await prisma.listMember.count()).toBe(1);
+      const forged = await graphql(LEAVE_TOKEN, {
+        input: { token: `${donor.id}.*.AAAA`, all: true },
+      });
+      expect(
+        (forged.body as { data: { leaveListWithToken: boolean } }).data
+          .leaveListWithToken,
+      ).toBe(false);
+      expect(await prisma.listMember.count()).toBe(1);
+
+      await asDonor(token, JOIN, lisbon);
+      await asDonor(token, LEAVE, lisbon);
+      await asDonor(token, LEAVE, { input: { city: '*' } });
+      expect(await prisma.listMember.count()).toBe(0);
+
+      // the admin sees the counts
+      await asDonor(token, JOIN, lisbon);
+      const counts = (await asAdmin(LIST_COUNTS)).body as {
+        data: { listCounts: unknown };
+      };
+      expect(counts.data.listCounts).toEqual({
+        newCities: 0,
+        cities: [{ slug: 'lisbon', name: 'Lisbon', waiting: 1 }],
+      });
+      const asDonorCounts = await asDonor(token, LIST_COUNTS);
+      expect(answer(asDonorCounts).errors?.[0].extensions.code).toBe(
+        'FORBIDDEN',
+      );
+    });
+
+    it("an admin's session is FORBIDDEN on joinList", async () => {
+      const joined = await asAdmin(JOIN, { input: {} });
+      expect(answer(joined).errors?.[0].extensions.code).toBe('FORBIDDEN');
+      const anon = await graphql(JOIN, { input: {} }).expect(200);
+      expect(answer(anon).errors?.[0].extensions.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('anyone gets cityMilestones with waiting', async () => {
+      const lisbon = await prisma.city.create({
+        data: { slug: 'lisbon', name: 'Lisbon', goalCents: 3000 },
+      });
+      await prisma.city.create({
+        data: { slug: 'rome', name: 'Rome', goalCents: 3000 },
+      });
+      const donor = await prisma.donor.create({
+        data: { email: 'mia@example.com' },
+      });
+      await prisma.listMember.create({
+        data: { donorId: donor.id, cityId: lisbon.id, locale: 'en-US' },
+      });
+      const res = await graphql(WAITING).expect(200);
+      expect(
+        (res.body as { data: { cityMilestones: unknown } }).data.cityMilestones,
+      ).toEqual([
+        { slug: 'lisbon', waiting: 1 },
+        { slug: 'rome', waiting: 0 },
+      ]);
     });
   });
 

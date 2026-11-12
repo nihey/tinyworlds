@@ -1,4 +1,12 @@
-import { inMilestoneOrder, type MilestoneRow } from './cities.service.js';
+import type { ConfigService } from '@nestjs/config';
+import { FakePrisma } from '../../test/fake-prisma.js';
+import type { Env } from '../config/env.js';
+import { ListsService } from '../lists/lists.service.js';
+import {
+  CitiesService,
+  inMilestoneOrder,
+  type MilestoneRow,
+} from './cities.service.js';
 
 const row = (over: Partial<MilestoneRow> & { name: string }): MilestoneRow => ({
   id: `id-${over.name}`,
@@ -51,6 +59,41 @@ describe('inMilestoneOrder', () => {
       donations: 3,
       status: 'PROPOSED',
       worldId: null,
+      waiting: 0,
     });
+  });
+});
+
+describe('CitiesService.milestones', () => {
+  it("carries each city's waiting, 0 without anyone", async () => {
+    const prisma = new FakePrisma();
+    const lisbon = prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
+    prisma.seedCity({ slug: 'rome', name: 'Rome' });
+    const donor = 'd0000000-0000-4000-8000-000000000001';
+    prisma.listMembers.push({
+      id: 'm1',
+      donorId: donor,
+      cityId: lisbon.id,
+      locale: 'en-US',
+      createdAt: new Date(),
+    });
+    prisma.listMembers.push({
+      id: 'm2',
+      donorId: donor,
+      cityId: null,
+      locale: 'en-US',
+      createdAt: new Date(),
+    });
+    const lists = new ListsService(prisma.asService(), {
+      get: () => 'x',
+    } as unknown as ConfigService<Env, true>);
+    const cities = await new CitiesService(
+      prisma.asService(),
+      lists,
+    ).milestones();
+    expect(cities.map((c) => [c.slug, c.waiting])).toEqual([
+      ['lisbon', 1],
+      ['rome', 0],
+    ]);
   });
 });

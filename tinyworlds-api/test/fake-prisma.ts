@@ -239,7 +239,12 @@ export class FakePrisma {
     },
     findMany: (
       args: {
-        where?: { hidden?: boolean; worldId?: { not: null } };
+        where?: {
+          hidden?: boolean;
+          worldId?: { not: null };
+          slug?: string;
+          id?: { in: string[] };
+        };
       } = {},
     ): Promise<CityRow[]> =>
       Promise.resolve(
@@ -248,6 +253,9 @@ export class FakePrisma {
             (c) =>
               (args.where?.hidden === undefined ||
                 c.hidden === args.where.hidden) &&
+              (args.where?.slug === undefined || c.slug === args.where.slug) &&
+              (args.where?.id === undefined ||
+                args.where.id.in.includes(c.id)) &&
               (args.where?.worldId === undefined || c.worldId !== null),
           )
           .map((c) => ({ ...c })),
