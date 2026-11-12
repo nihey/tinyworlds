@@ -31,6 +31,8 @@
     "cities:announce:dev": "tsx src/benefactors/announce-cli.ts",
     "hall:announce": "node dist/benefactors/hall-cli.js",
     "hall:announce:dev": "tsx src/benefactors/hall-cli.ts",
+    "owner:note": "node dist/benefactors/note-cli.js",
+    "owner:note:dev": "tsx src/benefactors/note-cli.ts",
     "funnel:import": "tsx prisma/import-funnel.ts",
     "webhook:send": "node scripts/send-webhook.mjs"
   },

@@ -10,6 +10,8 @@ export interface Mail {
   subject: string;
   text: string;
   html: string;
+  /** Who it is from, when that is not the site (MAIL_FROM): the owner's own note. */
+  from?: string;
 }
 
 /** What the API needs of a mail server; tests replace it. */
@@ -76,15 +78,38 @@ export type MailEnv = Pick<
   | 'MAIL_FROM'
 >;
 
+/** How a mail server is reached. */
+interface ServerOptions {
+  host: string;
+  port: number;
+  secure: boolean;
+  auth?: { user: string; pass: string };
+  connectionTimeout: number;
+  greetingTimeout: number;
+  socketTimeout: number;
+}
+
+/** What the mailer asks of a connection to a mail server; tests hand it one of their own. */
+export interface Transport {
+  sendMail(mail: Mail & { from: string }): Promise<unknown>;
+}
+
+const connectSmtp = (options: ServerOptions): Transport =>
+  createTransport(options);
+
 /**
  * The mail server the environment names, or the log when it names none. Used by the app (as
- * MAILER) and by the commands that send mail outside it (announce-cli.ts).
+ * MAILER) and by the commands that send mail outside it (announce-cli.ts). A mail goes out
+ * from the site (MAIL_FROM) unless it says itself who it is from.
  */
-export function createMailer(env: MailEnv): Mailer {
+export function createMailer(
+  env: MailEnv,
+  connect: (options: ServerOptions) => Transport = connectSmtp,
+): Mailer {
   const { SMTP_HOST: host, MAIL_FROM: from, SMTP_PORT: port } = env;
   if (!host || !from) return new LogMailer(env.NODE_ENV === 'production');
   const user = env.SMTP_USER;
-  const transport = createTransport({
+  const transport = connect({
     host,
     port,
     // 465 speaks TLS from the first byte; the others start plain and upgrade (STARTTLS)
@@ -96,7 +121,7 @@ export function createMailer(env: MailEnv): Mailer {
   });
   return {
     send: async (mail) => {
-      await transport.sendMail({ from, ...mail });
+      await transport.sendMail({ ...mail, from: mail.from ?? from });
     },
   };
 }
