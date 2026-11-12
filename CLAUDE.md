@@ -102,10 +102,14 @@ Each sub-project has its own `CLAUDE.md`.
   the front page again, so what is baked is at most a day old. A city named since the build
   has no page yet: the web server sends its address to `/hall-of-fame/?city=<slug>`, which
   shows it all the same.
-- **Donors get two mails, and one more, once.** Every donor in a city's hall of fame is told
-  so by a mail sent by hand, once each (`npm run hall:announce -- --send` in the API's
+- **Donors get two mails, and two more, once each.** Every donor in a city's hall of fame is
+  told so by a mail sent by hand, once each (`npm run hall:announce -- --send` in the API's
   container; without `--send` it only says who would be told): which halls they are in and
-  how they show there, and that they may put links beside their name. Otherwise:
+  how they show there, and that they may put links beside their name. The same donors get
+  **the owner's own note**, once each and by hand the same way (`npm run owner:note --
+  --send`; run again, it reaches those who have given since): a thank-you from the owner, not
+  from the site, with the owner's WhatsApp for whatever a donor wants to say. Who the owner is
+  (name, sender address, number) is the API's environment, never a tracked file. Otherwise:
   once Stripe confirms a gift, the API thanks the donor by mail
   (how much closer their city is, its stones with theirs lit, how many people explore the
   cities, where they are listed); and once a city is built, `deploy/deploy.sh <world>` runs the
