@@ -113,9 +113,10 @@ scripts/    send-webhook.mjs, rybbit-funnel.sql
 ## Contract
 
 Everything is under `/api`, so the site and the API can share a host. GraphQL at
-`POST /api/graphql`; REST for four routes only: `POST /api/stripe/webhook` (Stripe needs the
+`POST /api/graphql`; REST for a few routes only: `POST /api/stripe/webhook` (Stripe needs the
 raw body), signing in, `POST /api/auth/magic-link` and `POST /api/auth/verify`, and
-`GET /api/link-images/:id` (a link's icon or picture, for `<img>`). `schema.gql`
+`GET /api/link-images/:id` (a link's icon or picture, for `<img>`), and
+`POST /api/lists/unsubscribe?t=` (the one-click leave a mail client posts to; always 200). `schema.gql`
 is the generated record of the schema.
 
 ```graphql

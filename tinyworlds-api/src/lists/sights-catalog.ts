@@ -10,6 +10,8 @@ export interface MailSight {
   world: string;
   id: string;
   name: string;
+  /** The city the building is in, filled in by whoever knows it (the catalog reads worlds). */
+  city?: string;
   text: string;
   mapUrl: string;
   picture: { src: string; width: number; height: number } | null;

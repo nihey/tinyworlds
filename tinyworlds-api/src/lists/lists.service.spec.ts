@@ -1,9 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import { FakeMailer } from '../../test/fake-mailer.js';
 import { FakePrisma } from '../../test/fake-prisma.js';
 import type { Env } from '../config/env.js';
 import { leaveToken } from './leave-token.js';
 import { ListsService } from './lists.service.js';
+import type { MailSight, SightsCatalog } from './sights-catalog.js';
 
 const DORA = 'd0000000-0000-4000-8000-000000000001';
 const EVA = 'd0000000-0000-4000-8000-000000000002';
@@ -15,10 +17,32 @@ function setup() {
     get: (key: string) =>
       ({ JWT_SECRET: SECRET, SITE_URL: 'https://example.com' })[key],
   } as unknown as ConfigService<Env, true>;
-  const service = new ListsService(prisma.asService(), config);
+  const mailer = new FakeMailer();
+  const pickAcross = vi.fn(
+    (worlds: string[]): Promise<{ sights: MailSight[]; unread: string[] }> =>
+      Promise.resolve({
+        sights: worlds.map((world) => ({
+          world,
+          id: `${world}-1`,
+          name: `Building of ${world}`,
+          text: 'A famous one.',
+          mapUrl: `https://example.com/${world}/`,
+          picture: null,
+        })),
+        unread: [],
+      }),
+  );
+  const catalog = { pickAcross } as unknown as SightsCatalog;
+  const service = new ListsService(prisma.asService(), config, mailer, catalog);
+  for (const id of [DORA, EVA])
+    prisma.donors.push({
+      id,
+      email: `${id.slice(-1)}@example.com`,
+      displayName: null,
+    });
   const lisbon = prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
   const rome = prisma.seedCity({ slug: 'rome', name: 'Rome' });
-  return { prisma, service, lisbon, rome };
+  return { prisma, service, lisbon, rome, mailer, pickAcross };
 }
 
 const join = (s: ReturnType<typeof setup>, donor: string, slug?: string) =>
@@ -171,5 +195,72 @@ describe('ListsService', () => {
     expect(unsubscribeUrl).toBe(
       `https://example.com/api/lists/unsubscribe?t=${token}`,
     );
+  });
+
+  describe('the welcome mail', () => {
+    it("the first join sends one welcome, after answering, in the join's language", async () => {
+      const s = setup();
+      s.prisma.seedCity({
+        slug: 'paris',
+        name: 'Paris',
+        status: 'BUILT',
+        worldId: 'tinypar',
+      });
+      await s.service.join(DORA, { kind: 'city', slug: 'lisbon' }, 'pt-BR');
+      // answered first: nothing has gone out yet
+      expect(s.mailer.attempts).toBe(0);
+      await vi.waitFor(() => expect(s.mailer.sent).toHaveLength(1));
+      const [mail] = s.mailer.sent;
+      expect(mail.to).toBe('1@example.com');
+      expect(mail.subject).toBe('Você está na lista de Lisbon');
+      expect(mail.headers?.['List-Unsubscribe']).toContain(
+        '/api/lists/unsubscribe?t=',
+      );
+      expect(mail.text).toContain('/lists/leave/#t=');
+      expect(s.pickAcross).toHaveBeenCalledWith(['tinypar'], 'pt-BR', 3);
+      expect(s.prisma.donors[0].welcomedAt).toBeInstanceOf(Date);
+    });
+
+    it('a second join sends none', async () => {
+      const s = setup();
+      await join(s, DORA, 'lisbon');
+      await vi.waitFor(() => expect(s.mailer.sent).toHaveLength(1));
+      await join(s, DORA, 'lisbon');
+      await join(s, DORA, 'rome');
+      await join(s, DORA);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(s.mailer.attempts).toBe(1);
+      expect(s.prisma.listMembers).toHaveLength(3);
+    });
+
+    it('a failed welcome leaves the membership and lets the next join try again', async () => {
+      const s = setup();
+      s.mailer.failWith = new Error('smtp down');
+      await join(s, DORA, 'lisbon');
+      await vi.waitFor(() => expect(s.mailer.attempts).toBe(1));
+      await vi.waitFor(() => expect(s.prisma.donors[0].welcomedAt).toBeNull());
+      expect(s.prisma.listMembers).toHaveLength(1);
+      s.mailer.failWith = null;
+      await join(s, DORA, 'rome');
+      await vi.waitFor(() => expect(s.mailer.sent).toHaveLength(1));
+      expect(s.mailer.sent[0].subject).toBe("You're on the list for Rome");
+    });
+
+    it("the welcome's buildings come from built, shown worlds", async () => {
+      const s = setup();
+      for (const [slug, over] of [
+        ['a', { status: 'BUILT', worldId: 'tinya' }],
+        ['b', { status: 'BUILT', worldId: 'tinyb', hidden: true }],
+        ['c', { status: 'BUILDING', worldId: 'tinyc' }],
+        ['d', { status: 'BUILT', worldId: null }],
+      ] as const)
+        s.prisma.seedCity({ slug, name: slug, ...over });
+      await join(s, DORA);
+      await vi.waitFor(() => expect(s.mailer.sent).toHaveLength(1));
+      expect(s.pickAcross).toHaveBeenCalledWith(['tinya'], 'en-US', 3);
+      expect(s.mailer.sent[0].subject).toBe(
+        "You're on the list for new cities",
+      );
+    });
   });
 });

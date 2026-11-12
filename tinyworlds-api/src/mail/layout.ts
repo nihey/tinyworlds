@@ -64,8 +64,8 @@ export interface ShellOptions {
   hero?: { src: string; alt: string; width: number; height: number };
   /** The card's content. */
   body: string;
-  /** The lines under the card: why the person got the mail. */
-  footer: string[];
+  /** The lines under the card: why the person got the mail (`Markup` for one with a link). */
+  footer: (string | Markup)[];
 }
 
 /** The whole mail: band, card and footer, with the preheader hidden at the top. */
@@ -87,7 +87,9 @@ export function shell(options: ShellOptions): string {
     'width:100%;',
     ' width="100%"',
   );
-  const footer = options.footer.map(escapeHtml).join('<br>');
+  const footer = options.footer
+    .map((line) => (typeof line === 'string' ? escapeHtml(line) : line.html))
+    .join('<br>');
   // padding after the preheader keeps the inbox from showing the start of the body after it
   const filler = '&#847;&zwnj;&nbsp;'.repeat(60);
   return [

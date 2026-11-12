@@ -1,3 +1,5 @@
+import { FakeMailer } from '../../test/fake-mailer.js';
+import type { SightsCatalog } from '../lists/sights-catalog.js';
 import type { ConfigService } from '@nestjs/config';
 import { FakePrisma } from '../../test/fake-prisma.js';
 import type { Env } from '../config/env.js';
@@ -84,9 +86,12 @@ describe('CitiesService.milestones', () => {
       locale: 'en-US',
       createdAt: new Date(),
     });
-    const lists = new ListsService(prisma.asService(), {
-      get: () => 'x',
-    } as unknown as ConfigService<Env, true>);
+    const lists = new ListsService(
+      prisma.asService(),
+      { get: () => 'x' } as unknown as ConfigService<Env, true>,
+      new FakeMailer(),
+      {} as SightsCatalog,
+    );
     const cities = await new CitiesService(
       prisma.asService(),
       lists,

@@ -1,12 +1,21 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { failureOf } from '../auth/auth.service.js';
 import { sessionSecret } from '../auth/session-secret.js';
 import type { Env } from '../config/env.js';
 import type { Locale } from '../donations/locales.js';
 import { CityStatus } from '../generated/prisma/enums.js';
+import { MAILER, type Mailer } from '../mail/mailer.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { type ListKey, NEW_CITIES } from './list-key.js';
 import { leaveToken, readLeaveToken } from './leave-token.js';
+import { SightsCatalog } from './sights-catalog.js';
+import { welcomeMail } from './welcome-mail.js';
 
 export interface ListCityView {
   slug: string;
@@ -28,9 +37,13 @@ const byName = (a: { name: string }, b: { name: string }): number =>
 
 @Injectable()
 export class ListsService {
+  private readonly logger = new Logger(ListsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<Env, true>,
+    @Inject(MAILER) private readonly mailer: Mailer,
+    private readonly catalog: SightsCatalog,
   ) {}
 
   /** The lists a donor is on, and the unbuilt cities they gave to. */
@@ -86,15 +99,18 @@ export class ListsService {
     locale: Locale,
   ): Promise<MyListsView> {
     let cityId: string | null = null;
+    let city: { id: string; name: string; slug: string } | null = null;
     if (key.kind === 'city') {
-      const [city] = await this.prisma.city.findMany({
+      const [found] = await this.prisma.city.findMany({
         where: { slug: key.slug, hidden: false },
-        select: { id: true, status: true },
+        select: { id: true, slug: true, name: true, status: true },
       });
-      if (!city || city.status === CityStatus.BUILT)
+      if (!found || found.status === CityStatus.BUILT)
         throw new BadRequestException('That city has no list to join');
-      cityId = city.id;
+      city = found;
+      cityId = found.id;
     }
+    let isNew = true;
     try {
       await this.prisma.listMember.create({
         data: { donorId, cityId, locale },
@@ -102,8 +118,80 @@ export class ListsService {
     } catch (error) {
       // already on it: the unique index says so
       if ((error as { code?: string }).code !== 'P2002') throw error;
+      isNew = false;
     }
-    return this.mine(donorId);
+    const answer = await this.mine(donorId);
+    // the welcome goes out after the answer, and never holds it up
+    if (isNew) setImmediate(() => void this.welcome(donorId, city, locale));
+    return answer;
+  }
+
+  /**
+   * The welcome mail, once per donor: whoever claims `welcomedAt` sends it. Never throws; a
+   * failure gives the claim back so the next join tries again, and is logged by donor id.
+   */
+  async welcome(
+    donorId: string,
+    city: { id: string; name: string; slug: string } | null,
+    locale: Locale,
+  ): Promise<void> {
+    let claimed = false;
+    try {
+      const donor = await this.prisma.donor.findUnique({
+        where: { id: donorId },
+        select: { email: true, welcomedAt: true },
+      });
+      if (!donor || donor.welcomedAt) return;
+      const claim = await this.prisma.donor.updateMany({
+        where: { id: donorId, welcomedAt: null },
+        data: { welcomedAt: new Date() },
+      });
+      if (claim.count === 0) return;
+      claimed = true;
+      const site = this.config
+        .get('SITE_URL', { infer: true })
+        .replace(/\/+$/, '');
+      const cities = await this.prisma.city.findMany({
+        where: {
+          status: CityStatus.BUILT,
+          hidden: false,
+          worldId: { not: null },
+        },
+        select: { name: true, worldId: true },
+      });
+      const names = new Map<string, string>();
+      for (const c of cities) if (c.worldId) names.set(c.worldId, c.name);
+      const { sights } = await this.catalog.pickAcross(
+        [...names.keys()].sort(),
+        locale,
+        3,
+      );
+      const { leaveUrl, unsubscribeUrl } = this.leaveUrls(
+        donorId,
+        city ? city.id : NEW_CITIES,
+      );
+      await this.mailer.send({
+        to: donor.email,
+        ...welcomeMail({
+          locale,
+          site,
+          list: city
+            ? { kind: 'city', name: city.name, slug: city.slug }
+            : { kind: 'new' },
+          sights: sights.map((s) => ({ ...s, city: names.get(s.world) })),
+          leaveUrl,
+          unsubscribeUrl,
+        }),
+      });
+    } catch (error) {
+      this.logger.error(
+        `The welcome for donor ${donorId} was not sent: ${failureOf(error)}`,
+      );
+      if (claimed)
+        await this.prisma.donor
+          .update({ where: { id: donorId }, data: { welcomedAt: null } })
+          .catch(() => undefined);
+    }
   }
 
   /** Takes the donor off a list; being off it already is fine. */

@@ -241,6 +241,7 @@ export class FakePrisma {
       args: {
         where?: {
           hidden?: boolean;
+          status?: CityRow['status'];
           worldId?: { not: null };
           slug?: string;
           id?: { in: string[] };
@@ -253,6 +254,8 @@ export class FakePrisma {
             (c) =>
               (args.where?.hidden === undefined ||
                 c.hidden === args.where.hidden) &&
+              (args.where?.status === undefined ||
+                c.status === args.where.status) &&
               (args.where?.slug === undefined || c.slug === args.where.slug) &&
               (args.where?.id === undefined ||
                 args.where.id.in.includes(c.id)) &&
@@ -357,7 +360,11 @@ export class FakePrisma {
     },
     update: (args: {
       where: { id: string };
-      data: { displayName?: string; lastLoginAt?: Date };
+      data: {
+        displayName?: string;
+        lastLoginAt?: Date;
+        welcomedAt?: Date | null;
+      };
     }): Promise<DonorRow> => {
       const row = this.donors.find((d) => d.id === args.where.id);
       if (!row) throw new Error('No such donor');
@@ -365,17 +372,27 @@ export class FakePrisma {
         row.displayName = args.data.displayName;
       if (args.data.lastLoginAt !== undefined)
         row.lastLoginAt = args.data.lastLoginAt;
+      if (args.data.welcomedAt !== undefined)
+        row.welcomedAt = args.data.welcomedAt;
       return Promise.resolve({ ...row });
     },
-    /** The one `where` the webhook asks: set a name only where there is none. */
+    /** The two `where`s the API asks: set a name only where there is none, or claim the welcome. */
     updateMany: (args: {
-      where: { id: string; displayName: null };
-      data: { displayName: string };
+      where: { id: string; displayName?: null; welcomedAt?: null };
+      data: { displayName?: string; welcomedAt?: Date };
     }): Promise<{ count: number }> => {
       const row = this.donors.find(
-        (d) => d.id === args.where.id && d.displayName === null,
+        (d) =>
+          d.id === args.where.id &&
+          (args.where.displayName === undefined || d.displayName === null) &&
+          (args.where.welcomedAt === undefined || !d.welcomedAt),
       );
-      if (row) row.displayName = args.data.displayName;
+      if (row) {
+        if (args.data.displayName !== undefined)
+          row.displayName = args.data.displayName;
+        if (args.data.welcomedAt !== undefined)
+          row.welcomedAt = args.data.welcomedAt;
+      }
       return Promise.resolve({ count: row ? 1 : 0 });
     },
     findUnique: (args: { where: { id: string } }): Promise<DonorRow | null> => {

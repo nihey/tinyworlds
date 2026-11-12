@@ -10,6 +10,8 @@ export interface Mail {
   subject: string;
   text: string;
   html: string;
+  /** Extra headers, such as List-Unsubscribe. */
+  headers?: Record<string, string>;
 }
 
 /** What the API needs of a mail server; tests replace it. */

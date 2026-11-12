@@ -816,6 +816,33 @@ describe('the API over HTTP', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
+    it('POST /api/lists/unsubscribe with a good token leaves the list; with a bad one it answers 200 and changes nothing', async () => {
+      const lisbon = await prisma.city.create({
+        data: { slug: 'lisbon', name: 'Lisbon', goalCents: 3000 },
+      });
+      const { accessToken: token, donor } =
+        await signInDonor('uma@example.com');
+      await asDonor(token, JOIN, { input: { city: 'lisbon' } });
+      await asDonor(token, JOIN, { input: {} });
+      expect(await prisma.listMember.count()).toBe(2);
+      const url = app
+        .get(ListsService)
+        .leaveUrls(donor.id, lisbon.id).unsubscribeUrl;
+      const path = `/api/lists/unsubscribe?${url.split('?')[1]}`;
+      for (let i = 0; i < 2; i++)
+        await post(path, {})
+          .set('x-forwarded-for', '203.0.113.200')
+          .expect(200);
+      expect(await prisma.listMember.count()).toBe(1);
+      await post('/api/lists/unsubscribe?t=nonsense', {})
+        .set('x-forwarded-for', '203.0.113.200')
+        .expect(200);
+      await post('/api/lists/unsubscribe', {})
+        .set('x-forwarded-for', '203.0.113.200')
+        .expect(200);
+      expect(await prisma.listMember.count()).toBe(1);
+    });
+
     it('a donor joins, sees, and leaves a list over GraphQL', async () => {
       await prisma.city.create({
         data: { slug: 'lisbon', name: 'Lisbon', goalCents: 3000 },
