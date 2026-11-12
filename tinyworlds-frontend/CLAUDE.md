@@ -108,7 +108,9 @@ run it after changing the art, and commit what it writes.
 src/
 ├── app/                 # layout (fonts, metadata, theme script, accent), globals.css, and two
 │                        # pages: page.map.tsx (a world) and page.home.tsx (the front page);
-│                        # admin/page.home.tsx: the admin pages, in the front page's build only
+│                        # admin/page.home.tsx: the admin pages, in the front page's build only;
+│                        # hall-of-fame/page.home.tsx and hall-of-fame/[city]/page.home.tsx:
+│                        # the hall of fame and a city's own, likewise
 ├── site.ts              # what this build is (world or front page): id, name, home language,
 │                        # accent, GITHUB_URL, CONTACT_EMAIL, where the worlds and their cards are
 ├── worlds/              # one config per world + index.ts (`WORLDS`, `WORLD`, `IS_HOME`)
@@ -137,6 +139,8 @@ src/
 │                        # or a strip) and drift.tsx (a list that drifts by)
 ├── components/benefactors/ # a city's benefactors (panel, sign, stone grid), the badges' pixel
 │                        # art, and benefactor-link.tsx (one of a benefactor's links)
+├── components/hall/     # the hall of fame: hall-of-fame.tsx (everyone, then the cities),
+│                        # city-hall.tsx (one city's), hall-cards.tsx, hall-frame.tsx
 ├── components/me/       # "Your cities" (/me/): me-app.tsx (signed in or not), me-page.tsx,
 │                        # your-cities.tsx, your-links.tsx, badges.tsx, keep-exploring.tsx,
 │                        # name-editor.tsx
@@ -162,7 +166,9 @@ src/
                          # analytics hear), consent.ts (who is asked before Google's tags
                          # load, and loading them), links.ts (pure: a benefactor's links as
                          # the API says them, what a link may be), wall.ts (everyone who
-                         # gave: the request, its answer, the two sides)
+                         # gave: the request, its answer, the two sides), hall.ts (the hall
+                         # of fame's questions and answers), hall-build.ts (the same, asked
+                         # by the build to bake the pages)
 ```
 
 ## Targets: worlds and the front page
@@ -197,7 +203,8 @@ src/
   cities can still be given to (the funded and the ranked of `rankCities`). A figure takes its
   place when its number arrives and is left out if it never does; the strip is as tall from the
   first paint as it will be with all four, so nothing below it moves.
-- **Everyone who gave to a city is on the front page** (`benefactor-wall.tsx`, with an API;
+- **Everyone who gave to a city is on the front page, as "Our Benefactors"**
+  (`benefactor-wall.tsx`, with an API;
   `useWall` asks `benefactorWall` once, with a plain `fetch`). A plaque each, the largest gifts
   first: a name, the sum in the accent, the cities (each opens that city's benefactors; two
   by name, then "+2 more"), and a named benefactor's links (below). An unnamed gift is
@@ -206,8 +213,12 @@ src/
   - **From 90rem wide** (`WallColumns`): a column fixed down each side of the page, beside its
     64rem column (10.5 to 15.5rem wide, a little into the page's own margin), the wall dealt
     left and right in turn (`wallSides`). A link is a card: its picture, when it has one to
-    show, across the plaque, then icon, title and host.
-  - **Narrower** (`WallStrip`): one row under the figures, every plaque one height (84 px: a
+    show, across the plaque, then icon, title and host. Over the left column, "Our
+    Benefactors"; over the right one, across the page from it, the way to the hall of fame.
+    Both stand level with the page's own links and the plaques begin level with the hero, so
+    the columns read as part of the page.
+  - **Narrower** (`WallStrip`): "Our Benefactors", what the list is and the way to the hall
+    of fame on one line, then one row under the figures, every plaque one height (84 px: a
     name, the sum and cities on one line, the links on one line; the first picture at the
     plaque's side). Its room is there from the first paint, with empty plaques while the list
     is on its way, so the page below does not move; a failed answer leaves the invitation
@@ -496,7 +507,10 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   site's icon, the page's picture). They show under the name in a city's sign (`look="row"`:
   a small picture in the icon's place) and on the front page's plaques (`look="card"`), never
   on an unnamed row (the parsers drop them there, whatever the answer says). A link opens in
-  a new tab with `rel="sponsored nofollow noopener"`: a gift put it there. Icons sit on a
+  a new tab and is a **plain link**, `rel="noopener"` and nothing else (`LINK_REL`): no
+  `nofollow`, no `sponsored`, no `ugc`, because the benefactors are told that search engines
+  follow their links. Do not add one of those back without changing what the mail and the
+  hall of fame say. Icons sit on a
   white tile, since many are dark marks drawn for a light browser tab. **Nothing is loaded
   from a linked site**: `icon` and `image` are paths on the API (`/api/link-images/<id>`),
   `assetUrl` puts the API's origin (`apiOrigin`: `NEXT_PUBLIC_API_URL` may be a path) in
@@ -504,6 +518,46 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   is not shown at all. The picture is there only when the API sends it (the donor has given
   US$10 in all). On `/admin/`, each name comes with its links, pictures and all, and a second
   switch hides the links alone (`setLinksHidden`).
+
+## The hall of fame (`/hall-of-fame/`)
+
+Two routes of the front page's build (`page.home.tsx`, like `/me/` and `/admin/`), for
+everyone, search engines included: no `noindex`, each with its own title, description and
+canonical address.
+
+- **`/hall-of-fame/`** (`components/hall/hall-of-fame.tsx`): "Our Benefactors", everyone on
+  the wall as cards (`PersonCard`: name, sum, the cities, each a link to that city's hall,
+  and their links with pictures), then "City by city": a tile per city someone gave to
+  (`hallCities`: how many are in its hall, where it stands, the first names), each leading to
+  its own page; last, "Fund a city" and what the links are.
+- **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): the city's foundation (the
+  sign's `StoneGrid` and legend), "Become a benefactor" and "Explore" for a built one, then
+  its founders (`FounderCard`: number, badges, stones, sum, links) and its benefactors
+  (`BenefactorCard`), all of them, as cards.
+- **Cards are set in columns** (`CARDS`: one, two, three, each filled from the top), because
+  a card with pictures is several times as tall as one without: a grid of rows leaves holes.
+- **The pages are baked** (`lib/hall-build.ts`): each is an async page that asks the API when
+  the build runs (`hallAtBuild`, `cityAtBuild`; `buildEndpoint`: `NEXT_PUBLIC_API_URL`, on
+  `NEXT_PUBLIC_SITE_URL` when it is a path) and hands what it got to its client component as
+  `initial`, so the names and the links are in the HTML for anything that reads a page
+  without running it. Asked afresh by every build, never kept from the last. Once open, the
+  page asks again (`fetchHall`, `fetchCityHall`, plain `fetch`) and shows what is true now;
+  when the API is away, what was baked stays. **The build never fails for it**: no API, or
+  one that does not answer, is a page with nothing baked in. `deploy.sh release
+--fresh-home` (the daily run) builds the front page again so that what is baked is a day
+  old at most.
+- **Which cities have a page**: `generateStaticParams` makes one for every city the API
+  lists whose slug is plain (a-z, 0-9, "-"); with no API to ask it still makes one
+  (`new-york`), so the route exists. A city with another kind of slug (a name in another
+  script), or named since the build, has none: `hallCityUrl` (`site.ts`) addresses the first
+  as `/hall-of-fame/?city=<slug>` and the web server redirects the second there
+  (`deploy/nginx.conf`); `HallOfFame`, asked for a city that way (`cityAsked`), is that
+  city's hall.
+- **Where it is linked from**: the front page's links across the top and over its
+  benefactors, a city's benefactors sign ("{city}'s Hall of Fame", from a map too:
+  `HALL_URL`), and the mail that tells donors they are in it.
+- `HallFrame` is what both pages stand in: the wordmark home, "Your cities", the language,
+  title and theme, the visit, and the donate sign.
 
 ## "Your cities" (`/me/`)
 

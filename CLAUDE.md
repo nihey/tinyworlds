@@ -88,11 +88,25 @@ Each sub-project has its own `CLAUDE.md`.
   visitor's browser never asks a linked site for anything. The links show wherever the donor's
   name does, never beside an unnamed gift; their pictures show once the donor has given US$10
   in all. Admins see every link on `/admin/` and can hide a donor's links (hiding the name
-  hides them too). The front page lists **everyone who gave to a city** (`benefactorWall`):
-  down both sides of the page where the screen has room, as a strip under the figures where
-  it has not; a named donor once, with what they are named for and their links, every unnamed
-  gift as "Anonymous" with what it gave and where.
-- **Donors get two mails.** Once Stripe confirms a gift, the API thanks the donor by mail
+  hides them too). The front page lists **everyone who gave to a city** (`benefactorWall`),
+  under "Our Benefactors": down both sides of the page where the screen has room, as a strip
+  under the figures where it has not; a named donor once, with what they are named for and
+  their links, every unnamed gift as "Anonymous" with what it gave and where.
+- **The hall of fame** (`/hall-of-fame/`, part of the front page's build): everyone who gave,
+  with their links, then the cities, each leading to **a hall of its own**
+  (`/hall-of-fame/<city's slug>/`): its foundation, its founders and its benefactors as cards.
+  Unlike `/me/` and `/admin/` these pages are for search engines too. **The links are plain
+  links**: no `nofollow`, no `sponsored`, and the benefactors are told so, which is why the
+  pages are **baked** with what the API says when the front page is built (the names and the
+  links are in the HTML itself) and ask the API again once open. The daily deploy run builds
+  the front page again, so what is baked is at most a day old. A city named since the build
+  has no page yet: the web server sends its address to `/hall-of-fame/?city=<slug>`, which
+  shows it all the same.
+- **Donors get two mails, and one more, once.** Every donor in a city's hall of fame is told
+  so by a mail sent by hand, once each (`npm run hall:announce -- --send` in the API's
+  container; without `--send` it only says who would be told): which halls they are in and
+  how they show there, and that they may put links beside their name. Otherwise:
+  once Stripe confirms a gift, the API thanks the donor by mail
   (how much closer their city is, its stones with theirs lit, how many people explore the
   cities, where they are listed); and once a city is built, `deploy/deploy.sh <world>` runs the
   API's announce command, which tells each of its donors, once, that it is on the map. The

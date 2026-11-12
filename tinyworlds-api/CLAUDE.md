@@ -33,6 +33,11 @@ npm run donors:backfill   # in the built image (node dist/benefactors/backfill-c
 npm run donors:backfill:dev   # the same from a checkout, through tsx
 npm run cities:announce -- tinysp [tinyrao …]   # in the built image (node dist/benefactors/announce-cli.js): mails the donors of each world's city that it is built, once (deploy/deploy.sh runs it)
 npm run cities:announce:dev -- tinysp   # the same from a checkout, through tsx (without SMTP_HOST, the mails go to the log)
+npm run hall:announce     # in the built image (node dist/benefactors/hall-cli.js): who would be told they are in the hall of fame; sends nothing
+npm run hall:announce -- --preview /tmp/mails   # the same, and writes each mail there to be read
+npm run hall:announce -- --test-to you@example.com   # sends the first of those mails to that address instead; nobody is marked told
+npm run hall:announce -- --send   # mails every donor not told yet, once each
+npm run hall:announce:dev -- …    # the same from a checkout, through tsx
 ```
 
 ## Structure
@@ -71,7 +76,8 @@ src/
 │   ├── display-name.ts             # cleanDisplayName: what a listed name may be
 │   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors, wall
 │   ├── announce.service.ts built-mail.ts   # a built city's donors told, once; the mail
-│   ├── announce-cli.ts backfill-cli.ts     # the commands compiled into the image
+│   ├── hall-announce.ts hall-mail.ts       # every donor told they are in the hall of fame, once; the mail
+│   ├── announce-cli.ts backfill-cli.ts hall-cli.ts   # the commands compiled into the image
 │   └── benefactors.resolver.ts my-giving.resolver.ts dto/ models/   # the public query; the donor's own
 ├── links/                          # the links donors show beside their names
 │   ├── link-url.ts                 # pure: cleanLinkUrl, isPublicUrl (https, a public host name, no port, no user)
@@ -232,7 +238,8 @@ Three guards on grouping: only a named gift joins others (an unnamed gift is alw
 a donor's founding gifts share their first row; a named founder is not listed again among the
 benefactors.
 
-`donors` holds one row per lower-case email (`display_name`, `name_hidden`, `last_login_at`);
+`donors` holds one row per lower-case email (`display_name`, `name_hidden`, `links_hidden`,
+`hall_mailed_at`, `last_login_at`);
 `donations.donor_id` ties a gift to it (null when Stripe gave no usable address) and
 `donations.listed` says the donor asked to be named for that gift. A name is shown only when the
 gift is listed, the donor has a name, and `name_hidden` is false; an admin hides one
@@ -312,6 +319,10 @@ pictures, `donors.links_hidden` an admin's switch.
   gives the donor's own page every picture, with `givenCents` and `picturesFromCents` to say
   what is missing. Links go up at once, as names do; `benefactorNames` shows admins every link
   with its picture, hidden or not, and `setLinksHidden` takes a donor's links off every list.
+- **They are plain links on the site** (no `nofollow`, no `sponsored`): the hall of fame's
+  pages bake them into their HTML, and the donors are told they are followed. That is the
+  site's doing, not this API's, but it is why a link must be what `cleanLinkUrl` allows and
+  nothing else, and why an admin can take a donor's links down at once.
 
 ## Signing in, for admins and donors (`auth/`)
 
@@ -408,7 +419,7 @@ itself, so this API keeps no copy of them. It keeps the answers and tallies them
 
 ## Mails (`mail/`)
 
-Three mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
+Four mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
 a white card on paper, yellow pill buttons, the pixel badges, a footer saying why the person got
 it), each in en-US, pt-BR and es-ES, each with a plain-text part. `MailModule` provides `MAILER`
 (`createMailer`: SMTP, or the log without `SMTP_HOST`/`MAIL_FROM`) to auth, donations and
@@ -418,7 +429,7 @@ benefactors. `layout.ts` is the look, as pure functions of tables and inline sty
 `codeBox`. **Every text is escaped** (`html.ts`: `fillHtml` escapes a template and each value
 that is not already markup): city names and display names are typed by donors. Each mail is a
 pure builder from typed facts to `{ subject, text, html }`: `signInMail`, `thanksMail`,
-`builtMail`.
+`builtMail`, `hallMail`.
 
 Links and pictures are made from `SITE_URL` (an origin; default: the first of
 `ALLOWED_ORIGINS`): `/me/`, `/`, `/<world>/`, the pictures at `/email/wordmark.png`,
@@ -471,6 +482,24 @@ address.
   WHERE …`). It exits 1 when any world fell short, 0 otherwise. The migration that added the
   column counted every city already on the map (`BUILT`, or with a `world_id`) as announced.
   The command builds its services by hand (no Nest container), so tsx can run it too.
+- **You are in the hall of fame** (`benefactors/hall-mail.ts`, `hall-announce.ts`,
+  `hall-cli.ts`). Sent by hand, not by any request: `npm run hall:announce -- --send` in the
+  container mails every donor who has not been told (`donors.hall_mailed_at` is null) and
+  gave, in dollars, to a city the site shows: once each, in the language of their latest gift.
+  It says which cities' halls they are in, the one they gave most to first, each a link to
+  that city's page (`hallCityUrl`: `/hall-of-fame/<slug>/` for a plain slug, else
+  `/hall-of-fame/?city=…`, as the site addresses it) with how they show there ("as Ana", "as
+  “Anonymous”"); that they may put up to three links beside their name, **plain links that
+  search engines follow** (the site's `rel` carries no `nofollow` or `sponsored`: the mail
+  must never promise more than the site does); for someone named nowhere, that links go with
+  a name; and whether their links' pictures show, with what they have given so far when not.
+  **Without `--send` nothing goes out**: the command lists who would be told (donor ids,
+  languages, counts), `--preview <dir>` writes each mail to be read, and `--test-to <address>`
+  sends the first one to that address instead, marking nobody. A donor is claimed
+  (`hall_mailed_at`) before their mail goes out, so two runs cannot both mail them, and given
+  back if it does not, so the next run tries again; a mail server that is away stops the run
+  at its first failure. A later `--send` reaches only those a first run could not, and those
+  who have given since. Failures are reported by donor id, never by address.
 - **Sign-in** (`auth/sign-in-mail.ts`): see Signing in. The subject is unchanged ("Your
   tinyworlds code: 482 913"). Its last line says "The code and the button work once, for 15
   minutes. Asked more than once? Use the newest mail.": strictly true (an older mail's code

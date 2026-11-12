@@ -149,6 +149,14 @@ before the viewers, as the new queries want. The API reads each linked page itse
 container must be able to reach the internet (as it already does for Stripe and the mail
 server); the pictures it keeps are in its database. Admins review and hide links on `/admin/`.
 
+The hall of fame (`/hall-of-fame/`, and a page per city under it) is part of the front page's
+build and needs nothing set either: it is baked from the API when the front page is built, and
+the daily deploy run builds it again. Its links are plain links, without `nofollow`. Telling
+the donors they are in it is done by hand, once, in the API's container, after both are
+deployed: `npm run hall:announce` says who would be told and sends nothing,
+`npm run hall:announce -- --test-to you@example.com` sends you one to look at, and
+`npm run hall:announce -- --send` mails each donor once.
+
 Or `./dev.sh [world]` for all three in tmux.
 
 ### Environment
