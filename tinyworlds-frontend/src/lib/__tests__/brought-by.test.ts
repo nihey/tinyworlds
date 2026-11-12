@@ -12,6 +12,7 @@ const city = (extra: Partial<CityMilestone> = {}): CityMilestone => ({
   benefactorCount: 2,
   status: "BUILT",
   worldId: "tinydal",
+  waiting: 0,
   ...extra,
 });
 

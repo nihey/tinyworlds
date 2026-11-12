@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { COUNTED_CURRENCY } from '../donations/currency.js';
 import { CityStatus } from '../generated/prisma/enums.js';
+import { ListsService } from '../lists/lists.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CityMilestone } from './models/city-milestone.model.js';
 
@@ -44,7 +45,10 @@ export function benefactorCounts(
  * The order of the public list: cities still to be built first, the best funded at the top and
  * ties by name; the ones already built last, by name.
  */
-export function inMilestoneOrder(rows: MilestoneRow[]): CityMilestone[] {
+export function inMilestoneOrder(
+  rows: MilestoneRow[],
+  waiting: ReadonlyMap<string, number> = new Map(),
+): CityMilestone[] {
   const built = (row: MilestoneRow): number =>
     row.status === CityStatus.BUILT ? 1 : 0;
   return [...rows]
@@ -64,19 +68,23 @@ export function inMilestoneOrder(rows: MilestoneRow[]): CityMilestone[] {
       benefactorCount: row.benefactors,
       status: row.status,
       worldId: row.worldId,
+      waiting: waiting.get(row.id) ?? 0,
     }));
 }
 
 @Injectable()
 export class CitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly lists: ListsService,
+  ) {}
 
   /**
    * Every city that may be shown, in the order the site lists them, each with how many people
    * gave to it: the gifts that count toward it (in dollars, as `raisedCents` counts them).
    */
   async milestones(): Promise<CityMilestone[]> {
-    const [rows, gifts] = await Promise.all([
+    const [rows, gifts, waiting] = await Promise.all([
       this.prisma.city.findMany({
         where: { hidden: false },
         select: {
@@ -100,6 +108,7 @@ export class CitiesService {
         },
         _count: { _all: true },
       }),
+      this.lists.waitingByCity(),
     ]);
     // a gift without a donor is someone of its own: its group counts each of them
     const people: { cityId: string; donorId: string | null }[] = [];
@@ -111,6 +120,7 @@ export class CitiesService {
     const counts = benefactorCounts(people);
     return inMilestoneOrder(
       rows.map((row) => ({ ...row, benefactors: counts.get(row.id) ?? 0 })),
+      waiting,
     );
   }
 }

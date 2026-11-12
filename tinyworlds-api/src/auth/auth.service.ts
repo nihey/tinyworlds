@@ -15,12 +15,18 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import type { Env } from '../config/env.js';
-import type { Locale } from '../donations/locales.js';
+import { isLocale, type Locale } from '../donations/locales.js';
 import { acceptReturnUrl } from '../donations/return-url.js';
+import { listKeyOf, listParam } from '../lists/list-key.js';
+import { ListsService } from '../lists/lists.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MAILER, type Mailer } from '../mail/mailer.js';
+import { failureOf } from './failure.js';
 import { sessionSecret } from './session-secret.js';
 import { signInMail } from './sign-in-mail.js';
+
+/** Re-exported: it lived here first. */
+export { failureOf };
 
 /** How long a sign-in link is good for. */
 export const LINK_MINUTES = 15;
@@ -73,19 +79,6 @@ export interface Session {
 const linksOf = (kind: Purpose, id: string) =>
   kind === 'admin' ? { adminId: id } : { donorId: id };
 
-/**
- * What went wrong, for the log, without the error's message: a mail server's refusal quotes the
- * address, and so may a database error quoting its query.
- */
-export function failureOf(error: unknown): string {
-  const { name, code, responseCode } = (error ?? {}) as Record<string, unknown>;
-  return (
-    [name, code, responseCode]
-      .filter((part) => typeof part === 'string' || typeof part === 'number')
-      .join(' ') || 'unknown error'
-  );
-}
-
 /** What is kept of a link's token: enough to recognise it, not enough to use it. */
 export const hashToken = (token: string): string =>
   createHash('sha256').update(token).digest('hex');
@@ -125,6 +118,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     @Inject(MAILER) private readonly mailer: Mailer,
     @Inject(REFUSAL_FLOOR) private readonly refusalFloorMs: number,
+    private readonly lists: ListsService,
   ) {}
 
   private isAdmin(email: string): boolean {
@@ -184,12 +178,17 @@ export class AuthService {
    * Mails a sign-in link to the address if it has (or, as a donor, may have) an account of the
    * kind asked for, and does nothing otherwise: the caller is told the same either way, so the
    * API never says who the admins are. True when a mail went out.
+   *
+   * A donor's link may carry a list to join once it is used (a city's slug, or `*` for new
+   * cities). A list nobody can join (built, hidden, unknown) is dropped without a word: the
+   * mail is then a plain sign-in. An admin's link never carries one.
    */
   async sendLink(
     address: string,
     target: string,
     locale: Locale,
     purpose: Purpose,
+    list?: string,
   ): Promise<boolean> {
     const email = address.trim().toLowerCase();
     const account = await this.accountFor(email, purpose);
@@ -208,6 +207,17 @@ export class AuthService {
     });
     if (recent) return false;
 
+    let joining: Awaited<ReturnType<ListsService['describe']>> = null;
+    if (purpose === 'donor' && list !== undefined) {
+      try {
+        joining = await this.lists.describe(list);
+      } catch (error) {
+        this.logger.error(
+          `A list for ${purpose} ${account.id} could not be read: ${failureOf(error)}`,
+        );
+      }
+    }
+
     const token = randomBytes(32).toString('base64url');
     const code = randomInt(0, 10 ** CODE_DIGITS)
       .toString()
@@ -219,6 +229,9 @@ export class AuthService {
         tokenHash,
         codeHash: hashCode(sessionSecret(this.config), tokenHash, code),
         expiresAt: new Date(now + LINK_MINUTES * 60_000),
+        ...(joining && list !== undefined
+          ? { joinList: listParam(listKeyOf(list)), joinLocale: locale }
+          : {}),
       },
       select: { id: true },
     });
@@ -233,6 +246,7 @@ export class AuthService {
           minutes: LINK_MINUTES,
           purpose,
           site: this.config.get('SITE_URL', { infer: true }),
+          ...(joining ? { list: joining } : {}),
         }),
       });
     } catch (error) {
@@ -268,7 +282,14 @@ export class AuthService {
   }
 
   /** Spends a link, once, and answers with the session it opens for its owner. */
-  private async spend(linkId: string, who: SessionIdentity): Promise<Session> {
+  private async spend(
+    linkId: string,
+    who: SessionIdentity,
+    join: { list: string | null; locale: string | null } = {
+      list: null,
+      locale: null,
+    },
+  ): Promise<Session> {
     const now = new Date();
     // in one statement, so two openings of the same link cannot both get a session
     const spent = await this.prisma.magicLink.updateMany({
@@ -282,11 +303,19 @@ export class AuthService {
         where: { id: who.id },
         data: { lastLoginAt: now },
       });
-    else
+    else {
       await this.prisma.donor.update({
         where: { id: who.id },
         data: { lastLoginAt: now },
       });
+      // before answering, so the page's next `myLists` already shows it; never fails the sign-in
+      if (join.list !== null)
+        await this.lists.joinAfterSignIn(
+          who.id,
+          join.list,
+          isLocale(join.locale) ? join.locale : 'en-US',
+        );
+    }
     return {
       accessToken: await this.jwt.signAsync(
         { sub: who.id, kind: who.kind },
@@ -306,13 +335,18 @@ export class AuthService {
       where: { tokenHash: hashToken(token) },
       select: {
         id: true,
+        joinList: true,
+        joinLocale: true,
         admin: { select: { id: true, email: true } },
         donor: { select: { id: true, email: true } },
       },
     });
     const who = link && this.ownerOf(link);
     if (!link || !who) throw this.refused();
-    return this.spend(link.id, who);
+    return this.spend(link.id, who, {
+      list: link.joinList,
+      locale: link.joinLocale,
+    });
   }
 
   /**
@@ -359,6 +393,8 @@ export class AuthService {
         id: true,
         tokenHash: true,
         codeHash: true,
+        joinList: true,
+        joinLocale: true,
         admin: { select: { id: true, email: true } },
         donor: { select: { id: true, email: true } },
       },
@@ -410,7 +446,10 @@ export class AuthService {
         });
       throw this.refused();
     }
-    return this.spend(link.id, who);
+    return this.spend(link.id, who, {
+      list: link.joinList,
+      locale: link.joinLocale,
+    });
   }
 
   /**

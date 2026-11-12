@@ -1,5 +1,12 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsIn, IsOptional, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 import { LOCALES, type Locale } from '../../donations/locales.js';
 import { PURPOSES, type Purpose } from '../auth.service.js';
 
@@ -25,6 +32,15 @@ export class RequestLinkDto {
   @IsOptional()
   @IsIn(LOCALES)
   locale?: Locale;
+
+  /**
+   * A donor's wish to join a list when the link is used: a city's slug, or `*` for new cities.
+   * A list that cannot be joined is dropped silently; admins' links ignore it.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  list?: string;
 
   /** Who asks: an admin (when left out) or a donor. */
   @IsIn(PURPOSES)

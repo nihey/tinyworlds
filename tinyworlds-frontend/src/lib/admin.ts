@@ -325,6 +325,37 @@ export function parseNames(value: unknown, origin: string | null = null): Benefa
   });
 }
 
+/** How many people wait on each list: counts only, never an address. */
+export interface ListCounts {
+  /** a city per row, most waited for first, as the API gave them */
+  cities: { name: string; slug: string; waiting: number }[];
+  /** on "new cities" */
+  newCities: number;
+}
+
+const isCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
+
+/**
+ * Reads the API's `listCounts`. Null when it is not counts at all, so the page says it failed
+ * rather than showing a table that claims nobody waits; malformed city rows are left out.
+ */
+export function parseListCounts(value: unknown): ListCounts | null {
+  if (typeof value !== "object" || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  if (!Array.isArray(raw.cities) || !isCount(raw.newCities)) return null;
+  const cities = list(raw.cities).flatMap(({ name, slug, waiting }) =>
+    typeof name === "string" &&
+    name !== "" &&
+    typeof slug === "string" &&
+    slug !== "" &&
+    isCount(waiting)
+      ? [{ name, slug, waiting }]
+      : [],
+  );
+  return { cities, newCities: raw.newCities };
+}
+
 /** A round number at or above the largest value: where a chart's scale tops out. */
 export function niceMax(value: number): number {
   if (!(value > 0)) return 1;

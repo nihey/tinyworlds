@@ -11,6 +11,9 @@ export interface CityRow {
   donationCount: number;
   worldId: string | null;
   hidden: boolean;
+  /** When its list opened, and when the list was told it is built; null until then. */
+  listsStartedAt?: Date | null;
+  listsAnnouncedAt?: Date | null;
 }
 
 export interface DonationRow {
@@ -36,6 +39,8 @@ export interface DonorRow {
   displayName: string | null;
   nameHidden?: boolean;
   lastLoginAt?: Date | null;
+  /** When the donor was mailed the welcome to the lists; null until then. */
+  welcomedAt?: Date | null;
 }
 
 export interface FunnelEventRow {
@@ -84,7 +89,31 @@ export interface MagicLinkRow {
   attempts: number;
   expiresAt: Date;
   usedAt: Date | null;
+  /** A list to join once the link is used: a city's slug, or "*" for new cities. */
+  joinList: string | null;
+  joinLocale: string | null;
   createdAt: Date;
+}
+
+export interface ListMemberRow {
+  id: string;
+  donorId: string;
+  /** Null is the list of new cities. */
+  cityId: string | null;
+  locale: string;
+  createdAt: Date;
+}
+
+export interface ListNoticeRow {
+  donorId: string;
+  cityId: string;
+  sentAt: Date;
+}
+
+/** The conditions the code puts on list rows, as Prisma spells them. */
+interface ListWhere {
+  donorId?: string | { in: string[] };
+  cityId?: string | null | { in: string[] };
 }
 
 /** The conditions the code puts on a link, as Prisma spells them. */
@@ -125,6 +154,8 @@ export class FakePrisma {
   quizAnswers: QuizAnswerRow[] = [];
   admins: AdminRow[] = [];
   links: MagicLinkRow[] = [];
+  listMembers: ListMemberRow[] = [];
+  listNotices: ListNoticeRow[] = [];
   /** Set to make the next write of a funnel step fail, the way a database that is away does. */
   failEvents: Error | null = null;
   /** Set to make the donor step of a donation fail, the way a database error would. */
@@ -158,6 +189,8 @@ export class FakePrisma {
       donationCount: 0,
       worldId: null,
       hidden: false,
+      listsStartedAt: null,
+      listsAnnouncedAt: null,
       ...over,
     };
     this.cities.push(row);
@@ -206,7 +239,14 @@ export class FakePrisma {
     },
     findMany: (
       args: {
-        where?: { hidden?: boolean; worldId?: { not: null } };
+        where?: {
+          hidden?: boolean;
+          status?: CityRow['status'];
+          worldId?: { not: null } | { in: string[] };
+          slug?: string;
+          id?: { in: string[] };
+          listsAnnouncedAt?: null;
+        };
       } = {},
     ): Promise<CityRow[]> =>
       Promise.resolve(
@@ -215,10 +255,40 @@ export class FakePrisma {
             (c) =>
               (args.where?.hidden === undefined ||
                 c.hidden === args.where.hidden) &&
-              (args.where?.worldId === undefined || c.worldId !== null),
+              (args.where?.status === undefined ||
+                c.status === args.where.status) &&
+              (args.where?.slug === undefined || c.slug === args.where.slug) &&
+              (args.where?.id === undefined ||
+                args.where.id.in.includes(c.id)) &&
+              (args.where?.worldId === undefined ||
+                ('in' in args.where.worldId
+                  ? c.worldId !== null &&
+                    args.where.worldId.in.includes(c.worldId)
+                  : c.worldId !== null)) &&
+              (args.where?.listsAnnouncedAt === undefined ||
+                !c.listsAnnouncedAt),
           )
           .map((c) => ({ ...c })),
       ),
+    /** The lists' marks, set only where they are not yet: `where` as the list announcement asks. */
+    updateMany: (args: {
+      where: {
+        id: string | { in: string[] };
+        listsStartedAt?: null;
+        listsAnnouncedAt?: null;
+      };
+      data: { listsStartedAt?: Date; listsAnnouncedAt?: Date };
+    }): Promise<{ count: number }> => {
+      const { id, listsStartedAt, listsAnnouncedAt } = args.where;
+      const found = this.cities.filter(
+        (c) =>
+          (typeof id === 'string' ? c.id === id : id.in.includes(c.id)) &&
+          (listsStartedAt === undefined || !c.listsStartedAt) &&
+          (listsAnnouncedAt === undefined || !c.listsAnnouncedAt),
+      );
+      for (const c of found) Object.assign(c, args.data);
+      return Promise.resolve({ count: found.length });
+    },
   };
 
   donation = {
@@ -240,18 +310,31 @@ export class FakePrisma {
       }
       return Promise.resolve(found);
     },
-    /** Gifts with no donor yet (the backfill), or a city's gifts in one currency; in order made. */
+    /**
+     * Gifts with no donor yet (the backfill), a city's gifts in one currency, or the gifts with a
+     * donor to some cities (the lists' announcement); in order made.
+     */
     findMany: (args: {
-      where: { donorId?: null; cityId?: string; currency?: string };
+      where: {
+        donorId?: string | null | { not: null };
+        cityId?: string | { in: string[] };
+        currency?: string;
+      };
     }): Promise<ReturnType<FakePrisma['withRelations']>[]> =>
       Promise.resolve(
         this.donations
           .filter(
             (d) =>
               (args.where.donorId === undefined ||
-                d.donorId === args.where.donorId) &&
+                (args.where.donorId !== null &&
+                typeof args.where.donorId === 'object'
+                  ? d.donorId !== null
+                  : d.donorId === args.where.donorId)) &&
               (args.where.cityId === undefined ||
-                d.cityId === args.where.cityId) &&
+                (typeof args.where.cityId === 'string'
+                  ? d.cityId === args.where.cityId
+                  : d.cityId !== null &&
+                    args.where.cityId.in.includes(d.cityId))) &&
               (args.where.currency === undefined ||
                 d.currency === args.where.currency),
           )
@@ -287,6 +370,41 @@ export class FakePrisma {
       this.donations.push(row);
       return Promise.resolve(row);
     },
+    /** Only the shape the milestones ask for: by city and donor, counted, to shown cities in one currency. */
+    groupBy: (args: {
+      by: ['cityId', 'donorId'];
+      where: {
+        currency: string;
+        cityId: { not: null };
+        city: { hidden: false };
+      };
+      _count: { _all: true };
+    }): Promise<
+      {
+        cityId: string | null;
+        donorId: string | null;
+        _count: { _all: number };
+      }[]
+    > => {
+      const groups = new Map<
+        string,
+        { cityId: string; donorId: string | null; _count: { _all: number } }
+      >();
+      for (const d of this.donations) {
+        if (d.currency !== args.where.currency || d.cityId === null) continue;
+        const city = this.cities.find((c) => c.id === d.cityId);
+        if (!city || city.hidden) continue;
+        const key = `${d.cityId} ${d.donorId ?? ''}`;
+        const group = groups.get(key) ?? {
+          cityId: d.cityId,
+          donorId: d.donorId,
+          _count: { _all: 0 },
+        };
+        group._count._all++;
+        groups.set(key, group);
+      }
+      return Promise.resolve([...groups.values()]);
+    },
   };
 
   donor = {
@@ -306,13 +424,21 @@ export class FakePrisma {
       if (found) return Promise.resolve({ ...found });
       if (this.donors.some((d) => d.email === args.create.email))
         throw unique('email');
-      const row: DonorRow = { id: randomUUID(), ...args.create };
+      const row: DonorRow = {
+        id: randomUUID(),
+        welcomedAt: null,
+        ...args.create,
+      };
       this.donors.push(row);
       return Promise.resolve({ ...row });
     },
     update: (args: {
       where: { id: string };
-      data: { displayName?: string; lastLoginAt?: Date };
+      data: {
+        displayName?: string;
+        lastLoginAt?: Date;
+        welcomedAt?: Date | null;
+      };
     }): Promise<DonorRow> => {
       const row = this.donors.find((d) => d.id === args.where.id);
       if (!row) throw new Error('No such donor');
@@ -320,17 +446,27 @@ export class FakePrisma {
         row.displayName = args.data.displayName;
       if (args.data.lastLoginAt !== undefined)
         row.lastLoginAt = args.data.lastLoginAt;
+      if (args.data.welcomedAt !== undefined)
+        row.welcomedAt = args.data.welcomedAt;
       return Promise.resolve({ ...row });
     },
-    /** The one `where` the webhook asks: set a name only where there is none. */
+    /** The two `where`s the API asks: set a name only where there is none, or claim the welcome. */
     updateMany: (args: {
-      where: { id: string; displayName: null };
-      data: { displayName: string };
+      where: { id: string; displayName?: null; welcomedAt?: null };
+      data: { displayName?: string; welcomedAt?: Date };
     }): Promise<{ count: number }> => {
       const row = this.donors.find(
-        (d) => d.id === args.where.id && d.displayName === null,
+        (d) =>
+          d.id === args.where.id &&
+          (args.where.displayName === undefined || d.displayName === null) &&
+          (args.where.welcomedAt === undefined || !d.welcomedAt),
       );
-      if (row) row.displayName = args.data.displayName;
+      if (row) {
+        if (args.data.displayName !== undefined)
+          row.displayName = args.data.displayName;
+        if (args.data.welcomedAt !== undefined)
+          row.welcomedAt = args.data.welcomedAt;
+      }
       return Promise.resolve({ count: row ? 1 : 0 });
     },
     findUnique: (args: { where: { id: string } }): Promise<DonorRow | null> => {
@@ -349,8 +485,18 @@ export class FakePrisma {
       );
       return Promise.resolve(row ? { ...row } : null);
     },
-    findMany: (): Promise<DonorRow[]> =>
-      Promise.resolve(this.donors.map((d) => ({ ...d }))),
+    /** Every donor, or those with the ids asked. */
+    findMany: (
+      args: { where?: { id?: { in: string[] } } } = {},
+    ): Promise<DonorRow[]> =>
+      Promise.resolve(
+        this.donors
+          .filter(
+            (d) =>
+              args.where?.id === undefined || args.where.id.in.includes(d.id),
+          )
+          .map((d) => ({ ...d })),
+      ),
   };
 
   funnelEvent = {
@@ -565,6 +711,8 @@ export class FakePrisma {
         tokenHash: string;
         codeHash: string;
         expiresAt: Date;
+        joinList?: string;
+        joinLocale?: string;
       };
     }): Promise<MagicLinkRow> => {
       if (this.links.some((l) => l.tokenHash === args.data.tokenHash))
@@ -580,6 +728,8 @@ export class FakePrisma {
         usedAt: null,
         attempts: 0,
         createdAt: new Date(),
+        joinList: null,
+        joinLocale: null,
         ...args.data,
         adminId: args.data.adminId ?? null,
         donorId: args.data.donorId ?? null,
@@ -632,6 +782,176 @@ export class FakePrisma {
       this.links = this.links.filter((link) => !gone.has(link));
       return Promise.resolve({ count: gone.size });
     },
+  };
+
+  private listMatch(
+    row: { donorId: string; cityId: string | null },
+    where: ListWhere = {},
+  ): boolean {
+    const is = (value: string | null, want: ListWhere['cityId']) =>
+      want === undefined ||
+      (want !== null && typeof want === 'object'
+        ? value !== null && want.in.includes(value)
+        : value === want);
+    return is(row.donorId, where.donorId) && is(row.cityId, where.cityId);
+  }
+
+  /** One membership per donor and list; a null city counts as one list, like the database's index. */
+  listMember = {
+    findMany: (args: { where?: ListWhere } = {}): Promise<ListMemberRow[]> =>
+      Promise.resolve(
+        this.listMembers
+          .filter((m) => this.listMatch(m, args.where))
+          .map((m) => ({ ...m })),
+      ),
+    findFirst: (
+      args: { where?: ListWhere } = {},
+    ): Promise<ListMemberRow | null> => {
+      const row = this.listMembers.find((m) => this.listMatch(m, args.where));
+      return Promise.resolve(row ? { ...row } : null);
+    },
+    create: (args: {
+      data: Pick<ListMemberRow, 'donorId' | 'locale'> &
+        Partial<Pick<ListMemberRow, 'cityId'>>;
+    }): Promise<ListMemberRow> => {
+      const cityId = args.data.cityId ?? null;
+      if (
+        this.listMembers.some(
+          (m) => m.donorId === args.data.donorId && m.cityId === cityId,
+        )
+      )
+        throw unique('donor_id, COALESCE(city_id)');
+      const row: ListMemberRow = {
+        id: randomUUID(),
+        createdAt: new Date(),
+        ...args.data,
+        cityId,
+      };
+      this.listMembers.push(row);
+      return Promise.resolve({ ...row });
+    },
+    createMany: (args: {
+      data: (Pick<ListMemberRow, 'donorId' | 'locale'> &
+        Partial<Pick<ListMemberRow, 'cityId'>>)[];
+      skipDuplicates?: boolean;
+    }): Promise<{ count: number }> => {
+      let count = 0;
+      for (const data of args.data) {
+        const cityId = data.cityId ?? null;
+        const there = this.listMembers.some(
+          (m) => m.donorId === data.donorId && m.cityId === cityId,
+        );
+        if (there && !args.skipDuplicates)
+          throw unique('donor_id, COALESCE(city_id)');
+        if (there) continue;
+        this.listMembers.push({
+          id: randomUUID(),
+          createdAt: new Date(),
+          ...data,
+          cityId,
+        });
+        count++;
+      }
+      return Promise.resolve({ count });
+    },
+    deleteMany: (
+      args: { where?: ListWhere } = {},
+    ): Promise<{ count: number }> => {
+      const before = this.listMembers.length;
+      this.listMembers = this.listMembers.filter(
+        (m) => !this.listMatch(m, args.where),
+      );
+      return Promise.resolve({ count: before - this.listMembers.length });
+    },
+    updateMany: (args: {
+      where?: ListWhere;
+      data: { locale?: string };
+    }): Promise<{ count: number }> => {
+      const found = this.listMembers.filter((m) =>
+        this.listMatch(m, args.where),
+      );
+      for (const m of found) Object.assign(m, args.data);
+      return Promise.resolve({ count: found.length });
+    },
+    count: (args: { where?: ListWhere } = {}): Promise<number> =>
+      Promise.resolve(
+        this.listMembers.filter((m) => this.listMatch(m, args.where)).length,
+      ),
+    /** By city, counted: the sizes of the lists. */
+    groupBy: (args: {
+      by: ['cityId'];
+      where?: ListWhere;
+      _count: { _all: true };
+    }): Promise<{ cityId: string | null; _count: { _all: number } }[]> => {
+      const counts = new Map<string | null, number>();
+      for (const m of this.listMembers)
+        if (this.listMatch(m, args.where))
+          counts.set(m.cityId, (counts.get(m.cityId) ?? 0) + 1);
+      return Promise.resolve(
+        [...counts].map(([cityId, n]) => ({ cityId, _count: { _all: n } })),
+      );
+    },
+  };
+
+  listNotice = {
+    findMany: (args: { where?: ListWhere } = {}): Promise<ListNoticeRow[]> =>
+      Promise.resolve(
+        this.listNotices
+          .filter((n) => this.listMatch(n, args.where))
+          .map((n) => ({ ...n })),
+      ),
+    findFirst: (
+      args: { where?: ListWhere } = {},
+    ): Promise<ListNoticeRow | null> => {
+      const row = this.listNotices.find((n) => this.listMatch(n, args.where));
+      return Promise.resolve(row ? { ...row } : null);
+    },
+    create: (args: {
+      data: Pick<ListNoticeRow, 'donorId' | 'cityId'>;
+    }): Promise<ListNoticeRow> => {
+      if (
+        this.listNotices.some(
+          (n) =>
+            n.donorId === args.data.donorId && n.cityId === args.data.cityId,
+        )
+      )
+        throw unique('donor_id, city_id');
+      const row: ListNoticeRow = { sentAt: new Date(), ...args.data };
+      this.listNotices.push(row);
+      return Promise.resolve({ ...row });
+    },
+    /** One INSERT: a row that is there already refuses them all, unless skipped. */
+    createMany: (args: {
+      data: Pick<ListNoticeRow, 'donorId' | 'cityId'>[];
+      skipDuplicates?: boolean;
+    }): Promise<{ count: number }> => {
+      const there = (data: Pick<ListNoticeRow, 'donorId' | 'cityId'>) =>
+        this.listNotices.some(
+          (n) => n.donorId === data.donorId && n.cityId === data.cityId,
+        );
+      if (!args.skipDuplicates && args.data.some(there))
+        return Promise.reject(unique('donor_id, city_id'));
+      let count = 0;
+      for (const data of args.data) {
+        if (there(data)) continue;
+        this.listNotices.push({ sentAt: new Date(), ...data });
+        count++;
+      }
+      return Promise.resolve({ count });
+    },
+    deleteMany: (
+      args: { where?: ListWhere } = {},
+    ): Promise<{ count: number }> => {
+      const before = this.listNotices.length;
+      this.listNotices = this.listNotices.filter(
+        (n) => !this.listMatch(n, args.where),
+      );
+      return Promise.resolve({ count: before - this.listNotices.length });
+    },
+    count: (args: { where?: ListWhere } = {}): Promise<number> =>
+      Promise.resolve(
+        this.listNotices.filter((n) => this.listMatch(n, args.where)).length,
+      ),
   };
 
   private inTransaction = false;

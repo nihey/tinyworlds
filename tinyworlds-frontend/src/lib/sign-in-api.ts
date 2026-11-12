@@ -42,15 +42,17 @@ export async function post(route: "magic-link" | "verify", body: unknown): Promi
 
 /**
  * Asks for a sign-in link and code to be mailed. The API answers the same whoever the address
- * belongs to, so this resolving says only that the request arrived.
+ * belongs to, so this resolving says only that the request arrived. `list` ("*" for new cities,
+ * or a city's slug) makes opening the link or typing the code join that list too.
  */
 export async function requestLink(
   email: string,
   returnUrl: string,
   locale: Locale,
   purpose: Purpose,
+  list?: string,
 ): Promise<void> {
-  await post("magic-link", { email, returnUrl, locale, purpose });
+  await post("magic-link", { email, returnUrl, locale, purpose, ...(list ? { list } : {}) });
 }
 
 /** Trades the token of a sign-in link for a session; "unauthorized" when the link is spent or stale. */

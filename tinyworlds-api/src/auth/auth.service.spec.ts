@@ -9,6 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { FakeMailer } from '../../test/fake-mailer.js';
 import { FakePrisma } from '../../test/fake-prisma.js';
 import type { Env } from '../config/env.js';
+import { ListsService } from '../lists/lists.service.js';
+import type { SightsCatalog } from '../lists/sights-catalog.js';
 import {
   AuthService,
   CODE_TRIES,
@@ -67,14 +69,19 @@ function setup(admins: string[] = [ADMIN], floorMs = 0) {
   const config = {
     get: (key: keyof typeof env) => env[key],
   } as unknown as ConfigService<Env, true>;
+  const catalog = {
+    pickAcross: () => Promise.resolve({ sights: [], unread: [] }),
+  } as unknown as SightsCatalog;
+  const lists = new ListsService(prisma.asService(), config, mailer, catalog);
   const service = new AuthService(
     prisma.asService(),
     config,
     jwt,
     mailer,
     floorMs,
+    lists,
   );
-  return { prisma, mailer, jwt, service, env };
+  return { prisma, mailer, jwt, service, env, lists };
 }
 
 describe('AuthService.linkTarget', () => {
@@ -714,5 +721,88 @@ describe('AuthService, for donors', () => {
     expect(refusals[0]).toBeInstanceOf(UnauthorizedException);
     expect(refusals[1]).toBeInstanceOf(UnauthorizedException);
     expect((refusals[0] as Error).message).toBe((refusals[1] as Error).message);
+  });
+});
+
+describe('AuthService, joining a list by signing in', () => {
+  const ask = (
+    s: ReturnType<typeof setup>,
+    list: string,
+    purpose: 'admin' | 'donor' = 'donor',
+    email = DONOR,
+  ) => s.service.sendLink(email, HOME, 'pt-BR', purpose, list);
+
+  it("a donor's link asked with a list joins it when the link is opened", async () => {
+    const s = setup();
+    const lisbon = s.prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
+    await ask(s, 'lisbon');
+    expect(s.prisma.links[0]).toMatchObject({
+      joinList: 'lisbon',
+      joinLocale: 'pt-BR',
+    });
+    expect(s.mailer.sent[0].text).toContain('Lisbon');
+    expect(s.prisma.listMembers).toEqual([]);
+
+    const session = await s.service.verify(s.mailer.token());
+    expect(s.prisma.listMembers).toMatchObject([
+      { donorId: session.identity.id, cityId: lisbon.id, locale: 'pt-BR' },
+    ]);
+  });
+
+  it('joins new cities for "*", and when the code is typed instead', async () => {
+    const s = setup();
+    await ask(s, '*');
+    expect(s.mailer.sent[0].subject).toMatch(/^Seu código/);
+    const session = await s.service.verifyCode(DONOR, s.mailer.code(), 'donor');
+    expect(s.prisma.listMembers).toMatchObject([
+      { donorId: session.identity.id, cityId: null },
+    ]);
+  });
+
+  it('a list for a built or unknown city is dropped: a plain sign-in, and spending joins nothing', async () => {
+    const s = setup();
+    s.prisma.seedCity({ slug: 'paris', name: 'Paris', status: 'BUILT' });
+    s.prisma.seedCity({ slug: 'secret', name: 'Secret', hidden: true });
+    vi.useFakeTimers();
+    for (const list of ['paris', 'secret', 'nowhere']) {
+      s.mailer.sent.length = 0;
+      expect(await ask(s, list)).toBe(true);
+      expect(s.prisma.links.at(-1)).toMatchObject({
+        joinList: null,
+        joinLocale: null,
+      });
+      await s.service.verify(s.mailer.token());
+      vi.advanceTimersByTime(LINK_EVERY_MS + 1);
+    }
+    expect(s.prisma.listMembers).toEqual([]);
+  });
+
+  it("an admin's link ignores list", async () => {
+    const s = setup();
+    s.prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
+    await ask(s, 'lisbon', 'admin', ADMIN);
+    expect(s.prisma.links[0].joinList).toBeNull();
+    await s.service.verify(s.mailer.token());
+    expect(s.prisma.listMembers).toEqual([]);
+  });
+
+  it('a city built between asking and opening: the sign-in succeeds and nothing is joined', async () => {
+    const s = setup();
+    const lisbon = s.prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
+    await ask(s, 'lisbon');
+    lisbon.status = 'BUILT';
+    const session = await s.service.verify(s.mailer.token());
+    expect(session.identity.kind).toBe('donor');
+    expect(s.prisma.listMembers).toEqual([]);
+  });
+
+  it('spending a joining link never fails because joining failed', async () => {
+    const s = setup();
+    s.prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
+    await ask(s, 'lisbon');
+    vi.spyOn(s.lists, 'join').mockRejectedValue(new Error('down'));
+    const session = await s.service.verify(s.mailer.token());
+    expect(session.accessToken).toBeTruthy();
+    expect(s.prisma.listMembers).toEqual([]);
   });
 });

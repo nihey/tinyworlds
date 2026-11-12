@@ -1,5 +1,12 @@
+import { FakeMailer } from '../../test/fake-mailer.js';
+import type { SightsCatalog } from '../lists/sights-catalog.js';
+import type { ConfigService } from '@nestjs/config';
+import { FakePrisma } from '../../test/fake-prisma.js';
+import type { Env } from '../config/env.js';
+import { ListsService } from '../lists/lists.service.js';
 import {
   benefactorCounts,
+  CitiesService,
   inMilestoneOrder,
   type MilestoneRow,
 } from './cities.service.js';
@@ -62,6 +69,7 @@ describe('inMilestoneOrder', () => {
       benefactorCount: 2,
       status: 'PROPOSED',
       worldId: null,
+      waiting: 0,
     });
   });
 });
@@ -86,5 +94,42 @@ describe('benefactorCounts', () => {
 
   it('knows no city nobody gave to', () => {
     expect(benefactorCounts([]).get('lisbon')).toBeUndefined();
+  });
+});
+
+describe('CitiesService.milestones', () => {
+  it("carries each city's waiting, 0 without anyone", async () => {
+    const prisma = new FakePrisma();
+    const lisbon = prisma.seedCity({ slug: 'lisbon', name: 'Lisbon' });
+    prisma.seedCity({ slug: 'rome', name: 'Rome' });
+    const donor = 'd0000000-0000-4000-8000-000000000001';
+    prisma.listMembers.push({
+      id: 'm1',
+      donorId: donor,
+      cityId: lisbon.id,
+      locale: 'en-US',
+      createdAt: new Date(),
+    });
+    prisma.listMembers.push({
+      id: 'm2',
+      donorId: donor,
+      cityId: null,
+      locale: 'en-US',
+      createdAt: new Date(),
+    });
+    const lists = new ListsService(
+      prisma.asService(),
+      { get: () => 'x' } as unknown as ConfigService<Env, true>,
+      new FakeMailer(),
+      {} as SightsCatalog,
+    );
+    const cities = await new CitiesService(
+      prisma.asService(),
+      lists,
+    ).milestones();
+    expect(cities.map((c) => [c.slug, c.waiting])).toEqual([
+      ['lisbon', 1],
+      ['rome', 0],
+    ]);
   });
 });

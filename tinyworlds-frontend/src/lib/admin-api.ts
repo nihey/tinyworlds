@@ -2,10 +2,12 @@ import { ApolloClient, gql, HttpLink, InMemoryCache } from "@apollo/client";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import {
   parseFunnel,
+  parseListCounts,
   parseNames,
   type AdminSession,
   type BenefactorName,
   type DonationFunnel,
+  type ListCounts,
 } from "./admin";
 import { API_URL, withTimeout } from "./donate";
 import { apiOrigin } from "./links";
@@ -211,6 +213,38 @@ export async function setLinksHidden(
       TIMEOUT,
     );
     if (result.data?.setLinksHidden !== true) throw new AdminApiError("failed");
+  } catch (error) {
+    throw failure(error);
+  }
+}
+
+const LIST_COUNTS = gql`
+  query ListCounts {
+    listCounts {
+      cities {
+        name
+        slug
+        waiting
+      }
+      newCities
+    }
+  }
+`;
+
+/** How many people wait on each city's list and on "new cities": counts, never addresses. */
+export async function fetchListCounts(session: AdminSession): Promise<ListCounts> {
+  try {
+    const result = await withTimeout(
+      apollo(session.accessToken).query<{ listCounts: unknown }>({
+        query: LIST_COUNTS,
+        fetchPolicy: "no-cache",
+        context: { fetchOptions: { signal: AbortSignal.timeout(TIMEOUT) } },
+      }),
+      TIMEOUT,
+    );
+    const counts = parseListCounts(result.data?.listCounts);
+    if (counts === null) throw new AdminApiError("failed");
+    return counts;
   } catch (error) {
     throw failure(error);
   }

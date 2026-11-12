@@ -2,8 +2,10 @@
 
 import { ArrowUpRight, Code, UserRound } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
+import { JoinSign } from "@/components/lists/join-sign";
 import { BuildNext } from "@/components/donate/build-next";
 import { DonateDialog } from "@/components/donate/donate-dialog";
 import { WallColumns, WallStrip } from "@/components/home/benefactor-wall";
@@ -15,6 +17,9 @@ import { WorldCard } from "@/components/home/world-card";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { ACTION_QUIET } from "@/components/styles";
 import { useAdminSession } from "@/hooks/use-admin-session";
+import { useDonorSession } from "@/hooks/use-donor-session";
+import { useJoinReturn } from "@/hooks/use-join-return";
+import { useLists } from "@/hooks/use-lists";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMilestones, type Milestones } from "@/hooks/use-milestones";
 import { usePrefs } from "@/hooks/use-prefs";
@@ -24,7 +29,8 @@ import { useWall } from "@/hooks/use-wall";
 import { useWorldVisits } from "@/hooks/use-world-visits";
 import { broughtByWorld, type BroughtWorld } from "@/lib/brought-by";
 import { rankCities } from "@/lib/city-picker";
-import { API_URL, paymentLinkFor } from "@/lib/donate";
+import { API_URL, paymentLinkFor, type CityMilestone } from "@/lib/donate";
+import { type ListKey } from "@/lib/lists";
 import { cn } from "@/lib/utils";
 import { byVisits, siteTotals, type WorldCounts } from "@/lib/visits";
 import {
@@ -79,7 +85,11 @@ function WorldGrid({
   /** each world's visits; undefined when the build has no API, and the cards say none */
   visits?: WorldCounts | null;
   /** the tile after the cards: the list it draws its cities from, and how to open the donate sign */
-  next?: { milestones: Milestones; onDonate: () => void };
+  next?: {
+    milestones: Milestones;
+    onDonate: () => void;
+    newCities?: { on: boolean; onJoin: () => void; onLeave: () => void };
+  };
 }) {
   return (
     <section aria-labelledby={id}>
@@ -111,6 +121,7 @@ function WorldGrid({
             columns={columns}
             milestones={next.milestones}
             onDonate={next.onDonate}
+            newCities={next.newCities}
           />
         )}
       </ul>
@@ -138,7 +149,41 @@ export function Landing() {
     by: { slug: "" },
   });
   const openBenefactors = (by: CityRef) => setBenefactors({ open: true, by });
-  const milestones = useMilestones();
+  // the lists "hear when a city is built": the sign for someone not signed in, and a recount of
+  // who waits whenever a list is joined or left
+  const [join, setJoin] = useState<{ open: boolean; list: ListKey | null }>({
+    open: false,
+    list: null,
+  });
+  const [listsVersion, setListsVersion] = useState(0);
+  const milestones = useMilestones(listsVersion);
+  const donor = useDonorSession();
+  const { lists, join: joinList, leave: leaveList } = useLists();
+  const joinReturn = useJoinReturn();
+  // the page was opened from a sign-in link with a join waiting: the sign opens on its last
+  // step, or asks again when the link did not sign the visitor in (saying why)
+  const [returnShown, setReturnShown] = useState(true);
+  const tellMe = (key: ListKey) => {
+    if (!donor) {
+      setJoin({ open: true, list: key });
+      return;
+    }
+    void joinList(key).then((ok) => {
+      if (ok) setListsVersion((v) => v + 1);
+      else toast.error(t.lists.join.failed);
+    });
+  };
+  const stopTelling = (key: ListKey) => {
+    void leaveList(key).then((ok) => {
+      if (ok) setListsVersion((v) => v + 1);
+      else toast.error(t.lists.leaveFailed);
+    });
+  };
+  const cityKey = (city: CityMilestone): ListKey => ({
+    kind: "city",
+    slug: city.slug,
+    name: city.name,
+  });
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
   // the real cities first, then the places that only exist in stories; each group most visited
   // first, by the first counts that came (the registry's order until then)
@@ -174,6 +219,16 @@ export function Landing() {
   const ranking = rankCities(milestones.cities);
   const funding =
     milestones.state === "ready" ? ranking.funded.length + ranking.ranked.length : null;
+  const newCities = {
+    on: lists?.newCities ?? false,
+    onJoin: () => tellMe({ kind: "new" }),
+    onLeave: () => stopTelling({ kind: "new" }),
+  };
+  const cityLists = {
+    mine: lists,
+    onTellMe: (city: CityMilestone) => tellMe(cityKey(city)),
+    onLeave: (city: CityMilestone) => stopTelling(cityKey(city)),
+  };
   const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
 
   return (
@@ -248,7 +303,13 @@ export function Landing() {
         brought={brought}
         visits={shownVisits}
         next={
-          takesDonations ? { milestones, onDonate: () => setDonate({ city: null }) } : undefined
+          takesDonations
+            ? {
+                milestones,
+                onDonate: () => setDonate({ city: null }),
+                newCities: withApi ? newCities : undefined,
+              }
+            : undefined
         }
       />
       {imagined.length > 0 && (
@@ -272,6 +333,7 @@ export function Landing() {
             milestones={milestones}
             onDonate={(city) => setDonate({ city })}
             onBenefactors={(slug) => openBenefactors({ slug })}
+            lists={withApi ? cityLists : undefined}
           />
         </section>
       )}
@@ -331,6 +393,25 @@ export function Landing() {
           onBecome={(city) => {
             // one sign at a time: the donate sign takes the benefactors' place
             setBenefactors((b) => ({ ...b, open: false }));
+            openFor(city);
+          }}
+        />
+      )}
+
+      {withApi && (
+        <JoinSign
+          open={join.open || (joinReturn.list !== null && returnShown)}
+          list={join.list ?? joinReturn.list}
+          notice={join.list === null ? joinReturn.notice : null}
+          onOpenChange={(open) => {
+            if (open) return;
+            setJoin((j) => ({ ...j, open: false }));
+            setReturnShown(false);
+          }}
+          onHelp={(city) => {
+            // one sign at a time: the donate sign takes the join sign's place
+            setJoin((j) => ({ ...j, open: false }));
+            setReturnShown(false);
             openFor(city);
           }}
         />

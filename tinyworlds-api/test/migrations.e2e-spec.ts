@@ -105,4 +105,32 @@ describe('the migrations', () => {
       false,
     ]);
   });
+
+  it('counts every world already on the map as told to the lists', async () => {
+    const migration = '20261112030000_city_lists';
+    await upTo(migration);
+    await db.query(`INSERT INTO cities (id, slug, name, status, goal_cents, world_id, updated_at) VALUES
+      (gen_random_uuid(), 'new-york', 'New York', 'BUILT', 3000, 'tinynyc', now()),
+      (gen_random_uuid(), 'winterfell', 'Winterfell', 'PROPOSED', 3000, 'tinywinterfell', now()),
+      (gen_random_uuid(), 'lisbon', 'Lisbon', 'PROPOSED', 3000, NULL, now())`);
+    await db.query(sqlOf(migration));
+    const { rows } = await db.query<{
+      slug: string;
+      lists_announced_at: Date | null;
+      lists_started_at: Date | null;
+    }>(
+      'SELECT slug, lists_announced_at, lists_started_at FROM cities ORDER BY slug',
+    );
+    expect(
+      rows.map((row) => [
+        row.slug,
+        row.lists_announced_at !== null,
+        row.lists_started_at !== null,
+      ]),
+    ).toEqual([
+      ['lisbon', false, false],
+      ['new-york', true, true],
+      ['winterfell', true, true],
+    ]);
+  });
 });

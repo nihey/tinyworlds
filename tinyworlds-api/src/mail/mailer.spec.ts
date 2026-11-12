@@ -1,4 +1,9 @@
-import { createMailer, type MailEnv } from './mailer.js';
+import {
+  createMailer,
+  isRecipientRefused,
+  isServerFailure,
+  type MailEnv,
+} from './mailer.js';
 
 const ENV: MailEnv = {
   NODE_ENV: 'production',
@@ -46,5 +51,44 @@ describe('createMailer', () => {
     const { handed, made } = mailer();
     await made.send({ ...MAIL, from: undefined });
     expect(handed[0].from).toBe('tinyworlds <site@example.com>');
+  });
+});
+
+/** An error as nodemailer makes one for a reply of the mail server's. */
+const smtpError = (code: string, command: string, responseCode?: number) =>
+  Object.assign(new Error('refused'), { code, command, responseCode });
+
+describe('isRecipientRefused', () => {
+  it('is a 5xx reply to the recipient: that address will never take the mail', () => {
+    expect(isRecipientRefused(smtpError('EENVELOPE', 'RCPT TO', 550))).toBe(
+      true,
+    );
+    expect(isRecipientRefused(smtpError('EENVELOPE', 'RCPT TO', 553))).toBe(
+      true,
+    );
+  });
+
+  it('is not a temporary reply (4xx), which may go through next time', () => {
+    expect(isRecipientRefused(smtpError('EENVELOPE', 'RCPT TO', 450))).toBe(
+      false,
+    );
+  });
+
+  it('is not a refusal of the sender or of the message, which every mail would get', () => {
+    expect(isRecipientRefused(smtpError('EENVELOPE', 'MAIL FROM', 550))).toBe(
+      false,
+    );
+    expect(isRecipientRefused(smtpError('EMESSAGE', 'DATA', 554))).toBe(false);
+  });
+
+  it('is not the mail server failing, nor an error with no reply', () => {
+    const auth = smtpError('EAUTH', 'AUTH PLAIN', 535);
+    expect(isServerFailure(auth)).toBe(true);
+    expect(isRecipientRefused(auth)).toBe(false);
+    expect(isRecipientRefused(smtpError('ECONNECTION', 'CONN'))).toBe(false);
+    expect(isRecipientRefused(new Error('550 mailbox unavailable'))).toBe(
+      false,
+    );
+    expect(isRecipientRefused(null)).toBe(false);
   });
 });

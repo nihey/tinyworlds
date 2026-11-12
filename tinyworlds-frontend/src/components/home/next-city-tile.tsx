@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDown, Heart } from "lucide-react";
+import { NewCitiesButton } from "@/components/lists/new-cities-button";
 import { MilestoneBar } from "@/components/donate/milestone-bar";
 import { ACTION, QUIET } from "@/components/styles";
 import type { Milestones } from "@/hooks/use-milestones";
@@ -36,6 +37,7 @@ export function NextCityTile({
   columns = 3,
   milestones,
   onDonate,
+  newCities,
 }: {
   /** how many cards stand before it */
   cards: number;
@@ -43,6 +45,8 @@ export function NextCityTile({
   columns?: number;
   milestones: Milestones;
   onDonate: () => void;
+  /** the "new cities" list: its button is there only with an API */
+  newCities?: { on: boolean; onJoin: () => void; onLeave: () => void };
 }) {
   const { t, locale } = useI18n();
   const small = tileSpan(cards, Math.min(columns, 2));
@@ -83,6 +87,7 @@ export function NextCityTile({
                 <Heart aria-hidden className="size-4 fill-current" strokeWidth={2.5} />
                 {t.home.next.action}
               </button>
+              {newCities && <NewCitiesButton {...newCities} />}
               <a href="#ranking" className={cn(QUIET, "inline-flex items-center gap-1")}>
                 {t.home.next.ranking}
                 <ArrowDown aria-hidden className="size-3.5" strokeWidth={2.5} />

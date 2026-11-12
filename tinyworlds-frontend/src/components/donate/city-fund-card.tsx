@@ -2,10 +2,12 @@
 
 import { ArrowUpRight, BadgeCheck, Heart } from "lucide-react";
 import { useState } from "react";
+import { TellMeButton } from "@/components/lists/tell-me-button";
 import { PixelIcon } from "@/components/benefactors/pixel-badge";
 import { PILL_DONATE, PILL_GHOST, PILL_SOLID } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
 import { donationsLabel, formatUsd, type CityMilestone } from "@/lib/donate";
+import { waitingLine } from "@/lib/lists";
 import { cityStones } from "@/lib/stones";
 import { cn } from "@/lib/utils";
 import { SITE_ID, worldCardUrl, worldUrl } from "@/site";
@@ -34,6 +36,10 @@ interface CityFundCardProps {
   onDonate: (city: string) => void;
   onBenefactors: (slug: string) => void;
   as?: NameLevel;
+  /** the list "hear when it is built": without these (no API) there is no button */
+  onTellMe?: (city: CityMilestone) => void;
+  onLeave?: (city: CityMilestone) => void;
+  listState?: "join" | "joined" | "donor";
 }
 
 /**
@@ -46,6 +52,9 @@ export function CityFundCard({
   onDonate,
   onBenefactors,
   as: Name = "h4",
+  onTellMe,
+  onLeave,
+  listState = "join",
 }: CityFundCardProps) {
   const { t, locale } = useI18n();
   const stones = cityStones(city.raisedCents, city.goalCents);
@@ -54,6 +63,7 @@ export function CityFundCard({
     .replace("{goal}", formatUsd(city.goalCents, locale));
   const status = statusLabel(city, t);
   const donations = donationsLabel(city.donations, locale, t.donate.donations);
+  const waiting = waitingLine(city.waiting, locale, t);
   return (
     <article className={cn(CARD, status && REACHED)}>
       <div className="flex items-start gap-2">
@@ -96,8 +106,17 @@ export function CityFundCard({
             <span>{t.donate.build.firstUnclaimed}</span>
           </>
         )}
+        {waiting && <span>· {waiting}</span>}
       </p>
       <div className="mt-auto flex flex-wrap gap-2">
+        {onTellMe && onLeave && (
+          <TellMeButton
+            city={city}
+            state={listState}
+            onJoin={() => onTellMe(city)}
+            onLeave={() => onLeave(city)}
+          />
+        )}
         {city.donations > 0 && (
           <button
             type="button"

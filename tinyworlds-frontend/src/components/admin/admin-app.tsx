@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { replaceUrl } from "@/map/hash";
 import { HOME_URL } from "@/site";
 import { FunnelReport } from "./funnel-report";
+import { ListCounts } from "./list-counts";
 import { Names } from "./names";
 import { SignIn, type SignInNotice } from "@/components/sign-in/sign-in";
 
@@ -138,6 +139,7 @@ function Report({ session, onEnded }: { session: AdminSession; onEnded: () => vo
         >
           <FunnelReport funnel={funnel} locale={locale} t={t} />
           <Names session={session} locale={locale} t={t} onEnded={onEnded} />
+          <ListCounts session={session} t={t} onEnded={onEnded} />
         </div>
       ) : (
         <div className="sign px-5 py-5 sm:px-6">

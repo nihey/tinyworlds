@@ -82,6 +82,8 @@ export interface CityMilestone {
   status: CityStatus;
   /** the world a built city lives at: "/<worldId>/" */
   worldId: string | null;
+  /** people waiting to hear when it is built */
+  waiting: number;
 }
 
 /** Keeps the well-formed entries of whatever the API answered. */
@@ -105,6 +107,7 @@ export function parseMilestones(value: unknown): CityMilestone[] {
         status === "FUNDED" || status === "BUILDING" || status === "BUILT" ? status : "PROPOSED",
       worldId:
         typeof item.worldId === "string" && /^[a-z0-9-]+$/.test(item.worldId) ? item.worldId : null,
+      waiting: Math.max(0, Number(item.waiting) || 0),
     });
   }
   return out;

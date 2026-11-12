@@ -7,6 +7,7 @@ import {
   normalizeCode,
   niceMax,
   parseFunnel,
+  parseListCounts,
   parseNames,
   parseSession,
   rangeOf,
@@ -296,5 +297,47 @@ describe("the benefactor names", () => {
   it("is empty for anything that is not a list", () => {
     expect(parseNames(null)).toEqual([]);
     expect(parseNames({})).toEqual([]);
+  });
+});
+
+describe("the lists' counts", () => {
+  const raw = {
+    cities: [
+      { name: "Austin", slug: "austin", waiting: 12 },
+      { name: "Denver", slug: "denver", waiting: 3 },
+    ],
+    newCities: 40,
+  };
+
+  it("keeps the cities in the order given, and the new cities' count", () => {
+    expect(parseListCounts(raw)).toEqual(raw);
+  });
+
+  it("has no cities and none waiting when the lists are empty", () => {
+    expect(parseListCounts({ cities: [], newCities: 0 })).toEqual({ cities: [], newCities: 0 });
+  });
+
+  it("drops rows that are malformed", () => {
+    const read = parseListCounts({
+      cities: [
+        raw.cities[0],
+        { name: "", slug: "x", waiting: 1 },
+        { name: "No slug", waiting: 1 },
+        { name: "Bad", slug: "bad", waiting: -1 },
+        { name: "Float", slug: "float", waiting: 1.5 },
+        { name: "Text", slug: "text", waiting: "4" },
+        null,
+      ],
+      newCities: 2,
+    });
+    expect(read?.cities).toEqual([raw.cities[0]]);
+  });
+
+  it("is null when the answer is not counts at all, never a table that claims nobody waits", () => {
+    expect(parseListCounts(null)).toBeNull();
+    expect(parseListCounts("x")).toBeNull();
+    expect(parseListCounts({ cities: [] })).toBeNull();
+    expect(parseListCounts({ cities: [], newCities: -1 })).toBeNull();
+    expect(parseListCounts({ cities: "no", newCities: 1 })).toBeNull();
   });
 });

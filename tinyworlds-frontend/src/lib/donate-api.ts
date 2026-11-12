@@ -34,6 +34,7 @@ const MILESTONES = gql`
       benefactorCount
       status
       worldId
+      waiting
     }
   }
 `;

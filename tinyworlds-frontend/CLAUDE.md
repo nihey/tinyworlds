@@ -111,6 +111,7 @@ src/
 ├── app/                 # layout (fonts, metadata, theme script, accent), globals.css, and two
 │                        # pages: page.map.tsx (a world) and page.home.tsx (the front page);
 │                        # admin/page.home.tsx: the admin pages, in the front page's build only;
+│                        # lists/leave/page.home.tsx: what a mail's leave link opens;
 │                        # hall-of-fame/page.home.tsx and hall-of-fame/[city]/page.home.tsx:
 │                        # the hall of fame and a city's own, likewise; terms/page.home.tsx and
 │                        # privacy/page.home.tsx: the terms of service and the privacy policy
@@ -156,14 +157,20 @@ src/
 ├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
 ├── components/admin/    # the admin pages: admin-app.tsx (signed in or not),
 │                        # funnel-report.tsx (the steps, the cities by visits, the days),
-│                        # names.tsx (donors' names and their links: hide and show)
+│                        # names.tsx (donors' names and their links: hide and show),
+│                        # list-counts.tsx (how many wait on each list: counts only)
+├── components/lists/    # the waiting lists: join-sign.tsx (the sign "Tell me" opens),
+│                        # tell-me-button.tsx (a city's button and its "N waiting"),
+│                        # new-cities-button.tsx, leave-page.tsx (/lists/leave/); their hooks
+│                        # are in hooks/: use-lists.ts (the donor's lists, and joining),
+│                        # use-join-return.ts (the front page opened from a join's link)
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/legal/    # the legal pages (legal-page.tsx, legal-text.tsx) and the footers'
 │                        # links to them (legal-links.tsx)
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
-│                        # useAdminSession, …
+│                        # useAdminSession, useLists, useJoinReturn, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
@@ -180,7 +187,10 @@ src/
                          # gave: the request, its answer, the two sides), hall.ts (the hall
                          # of fame's questions and answers, its cities and figures),
                          # hall-build.ts (the same, asked by the build to bake the pages),
-                         # brought-by.ts (pure: which cities their benefactors brought)
+                         # brought-by.ts (pure: which cities their benefactors brought),
+                         # lists.ts (pure: a list's key, the join waiting for a sign-in in
+                         # localStorage "tinyworlds.join", the leave link's states),
+                         # lists-api.ts (myLists, joinList, leaveList, leaveListWithToken; lazy)
 ```
 
 ## Targets: worlds and the front page
@@ -498,6 +508,11 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
   with a table behind it; the latest donations. One period for everything (7, 30, 90 days,
   12 months: whole local days, `rangeOf`). One colour marks everything (`--taxi`), bars are
   thin, and every figure a bar stands for is written beside it or in the table.
+- **"Waiting to hear"** (`components/admin/list-counts.tsx`, `listCounts` through
+  `fetchListCounts`, parsed by `parseListCounts`): a table under the names, a row per city
+  (most waited for first) and a "New cities" row. Counts only, never an address; it loads on
+  its own, and a failed load says so (with a retry) rather than showing a table that claims
+  nobody waits.
 - There is nothing secret in the page itself: the numbers come from the API, which gives them
   to signed-in admins alone. Who the admins are is the API's `ADMIN_EMAILS`.
 
@@ -573,7 +588,8 @@ either build, like `HALL_URL`.
   the quiz's answers, Rybbit and Google Analytics behind the cookie question, what the
   browser keeps, what a donation, a donor, a link and a sign-in store, and where it goes.
   **Change it with any change to what the site or the API collects, keeps or sends
-  elsewhere**, move `LEGAL_UPDATED`, and tell donors by email when the change matters to
+  elsewhere** (the lists' addresses and mails, and the join kept in `localStorage` while a
+  sign-in link is on its way, are covered in `/privacy/#lists`), move `LEGAL_UPDATED`, and tell donors by email when the change matters to
   them (both texts promise this). The commitments in the terms (refunds within 30 days, a
   city that cannot be built offered elsewhere or refunded) are the owner's to change, not
   the code's.
@@ -627,6 +643,37 @@ canonical address.
 - `HallFrame` is what both pages stand in: the wordmark home, "Your cities", the language,
   title and theme, the visit, and the donate sign.
 
+## The waiting lists (front page, `/me/`, `/lists/leave/`)
+
+Anyone may ask to hear when a city is built, or when any new one is (root `CLAUDE.md`, the
+lists' bullet). Only with an API (`withApi`); `lib/lists.ts` is the pure part, `lib/lists-api.ts`
+(Apollo, lazy) the calls, `useLists` (`hooks/use-lists.ts`) the donor's lists.
+
+- **On the front page**: each city being funded (the "Build the next city" tile and the
+  ranking's cards, `CityFundCard`) has a **"Tell me"** button (`TellMeButton`; "You'll be told"
+  once on the list, and pressing it leaves: its label for screen readers starts with those
+  words, `leaveAria`; a donor of the city is told without a list, and the button says so) and shows **"N waiting"** (`waiting` of `cityMilestones`). The tile (`NextCityTile`)
+  also has **"Tell me when new cities are built"** (`NewCitiesButton`).
+- **The join sign** (`JoinSign`): a signed-in donor joins at once; anyone else is asked for an
+  address and confirms it with the sign-in link or code (`SignIn purpose="donor"`, the list
+  carried in `magic-link`'s `list`, so the link joins server side wherever it is opened).
+  Its body says what the list sends (`joinWords(…).body`: one mail for a city, one per new
+  city for new cities). When the sign opens, `savePendingJoin` keeps which list, and when, in
+  localStorage (`tinyworlds.join`); closed before a link was asked for that list
+  (`pendingKeptOnClose`), it forgets it (`dropPendingJoin`), so a link asked for on another
+  device never joins a list this browser only looked at.
+- **The front page opened from the link** (`hooks/use-join-return.ts`): the token leaves the
+  address, `verifyLink` trades it, and `takePendingJoin` (ignored after an hour) reads the
+  join waiting here. `joinReturnOf` says what shows: with a join waiting, the sign on that
+  list, on its last step when the link signed the visitor in, else asking again with why (the
+  `notice`, `linkNoticeOf`: expired or used, too many tries, no answer), a new link one press
+  away; with none (the link was opened on another device, and the API joined the list
+  itself), a toast: "You're signed in. Your lists are on Your cities." (never a promise of a
+  welcome mail: that goes once per person, only on a join), with a way to Your cities, and
+  the buttons show the lists; or, when the link failed, why.
+- **"Your lists"** on `/me/` and **`/lists/leave/`**: below.
+- **The admins' counts**: "The donation funnel and the admin pages" above.
+
 ## "Your cities" (`/me/`)
 
 The donor's own page, `src/app/me/page.home.tsx`: front page's build only, `noindex`, like
@@ -666,6 +713,16 @@ session in `donorStore`, "unauthorized" → back to sign-in with the `ended` not
   imagined places together, as `SmallWorldCard`s, and a link to all of them (`CITIES_PATH`).
 - The page owns the donate sign and the benefactors' sign (one at a time, as the front page
   does) and calls `useDonationReturn`: a checkout started here comes back here.
+- **"Your lists"** (`me/your-lists.tsx`, above "Your links"): the cities the donor waits to hear
+  about (with the ranking's words) and "New cities", each with Leave; with none, the "new cities"
+  button. Nothing shows until `useLists().lists` is known. The "Build the next city" cards get
+  "Tell me" too; being signed in, the page needs no join sign.
+- **`/lists/leave/`** (`app/lists/leave/page.home.tsx`, `lists/leave-page.tsx`, noindex, the
+  front page's build only): a mail's leave link, `#t=<token>`. The token is read once and taken
+  out of the address at once (`replaceUrl`), `leaveWithToken` leaves, and `leaveState` says
+  whether it did (`left`, `left-all`, `bad` for a token that is not ours, `failed` for an API
+  that did not answer, which can be retried). "Leave all lists" and "Join again" (the join sign
+  for new cities, `RANKING_PATH` for a city) follow.
 
 Linked from the front page's header, About in every map (`ME_URL`) and the thank-you toast;
 links show only with an API.
