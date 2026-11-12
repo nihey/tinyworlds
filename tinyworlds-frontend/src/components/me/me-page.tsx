@@ -2,6 +2,7 @@
 
 import { LogOut } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
 import { BuildNextShort } from "@/components/donate/build-next";
@@ -10,14 +11,18 @@ import { Wordmark } from "@/components/map/wordmark";
 import { FOG_LINK, QUIET } from "@/components/styles";
 import { useGiving } from "@/hooks/use-giving";
 import { useI18n } from "@/hooks/use-i18n";
+import { useLists } from "@/hooks/use-lists";
 import { useMilestones } from "@/hooks/use-milestones";
 import { useDonationReturn } from "@/hooks/use-site-effects";
 import type { AdminSession } from "@/lib/admin";
 import { defaultGoal, rankCities, withGoal } from "@/lib/city-picker";
+import type { CityMilestone } from "@/lib/donate";
+import type { ListKey } from "@/lib/lists";
 import { cn } from "@/lib/utils";
 import { HOME_URL, RANKING_PATH } from "@/site";
 import { YourBadges } from "./badges";
 import { KeepExploring } from "./keep-exploring";
+import { YourLists } from "./your-lists";
 import { YourCities } from "./your-cities";
 import { YourLinks } from "./your-links";
 
@@ -41,7 +46,27 @@ export function MePage({
   // a checkout started here comes back here
   useDonationReturn();
   const { load, retry, patch } = useGiving(session, onEnded);
-  const milestones = useMilestones();
+  // the lists "hear when a city is built": a recount of who waits whenever one is joined or left
+  const [listsVersion, setListsVersion] = useState(0);
+  const milestones = useMilestones(listsVersion);
+  const { lists, busy, join: joinList, leave: leaveList } = useLists();
+  const tellMe = (key: ListKey) => {
+    void joinList(key).then((ok) => {
+      if (ok) setListsVersion((v) => v + 1);
+      else toast.error(t.lists.join.failed);
+    });
+  };
+  const stopTelling = (key: ListKey) => {
+    void leaveList(key).then((ok) => {
+      if (ok) setListsVersion((v) => v + 1);
+      else toast.error(t.lists.leaveFailed);
+    });
+  };
+  const cityKey = (city: CityMilestone): ListKey => ({
+    kind: "city",
+    slug: city.slug,
+    name: city.name,
+  });
   // null: closed; otherwise open, with the city it was opened for (or none)
   const [donate, setDonate] = useState<{ city: string | null } | null>(null);
   // `by` stays what it was when the sign closes, so the fading sign does not change or refetch
@@ -96,6 +121,7 @@ export function MePage({
             onEnded={onEnded}
             onGive={(city) => setDonate({ city })}
           />
+          <YourLists lists={lists} busy={busy} onJoin={tellMe} onLeave={stopTelling} />
           {/* links go beside a name on a city's list: for those who gave to one */}
           {donor && giving?.links && (
             <YourLinks
@@ -125,6 +151,11 @@ export function MePage({
                 columns={donor ? 1 : 2}
                 onDonate={(city) => setDonate({ city })}
                 onBenefactors={(slug) => setBenefactors({ open: true, by: { slug } })}
+                lists={{
+                  mine: lists,
+                  onTellMe: (city) => tellMe(cityKey(city)),
+                  onLeave: (city) => stopTelling(cityKey(city)),
+                }}
               />
             </div>
             {listed && open > 0 && (

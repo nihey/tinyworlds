@@ -211,3 +211,39 @@ export function waitingLine(n: number, locale: Locale, t: Strings): string | nul
     new Intl.PluralRules(locale).select(n) === "one" ? t.lists.waitingOne : t.lists.waitingMany;
   return form.replace("{n}", new Intl.NumberFormat(locale).format(n));
 }
+
+// ---------------------------------------------------------------------------------------------
+// the page a mail's leave link opens
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The token of a leave link: `…/lists/leave/#t=<donor>.<list>.<mac>`. In the hash, so it is
+ * never sent to the web server nor seen by the page analytics. Null when the address has none
+ * or it is not shaped like one (the API judges the rest).
+ */
+export function leaveTokenFromHash(hash: string): string | null {
+  const token = new URLSearchParams(hash.replace(/^#/, "")).get("t");
+  return token && /^[\w.*-]{20,300}$/.test(token) ? token : null;
+}
+
+/** Where the leave page is: waiting for the API, done, a link that is not ours, or no answer. */
+export type LeaveState =
+  | { phase: "working"; all: boolean }
+  | { phase: "left" }
+  | { phase: "left-all" }
+  | { phase: "bad" }
+  | { phase: "failed"; all: boolean };
+
+export type LeaveEvent =
+  | { type: "start"; all: boolean }
+  | { type: "answered"; all: boolean; good: boolean }
+  | { type: "failed" };
+
+/** An answer only counts while one is awaited; `failed` keeps what to retry. */
+export function leaveState(state: LeaveState, event: LeaveEvent): LeaveState {
+  if (event.type === "start") return { phase: "working", all: event.all };
+  if (state.phase !== "working") return state;
+  if (event.type === "failed") return { phase: "failed", all: state.all };
+  if (!event.good) return { phase: "bad" };
+  return event.all ? { phase: "left-all" } : { phase: "left" };
+}

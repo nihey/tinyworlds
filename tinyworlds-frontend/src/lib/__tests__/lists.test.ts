@@ -9,6 +9,9 @@ import {
   isBusy,
   joinStep,
   joinWords,
+  leaveState,
+  leaveTokenFromHash,
+  type LeaveState,
   homeReturnUrl,
   NO_OPS,
   listParam,
@@ -246,5 +249,67 @@ describe("waitingLine", () => {
   it("groups thousands as the language does, in its own words", () => {
     expect(waitingLine(1234, "en-US", en)).toBe("1,234 waiting");
     expect(waitingLine(1234, "pt-BR", ptBR)).toBe("1.234 esperando");
+  });
+});
+
+describe("leaveTokenFromHash", () => {
+  const token =
+    "0b6e2a4c-1d3f-4e5a-8b7c-9d0e1f2a3b4c.*.q1w2e3r4t5y6u7i8o9p0_-AbCdEfGhIjKlMnOpQrStUvWx";
+
+  it("reads the token of a leave link, a star and dots included", () => {
+    expect(leaveTokenFromHash(`#t=${token}`)).toBe(token);
+    expect(leaveTokenFromHash(`t=${token}`)).toBe(token);
+  });
+
+  it("is null when there is none, or it is not shaped like one", () => {
+    expect(leaveTokenFromHash("")).toBeNull();
+    expect(leaveTokenFromHash("#")).toBeNull();
+    expect(leaveTokenFromHash("#t=")).toBeNull();
+    expect(leaveTokenFromHash("#t=short")).toBeNull();
+    expect(leaveTokenFromHash(`#token=${token}`)).toBeNull();
+    expect(leaveTokenFromHash(`#t=${token}<script>`)).toBeNull();
+    expect(leaveTokenFromHash(`#t=${"a".repeat(400)}`)).toBeNull();
+  });
+});
+
+describe("leaveState", () => {
+  const working: LeaveState = { phase: "working", all: false };
+
+  it("starts working, remembering whether it leaves one list or all", () => {
+    expect(leaveState({ phase: "left" }, { type: "start", all: true })).toEqual({
+      phase: "working",
+      all: true,
+    });
+  });
+
+  it("a good token leaves the list, or every list when asked", () => {
+    expect(leaveState(working, { type: "answered", all: false, good: true })).toEqual({
+      phase: "left",
+    });
+    expect(leaveState(working, { type: "answered", all: true, good: true })).toEqual({
+      phase: "left-all",
+    });
+  });
+
+  it("a token that is not ours is bad, whichever was asked", () => {
+    expect(leaveState(working, { type: "answered", all: false, good: false })).toEqual({
+      phase: "bad",
+    });
+    expect(leaveState(working, { type: "answered", all: true, good: false })).toEqual({
+      phase: "bad",
+    });
+  });
+
+  it("an unreachable API is failed, not bad, and remembers what to retry", () => {
+    expect(leaveState({ phase: "working", all: true }, { type: "failed" })).toEqual({
+      phase: "failed",
+      all: true,
+    });
+  });
+
+  it("an answer that arrives when nothing is awaited changes nothing", () => {
+    const left: LeaveState = { phase: "left" };
+    expect(leaveState(left, { type: "answered", all: true, good: false })).toBe(left);
+    expect(leaveState(left, { type: "failed" })).toBe(left);
   });
 });

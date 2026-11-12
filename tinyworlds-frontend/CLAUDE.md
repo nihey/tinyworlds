@@ -600,6 +600,16 @@ session in `donorStore`, "unauthorized" → back to sign-in with the `ended` not
   imagined places together, as `SmallWorldCard`s, and a link to all of them (`CITIES_PATH`).
 - The page owns the donate sign and the benefactors' sign (one at a time, as the front page
   does) and calls `useDonationReturn`: a checkout started here comes back here.
+- **"Your lists"** (`me/your-lists.tsx`, above "Your links"): the cities the donor waits to hear
+  about (with the ranking's words) and "New cities", each with Leave; with none, the "new cities"
+  button. Nothing shows until `useLists().lists` is known. The "Build the next city" cards get
+  "Tell me" too; being signed in, the page needs no join sign.
+- **`/lists/leave/`** (`app/lists/leave/page.home.tsx`, `lists/leave-page.tsx`, noindex, the
+  front page's build only): a mail's leave link, `#t=<token>`. The token is read once and taken
+  out of the address at once (`replaceUrl`), `leaveWithToken` leaves, and `leaveState` says
+  whether it did (`left`, `left-all`, `bad` for a token that is not ours, `failed` for an API
+  that did not answer, which can be retried). "Leave all lists" and "Join again" (the join sign
+  for new cities, `RANKING_PATH` for a city) follow.
 
 Linked from the front page's header, About in every map (`ME_URL`) and the thank-you toast;
 links show only with an API.
