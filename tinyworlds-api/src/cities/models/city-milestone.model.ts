@@ -23,6 +23,12 @@ export class CityMilestone {
   @Field(() => Int, { description: 'How many donations named this city' })
   donations: number;
 
+  @Field(() => Int, {
+    description:
+      'How many people gave to it: a donor once, however many gifts; a gift with no address as one',
+  })
+  benefactorCount: number;
+
   @Field(() => CityStatus)
   status: CityStatus;
 

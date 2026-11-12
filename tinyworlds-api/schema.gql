@@ -91,6 +91,10 @@ type BenefactorRow {
 
 """A city's stones, founders and benefactors"""
 type CityBenefactors {
+  """
+  How many people gave to it: a donor once, however many gifts; a gift with no address as one
+  """
+  benefactorCount: Int!
   benefactors: [BenefactorRow!]!
   founders: [FounderRow!]!
   goalCents: Int!
@@ -116,6 +120,11 @@ input CityBenefactorsInput {
 
 """A city and how far it is from the donations that get it built"""
 type CityMilestone {
+  """
+  How many people gave to it: a donor once, however many gifts; a gift with no address as one
+  """
+  benefactorCount: Int!
+
   """How many donations named this city"""
   donations: Int!
 

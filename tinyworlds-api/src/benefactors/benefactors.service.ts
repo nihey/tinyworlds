@@ -10,6 +10,7 @@ import type { MyGiving } from './models/my-giving.model.js';
 import type { WallBenefactor } from './models/wall.model.js';
 import { cityStanding, type Gift } from './standing.js';
 import { benefactorWall } from './wall.js';
+import { benefactorCounts } from '../cities/cities.service.js';
 
 @Injectable()
 export class BenefactorsService {
@@ -49,7 +50,8 @@ export class BenefactorsService {
       where: slug ? { slug, hidden: false } : { worldId: world, hidden: false },
     });
     if (!city) return null;
-    const standing = cityStanding(await this.giftsOf(city.id), city.goalCents);
+    const gifts = await this.giftsOf(city.id);
+    const standing = cityStanding(gifts, city.goalCents);
     // a named row shows its donor's links; a row is named only where the name may be shown
     const rows = [...standing.founders, ...standing.benefactors];
     const links = await this.links.shownFor(
@@ -64,6 +66,10 @@ export class BenefactorsService {
       worldId: city.worldId,
       goalCents: city.goalCents,
       raisedCents: city.raisedCents,
+      benefactorCount:
+        benefactorCounts(
+          gifts.map((gift) => ({ cityId: city.id, donorId: gift.donorId })),
+        ).get(city.id) ?? 0,
       stones: standing.stones,
       founders: standing.founders.map((row) => ({
         ...row,
