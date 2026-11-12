@@ -8,7 +8,13 @@ import { AppModule } from '../src/app.module.js';
 import { AnnounceService } from '../src/benefactors/announce.service.js';
 import { BenefactorsService } from '../src/benefactors/benefactors.service.js';
 import { announceHall, hallLetters } from '../src/benefactors/hall-announce.js';
+import {
+  describeListAnnouncement,
+  ListAnnounceService,
+  listsFellShort,
+} from '../src/lists/list-announce.service.js';
 import { ListsService } from '../src/lists/lists.service.js';
+import { SightsCatalog } from '../src/lists/sights-catalog.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
@@ -2926,6 +2932,127 @@ describe('the API over HTTP', () => {
       }
       expect(await announcedAt()).toBeNull();
       expect((await announce('tinylis')).kind).toBe('sent');
+    });
+
+    it("after the donors' announcement, the CLI's list step mails the waiting", async () => {
+      await giveToLisbon();
+      const lisbon = await prisma.city.findUniqueOrThrow({
+        where: { slug: 'lisbon' },
+      });
+      const [ana] = await donorIds();
+      const dee = await prisma.donor.create({
+        data: { email: 'dee@example.com' },
+      });
+      const eli = await prisma.donor.create({
+        data: { email: 'eli@example.com' },
+      });
+      await prisma.listMember.createMany({
+        data: [
+          // on both lists: one mail
+          { donorId: dee.id, cityId: lisbon.id, locale: 'pt-BR' },
+          { donorId: dee.id, cityId: null, locale: 'pt-BR' },
+          { donorId: eli.id, cityId: null, locale: 'en-US' },
+          // a donor of the city: the donors' mail, and no other
+          { donorId: ana, cityId: lisbon.id, locale: 'en-US' },
+        ],
+      });
+      await build();
+      // the site's files are not asked for: a world with no buildings, and a quiz
+      const pickIn = vi
+        .spyOn(app.get(SightsCatalog), 'pickIn')
+        .mockResolvedValue({ sights: [], unread: false, quiz: true });
+      try {
+        expect((await announce('tinylis')).kind).toBe('sent');
+        const lists = app.get(ListAnnounceService);
+        const done = await lists.announce(['tinylis']);
+        expect(done).toEqual({
+          cities: [
+            {
+              world: 'tinylis',
+              city: 'Lisbon',
+              mailed: 2,
+              failed: [],
+              unsent: [],
+              closed: true,
+            },
+          ],
+          unread: [],
+        });
+        expect(describeListAnnouncement(done)).toEqual([
+          'Lisbon (tinylis), its lists: 2 mailed, 0 failed. Its list is closed.',
+        ]);
+        expect(listsFellShort(done)).toBe(false);
+
+        const listMails = mailer.sent
+          .slice(start)
+          .filter((mail) => mail.headers?.['List-Unsubscribe']);
+        expect(listMails.map((mail) => mail.to).sort()).toEqual([
+          'dee@example.com',
+          'eli@example.com',
+        ]);
+        const toDee = listMails.find((mail) => mail.to === 'dee@example.com');
+        expect(toDee?.subject).toBe('Lisbon já está no mapa. Venha ver');
+        expect(toDee?.html).toContain('href="https://example.com/tinylis/"');
+        expect(toDee?.html).toContain('Jogar Adivinhe o prédio');
+        // Ana had her own mail about Lisbon (in the language of her latest gift), and only that one
+        expect(
+          mailer.sent
+            .slice(start)
+            .filter(
+              (mail) =>
+                mail.to === 'ana@example.com' &&
+                mail.html.includes('/tinylis/og/tinylis.jpg'),
+            )
+            .map((mail) => mail.subject),
+        ).toEqual(['Lisbon ya está en el mapa. Ven a verla']);
+        // a mail of the donors' carries no list header
+        expect(
+          mailer.sent
+            .slice(start)
+            .some(
+              (mail) =>
+                mail.to === 'ana@example.com' &&
+                mail.headers?.['List-Unsubscribe'],
+            ),
+        ).toBe(false);
+
+        const after = await prisma.city.findUniqueOrThrow({
+          where: { slug: 'lisbon' },
+        });
+        expect(after.listsStartedAt).toBeInstanceOf(Date);
+        expect(after.listsAnnouncedAt).toBeInstanceOf(Date);
+        expect(
+          (await prisma.listNotice.findMany()).map((n) => n.donorId).sort(),
+        ).toEqual([dee.id, eli.id].sort());
+        // Lisbon's list has ended; new cities goes on
+        expect(
+          (await prisma.listMember.findMany()).map((m) => [
+            m.donorId,
+            m.cityId,
+          ]),
+        ).toEqual(
+          expect.arrayContaining([
+            [dee.id, null],
+            [eli.id, null],
+          ]),
+        );
+        expect(await prisma.listMember.count()).toBe(2);
+        // the buildings, once per language
+        expect(pickIn).toHaveBeenCalledTimes(2);
+
+        // the next deploy sends nothing
+        expect(await lists.announce(['tinylis'])).toEqual({
+          cities: [],
+          unread: [],
+        });
+        expect(
+          mailer.sent
+            .slice(start)
+            .filter((mail) => mail.headers?.['List-Unsubscribe']),
+        ).toHaveLength(2);
+      } finally {
+        pickIn.mockRestore();
+      }
     });
   });
 

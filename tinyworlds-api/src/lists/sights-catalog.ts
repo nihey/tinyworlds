@@ -25,6 +25,13 @@ interface SightFile {
   sprite?: { src: string; w: number; h: number };
 }
 
+/** What the site's files say of a world, in one language. */
+interface WorldReading {
+  sights: MailSight[];
+  /** It has Guess the building (its quiz file is there). */
+  quiz: boolean;
+}
+
 const TEXT_MAX = 160;
 const CACHE_MS = 60 * 60 * 1000;
 const TIMEOUT_MS = 5000;
@@ -57,7 +64,7 @@ export class SightsCatalog {
   private readonly logger = new Logger(SightsCatalog.name);
   private readonly cache = new Map<
     string,
-    { at: number; sights: MailSight[] }
+    { at: number; reading: WorldReading }
   >();
 
   constructor(
@@ -80,10 +87,18 @@ export class SightsCatalog {
   }
 
   async famous(world: string, locale: Locale): Promise<MailSight[] | null> {
+    return (await this.reading(world, locale))?.sights ?? null;
+  }
+
+  /** A world's famous buildings and whether it has a quiz; null when its files cannot be read. */
+  private async reading(
+    world: string,
+    locale: Locale,
+  ): Promise<WorldReading | null> {
     if (!WORLD_PATTERN.test(world)) return null;
     const key = `${world}/${locale}`;
     const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.at < CACHE_MS) return cached.sights;
+    if (cached && Date.now() - cached.at < CACHE_MS) return cached.reading;
     try {
       const site = this.site();
       const base = `${site}/${world}/data`;
@@ -118,8 +133,10 @@ export class SightsCatalog {
           },
         });
       }
-      this.cache.set(key, { at: Date.now(), sights: found });
-      return found;
+      // a quiz file that is a 404 is a world without the quiz
+      const reading = { sights: found, quiz: quiz !== null };
+      this.cache.set(key, { at: Date.now(), reading });
+      return reading;
     } catch (error) {
       this.logger.warn(
         `could not read ${world}'s buildings: ${error instanceof Error ? error.message : 'unknown'}`,
@@ -168,14 +185,22 @@ export class SightsCatalog {
     return { sights: chosen, unread };
   }
 
+  /**
+   * Up to `count` buildings of one world, at random, and whether it has a quiz (never said of a
+   * world whose files could not be read).
+   */
   async pickIn(
     world: string,
     locale: Locale,
     count: number,
     random: () => number = Math.random,
-  ): Promise<{ sights: MailSight[]; unread: boolean }> {
-    const sights = await this.famous(world, locale);
-    if (sights === null) return { sights: [], unread: true };
-    return { sights: shuffled(sights, random).slice(0, count), unread: false };
+  ): Promise<{ sights: MailSight[]; unread: boolean; quiz: boolean }> {
+    const reading = await this.reading(world, locale);
+    if (reading === null) return { sights: [], unread: true, quiz: false };
+    return {
+      sights: shuffled(reading.sights, random).slice(0, count),
+      unread: false,
+      quiz: reading.quiz,
+    };
   }
 }

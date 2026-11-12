@@ -242,9 +242,10 @@ export class FakePrisma {
         where?: {
           hidden?: boolean;
           status?: CityRow['status'];
-          worldId?: { not: null };
+          worldId?: { not: null } | { in: string[] };
           slug?: string;
           id?: { in: string[] };
+          listsAnnouncedAt?: null;
         };
       } = {},
     ): Promise<CityRow[]> =>
@@ -259,10 +260,35 @@ export class FakePrisma {
               (args.where?.slug === undefined || c.slug === args.where.slug) &&
               (args.where?.id === undefined ||
                 args.where.id.in.includes(c.id)) &&
-              (args.where?.worldId === undefined || c.worldId !== null),
+              (args.where?.worldId === undefined ||
+                ('in' in args.where.worldId
+                  ? c.worldId !== null &&
+                    args.where.worldId.in.includes(c.worldId)
+                  : c.worldId !== null)) &&
+              (args.where?.listsAnnouncedAt === undefined ||
+                !c.listsAnnouncedAt),
           )
           .map((c) => ({ ...c })),
       ),
+    /** The lists' marks, set only where they are not yet: `where` as the list announcement asks. */
+    updateMany: (args: {
+      where: {
+        id: string | { in: string[] };
+        listsStartedAt?: null;
+        listsAnnouncedAt?: null;
+      };
+      data: { listsStartedAt?: Date; listsAnnouncedAt?: Date };
+    }): Promise<{ count: number }> => {
+      const { id, listsStartedAt, listsAnnouncedAt } = args.where;
+      const found = this.cities.filter(
+        (c) =>
+          (typeof id === 'string' ? c.id === id : id.in.includes(c.id)) &&
+          (listsStartedAt === undefined || !c.listsStartedAt) &&
+          (listsAnnouncedAt === undefined || !c.listsAnnouncedAt),
+      );
+      for (const c of found) Object.assign(c, args.data);
+      return Promise.resolve({ count: found.length });
+    },
   };
 
   donation = {
@@ -284,18 +310,31 @@ export class FakePrisma {
       }
       return Promise.resolve(found);
     },
-    /** Gifts with no donor yet (the backfill), or a city's gifts in one currency; in order made. */
+    /**
+     * Gifts with no donor yet (the backfill), a city's gifts in one currency, or the gifts with a
+     * donor to some cities (the lists' announcement); in order made.
+     */
     findMany: (args: {
-      where: { donorId?: null; cityId?: string; currency?: string };
+      where: {
+        donorId?: string | null | { not: null };
+        cityId?: string | { in: string[] };
+        currency?: string;
+      };
     }): Promise<ReturnType<FakePrisma['withRelations']>[]> =>
       Promise.resolve(
         this.donations
           .filter(
             (d) =>
               (args.where.donorId === undefined ||
-                d.donorId === args.where.donorId) &&
+                (args.where.donorId !== null &&
+                typeof args.where.donorId === 'object'
+                  ? d.donorId !== null
+                  : d.donorId === args.where.donorId)) &&
               (args.where.cityId === undefined ||
-                d.cityId === args.where.cityId) &&
+                (typeof args.where.cityId === 'string'
+                  ? d.cityId === args.where.cityId
+                  : d.cityId !== null &&
+                    args.where.cityId.in.includes(d.cityId))) &&
               (args.where.currency === undefined ||
                 d.currency === args.where.currency),
           )
@@ -411,8 +450,18 @@ export class FakePrisma {
       );
       return Promise.resolve(row ? { ...row } : null);
     },
-    findMany: (): Promise<DonorRow[]> =>
-      Promise.resolve(this.donors.map((d) => ({ ...d }))),
+    /** Every donor, or those with the ids asked. */
+    findMany: (
+      args: { where?: { id?: { in: string[] } } } = {},
+    ): Promise<DonorRow[]> =>
+      Promise.resolve(
+        this.donors
+          .filter(
+            (d) =>
+              args.where?.id === undefined || args.where.id.in.includes(d.id),
+          )
+          .map((d) => ({ ...d })),
+      ),
   };
 
   funnelEvent = {
@@ -836,17 +885,20 @@ export class FakePrisma {
       this.listNotices.push(row);
       return Promise.resolve({ ...row });
     },
+    /** One INSERT: a row that is there already refuses them all, unless skipped. */
     createMany: (args: {
       data: Pick<ListNoticeRow, 'donorId' | 'cityId'>[];
       skipDuplicates?: boolean;
     }): Promise<{ count: number }> => {
-      let count = 0;
-      for (const data of args.data) {
-        const there = this.listNotices.some(
+      const there = (data: Pick<ListNoticeRow, 'donorId' | 'cityId'>) =>
+        this.listNotices.some(
           (n) => n.donorId === data.donorId && n.cityId === data.cityId,
         );
-        if (there && !args.skipDuplicates) throw unique('donor_id, city_id');
-        if (there) continue;
+      if (!args.skipDuplicates && args.data.some(there))
+        return Promise.reject(unique('donor_id, city_id'));
+      let count = 0;
+      for (const data of args.data) {
+        if (there(data)) continue;
         this.listNotices.push({ sentAt: new Date(), ...data });
         count++;
       }

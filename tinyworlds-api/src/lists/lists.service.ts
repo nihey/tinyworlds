@@ -32,6 +32,23 @@ export interface MyListsView {
   donated: string[];
 }
 
+/**
+ * The links a list mail carries to leave its list (`list`: a city's id or '*'): the page that
+ * leaves at once, and the one-click address a mail client posts to (RFC 8058).
+ */
+export function leaveUrlsFor(
+  config: ConfigService<Env, true>,
+  donorId: string,
+  list: string,
+): { leaveUrl: string; unsubscribeUrl: string } {
+  const site = config.get('SITE_URL', { infer: true }).replace(/\/+$/, '');
+  const token = leaveToken(sessionSecret(config), donorId, list);
+  return {
+    leaveUrl: `${site}/lists/leave/#t=${token}`,
+    unsubscribeUrl: `${site}/api/lists/unsubscribe?t=${token}`,
+  };
+}
+
 const byName = (a: { name: string }, b: { name: string }): number =>
   a.name.localeCompare(b.name, 'en');
 
@@ -301,14 +318,7 @@ export class ListsService {
     donorId: string,
     list: string,
   ): { leaveUrl: string; unsubscribeUrl: string } {
-    const site = this.config
-      .get('SITE_URL', { infer: true })
-      .replace(/\/+$/, '');
-    const token = leaveToken(sessionSecret(this.config), donorId, list);
-    return {
-      leaveUrl: `${site}/lists/leave/#t=${token}`,
-      unsubscribeUrl: `${site}/api/lists/unsubscribe?t=${token}`,
-    };
+    return leaveUrlsFor(this.config, donorId, list);
   }
 
   /** A city's id for a list key; null for new cities; undefined for a city that is not there. */

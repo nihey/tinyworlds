@@ -8,7 +8,13 @@ import { WORLD_PATTERN } from '../donations/donation-facts.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { createMailer } from '../mail/mailer.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
-import { failureOf } from '../auth/auth.service.js';
+import { failureOf } from '../auth/failure.js';
+import {
+  describeListAnnouncement,
+  ListAnnounceService,
+  listsFellShort,
+} from '../lists/list-announce.service.js';
+import { SightsCatalog } from '../lists/sights-catalog.js';
 import {
   AnnounceService,
   describeAnnouncement,
@@ -18,11 +24,15 @@ import { BenefactorsService } from './benefactors.service.js';
 
 /**
  * Mails the donors of each world's city that it is built: once per city, so it is safe to run
- * on every deploy (deploy/deploy.sh does, after uploading the worlds). Prints what happened,
- * world by world, with counts and donor ids, never an address. Exits 1 when a world fell short
- * (a mail that did not go out, or an announcement that failed), 0 otherwise: an unknown world,
- * a city not marked BUILT yet, or one announced before, are not errors. The environment is the
- * API's own, checked the same way; without a mail server (development) the mails go to the log.
+ * on every deploy (deploy/deploy.sh does, after uploading the worlds). Then tells everyone
+ * waiting on those cities' lists, or on new cities, who did not give to them: once each, one
+ * mail per person for all the worlds of the run (ListAnnounceService), with buildings read from
+ * the site's own files. Prints what happened, world by world, with counts and donor ids, never
+ * an address. Exits 1 when a world fell short (a mail that did not go out, or an announcement
+ * that failed) or the lists did (someone not mailed: the next run tries them), 0 otherwise: an
+ * unknown world, a city not marked BUILT yet, one announced before, or buildings that could not
+ * be read (printed), are not errors. The environment is the API's own, checked the same way;
+ * without a mail server (development) the mails go to the log.
  *
  *   node dist/benefactors/announce-cli.js <world>...   (the built image: npm run cities:announce)
  *   npm run cities:announce:dev -- <world>...          (a checkout: tsx)
@@ -49,11 +59,19 @@ const settings = {
   get: <K extends keyof Env>(key: K): Env[K] => env[key],
 } as unknown as ConfigService<Env, true>;
 
+const mailer = createMailer(env);
 const announcer = new AnnounceService(
   prisma,
   settings,
-  createMailer(env),
+  mailer,
   new BenefactorsService(prisma, new LinksService(prisma, createLinkReader())),
+);
+// the buildings come from the site, as a browser reads them (the real fetch)
+const lists = new ListAnnounceService(
+  prisma,
+  settings,
+  mailer,
+  new SightsCatalog(settings, fetch),
 );
 let shortfall = false;
 try {
@@ -67,6 +85,18 @@ try {
       console.error(`${world}: the announcement failed: ${failureOf(error)}`);
       shortfall = true;
     }
+  }
+  // then the lists, every world of the run at once: one mail per person for all of them
+  try {
+    const done = await lists.announce(worlds);
+    for (const line of describeListAnnouncement(done)) console.log(line);
+    if (listsFellShort(done)) shortfall = true;
+  } catch (error) {
+    // nothing is lost: whoever was not mailed is tried again by the next run
+    console.error(
+      `The lists' announcement failed: ${failureOf(error)}. The next run tries again.`,
+    );
+    shortfall = true;
   }
 } finally {
   await prisma.$disconnect();

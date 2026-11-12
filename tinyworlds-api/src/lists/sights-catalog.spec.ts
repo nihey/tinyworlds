@@ -188,6 +188,19 @@ describe('SightsCatalog', () => {
     expect(await catalog.pickIn('tinynope', 'en-US', 2)).toEqual({
       sights: [],
       unread: true,
+      quiz: false,
     });
+  });
+
+  it('pickIn says whether the world has a quiz: a quiz file that is a 404 is none', async () => {
+    const files = {
+      ...world('tinycos'),
+      ...world('tinytkf', { quiz: false }),
+    };
+    const catalog = new SightsCatalog(config, fake(files).fetcher);
+    expect((await catalog.pickIn('tinycos', 'en-US', 1)).quiz).toBe(true);
+    expect((await catalog.pickIn('tinytkf', 'en-US', 1)).quiz).toBe(false);
+    // and the same from the cache
+    expect((await catalog.pickIn('tinycos', 'en-US', 1)).quiz).toBe(true);
   });
 });

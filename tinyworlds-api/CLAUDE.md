@@ -7,7 +7,8 @@ It also keeps the **donation funnel** (which steps towards a donation each visit
 so how many visits each world had) and shows it to **admins**, who sign in through a link sent
 by email; each world's **visits**, and how many are there now, are public, for the front page's
 cards. **Donors** sign in the same way, to see the cities they helped build; they are thanked by
-mail once Stripe confirms a gift, and told by mail once a city they gave to is built. A donor
+mail once Stripe confirms a gift, and told by mail once a city they gave to is built. Anyone
+may join a **list** (one city's, or every new city's) to hear, once, the day it is built. A donor
 may show up to three **links** beside their name: the API reads each page once and keeps small
 copies of its pictures. And it
 keeps the answers of **Guess the building**, the map's quiz on its famous buildings. Other
@@ -31,7 +32,7 @@ npm run webhook:send -- --amount 40 --city "São Paulo"   # a signed webhook, wi
 npm run funnel:import < funnel.ndjson   # funnel steps from somewhere else (history; safe to repeat)
 npm run donors:backfill   # in the built image (node dist/benefactors/backfill-cli.js): past donations get their donors from Stripe; run once after deploying (safe to repeat: sessions without an email, or whose lookup failed, are asked again)
 npm run donors:backfill:dev   # the same from a checkout, through tsx
-npm run cities:announce -- tinysp [tinyrao …]   # in the built image (node dist/benefactors/announce-cli.js): mails the donors of each world's city that it is built, once (deploy/deploy.sh runs it)
+npm run cities:announce -- tinysp [tinyrao …]   # in the built image (node dist/benefactors/announce-cli.js): mails the donors of each world's city that it is built, once, then everyone waiting on its lists (deploy/deploy.sh runs it)
 npm run cities:announce:dev -- tinysp   # the same from a checkout, through tsx (without SMTP_HOST, the mails go to the log)
 npm run hall:announce     # in the built image (node dist/benefactors/hall-cli.js): who would be told they are in the hall of fame; sends nothing
 npm run hall:announce -- --preview /tmp/mails   # the same, and writes each mail there to be read
@@ -60,6 +61,7 @@ src/
 │   ├── jwt.strategy.ts jwt-auth.guard.ts   # the global guard: admins' unless @Public() / @ForDonors()
 │   ├── public.decorator.ts for-donors.decorator.ts   # the marks the guard reads
 │   ├── current-admin.decorator.ts current-donor.decorator.ts session-secret.ts
+│   ├── failure.ts                  # failureOf: what went wrong, for a log, without the error's message (it may quote an address)
 │   ├── sign-in-mail.ts             # the sign-in mail (code first, then the button), in three languages
 │   └── admin.resolver.ts models/   # { me }
 ├── quiz/                           # Guess the building: quiz.service.ts (answer, tally), resolver, dto/, models/
@@ -89,6 +91,16 @@ src/
 │   ├── links.service.ts            # mine, add, remove, refresh; shownFor (the lists), forReview, setHidden, imageBytes
 │   ├── links.resolver.ts links-admin.resolver.ts dto/ models/   # donors' own; the admins' switch
 │   └── link-images.controller.ts   # GET /api/link-images/:id (REST: a page shows it with <img>)
+├── lists/                          # lists to hear when a city is built
+│   ├── list-key.ts leave-token.ts  # a list as one string ('*' or a slug); the signed leave token
+│   ├── lists.service.ts            # mine, join (then the welcome), describe, joinAfterSignIn, leave, leaveWithToken, counts; leaveUrlsFor
+│   ├── lists.resolver.ts leave.resolver.ts list-counts.resolver.ts dto/ models/   # donors' own; the public leave; the admins' counts
+│   ├── unsubscribe.controller.ts   # POST /api/lists/unsubscribe?t= (REST: what a mail client posts to, RFC 8058)
+│   ├── sights-catalog.ts           # famous buildings read from the site's own files: pickAcross, pickIn
+│   ├── sight-pictures.ts sight-pictures.controller.ts   # a building's sprite as a PNG: GET /api/sight-pictures/:world/:file
+│   ├── mail-parts.ts               # buildings as rows (HTML and text), the List-Unsubscribe headers
+│   ├── welcome-mail.ts             # the welcome, once per person
+│   └── list-announce.service.ts list-built-mail.ts   # the lists told a world is built, once per person (announce-cli's second step); the mail
 ├── cities/
 │   ├── city-name.ts                # cleanCityName, citySlug: what makes two spellings one city
 │   ├── cities.service.ts           # the public list and its order
@@ -115,13 +127,15 @@ scripts/    send-webhook.mjs, rybbit-funnel.sql
 Everything is under `/api`, so the site and the API can share a host. GraphQL at
 `POST /api/graphql`; REST for a few routes only: `POST /api/stripe/webhook` (Stripe needs the
 raw body), signing in, `POST /api/auth/magic-link` and `POST /api/auth/verify`, and
-`GET /api/link-images/:id` (a link's icon or picture, for `<img>`), and
-`POST /api/lists/unsubscribe?t=` (the one-click leave a mail client posts to; always 200). `schema.gql`
-is the generated record of the schema.
+`GET /api/link-images/:id` (a link's icon or picture, for `<img>`),
+`GET /api/sight-pictures/:world/:file` (a famous building's picture as a PNG, for the mails'
+`<img>`), and `POST /api/lists/unsubscribe?t=` (the one-click leave a mail client posts to;
+always 200). `schema.gql` is the generated record of the schema.
 
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
-type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String }
+type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String
+  waiting: Int! }                                              # how many are on its list
 input CreateDonationCheckoutInput { amountCents: Int  city: String  benefactorName: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
 input CityBenefactorsInput { slug: String  world: String }   # exactly one, else BAD_REQUEST
@@ -142,6 +156,7 @@ enum QuizLevel { EASY MEDIUM HARD }
 input AnswerQuizInput { visitId: ID  world: String!  sightId: String!  choice: String!  choices: [String!]  level: QuizLevel  locale: String }
 type QuizPick { choice: String!  count: Int! }
 type QuizTally { answers: Int!  picks: [QuizPick!]! }
+input LeaveListWithTokenInput { token: String!  all: Boolean }   # a mail's leave token; all: every list
 
 # admins only
 type Admin { id: ID!  email: String! }
@@ -151,6 +166,8 @@ type FunnelWorld { world: String  …the same counts }      # null: donations th
 type FunnelDay { day: String!  …the same counts }         # "2026-11-10"
 type FunnelDonation { id: ID!  createdAt: DateTime!  amountCents: Int!  currency: String!  city: String  world: String  locale: String }
 type DonationFunnel { from: DateTime!  to: DateTime!  timeZone: String!  totals: FunnelCounts!  worlds: [FunnelWorld!]!  days: [FunnelDay!]!  recentDonations: [FunnelDonation!]! }
+type CityWaiting { slug: String!  name: String!  waiting: Int! }
+type ListCounts { newCities: Int!  cities: [CityWaiting!]! }   # the size of every list, most waited for first
 
 type Query {
   health: String!  uptime: Int!  cityMilestones: [CityMilestone!]!      # public; uptime: seconds since the process started
@@ -158,14 +175,17 @@ type Query {
   benefactorWall: [WallBenefactor!]!                                    # public; everyone who gave to a city, at most 200
   worldVisits(input: WorldVisitsInput!): [WorldVisits!]!                # public; the worlds asked, in that order
   me: Admin!  donationFunnel(input: DonationFunnelInput!): DonationFunnel!   # admins
-  myGiving: MyGiving!  myLinks: MyLinks!                                # donors
-  benefactorNames: [BenefactorName!]!                                   # admins
+  myGiving: MyGiving!  myLinks: MyLinks!  myLists: MyLists!            # donors
+  benefactorNames: [BenefactorName!]!  listCounts: ListCounts!          # admins
 }
 type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!   # public
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!                          # public
   trackPresence(input: TrackPresenceInput!): Boolean!                              # public
   answerQuiz(input: AnswerQuizInput!): QuizTally!                                  # public
+  leaveListWithToken(input: LeaveListWithTokenInput!): Boolean!                    # public; true for any token of ours
+  joinList(input: ListInput!): MyLists!                                            # donors; once
+  leaveList(input: ListInput!): MyLists!                                           # donors
   setListing(input: SetListingInput!): Boolean!                                    # donors
   setDisplayName(input: SetDisplayNameInput!): String!                             # donors
   addLink(input: AddLinkInput!): MyLink!                                           # donors; reads the page
@@ -191,6 +211,9 @@ type MyLink { id: ID!  url: String!  title: String!  description: String  icon: 
 type MyLinks { links: [MyLink!]!  max: Int!  givenCents: Int!  picturesFromCents: Int!  hidden: Boolean! }   # in the order added
 input AddLinkInput { url: String! }                         # cleaned (cleanLinkUrl); BAD_REQUEST: not a public https page, not given yet, there already, or three
 input LinkIdInput { id: ID! }                               # one of the donor's own links
+input ListInput { city: String  locale: String }            # city by slug, omitted: new cities; locale: the list's mails (joining)
+type ListCity { slug: String!  name: String!  status: CityStatus!  raisedCents: Int!  goalCents: Int!  waiting: Int! }
+type MyLists { newCities: Boolean!  cities: [ListCity!]!  donated: [String!]! }   # cities by name; donated: unbuilt cities they gave to
 ```
 
 **Admins' unless marked.** `JwtAuthGuard` is global (`AuthModule`): every resolver and route
@@ -325,6 +348,63 @@ pictures, `donors.links_hidden` an admin's switch.
   site's doing, not this API's, but it is why a link must be what `cleanLinkUrl` allows and
   nothing else, and why an admin can take a donor's links down at once.
 
+## Lists (`lists/`)
+
+Anyone may ask to hear, once, the day a city is built: on **one city's list**, or on **new
+cities** (every world built after they joined, imagined ones too). Who is on a list is a donor
+row (an address confirmed by signing in), and nothing more.
+
+- **Tables.** `list_members`: one row per donor and list (`city_id`, null for new cities;
+  `locale`, the language of every mail the list sends; `created_at`), unique on
+  `(donor_id, COALESCE(city_id, <zero uuid>))`, an expression index in the migration (Prisma
+  cannot model it), so joining twice is joining once. `list_notices` (`donor_id`, `city_id`,
+  `sent_at`; the key is the pair): that a donor was told a city is built, and the claim that
+  keeps it to once. `donors.welcomed_at`: the welcome went out. `cities.lists_started_at`: when
+  the first run telling the city's lists began, their cut-off; `cities.lists_announced_at`:
+  when everyone on them had been told. The migration counted every world already on the map
+  (`BUILT`, or with a `world_id`) as both, so nobody is told about those.
+- **Joining.** `joinList` (donors, 20 a minute per address: `JOINS_PER_MINUTE`): new cities, or
+  a city that exists, is not hidden and is not `BUILT`, else `BAD_REQUEST`. A visitor who is not
+  signed in joins through the sign-in mail (`POST /api/auth/magic-link` with `list`, see Signing
+  in): the join rides on the link, so opening it on another device joins all the same, and a
+  city built or hidden in between is simply not joined. The first join a donor ever makes sends
+  the **welcome** (Mails), after the answer.
+- **Leaving.** `leaveList` (donors); or from a mail, with no sign-in: the site's
+  `/lists/leave/#t=<token>` calls `leaveListWithToken` (public, 30 a minute per address:
+  `LEAVES_PER_MINUTE`; `all` leaves every list), and a mail client's own unsubscribe posts to
+  `POST /api/lists/unsubscribe?t=<token>` (public, 30 a minute; always 200, saying nothing of
+  the token). Every list mail carries `List-Unsubscribe` and
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) for that. A token of ours
+  answers true even used twice, or after the city is built (nothing left to leave); any other
+  answers false and changes nothing.
+- **The token** (`leave-token.ts`) is `<donorId>.<list>.<mac>`, where the list is a city's id or
+  `*` and the mac is HMAC-SHA256 of both under `JWT_SECRET` (`sessionSecret`). It holds no
+  address and never expires: leaving must always work. **Rotating `JWT_SECRET` invalidates
+  every leave link already mailed** (they answer false; people can still leave from Your
+  cities, and a mail client's unsubscribe is answered 200 and does nothing). In development
+  without `JWT_SECRET`, a secret made up at start signs them, so they die on restart.
+  `leaveUrlsFor` makes both links of a mail.
+- **A city's donors are not on its list's mail**: they get their own (`builtMail`). `myLists`
+  answers `donated` (the unbuilt cities the donor gave to) so the site can say they will hear
+  anyway instead of offering the list.
+- **Counts.** `CityMilestone.waiting` (public) is how many are on the city's list (its donors
+  only if they joined); `listCounts` (admins) the size of every list, most waited for first,
+  and of new cities. Counts only, never an address.
+- **The buildings in the mails** (`sights-catalog.ts`) are read from the site's own published
+  files, as a browser reads them: `SITE_URL/<world>/data/quiz.<locale>.json`, `sights.json`,
+  `sights.<locale>.json` (5 s each). The famous ones are the quiz's easiest level (for a world
+  without a quiz, every sight with an article), each with its sprite and its Wikipedia opening
+  cut at a word to 160 characters. A reading is kept for an hour per world and language. The
+  catalog never throws: a world whose files cannot be read (anything but a quiz file that is a
+  404) is **unread**, logged with its name and asked again next time. `pickAcross` takes one
+  building from each of several worlds (the welcome); `pickIn` some of one world, and whether
+  it has a quiz (a quiz file that is a 404 is none; an unread world has none).
+- **Their pictures** (`GET /api/sight-pictures/:world/<hash>.png`, public): the sprite
+  (`/<world>/data/sights/<hash>.webp`, at most 2 MB) drawn again by sharp as a PNG within
+  220 px (mails show it at 110), since Outlook on Windows shows no WebP. The last 200 are kept
+  in memory; a picture is `Cache-Control: public, max-age=31536000, immutable` (a hash's
+  picture never changes), a 404 is not.
+
 ## Signing in, for admins and donors (`auth/`)
 
 There are no passwords. Two kinds of account sign in (`Purpose`: `admin | donor`), sharing the
@@ -343,7 +423,7 @@ each, and each gets its own links.
 `magic_links` belong to one account: `admin_id` or `donor_id`, exactly one of them (the check
 `magic_links_one_owner`, in the migration since Prisma has no checks).
 
-1. `POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (`purpose` defaults to
+1. `POST /api/auth/magic-link { email, returnUrl, locale?, purpose?, list? }` (`purpose` defaults to
    `admin`) → `202 { sent: true }`, whoever asks. It mails a link to `returnUrl#token=…` to
    any address asked as a donor, and only to an admin's address asked as an admin; `returnUrl` must be a plain page of `ALLOWED_ORIGINS` (the site's `/admin/`, or the
    page a donor asked from). The mail goes out after the answer (`setImmediate`), so neither
@@ -425,24 +505,25 @@ itself, so this API keeps no copy of them. It keeps the answers and tallies them
 
 ## Mails (`mail/`)
 
-Four mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
+Six mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
 a white card on paper, yellow pill buttons, the pixel badges, a footer saying why the person got
 it), each in en-US, pt-BR and es-ES, each with a plain-text part. `MailModule` provides `MAILER`
-(`createMailer`: SMTP, or the log without `SMTP_HOST`/`MAIL_FROM`) to auth, donations and
-benefactors. `layout.ts` is the look, as pure functions of tables and inline styles, readable from
+(`createMailer`: SMTP, or the log without `SMTP_HOST`/`MAIL_FROM`) to auth, donations,
+benefactors and lists. `layout.ts` is the look, as pure functions of tables and inline styles, readable from
 320 to 600 px: `shell`, `button(s)`, `badge`, `stonesGrid`, `progressBar`, `facts`, `impactBox`
 (a number drawn in Tiny5's pixels out of table cells, so it shows without pictures or fonts) and
 `codeBox`. **Every text is escaped** (`html.ts`: `fillHtml` escapes a template and each value
 that is not already markup): city names and display names are typed by donors. Each mail is a
-pure builder from typed facts to `{ subject, text, html }`: `signInMail`, `thanksMail`,
-`builtMail`, `hallMail`.
+pure builder from typed facts to `{ subject, text, html }` (and `headers`, for the lists'):
+`signInMail`, `thanksMail`, `builtMail`, `hallMail`, `welcomeMail`, `listBuiltMail`.
 
 Links and pictures are made from `SITE_URL` (an origin; default: the first of
 `ALLOWED_ORIGINS`): `/me/`, `/`, `/<world>/`, the pictures at `/email/wordmark.png`,
 `founding.png`, `first-stone.png`, `keystone.png` (the front page's own files,
 `tinyworlds-frontend/public/email/`, made by its `npm run email-images`) and a built world's
-real share card, `/<world>/og/<world>.jpg`. Every picture has alt text, and the badges' words
-are text beside their pictures, so a mail with pictures blocked still reads.
+real share card, `/<world>/og/<world>.jpg`; the lists' mails also show famous buildings, as
+PNGs drawn by this API (`/api/sight-pictures/…`, see Lists). Every picture has alt text, and
+the badges' words are text beside their pictures, so a mail with pictures blocked still reads.
 
 A mail never fails, holds up or undoes a donation, a deploy or a sign-in; it goes only to the
 person's own address and names nobody else's; logs name a donation or a donor by id, never by
@@ -485,9 +566,45 @@ address.
   donor. Once some mails have gone out the city counts as announced, and the output says it was
   partial, naming the donors not mailed (failed, or not tried) by id; a later run does not mail
   them (to send the whole announcement again: `UPDATE cities SET built_announced_at = NULL
-  WHERE …`). It exits 1 when any world fell short, 0 otherwise. The migration that added the
-  column counted every city already on the map (`BUILT`, or with a `world_id`) as announced.
-  The command builds its services by hand (no Nest container), so tsx can run it too.
+  WHERE …`). The migration that added the column counted every city already on the map
+  (`BUILT`, or with a `world_id`) as announced. Then, in the same command, **the lists** are
+  told (below). It exits 1 when any world fell short, or the lists did, 0 otherwise. The
+  command builds its services by hand (no Nest container; the catalog with the real `fetch`),
+  so tsx can run it too.
+- **A world is built, for the lists** (`lists/list-announce.service.ts`, `list-built-mail.ts`):
+  the announce command's second step, `ListAnnounceService.announce(worlds)`, every world of the
+  run at once. (1) It takes the worlds' cities that are `BUILT`, not hidden and not yet
+  announced to their lists (`lists_announced_at` null), and (2) marks each started
+  (`lists_started_at`, the first run only: a retry keeps the first run's cut-off). (3) The
+  people are the city's list, and new cities' members who joined by the cut-off; (4) left out
+  are the city's donors (anyone with a donation to it: they have their own mail), anyone
+  already told of it (`list_notices`), and a membership of the city's list made after the
+  cut-off. (5) One mail per person names all their cities of the run, in the language of their
+  newest membership among the reasons; it is about the city when one city's list is the only
+  reason, else about new cities, and its leave link leaves that list (so someone on both a
+  city's list and new cities may leave new cities, the list that goes on). (6) One world: its
+  share card, up to three of its buildings ("Three places to start"; "Two…", "A place…" when it
+  has fewer), "Explore {city}" and, with a quiz, "Play Guess the building" (both to
+  `/<world>/`); several: one block each, its card, one building and its buttons. Buildings are
+  picked once per world and language for the whole run, never per person. A world with none
+  (unread, or imagined) has its picture and buttons; the words never call it a city
+  ("{name} is built. Come and see it."). (7) **Each person is claimed before their mail goes
+  out**: their `list_notices` rows, in one `createMany`; a unique violation (P2002) means
+  another run is mailing them, and they are skipped. A mail that fails gives the claim back
+  (the rows are deleted) and the next run tries that person, and only them, again; a mail
+  server that is away (`isServerFailure`) stops the run, and everyone after is counted as not
+  tried. (8) A city whose run left nobody failed, untried or skipped is **closed**:
+  `lists_announced_at` is set and its list's rows are deleted (the list ends; new cities goes
+  on). The output says, city by city, how many were mailed, the donor ids not mailed, whether
+  the list is closed, and names the worlds whose buildings could not be read (their mails went
+  without them: printed, not a failure); counts and ids, never an address.
+- **Welcome to a list** (`lists/welcome-mail.ts`, `ListsService.welcome`): the first time a
+  donor joins any list, once ever (`donors.welcomed_at`, claimed before sending and given back
+  if it fails), after the join is answered: "We'll write the day {city} is built." (or "…each
+  time a new city is built."), what the list sends (one mail, that day), three buildings
+  already on the map, one from each of three worlds with the city's name over each
+  (`pickAcross`), "Explore the cities" and, for a city, "Help build {city}" (the front page's
+  ranking). The footer says why, with "Leave this list".
 - **You are in the hall of fame** (`benefactors/hall-mail.ts`, `hall-announce.ts`,
   `hall-cli.ts`). Sent by hand, not by any request: `npm run hall:announce -- --send` in the
   container mails every donor who has not been told (`donors.hall_mailed_at` is null) and
@@ -507,7 +624,10 @@ address.
   at its first failure. A later `--send` reaches only those a first run could not, and those
   who have given since. Failures are reported by donor id, never by address.
 - **Sign-in** (`auth/sign-in-mail.ts`): see Signing in. The subject is unchanged ("Your
-  tinyworlds code: 482 913"). Its last line says "The code and the button work once, for 15
+  tinyworlds code: 482 913"). A donor's mail that carries a list says what it is for instead
+  of signing in to Your cities: the label "Confirm your email", "One step and you're on the
+  list for {city}." (or "One step and you'll hear about new cities.") and the button "Confirm
+  and join"; a list that cannot be joined leaves the plain sign-in words. Its last line says "The code and the button work once, for 15
   minutes. Asked more than once? Use the newest mail.": strictly true (an older mail's code
   stops working once a newer link is asked for; its button keeps working until used or
   expired), and the advice is right either way.
@@ -637,10 +757,10 @@ Validated at startup (`config/env.ts`); the server does not start with anything 
 | `CITY_GOAL_CENTS` | `3000` | what a new city needs, in US cents; stored on the city when it is created, so changing it leaves the cities already there as they were: move them with a migration, as `20261111180000_city_goal_thirty_dollars` did when the goal went from US$100 to US$30 |
 | `ALLOWED_ORIGINS` | required | comma-separated origins of the site: the CORS allow-list, where a checkout may return to and where a sign-in link may lead |
 | `ADMIN_EMAILS` | empty | comma-separated addresses that may sign in to the admin pages; empty = nobody |
-| `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions and keys the codes' HMAC; at least 32 characters |
-| `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the mails (sign-in links, thank-yous, a city is built), and the address they come from |
+| `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions, keys the codes' HMAC and signs the lists' leave links (rotating it invalidates every leave link already mailed); at least 32 characters |
+| `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the mails (sign-in links, thank-yous, a city is built, the lists'), and the address they come from |
 | `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | `587`, none, none | 465 means TLS from the start, anything else STARTTLS |
-| `SITE_URL` | the first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail; in production it (or that first origin) must be https, or the API does not start |
+| `SITE_URL` | the first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail, and where the lists' mails read the famous buildings from (`/<world>/data/`); in production it (or that first origin) must be https, or the API does not start |
 | `PORT` | `4000` | |
 | `NODE_ENV` | `development` | GraphiQL and introspection are off in `production` |
 
@@ -662,7 +782,8 @@ go up. `npm run seed` also works by hand inside the image
 the database back too, or roll forward. The image has a `HEALTHCHECK` that asks `{ health }`.
 `sharp` (the links' pictures) comes with its own prebuilt library for the image's platform:
 nothing to install in the Dockerfile. Reading a donor's link needs the container to reach the
-internet, as Stripe and the mail server already do.
+internet, as Stripe and the mail server already do; the lists' mails and their pictures need it
+to reach `SITE_URL` (checked from the running container in production).
 In production the schema is kept in memory (the user cannot write `schema.gql`).
 
 ## Testing
@@ -692,7 +813,9 @@ In production the schema is kept in memory (the user cannot write `schema.gql`).
   between tests; `magic_links` is (with `donors`), so a test may ask for a fresh link. The
   checkout limit is per address and the tests share a minute: a test that starts several
   checkouts sets its own `x-forwarded-for`. The thank-you and the announcement are tested there
-  too (`AnnounceService` taken from the app); the visits' counts are kept in memory for 10 s and
+  too (`AnnounceService` taken from the app), and so are the lists' step after it
+  (`ListAnnounceService` taken from the app, the catalog's `pickIn` stubbed so no test asks the
+  site for its files); the visits' counts are kept in memory for 10 s and
   the thank-yous count too, so the visits tests start their clock when they start.
 - `test/migrations.e2e-spec.ts` tests migrations that change rows: on a database of its own
   (the e2e one's name + `_migrations`, made and dropped), it applies every migration before the
