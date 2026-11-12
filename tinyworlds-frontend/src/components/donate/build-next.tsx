@@ -14,7 +14,8 @@ import {
   rankCities,
   withGoal,
 } from "@/lib/city-picker";
-import { API_URL, formatUsd } from "@/lib/donate";
+import { API_URL, formatUsd, type CityMilestone } from "@/lib/donate";
+import { cityListState, type MyLists } from "@/lib/lists";
 import { cn } from "@/lib/utils";
 import { SITE_ID } from "@/site";
 import { BuiltCityCard, CityFundCard, OtherCityCard } from "./city-fund-card";
@@ -29,6 +30,23 @@ interface Handlers {
   onDonate: (city: string | null) => void;
   /** open that city's benefactors */
   onBenefactors: (slug: string) => void;
+  /** "Tell me" and leaving the list; without them (no API) the cards have no such button */
+  lists?: {
+    mine: MyLists | null;
+    onTellMe: (city: CityMilestone) => void;
+    onLeave: (city: CityMilestone) => void;
+  };
+}
+
+/** The props that give a card its "Tell me". */
+function listProps(lists: Handlers["lists"], slug: string) {
+  return lists
+    ? {
+        onTellMe: lists.onTellMe,
+        onLeave: lists.onLeave,
+        listState: cityListState(slug, lists.mine),
+      }
+    : {};
 }
 
 /** Whether there is a list of cities to show: an API, and an answer that did not fail. */
@@ -105,6 +123,7 @@ export function BuildNext({
   milestones,
   onDonate,
   onBenefactors,
+  lists,
 }: { milestones: Milestones } & Handlers) {
   const { t } = useI18n();
   const [allBuilt, setAllBuilt] = useState(false);
@@ -162,7 +181,12 @@ export function BuildNext({
           <ul className={GRID}>
             {funded.map((city) => (
               <li key={city.id} className="min-w-0">
-                <CityFundCard city={city} onDonate={onDonate} onBenefactors={onBenefactors} />
+                <CityFundCard
+                  city={city}
+                  onDonate={onDonate}
+                  onBenefactors={onBenefactors}
+                  {...listProps(lists, city.slug)}
+                />
               </li>
             ))}
           </ul>
@@ -187,6 +211,7 @@ export function BuildNext({
                   place={i + 1}
                   onDonate={onDonate}
                   onBenefactors={onBenefactors}
+                  {...listProps(lists, city.slug)}
                 />
               </li>
             ))}
@@ -212,6 +237,7 @@ export function BuildNextShort({
   columns,
   onDonate,
   onBenefactors,
+  lists,
 }: { milestones: Milestones; count: number; columns: 1 | 2 } & Handlers) {
   const { t } = useI18n();
   if (!listed(milestones)) return <Pitch onDonate={onDonate} />;
@@ -234,6 +260,7 @@ export function BuildNextShort({
               place={place < 0 ? undefined : place + 1}
               onDonate={onDonate}
               onBenefactors={onBenefactors}
+              {...listProps(lists, city.slug)}
               as="h3"
             />
           </li>

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/en";
+import { ptBR } from "@/i18n/pt-BR";
 import { parseMilestones } from "../donate";
 import {
   beginOp,
@@ -16,6 +17,7 @@ import {
   PENDING_JOIN_KEY,
   savePendingJoin,
   takePendingJoin,
+  waitingLine,
   type MyLists,
 } from "../lists";
 
@@ -227,5 +229,22 @@ describe("homeReturnUrl", () => {
     expect(homeReturnUrl("https://front.example.com/", "https://example.com")).toBe(
       "https://front.example.com/",
     );
+  });
+});
+
+describe("waitingLine", () => {
+  it("says nothing at zero (or less)", () => {
+    expect(waitingLine(0, "en-US", en)).toBeNull();
+    expect(waitingLine(-1, "en-US", en)).toBeNull();
+  });
+
+  it("says one, and how many", () => {
+    expect(waitingLine(1, "en-US", en)).toBe("1 waiting");
+    expect(waitingLine(12, "en-US", en)).toBe("12 waiting");
+  });
+
+  it("groups thousands as the language does, in its own words", () => {
+    expect(waitingLine(1234, "en-US", en)).toBe("1,234 waiting");
+    expect(waitingLine(1234, "pt-BR", ptBR)).toBe("1.234 esperando");
   });
 });

@@ -419,6 +419,7 @@ export const ptBR: Strings = {
     newCitiesOn: "Você saberá das novas cidades",
     waitingOne: "1 esperando",
     waitingMany: "{n} esperando",
+    leaveFailed: "Não foi possível tirar você da lista. Tente de novo.",
     join: {
       cityTitle: "Saiba quando {city} for construída",
       newTitle: "Saiba quando novas cidades forem construídas",

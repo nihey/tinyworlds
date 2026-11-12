@@ -11,9 +11,11 @@ export interface Milestones {
 /**
  * The cities people are funding, fetched once when the component appears. "idle" for good when
  * the build has no API; "failed" on any error or after five seconds, and the caller carries on
- * without the list. Apollo is only downloaded here, when something actually asks.
+ * without the list. Apollo is only downloaded here, when something actually asks. A new
+ * `version` fetches again (the counts of who waits change when someone joins), keeping what is
+ * shown until the answer comes.
  */
-export function useMilestones(): Milestones {
+export function useMilestones(version = 0): Milestones {
   const [milestones, setMilestones] = useState<Milestones>({
     state: API_URL ? "loading" : "idle",
     cities: [],
@@ -27,11 +29,13 @@ export function useMilestones(): Milestones {
         if (live) setMilestones({ state: "ready", cities });
       })
       .catch(() => {
-        if (live) setMilestones({ state: "failed", cities: [] });
+        // a later reading that fails leaves the earlier answer standing
+        if (live)
+          setMilestones((old) => (old.state === "ready" ? old : { state: "failed", cities: [] }));
       });
     return () => {
       live = false;
     };
-  }, []);
+  }, [version]);
   return milestones;
 }

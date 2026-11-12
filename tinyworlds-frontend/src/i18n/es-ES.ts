@@ -416,6 +416,7 @@ export const esES: Strings = {
     newCitiesOn: "Sabrás de las nuevas ciudades",
     waitingOne: "1 esperando",
     waitingMany: "{n} esperando",
+    leaveFailed: "No se pudo quitarte de la lista. Inténtalo de nuevo.",
     join: {
       cityTitle: "Entérate cuando {city} esté construida",
       newTitle: "Entérate cuando se construyan nuevas ciudades",

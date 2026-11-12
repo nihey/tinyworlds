@@ -408,6 +408,7 @@ export const en: Strings = {
     newCitiesOn: "You'll hear about new cities",
     waitingOne: "1 waiting",
     waitingMany: "{n} waiting",
+    leaveFailed: "Couldn't take you off the list. Try again.",
     join: {
       cityTitle: "Hear when {city} is built",
       newTitle: "Hear when new cities are built",

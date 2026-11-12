@@ -504,6 +504,8 @@ export interface Strings {
     waitingOne: string;
     /** "{n}" */
     waitingMany: string;
+    /** a sonner toast when leaving a list fails */
+    leaveFailed: string;
     join: {
       /** "{city}" */
       cityTitle: string;

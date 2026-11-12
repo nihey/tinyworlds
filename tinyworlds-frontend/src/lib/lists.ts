@@ -1,4 +1,5 @@
 import type { CityStatus } from "./donate";
+import type { Locale } from "@/i18n/locale";
 import type { Strings } from "@/i18n/types";
 
 /**
@@ -201,4 +202,12 @@ export function homeReturnUrl(homeUrl: string, origin: string): string {
   return /^https?:\/\//i.test(homeUrl)
     ? homeUrl
     : origin + (homeUrl.startsWith("/") ? homeUrl : `/${homeUrl}`);
+}
+
+/** "1 waiting", "12 waiting": how many wait to hear a city is built; null when none do. */
+export function waitingLine(n: number, locale: Locale, t: Strings): string | null {
+  if (!(n > 0)) return null;
+  const form =
+    new Intl.PluralRules(locale).select(n) === "one" ? t.lists.waitingOne : t.lists.waitingMany;
+  return form.replace("{n}", new Intl.NumberFormat(locale).format(n));
 }
