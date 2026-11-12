@@ -319,7 +319,7 @@ pictures, `donors.links_hidden` an admin's switch.
   gives the donor's own page every picture, with `givenCents` and `picturesFromCents` to say
   what is missing. Links go up at once, as names do; `benefactorNames` shows admins every link
   with its picture, hidden or not, and `setLinksHidden` takes a donor's links off every list.
-- **They are plain links on the site** (no `nofollow`, no `sponsored`): the hall of fame's
+- **They are dofollow links on the site** (`rel="dofollow"`, no `nofollow`, no `sponsored`): the hall of fame's
   pages bake them into their HTML, and the donors are told they are followed. That is the
   site's doing, not this API's, but it is why a link must be what `cleanLinkUrl` allows and
   nothing else, and why an admin can take a donor's links down at once.
@@ -489,9 +489,9 @@ address.
   It says which cities' halls they are in, the one they gave most to first, each a link to
   that city's page (`hallCityUrl`: `/hall-of-fame/<slug>/` for a plain slug, else
   `/hall-of-fame/?city=…`, as the site addresses it) with how they show there ("as Ana", "as
-  “Anonymous”"); that they may put up to three links beside their name, **plain links that
-  search engines follow** (the site's `rel` carries no `nofollow` or `sponsored`: the mail
-  must never promise more than the site does); for someone named nowhere, that links go with
+  “Anonymous”"); that they may put up to three links beside their name, **dofollow links that
+  search engines follow** (the site's `rel` says `dofollow` and never `nofollow` or
+  `sponsored`: the mail must never promise more than the site does); for someone named nowhere, that links go with
   a name; and whether their links' pictures show, with what they have given so far when not.
   **Without `--send` nothing goes out**: the command lists who would be told (donor ids,
   languages, counts), `--preview <dir>` writes each mail to be read, and `--test-to <address>`

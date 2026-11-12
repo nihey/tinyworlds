@@ -10,6 +10,15 @@ export const LINKS_MAX = 3;
 /** The longest link kept, in characters (the API's `URL_MAX`). */
 export const URL_MAX = 300;
 
+/**
+ * What a benefactor's link says of itself to a search engine: follow me, in so many words.
+ * Search engines follow any link that does not say `nofollow` and read nothing into
+ * `dofollow`; it is written out so that whoever looks at the page's source finds the promise
+ * made to the benefactors. Never `nofollow`, `sponsored` or `ugc` (`noopener` only keeps the
+ * page opened from reaching back into this one).
+ */
+export const LINK_REL = "dofollow noopener";
+
 /** A page a named donor points to, as the page described itself when the link was saved. */
 export interface BenefactorLink {
   url: string;

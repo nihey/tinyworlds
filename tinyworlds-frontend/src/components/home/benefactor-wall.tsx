@@ -2,18 +2,13 @@
 
 import { ArrowUpRight, Heart } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
-import {
-  BenefactorLinks,
-  LINK_REL,
-  LinkIcon,
-  LinkPicture,
-} from "@/components/benefactors/benefactor-link";
+import { BenefactorLinks, LinkIcon, LinkPicture } from "@/components/benefactors/benefactor-link";
 import { Drift } from "@/components/home/drift";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import type { WallLoad } from "@/hooks/use-wall";
 import { formatUsd } from "@/lib/donate";
-import { hostOf } from "@/lib/links";
+import { LINK_REL, hostOf } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import { citiesShown, wallSides, type WallCity, type WallEntry } from "@/lib/wall";
 import { HALL_URL, SITE_ID } from "@/site";

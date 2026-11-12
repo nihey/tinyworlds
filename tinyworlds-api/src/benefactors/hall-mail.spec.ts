@@ -35,12 +35,14 @@ describe('hallMail', () => {
     expect(mail.html).toContain('https://example.com/og/tinyworlds.jpg');
   });
 
-  it('promises what the site does: plain links that search engines follow', () => {
+  it('promises what the site does: dofollow links that search engines follow', () => {
     const { text, html } = hallMail(facts());
     expect(text).toContain('up to 3 links');
-    expect(text).toContain('search engines follow');
-    expect(text).toContain('no “nofollow”');
-    expect(html).toContain('no “nofollow”');
+    expect(text).toContain('They are dofollow links');
+    expect(text).toContain('search engines follow them');
+    expect(text).toContain('never “nofollow”');
+    expect(html).toContain('They are dofollow links');
+    expect(html).toContain('never “nofollow”');
   });
 
   it('says whether the pictures show, and what is missing when they do not', () => {
@@ -141,8 +143,9 @@ describe('hallMail', () => {
       expect(mail.html).not.toMatch(/\{\w+\}/);
       expect(mail.html).toContain(`<html lang="${locale}">`);
       expect(mail.text).toContain('https://example.com/me/');
-      // the promise is made in every language
-      expect(mail.text).toContain('nofollow');
+      // the promise is made in every language, in the word the site's links carry
+      expect(mail.text).toContain('dofollow');
+      expect(mail.html).toContain('dofollow');
     }
   });
 });

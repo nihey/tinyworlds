@@ -74,9 +74,9 @@ const WORDS: Record<Locale, Words> = {
     asName: 'as {name}',
     asAnonymous: 'as “Anonymous”',
     links:
-      'You can put up to {max} links beside your name: your site, your shop, your profile. They are plain links, the kind search engines follow (no “nofollow”), each shown with its title and icon.',
+      'You can put up to {max} links beside your name: your site, your shop, your profile. They are dofollow links: marked “dofollow”, never “nofollow”, so search engines follow them. Each is shown with its title and icon.',
     linksUp:
-      'Your links are up beside your name. They are plain links, the kind search engines follow (no “nofollow”).',
+      'Your links are up beside your name. They are dofollow links: marked “dofollow”, never “nofollow”, so search engines follow them.',
     needsName:
       'Links go where your name goes, and for now you are listed as “Anonymous”: turn your name on for a city on Your cities first.',
     picturesOn:
@@ -99,9 +99,9 @@ const WORDS: Record<Locale, Words> = {
     asName: 'como {name}',
     asAnonymous: 'como “Anônimo”',
     links:
-      'Você pode colocar até {max} links ao lado do seu nome: seu site, sua loja, seu perfil. São links comuns, do tipo que os buscadores seguem (sem “nofollow”), cada um com seu título e seu ícone.',
+      'Você pode colocar até {max} links ao lado do seu nome: seu site, sua loja, seu perfil. São links dofollow: marcados como “dofollow”, nunca “nofollow”, para que os buscadores os sigam. Cada um aparece com seu título e seu ícone.',
     linksUp:
-      'Seus links já estão ao lado do seu nome. São links comuns, do tipo que os buscadores seguem (sem “nofollow”).',
+      'Seus links já estão ao lado do seu nome. São links dofollow: marcados como “dofollow”, nunca “nofollow”, para que os buscadores os sigam.',
     needsName:
       'Os links aparecem onde o seu nome aparece, e por enquanto você está na lista como “Anônimo”: ative antes o seu nome em uma cidade, em Suas cidades.',
     picturesOn:
@@ -124,9 +124,9 @@ const WORDS: Record<Locale, Words> = {
     asName: 'como {name}',
     asAnonymous: 'como «Anónimo»',
     links:
-      'Puedes poner hasta {max} enlaces junto a tu nombre: tu web, tu tienda, tu perfil. Son enlaces normales, de los que siguen los buscadores (sin «nofollow»), cada uno con su título y su icono.',
+      'Puedes poner hasta {max} enlaces junto a tu nombre: tu web, tu tienda, tu perfil. Son enlaces dofollow: marcados como «dofollow», nunca «nofollow», para que los buscadores los sigan. Cada uno aparece con su título y su icono.',
     linksUp:
-      'Tus enlaces ya están junto a tu nombre. Son enlaces normales, de los que siguen los buscadores (sin «nofollow»).',
+      'Tus enlaces ya están junto a tu nombre. Son enlaces dofollow: marcados como «dofollow», nunca «nofollow», para que los buscadores los sigan.',
     needsName:
       'Los enlaces aparecen donde aparece tu nombre, y por ahora figuras como «Anónimo»: activa antes tu nombre en una ciudad, en Tus ciudades.',
     picturesOn:
@@ -150,7 +150,7 @@ export const CITIES_LISTED = 8;
 /**
  * The mail that tells a donor they are in the hall of fame: which cities' halls they are in and
  * how they are shown there, the way to each, and that they can put links beside their name
- * (plain links, which search engines follow), with what decides whether the pictures show.
+ * (dofollow links, which search engines follow), with what decides whether the pictures show.
  * It goes out once per donor (`hall-announce.ts`).
  */
 export function hallMail(f: HallFacts): Omit<Mail, 'to'> {

@@ -507,10 +507,12 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   site's icon, the page's picture). They show under the name in a city's sign (`look="row"`:
   a small picture in the icon's place) and on the front page's plaques (`look="card"`), never
   on an unnamed row (the parsers drop them there, whatever the answer says). A link opens in
-  a new tab and is a **plain link**, `rel="noopener"` and nothing else (`LINK_REL`): no
-  `nofollow`, no `sponsored`, no `ugc`, because the benefactors are told that search engines
-  follow their links. Do not add one of those back without changing what the mail and the
-  hall of fame say. Icons sit on a
+  a new tab and is a **dofollow link**, `rel="dofollow noopener"` (`LINK_REL`, in
+  `lib/links.ts`): never `nofollow`, `sponsored` or `ugc`, because the benefactors are told
+  that search engines follow their links. Search engines read nothing into `dofollow` itself
+  (a link without `nofollow` is followed): it is written out so the promise shows in the
+  page's source. Do not add one of the others without changing what the mail and the hall of
+  fame say. Icons sit on a
   white tile, since many are dark marks drawn for a light browser tab. **Nothing is loaded
   from a linked site**: `icon` and `image` are paths on the API (`/api/link-images/<id>`),
   `assetUrl` puts the API's origin (`apiOrigin`: `NEXT_PUBLIC_API_URL` may be a path) in
