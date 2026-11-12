@@ -300,6 +300,12 @@ describe("leaveState", () => {
     });
   });
 
+  it("no token at all is neutral, not bad", () => {
+    expect(leaveState(working, { type: "none" })).toEqual({ phase: "none" });
+    const left: LeaveState = { phase: "left" };
+    expect(leaveState(left, { type: "none" })).toBe(left);
+  });
+
   it("an unreachable API is failed, not bad, and remembers what to retry", () => {
     expect(leaveState({ phase: "working", all: true }, { type: "failed" })).toEqual({
       phase: "failed",

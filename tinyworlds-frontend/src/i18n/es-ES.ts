@@ -459,6 +459,9 @@ export const esES: Strings = {
     leave: {
       title: "Salir de la lista · tinyworlds",
       working: "Saliendo de la lista…",
+      workingAll: "Saliendo de todas las listas…",
+      noToken:
+        "Para darte de baja de una lista, usa el enlace al final de su correo, o entra en Tus ciudades.",
       left: "Has salido de la lista.",
       leftAll: "Has salido de todas las listas.",
       bad: "Ese enlace ya no funciona. Aún puedes salir desde Tus ciudades.",

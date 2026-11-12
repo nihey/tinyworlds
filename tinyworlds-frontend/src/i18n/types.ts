@@ -538,6 +538,10 @@ export interface Strings {
     leave: {
       title: string;
       working: string;
+      /** while "Leave all lists" is working */
+      workingAll: string;
+      /** no link in the address: a reload, or the page opened by hand */
+      noToken: string;
       left: string;
       leftAll: string;
       /** the link is not one of ours */

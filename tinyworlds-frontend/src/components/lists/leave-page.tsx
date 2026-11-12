@@ -6,7 +6,7 @@ import { HallFrame } from "@/components/hall/hall-frame";
 import { JoinSign } from "@/components/lists/join-sign";
 import { ACTION, ACTION_QUIET, QUIET } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
-import { leaveState, leaveTokenFromHash, type LeaveState } from "@/lib/lists";
+import { LEAVE_HASH, leaveState, leaveTokenFromHash, type LeaveState } from "@/lib/lists";
 import { replaceUrl } from "@/map/hash";
 import { HOME_URL, ME_PATH, RANKING_PATH } from "@/site";
 
@@ -26,12 +26,11 @@ export function LeavePage() {
 
   const run = useCallback((all: boolean) => {
     const token = link.current?.token;
+    dispatch({ type: "start", all });
     if (!token) {
-      dispatch({ type: "start", all });
-      dispatch({ type: "answered", all, good: false });
+      dispatch({ type: "none" });
       return;
     }
-    dispatch({ type: "start", all });
     import("@/lib/lists-api")
       .then((api) => api.leaveWithToken(token, all))
       .then(
@@ -44,7 +43,12 @@ export function LeavePage() {
     // once: a link may be used once here, and in development effects run twice
     if (started.current) return;
     started.current = true;
-    const token = leaveTokenFromHash(window.location.hash);
+    // the page's own first script has already taken the hash out of the address, for the
+    // trackers' sake, and kept it here; without it (a build served another way) it is still there
+    const early = (window as { [LEAVE_HASH]?: string })[LEAVE_HASH];
+    const hash = early ?? window.location.hash;
+    delete (window as { [LEAVE_HASH]?: string })[LEAVE_HASH];
+    const token = leaveTokenFromHash(hash);
     // the token leaves the address before anything else happens: it is a key
     if (window.location.hash) replaceUrl(window.location.pathname + window.location.search);
     if (token) link.current = { token, isNew: token.split(".")[1] === "*" };
@@ -53,14 +57,18 @@ export function LeavePage() {
 
   const message =
     state.phase === "working"
-      ? words.working
+      ? state.all
+        ? words.workingAll
+        : words.working
       : state.phase === "left"
         ? words.left
         : state.phase === "left-all"
           ? words.leftAll
           : state.phase === "bad"
             ? words.bad
-            : words.failed;
+            : state.phase === "none"
+              ? words.noToken
+              : words.failed;
 
   return (
     <HallFrame title={words.title}>
@@ -97,7 +105,7 @@ export function LeavePage() {
                 </button>
               </>
             )}
-            {state.phase === "bad" && (
+            {(state.phase === "bad" || state.phase === "none") && (
               <a href={ME_PATH} className={ACTION}>
                 {t.home.yourCities}
               </a>

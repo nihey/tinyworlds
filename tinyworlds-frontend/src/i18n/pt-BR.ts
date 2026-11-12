@@ -462,6 +462,9 @@ export const ptBR: Strings = {
     leave: {
       title: "Sair da lista · tinyworlds",
       working: "Saindo da lista…",
+      workingAll: "Saindo de todas as listas…",
+      noToken:
+        "Para sair de uma lista, clique no link no fim do e-mail dela, ou vá em Suas cidades.",
       left: "Você saiu da lista.",
       leftAll: "Você saiu de todas as listas.",
       bad: "Esse link não funciona mais. Você ainda pode sair em Suas cidades.",

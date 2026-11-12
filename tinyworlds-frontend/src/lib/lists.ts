@@ -226,24 +226,33 @@ export function leaveTokenFromHash(hash: string): string | null {
   return token && /^[\w.*-]{20,300}$/.test(token) ? token : null;
 }
 
-/** Where the leave page is: waiting for the API, done, a link that is not ours, or no answer. */
+/**
+ * Where the leave page is: waiting for the API, done, a link that is not ours (`bad`), no link at
+ * all (`none`: a reload after leaving, or the page opened by hand), or no answer.
+ */
 export type LeaveState =
   | { phase: "working"; all: boolean }
   | { phase: "left" }
   | { phase: "left-all" }
   | { phase: "bad" }
+  | { phase: "none" }
   | { phase: "failed"; all: boolean };
 
 export type LeaveEvent =
   | { type: "start"; all: boolean }
   | { type: "answered"; all: boolean; good: boolean }
-  | { type: "failed" };
+  | { type: "failed" }
+  | { type: "none" };
 
 /** An answer only counts while one is awaited; `failed` keeps what to retry. */
 export function leaveState(state: LeaveState, event: LeaveEvent): LeaveState {
   if (event.type === "start") return { phase: "working", all: event.all };
   if (state.phase !== "working") return state;
+  if (event.type === "none") return { phase: "none" };
   if (event.type === "failed") return { phase: "failed", all: state.all };
   if (!event.good) return { phase: "bad" };
   return event.all ? { phase: "left-all" } : { phase: "left" };
 }
+
+/** Where the page's first script leaves the hash it took out of the address (memory only). */
+export const LEAVE_HASH = "__tinyworldsLeaveHash";

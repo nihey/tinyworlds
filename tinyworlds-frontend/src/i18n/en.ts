@@ -451,6 +451,8 @@ export const en: Strings = {
     leave: {
       title: "Leave the list · tinyworlds",
       working: "Leaving the list…",
+      workingAll: "Leaving all lists…",
+      noToken: "To leave a list, use the link at the bottom of its mail, or Your cities.",
       left: "You've left the list.",
       leftAll: "You've left every list.",
       bad: "That link doesn't work any more. You can still leave from Your cities.",
