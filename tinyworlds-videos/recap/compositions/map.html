@@ -1,0 +1,50 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    /* the keystone opens onto the map: the take shows through a window that starts as the stone
+       (1637, 433, 88 x 88 in the frame) and grows to the whole frame */
+    #map-window {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      clip-path: inset(433px 195px 559px 1637px round 10px);
+    }
+    #map-take {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+    }
+  </style>
+  <div id="root" data-composition-id="map" data-width="1920" data-height="1080">
+    <div id="map-window">
+      <!-- one continuous take of the real Dallas viewer: npm run recap -- take (takes/dallas.json) -->
+      <video
+        id="map-take"
+        class="clip"
+        data-start="0"
+        data-duration="15.555"
+        data-track-index="0"
+        src="assets/takes/dallas.mp4"
+        muted
+        playsinline
+      ></video>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#map-window", { opacity: 1 }, 0.25);
+      tl.to(
+        "#map-window",
+        { clipPath: "inset(0px 0px 0px 0px round 0px)", duration: 0.5, ease: "power3.inOut" },
+        0.25,
+      );
+      window.__timelines["map"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,192 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+    }
+    /* the camera: inside it everything is in the front page's own CSS px; it scales and slides */
+    #cities-cam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 976px;
+      height: 2030.44px;
+    }
+    #cities-still {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 976px;
+      height: 2030.44px;
+    }
+    .cities-loop {
+      position: absolute;
+      object-fit: cover;
+    }
+  </style>
+  <div id="root" data-composition-id="cities" data-width="1920" data-height="1080">
+    <div id="cities-cam" data-layout-allow-overflow>
+      <!-- the live front page's Cities, three times its size (npm run recap -- pages) -->
+      <img id="cities-still" src="assets/takes/pages/cities.png" alt="" />
+      <video
+        id="cities-nyc"
+        class="clip cities-loop"
+        style="left: 0px; top: 48.5px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="1"
+        src="assets/loops/tinynyc.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-cvg"
+        class="clip cities-loop"
+        style="left: 330.66px; top: 51.5px; width: 314.67px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="2"
+        src="assets/loops/tinycvg.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-dal"
+        class="clip cities-loop"
+        style="left: 661.33px; top: 51.5px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="3"
+        src="assets/loops/tinydal.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-las"
+        class="clip cities-loop"
+        style="left: 0px; top: 461.44px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="4"
+        src="assets/loops/tinylas.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-orl"
+        class="clip cities-loop"
+        style="left: 330.66px; top: 461.44px; width: 314.67px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="5"
+        src="assets/loops/tinyorl.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-lax"
+        class="clip cities-loop"
+        style="left: 661.33px; top: 461.44px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="6"
+        src="assets/loops/tinylax.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-vlc"
+        class="clip cities-loop"
+        style="left: 0px; top: 807.62px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="7"
+        src="assets/loops/tinyvlc.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-rao"
+        class="clip cities-loop"
+        style="left: 330.66px; top: 807.62px; width: 314.67px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="8"
+        src="assets/loops/tinyrao.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-phl"
+        class="clip cities-loop"
+        style="left: 661.33px; top: 810.62px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="9"
+        src="assets/loops/tinyphl.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-fte"
+        class="clip cities-loop"
+        style="left: 0px; top: 1220.56px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="10"
+        src="assets/loops/tinyfte.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-pit"
+        class="clip cities-loop"
+        style="left: 330.66px; top: 1223.56px; width: 314.67px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="11"
+        src="assets/loops/tinypit.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-cos"
+        class="clip cities-loop"
+        style="left: 661.33px; top: 1223.56px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="12"
+        src="assets/loops/tinycos.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="cities-tkf"
+        class="clip cities-loop"
+        style="left: 0px; top: 1636.5px; width: 314.66px; height: 165.19px"
+        data-start="0"
+        data-duration="4.375"
+        data-track-index="13"
+        src="assets/loops/tinytkf.mp4"
+        muted
+        playsinline
+      ></video>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      // a page rect (CSS px) filling the frame
+      const view = (x, y, w, h) => {
+        const s = Math.min(1920 / w, 1080 / h);
+        return { x: (1920 - w * s) / 2 - x * s, y: (1080 - h * s) / 2 - y * s, scale: s };
+      };
+      // down the grid, New York to Truckee
+      tl.set("#cities-cam", { transformOrigin: "0 0", ...view(-40, -6, 1056, 594) }, 0);
+      tl.to("#cities-cam", { ...view(-40, 1436, 1056, 594), duration: 3.75, ease: "power1.inOut" }, 0.2);
+      window.__timelines["cities"] = tl;
+    })();
+  </script>
+</template>

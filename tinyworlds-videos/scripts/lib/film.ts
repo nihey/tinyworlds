@@ -45,7 +45,8 @@ export interface Stage {
   page: Page;
 }
 
-export async function openStage(url: string, startMs = 0): Promise<Stage> {
+/** `init`: more script to run before the page's own, after the clock is taken over. */
+export async function openStage(url: string, startMs = 0, init?: string): Promise<Stage> {
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome",
     headless: true,
@@ -54,6 +55,7 @@ export async function openStage(url: string, startMs = 0): Promise<Stage> {
   const page = await browser.newPage();
   await page.setViewport({ width: VIEW.width, height: VIEW.height, deviceScaleFactor: VIEW.dpr });
   await page.evaluateOnNewDocument(CLOCK);
+  if (init) await page.evaluateOnNewDocument(init);
   await page.goto(url, { waitUntil: "networkidle2", timeout: 120_000 });
   await page.addStyleTag({ content: STYLE });
   // the viewer keeps its engine on window.tinyworld; let it come up on its own clock first

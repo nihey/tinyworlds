@@ -1,0 +1,75 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+    }
+    /* the camera: inside it everything is in the page's own CSS px; it scales and slides */
+    #london-cam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 976px;
+      height: 1319px;
+    }
+    #london-still {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 976px;
+      height: 1319px;
+    }
+    #london-spot {
+      position: absolute;
+      left: 651px;
+      top: 807px;
+      width: 301px;
+      height: 164px;
+      border-radius: 10px;
+      box-shadow: 0 0 0 4000px rgb(12 14 16 / 0.58);
+      opacity: 0;
+    }
+    #london-first {
+      position: absolute;
+      left: 662.5px;
+      top: 847.8px;
+      width: 20.5px;
+      height: 20.5px;
+      border: 2px solid #f7c21b;
+      border-radius: 3px;
+      opacity: 0;
+    }
+  </style>
+  <div id="root" data-composition-id="london" data-width="1920" data-height="1080">
+    <div id="london-cam" data-layout-allow-overflow>
+      <!-- the live page, three times its size (npm run recap -- pages) -->
+      <img id="london-still" src="assets/takes/pages/ranking.png" alt="" />
+      <!-- the viewer's own spotlight (its dim, a lit building's cut-out), here on London's card -->
+      <div id="london-spot"></div>
+      <!-- London's first stone, left open: an outline in the accent, blinking like a cursor -->
+      <div id="london-first"></div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      // a page rect (CSS px) filling the frame
+      const view = (x, y, w, h) => {
+        const s = Math.min(1920 / w, 1080 / h);
+        return { x: (1920 - w * s) / 2 - x * s, y: (1080 - h * s) / 2 - y * s, scale: s };
+      };
+      // London's card among the cities still waiting; in close
+      tl.set("#london-cam", { transformOrigin: "0 0", ...view(16, 640, 960, 540) }, 0);
+      tl.to("#london-cam", { ...view(400, 738, 640, 360), duration: 0.7, ease: "power2.inOut" }, 0.08);
+      tl.to("#london-spot", { opacity: 1, duration: 0.12, ease: "none" }, 0.78);
+      // "Lay the first one": its place blinks, a beat on, a beat off. Nothing is laid.
+      for (let i = 0; i < 5; i++) {
+        tl.set("#london-first", { opacity: 1 }, 3.5 + i * 0.625);
+        tl.set("#london-first", { opacity: 0 }, 3.5 + i * 0.625 + 0.36);
+      }
+      window.__timelines["london"] = tl;
+    })();
+  </script>
+</template>

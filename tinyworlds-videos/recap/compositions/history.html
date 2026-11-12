@@ -1,0 +1,166 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+    }
+    .h-shot {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    /* each city's hero framing cut from its tiles (npm run plates; npm run recap -- plates): the
+       picture is the plate's middle 1920 x 1080, with room round it for the drift */
+    .h-pic {
+      position: absolute;
+      left: -268px;
+      top: -138px;
+      width: 2456px;
+      height: 1356px;
+    }
+    /* its flyover sign, as the pipeline's sign.ts draws it: the wordmark and its address */
+    .h-sign {
+      position: absolute;
+      left: 54px;
+      top: 46px;
+    }
+    /* the gold plaque of a city its benefactors brought, from its card on the front page (its
+       one-pixel gold edge is outside the element there, so it is drawn here) */
+    .h-plaque {
+      position: absolute;
+      left: 54px;
+      top: 262px;
+      width: 611px;
+      height: 110px;
+      box-shadow: 0 0 0 3px #7a5d0c;
+      opacity: 0;
+    }
+    /* the city's place in the order the map grew */
+    #h-count {
+      position: absolute;
+      right: 54px;
+      top: 46px;
+      padding: 22px 34px 30px;
+      background: #15171a;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 3px 0 rgb(255 255 255 / 0.08),
+        0 0 0 3px rgb(0 0 0 / 0.6),
+        0 30px 60px -26px rgb(0 0 0 / 0.65);
+      font-family: "Tiny5", monospace;
+      color: #f4f2ec;
+      white-space: nowrap;
+    }
+    #h-count-no {
+      font-size: 44px;
+    }
+    #h-count-n {
+      font-size: 96px;
+      line-height: 0.9;
+      color: #f7c21b;
+    }
+  </style>
+  <div id="root" data-composition-id="history" data-width="1920" data-height="1080">
+    <div id="h-nyc" class="clip h-shot" data-start="0" data-duration="1.25" data-track-index="0">
+      <img id="h-nyc-pic" class="h-pic" src="assets/plates/tinynyc.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinynyc-sign.png" alt="" />
+    </div>
+    <div id="h-rao" class="clip h-shot" data-start="1.25" data-duration="0.625" data-track-index="1">
+      <img id="h-rao-pic" class="h-pic" src="assets/plates/tinyrao.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinyrao-sign.png" alt="" />
+    </div>
+    <div id="h-orl" class="clip h-shot" data-start="1.875" data-duration="0.625" data-track-index="0">
+      <img id="h-orl-pic" class="h-pic" src="assets/plates/tinyorl.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinyorl-sign.png" alt="" />
+    </div>
+    <div id="h-fte" class="clip h-shot" data-start="2.5" data-duration="0.625" data-track-index="1">
+      <img id="h-fte-pic" class="h-pic" src="assets/plates/tinyfte.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinyfte-sign.png" alt="" />
+    </div>
+    <div id="h-vlc" class="clip h-shot" data-start="3.125" data-duration="0.625" data-track-index="0">
+      <img id="h-vlc-pic" class="h-pic" src="assets/plates/tinyvlc.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinyvlc-sign.png" alt="" />
+    </div>
+    <div id="h-las" class="clip h-shot" data-start="3.75" data-duration="0.625" data-track-index="1">
+      <img id="h-las-pic" class="h-pic" src="assets/plates/tinylas.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinylas-sign.png" alt="" />
+    </div>
+    <div id="h-lax" class="clip h-shot" data-start="4.375" data-duration="0.625" data-track-index="0">
+      <img id="h-lax-pic" class="h-pic" src="assets/plates/tinylax.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinylax-sign.png" alt="" />
+    </div>
+    <div id="h-dal" class="clip h-shot" data-start="5.0" data-duration="1.25" data-track-index="1">
+      <img id="h-dal-pic" class="h-pic" src="assets/plates/tinydal.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinydal-sign.png" alt="" />
+      <img id="h-dal-plaque" class="h-plaque" src="assets/takes/pages/plaque-tinydal.png" alt="" />
+    </div>
+    <div id="h-cvg" class="clip h-shot" data-start="6.25" data-duration="1.25" data-track-index="0">
+      <img id="h-cvg-pic" class="h-pic" src="assets/plates/tinycvg.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinycvg-sign.png" alt="" />
+      <img id="h-cvg-plaque" class="h-plaque" src="assets/takes/pages/plaque-tinycvg.png" alt="" />
+    </div>
+    <div id="h-pit" class="clip h-shot" data-start="7.5" data-duration="1.25" data-track-index="1">
+      <img id="h-pit-pic" class="h-pic" src="assets/plates/tinypit.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinypit-sign.png" alt="" />
+      <img id="h-pit-plaque" class="h-plaque" src="assets/takes/pages/plaque-tinypit.png" alt="" />
+    </div>
+    <div id="h-phl" class="clip h-shot" data-start="8.75" data-duration="1.25" data-track-index="0">
+      <img id="h-phl-pic" class="h-pic" src="assets/plates/tinyphl.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinyphl-sign.png" alt="" />
+      <img id="h-phl-plaque" class="h-plaque" src="assets/takes/pages/plaque-tinyphl.png" alt="" />
+    </div>
+    <div id="h-cos" class="clip h-shot" data-start="10.0" data-duration="1.25" data-track-index="1">
+      <img id="h-cos-pic" class="h-pic" src="assets/plates/tinycos.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinycos-sign.png" alt="" />
+      <img id="h-cos-plaque" class="h-plaque" src="assets/takes/pages/plaque-tinycos.png" alt="" />
+    </div>
+    <div id="h-tkf" class="clip h-shot" data-start="11.25" data-duration="1.25" data-track-index="0">
+      <img id="h-tkf-pic" class="h-pic" src="assets/plates/tinytkf.png" alt="" />
+      <img class="h-sign" src="assets/plates/tinytkf-sign.png" alt="" />
+      <img id="h-tkf-plaque" class="h-plaque" src="assets/takes/pages/plaque-tinytkf.png" alt="" />
+    </div>
+    <div id="h-count" class="clip" data-start="0" data-duration="12.5" data-track-index="2">
+      <span id="h-count-no">No. </span><span id="h-count-n">1</span>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      // a city a beat or two, in the order the map grew. The camera keeps travelling the same
+      // way across the cuts, as if the map went on; the count steps on at each city; a plaque
+      // steps in a moment after its city.
+      const shot = (id, start, dur, n, plaque) => {
+        tl.fromTo(
+          "#h-" + id + "-pic",
+          { x: 60, scale: 1 },
+          { x: -60, scale: 1.035, duration: dur, ease: "none" },
+          start,
+        );
+        tl.set("#h-count-n", { textContent: String(n) }, start);
+        if (plaque)
+          tl.fromTo(
+            "#h-" + id + "-plaque",
+            { opacity: 0, y: -24 },
+            { opacity: 1, y: 0, duration: 0.1, ease: "steps(3)" },
+            start + 0.15,
+          );
+      };
+      shot("nyc", 0, 1.25, 1, false);
+      shot("rao", 1.25, 0.625, 2, false);
+      shot("orl", 1.875, 0.625, 3, false);
+      shot("fte", 2.5, 0.625, 4, false);
+      shot("vlc", 3.125, 0.625, 5, false);
+      shot("las", 3.75, 0.625, 6, false);
+      shot("lax", 4.375, 0.625, 7, false);
+      shot("dal", 5.0, 1.25, 8, true);
+      shot("cvg", 6.25, 1.25, 9, true);
+      shot("pit", 7.5, 1.25, 10, true);
+      shot("phl", 8.75, 1.25, 11, true);
+      shot("cos", 10.0, 1.25, 12, true);
+      shot("tkf", 11.25, 1.25, 13, true);
+      window.__timelines["history"] = tl;
+    })();
+  </script>
+</template>
