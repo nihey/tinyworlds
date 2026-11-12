@@ -19,26 +19,31 @@ enum CityStatus {
 
 /// A city people can fund, or one that is already on the map.
 model City {
-  id               String     @id @default(uuid()) @db.Uuid
+  id               String       @id @default(uuid()) @db.Uuid
   /// The name without accents, case or punctuation: what makes "São Paulo" and "sao paulo" one city.
-  slug             String     @unique
+  slug             String       @unique
   /// As first typed by a donor (or seeded).
   name             String
-  status           CityStatus @default(PROPOSED)
-  goalCents        Int        @map("goal_cents")
+  status           CityStatus   @default(PROPOSED)
+  goalCents        Int          @map("goal_cents")
   /// US dollars only, in cents. Kept in step with the donations inside one transaction.
-  raisedCents      Int        @default(0) @map("raised_cents")
-  donationCount    Int        @default(0) @map("donation_count")
+  raisedCents      Int          @default(0) @map("raised_cents")
+  donationCount    Int          @default(0) @map("donation_count")
   /// The world's id once it is built: "tinynyc".
-  worldId          String?    @map("world_id")
+  worldId          String?      @map("world_id")
   /// Kept out of the public list (a name that should not be shown).
-  hidden           Boolean    @default(false)
+  hidden           Boolean      @default(false)
   /// When its donors were mailed that it is built (src/benefactors/announce-cli.ts); null until
   /// then. Set once, by the run that sends: a second run sends nothing.
-  builtAnnouncedAt DateTime?  @map("built_announced_at")
-  createdAt        DateTime   @default(now()) @map("created_at")
-  updatedAt        DateTime   @updatedAt @map("updated_at")
+  builtAnnouncedAt DateTime?    @map("built_announced_at")
+  /// When its list was first opened to join (null: not yet); and when the list was mailed that the
+  /// city is built (src/lists, announce); null until then. Cities already on the map count as both.
+  listsStartedAt   DateTime?    @map("lists_started_at")
+  listsAnnouncedAt DateTime?    @map("lists_announced_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
   donations        Donation[]
+  listMembers      ListMember[]
 
   @@map("cities")
 }
@@ -74,23 +79,27 @@ model Donation {
 
 /// Someone who has given, known by the email Stripe collected. Never exposed in GraphQL.
 model Donor {
-  id          String      @id @default(uuid()) @db.Uuid
+  id           String       @id @default(uuid()) @db.Uuid
   /// Lower case.
-  email       String      @unique
+  email        String       @unique
   /// How the donor is named on the lists; null until a gift came with a name.
-  displayName String?     @map("display_name")
-  nameHidden  Boolean     @default(false) @map("name_hidden")
+  displayName  String?      @map("display_name")
+  nameHidden   Boolean      @default(false) @map("name_hidden")
   /// An admin took the donor's links off every list; the name stays.
-  linksHidden Boolean     @default(false) @map("links_hidden")
+  linksHidden  Boolean      @default(false) @map("links_hidden")
   /// When the donor was mailed that they are in the hall of fame (src/benefactors/hall-cli.ts);
   /// null until then. Set once, by the run that sends: a second run mails them nothing.
-  hallMailedAt DateTime?  @map("hall_mailed_at")
-  lastLoginAt DateTime?   @map("last_login_at")
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  donations   Donation[]
-  magicLinks  MagicLink[]
-  links       DonorLink[]
+  hallMailedAt DateTime?    @map("hall_mailed_at")
+  /// When the donor was mailed the welcome to the lists (the first list they joined); null until then.
+  welcomedAt   DateTime?    @map("welcomed_at")
+  lastLoginAt  DateTime?    @map("last_login_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  donations    Donation[]
+  magicLinks   MagicLink[]
+  links        DonorLink[]
+  listMembers  ListMember[]
+  listNotices  ListNotice[]
 
   @@map("donors")
 }
@@ -190,17 +199,20 @@ model Admin {
 /// never stored, only its SHA-256. It is an admin's or a donor's, never both (a check in the
 /// migration, magic_links_one_owner).
 model MagicLink {
-  id        String    @id @default(uuid()) @db.Uuid
-  adminId   String?   @map("admin_id") @db.Uuid
-  admin     Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  donorId   String?   @map("donor_id") @db.Uuid
-  donor     Donor?    @relation(fields: [donorId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique @map("token_hash")
-  codeHash  String    @map("code_hash")
-  attempts  Int       @default(0)
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id         String    @id @default(uuid()) @db.Uuid
+  adminId    String?   @map("admin_id") @db.Uuid
+  admin      Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  donorId    String?   @map("donor_id") @db.Uuid
+  donor      Donor?    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @map("token_hash")
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  /// A list to join once the link is used: a city's slug, or "*" for new cities.
+  joinList   String?   @map("join_list")
+  joinLocale String?   @map("join_locale")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   @@index([adminId, createdAt])
   @@index([donorId, createdAt])
@@ -211,18 +223,18 @@ model MagicLink {
 /// answers a building once; the API keeps no copy of the questions (the right name is the
 /// building itself).
 model QuizAnswer {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
   /// The tab's visit (as the funnel's): not a person, gone when the tab closes.
-  visitId   String   @map("visit_id") @db.Uuid
+  visitId   String    @map("visit_id") @db.Uuid
   world     String
   /// The building asked about: a sight id from the world's sights.json.
-  sightId   String   @map("sight_id")
+  sightId   String    @map("sight_id")
   /// The sight id the visitor picked; right when it equals sightId.
   choice    String
   /// The game's difficulty: each offers other wrong answers. Answers from before it existed are HARD.
   level     QuizLevel @default(HARD)
   locale    String?
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@unique([visitId, world, sightId, level])
   @@index([world, sightId, level])
@@ -233,4 +245,31 @@ enum QuizLevel {
   EASY
   MEDIUM
   HARD
+}
+
+/// One donor's place on a list to hear when a city is built. A null city is the list of new
+/// cities. One membership per donor and list: the unique index is an expression
+/// (COALESCE(city_id, the nil uuid)) Prisma cannot model, so it lives in the migration alone.
+model ListMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  donorId   String   @map("donor_id") @db.Uuid
+  donor     Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  cityId    String?  @map("city_id") @db.Uuid
+  city      City?    @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  locale    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([cityId])
+  @@map("list_members")
+}
+
+/// That a donor was mailed about a city's list (so a second reason to hear sends nothing).
+model ListNotice {
+  donorId String   @map("donor_id") @db.Uuid
+  donor   Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  cityId  String   @map("city_id") @db.Uuid
+  sentAt  DateTime @default(now()) @map("sent_at")
+
+  @@id([donorId, cityId])
+  @@map("list_notices")
 }
