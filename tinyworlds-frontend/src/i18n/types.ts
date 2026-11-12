@@ -511,7 +511,7 @@ export interface Strings {
     toldYou: string;
     /** "{city}": names the Tell me button for screen readers */
     tellMeAria: string;
-    /** "{city}": names the button that leaves */
+    /** "{city}": names the joined button, which leaves; it starts with `toldYou`, the words it shows */
     leaveAria: string;
     /** the hint of "You'll be told" for a donor of the city: their donor mail covers it */
     donorCovered: string;
@@ -526,7 +526,10 @@ export interface Strings {
       /** "{city}" */
       cityTitle: string;
       newTitle: string;
+      /** what a city's list sends */
       body: string;
+      /** what new cities' list sends */
+      bodyNew: string;
       action: string;
       /** "{city}" */
       doneCity: string;
@@ -539,6 +542,8 @@ export interface Strings {
       help: string;
       close: string;
       failed: string;
+      /** a sonner toast: signed in from a join's link opened where no join was waiting (another device) */
+      signedIn: string;
       signIn: SignInWords;
     };
     me: {

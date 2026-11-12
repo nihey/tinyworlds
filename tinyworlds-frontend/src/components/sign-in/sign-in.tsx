@@ -44,6 +44,7 @@ export function SignIn({
   notice,
   verifying,
   onSession,
+  onSent,
   list,
   returnUrl,
   embedded = false,
@@ -54,6 +55,8 @@ export function SignIn({
   /** a link was just opened and is being traded for a session */
   verifying: boolean;
   onSession: (session: AdminSession) => void;
+  /** a link was asked for (and the API took the request) */
+  onSent?: () => void;
   /** a list the link joins on opening (the API's name for it); absent: a plain sign-in */
   list?: string;
   /** where the link brings the visitor back to; absent: this page */
@@ -100,6 +103,7 @@ export function SignIn({
       setCode("");
       setNow(Date.now());
       setResendAt(Date.now() + RESEND_SECONDS * 1000);
+      onSent?.();
     } catch (error) {
       const kind = (error as { kind?: string } | null)?.kind;
       setProblem(kind === "too-many" ? "tooMany" : "failed");

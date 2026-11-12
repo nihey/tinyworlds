@@ -413,7 +413,7 @@ export const en: Strings = {
     tellMe: "Tell me",
     toldYou: "You'll be told",
     tellMeAria: "Tell me when {city} is built",
-    leaveAria: "Stop telling me about {city}",
+    leaveAria: "You'll be told: stop telling me about {city}",
     donorCovered:
       "You gave to this city, so the mail that tells donors it is built will reach you.",
     newCities: "Tell me when new cities are built",
@@ -425,6 +425,8 @@ export const en: Strings = {
       cityTitle: "Hear when {city} is built",
       newTitle: "Hear when new cities are built",
       body: "One email the day it's on the map. First we check the address is yours: we'll send a code, no password.",
+      bodyNew:
+        "One email each time a new city is on the map. First we check the address is yours: we'll send a code, no password.",
       action: "Send me a code",
       doneCity: "You're on {city}'s list",
       doneNew: "You're on the list for new cities",
@@ -435,6 +437,7 @@ export const en: Strings = {
       help: "Help build {city}",
       close: "Close",
       failed: "Couldn't add you to the list. Try again.",
+      signedIn: "You're signed in. Your lists are on Your cities.",
       signIn: {
         heading: "Hear when a city is built",
         body: "One email the day it's on the map. First we check the address is yours: we'll send a code, no password.",

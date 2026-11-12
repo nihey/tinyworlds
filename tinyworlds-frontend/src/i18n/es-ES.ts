@@ -424,11 +424,11 @@ export const esES: Strings = {
     tellMe: "Avísame",
     toldYou: "Te avisaremos",
     tellMeAria: "Avísame cuando {city} esté construida",
-    leaveAria: "Dejar de avisarme sobre {city}",
+    leaveAria: "Te avisaremos: dejar de avisarme sobre {city}",
     donorCovered:
       "Donaste a esta ciudad, así que el correo que avisa a los donantes de que está construida te llegará a ti.",
     newCities: "Avísame cuando se construyan nuevas ciudades",
-    newCitiesOn: "Sabrás de las nuevas ciudades",
+    newCitiesOn: "Te avisaremos de las nuevas ciudades",
     waitingOne: "1 esperando",
     waitingMany: "{n} esperando",
     leaveFailed: "No se pudo quitarte de la lista. Inténtalo de nuevo.",
@@ -436,6 +436,8 @@ export const esES: Strings = {
       cityTitle: "Entérate cuando {city} esté construida",
       newTitle: "Entérate cuando se construyan nuevas ciudades",
       body: "Un correo el día en que esté en el mapa. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
+      bodyNew:
+        "Un correo cada vez que una nueva ciudad llegue al mapa. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
       action: "Enviarme un código",
       doneCity: "Estás en la lista de {city}",
       doneNew: "Estás en la lista de las nuevas ciudades",
@@ -446,6 +448,7 @@ export const esES: Strings = {
       help: "Ayudar a construir {city}",
       close: "Cerrar",
       failed: "No se pudo añadirte a la lista. Inténtalo de nuevo.",
+      signedIn: "Has iniciado sesión. Tus listas están en Tus ciudades.",
       signIn: {
         heading: "Entérate cuando se construya una ciudad",
         body: "Un correo el día en que esté en el mapa. Antes comprobamos que la dirección es tuya: te enviamos un código, sin contraseña.",
@@ -482,7 +485,7 @@ export const esES: Strings = {
       bad: "Ese enlace ya no funciona. Aún puedes salir desde Tus ciudades.",
       failed: "No se pudo contactar con el servidor. Inténtalo de nuevo.",
       leaveAll: "Salir de todas las listas",
-      joinAgain: "Volver a entrar",
+      joinAgain: "Volver a apuntarme",
       backHome: "Volver a las ciudades",
     },
     admin: {

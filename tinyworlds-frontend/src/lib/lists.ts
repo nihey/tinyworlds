@@ -115,6 +115,57 @@ export function takePendingJoin(now: number = Date.now()): ListKey | null {
   return null;
 }
 
+/** Forgets the remembered list: the sign closed before a link was asked for it. */
+export function dropPendingJoin(): void {
+  try {
+    window.localStorage.removeItem(PENDING_JOIN_KEY);
+  } catch {
+    // storage blocked: there is nothing kept to forget
+  }
+}
+
+/**
+ * Whether closing the join sign keeps the remembered list: only while a link asked for that
+ * list from this page may still bring the visitor back (`asked` holds those lists, as
+ * `listParam` names them). Closed before any was asked, it is forgotten, so a link asked for
+ * on another device never joins a list this browser only looked at.
+ */
+export function pendingKeptOnClose(list: ListKey, asked: ReadonlySet<string>): boolean {
+  return asked.has(listParam(list));
+}
+
+// ---------------------------------------------------------------------------------------------
+// the front page opened from a join's sign-in link
+// ---------------------------------------------------------------------------------------------
+
+/** Why a sign-in link did not sign the visitor in, in the sign-in words' own names. */
+export type LinkNotice = "expired" | "tooMany" | "failed";
+
+/** The API's refusal of a link: used or too old ("unauthorized"), too many tries, or no answer. */
+export function linkNoticeOf(error: unknown): LinkNotice {
+  const kind = (error as { kind?: unknown } | null)?.kind;
+  return kind === "unauthorized" ? "expired" : kind === "too-many" ? "tooMany" : "failed";
+}
+
+/**
+ * What the front page shows once the link it was opened from has been tried, given the join
+ * remembered in this browser (`pending`, taken once): with one, the join sign on that list (on
+ * its last step when signed in, else asking again with why); without one, a toast (the link
+ * was opened on another device than the one where "Tell me" was pressed).
+ */
+export type JoinReturn =
+  | { show: "sign"; list: ListKey; notice: LinkNotice | null }
+  | { show: "toast"; notice: LinkNotice }
+  | { show: "signed-in" };
+
+export function joinReturnOf(
+  outcome: { ok: true } | { ok: false; notice: LinkNotice },
+  pending: ListKey | null,
+): JoinReturn {
+  if (pending) return { show: "sign", list: pending, notice: outcome.ok ? null : outcome.notice };
+  return outcome.ok ? { show: "signed-in" } : { show: "toast", notice: outcome.notice };
+}
+
 // ---------------------------------------------------------------------------------------------
 // which of the lists' calls in flight may write, and whether any is pending
 // ---------------------------------------------------------------------------------------------
@@ -171,15 +222,25 @@ export function joinStep(s: {
   return s.failed ? "failed" : "joining";
 }
 
-/** The sign's words for one list; `help` is the "Help build" button's label, null for new cities. */
+/**
+ * The sign's words for one list: `body` says what the list sends (one mail for a city, one per
+ * new city for new cities); `help` is the "Help build" button's label, null for new cities.
+ */
 export function joinWords(
   t: Strings,
   list: ListKey,
-): { title: string; doneTitle: string; doneBody: (email: string) => string; help: string | null } {
+): {
+  title: string;
+  body: string;
+  doneTitle: string;
+  doneBody: (email: string) => string;
+  help: string | null;
+} {
   const j = t.lists.join;
   if (list.kind === "new") {
     return {
       title: j.newTitle,
+      body: j.bodyNew,
       doneTitle: j.doneNew,
       doneBody: (email) => j.doneBodyNew.replace("{email}", email),
       help: null,
@@ -188,6 +249,7 @@ export function joinWords(
   const fill = (text: string) => text.replace("{city}", list.name);
   return {
     title: fill(j.cityTitle),
+    body: j.body,
     doneTitle: fill(j.doneCity),
     doneBody: (email) => fill(j.doneBody.replace("{email}", email)),
     help: fill(j.help),

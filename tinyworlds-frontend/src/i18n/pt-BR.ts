@@ -425,9 +425,9 @@ export const ptBR: Strings = {
   },
   lists: {
     tellMe: "Me avise",
-    toldYou: "Você será avisado",
+    toldYou: "Vamos te avisar",
     tellMeAria: "Me avise quando {city} for construída",
-    leaveAria: "Parar de me avisar sobre {city}",
+    leaveAria: "Vamos te avisar: parar de me avisar sobre {city}",
     donorCovered:
       "Você doou para esta cidade, então o e-mail que avisa os doadores de que ela foi construída vai chegar até você.",
     newCities: "Me avise quando novas cidades forem construídas",
@@ -439,6 +439,8 @@ export const ptBR: Strings = {
       cityTitle: "Saiba quando {city} for construída",
       newTitle: "Saiba quando novas cidades forem construídas",
       body: "Um e-mail no dia em que ela entrar no mapa. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
+      bodyNew:
+        "Um e-mail cada vez que uma nova cidade entrar no mapa. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
       action: "Enviar um código",
       doneCity: "Você está na lista de {city}",
       doneNew: "Você está na lista das novas cidades",
@@ -449,6 +451,7 @@ export const ptBR: Strings = {
       help: "Ajudar a construir {city}",
       close: "Fechar",
       failed: "Não foi possível colocar você na lista. Tente de novo.",
+      signedIn: "Você entrou. Suas listas estão em Suas cidades.",
       signIn: {
         heading: "Saiba quando uma cidade for construída",
         body: "Um e-mail no dia em que ela entrar no mapa. Antes, conferimos que o endereço é seu: enviamos um código, sem senha.",
@@ -472,7 +475,7 @@ export const ptBR: Strings = {
       leave: "Sair",
       leaveLabel: "Sair da lista de {city}",
       empty: "Você ainda não espera por nenhuma cidade.",
-      pressTellMe: 'Ou toque em "Me avise" em uma cidade abaixo.',
+      pressTellMe: 'Ou clique em "Me avise" em uma cidade abaixo.',
     },
     leave: {
       title: "Sair da lista · tinyworlds",
@@ -485,7 +488,7 @@ export const ptBR: Strings = {
       bad: "Esse link não funciona mais. Você ainda pode sair em Suas cidades.",
       failed: "Não foi possível falar com o servidor. Tente de novo.",
       leaveAll: "Sair de todas as listas",
-      joinAgain: "Entrar de novo",
+      joinAgain: "Entrar na lista de novo",
       backHome: "Voltar às cidades",
     },
     admin: {

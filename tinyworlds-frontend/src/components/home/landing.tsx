@@ -160,7 +160,8 @@ export function Landing() {
   const donor = useDonorSession();
   const { lists, join: joinList, leave: leaveList } = useLists();
   const joinReturn = useJoinReturn();
-  // the page was opened from a sign-in link with a join waiting: the sign opens on its last step
+  // the page was opened from a sign-in link with a join waiting: the sign opens on its last
+  // step, or asks again when the link did not sign the visitor in (saying why)
   const [returnShown, setReturnShown] = useState(true);
   const tellMe = (key: ListKey) => {
     if (!donor) {
@@ -401,6 +402,7 @@ export function Landing() {
         <JoinSign
           open={join.open || (joinReturn.list !== null && returnShown)}
           list={join.list ?? joinReturn.list}
+          notice={join.list === null ? joinReturn.notice : null}
           onOpenChange={(open) => {
             if (open) return;
             setJoin((j) => ({ ...j, open: false }));

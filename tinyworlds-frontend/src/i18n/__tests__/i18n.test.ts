@@ -65,6 +65,11 @@ describe("dictionaries", () => {
     }
   });
 
+  it("name the joined button with the words it shows, first (WCAG 2.5.3)", () => {
+    for (const [locale, { lists }] of Object.entries(DICTIONARIES))
+      expect(lists.leaveAria.startsWith(lists.toldYou), locale).toBe(true);
+  });
+
   it("keep the placeholders of the lists", () => {
     for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
       const { lists } = dictionary;

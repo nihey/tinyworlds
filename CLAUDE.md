@@ -397,7 +397,7 @@ type Mutation {
 #   query    myLinks: MyLinks!                           # their links (each with its id), max, givenCents, picturesFromCents, hidden
 #   mutation addLink(input: { url: String! }): MyLink!   # reads the page; refreshLink(input: { id }) reads it again
 #   mutation removeLink(input: { id: ID! }): Boolean!
-#   query    myLists: MyLists!                           # { cities: [{ slug, name, status }], donated: [slug], newCities: Boolean }; donated: unbuilt cities they gave to (told without a list)
+#   query    myLists: MyLists!                           # { cities: [{ slug, name, status, raisedCents, goalCents, waiting }], donated: [slug], newCities: Boolean }; donated: unbuilt cities they gave to (told without a list)
 #   mutation joinList(input: { city?: String, locale?: String }): MyLists!   # city omitted: "new cities"; once; a city that is built or unknown is not joined
 #   mutation leaveList(input: { city?: String }): MyLists!
 # admins only (Authorization: Bearer <an admin's session>):

@@ -1,23 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DICTIONARIES } from "@/i18n";
 import { en } from "@/i18n/en";
 import { ptBR } from "@/i18n/pt-BR";
 import { parseMilestones } from "../donate";
 import {
   beginOp,
   cityListState,
+  dropPendingJoin,
   finishOp,
   isBusy,
+  joinReturnOf,
   joinStep,
   joinWords,
   leaveState,
   leaveTokenFromHash,
   type LeaveState,
+  linkNoticeOf,
   homeReturnUrl,
   NO_OPS,
   listParam,
   NEW_CITIES,
   parseMyLists,
   PENDING_JOIN_KEY,
+  pendingKeptOnClose,
   savePendingJoin,
   takePendingJoin,
   waitingLine,
@@ -140,6 +145,81 @@ describe("the pending join", () => {
     });
     expect(() => savePendingJoin({ kind: "new" })).not.toThrow();
     expect(takePendingJoin()).toBeNull();
+    expect(() => dropPendingJoin()).not.toThrow();
+  });
+
+  it("is dropped when the sign closes", () => {
+    const data = storage();
+    savePendingJoin({ kind: "new" });
+    dropPendingJoin();
+    expect(data.has(PENDING_JOIN_KEY)).toBe(false);
+    expect(takePendingJoin()).toBeNull();
+  });
+});
+
+describe("pendingKeptOnClose", () => {
+  const lisbon = { kind: "city", slug: "lisbon", name: "Lisbon" } as const;
+  it("keeps the join while a link asked for its list may still come back", () => {
+    expect(pendingKeptOnClose(lisbon, new Set(["lisbon"]))).toBe(true);
+    expect(pendingKeptOnClose({ kind: "new" }, new Set([NEW_CITIES]))).toBe(true);
+  });
+  it("drops it when the sign closes before a link was asked for that list", () => {
+    expect(pendingKeptOnClose(lisbon, new Set())).toBe(false);
+    expect(pendingKeptOnClose(lisbon, new Set([NEW_CITIES]))).toBe(false);
+  });
+});
+
+describe("linkNoticeOf", () => {
+  it("says a refused link has expired or was used", () => {
+    expect(linkNoticeOf({ kind: "unauthorized" })).toBe("expired");
+  });
+  it("says to wait when there were too many tries", () => {
+    expect(linkNoticeOf({ kind: "too-many" })).toBe("tooMany");
+  });
+  it("says the server could not be reached otherwise", () => {
+    expect(linkNoticeOf({ kind: "network" })).toBe("failed");
+    expect(linkNoticeOf(new Error("boom"))).toBe("failed");
+    expect(linkNoticeOf(null)).toBe("failed");
+  });
+});
+
+describe("joinReturnOf", () => {
+  const lisbon = { kind: "city", slug: "lisbon", name: "Lisbon" } as const;
+  it("a link that failed, with the join waiting here: the sign on that list, saying why", () => {
+    expect(joinReturnOf({ ok: false, notice: "expired" }, lisbon)).toEqual({
+      show: "sign",
+      list: lisbon,
+      notice: "expired",
+    });
+    expect(joinReturnOf({ ok: false, notice: "failed" }, { kind: "new" })).toEqual({
+      show: "sign",
+      list: { kind: "new" },
+      notice: "failed",
+    });
+  });
+  it("a link that failed, with no join waiting here: a toast saying why", () => {
+    expect(joinReturnOf({ ok: false, notice: "expired" }, null)).toEqual({
+      show: "toast",
+      notice: "expired",
+    });
+  });
+  it("a link that worked, with no join waiting here (opened on another device): signed in", () => {
+    expect(joinReturnOf({ ok: true }, null)).toEqual({ show: "signed-in" });
+  });
+  it("a link that worked, with the join waiting here: the sign, on its last step", () => {
+    expect(joinReturnOf({ ok: true }, lisbon)).toEqual({
+      show: "sign",
+      list: lisbon,
+      notice: null,
+    });
+  });
+  it("words every notice it can show, and the signed-in toast, in every language", () => {
+    for (const [locale, t] of Object.entries(DICTIONARIES)) {
+      for (const notice of ["expired", "tooMany", "failed"] as const)
+        expect(t.lists.join.signIn[notice].trim(), locale).not.toBe("");
+      // it never promises a welcome mail: that goes once per person, and only on a join
+      expect(t.lists.join.signedIn, locale).not.toMatch(/welcome|boas-vindas|bienvenida/i);
+    }
   });
 });
 
@@ -221,6 +301,14 @@ describe("joinWords", () => {
     expect(w.doneTitle).toBe("You're on the list for new cities");
     expect(w.doneBody("ana@example.com")).toContain("ana@example.com");
     expect(w.help).toBeNull();
+  });
+  it("says what each list sends: one mail for a city, one per new city for new cities", () => {
+    expect(joinWords(en, lisbon).body).toBe(en.lists.join.body);
+    expect(joinWords(en, { kind: "new" }).body).toBe(
+      "One email each time a new city is on the map. First we check the address is yours: we'll send a code, no password.",
+    );
+    for (const [locale, t] of Object.entries(DICTIONARIES))
+      expect(joinWords(t, { kind: "new" }).body, locale).not.toBe(joinWords(t, lisbon).body);
   });
 });
 

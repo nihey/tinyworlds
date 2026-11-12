@@ -8,12 +8,15 @@ import { donorStore, useDonorSession } from "@/hooks/use-donor-session";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLists } from "@/hooks/use-lists";
 import {
+  dropPendingJoin,
   homeReturnUrl,
   joinStep,
   joinWords,
   listParam,
+  pendingKeptOnClose,
   savePendingJoin,
   takePendingJoin,
+  type LinkNotice,
   type ListKey,
 } from "@/lib/lists";
 import { HOME_URL } from "@/site";
@@ -26,23 +29,37 @@ const QUIET =
 
 /**
  * The sign "Tell me" opens for someone not signed in: ask for a link by email (the list rides on
- * it), open it or type its code, and they are on the list. It also opens, already signed in, on
- * its last step when the front page is reached from the link. `list` is what the sign is about.
+ * it), open it or type its code, and they are on the list. It also opens when the front page is
+ * reached from the link: on its last step when that signed the visitor in, else asking again
+ * with why (`notice`: the link was used or too old, say). `list` is what the sign is about.
  */
 export function JoinSign({
   open,
   list,
+  notice = null,
   onOpenChange,
   onHelp,
 }: {
   open: boolean;
   list: ListKey | null;
+  /** why the sign asks again: the link it was reached from did not sign the visitor in */
+  notice?: LinkNotice | null;
   onOpenChange: (open: boolean) => void;
   /** "Help build {city}": the opener takes it to the donate sign */
   onHelp?: (city: string) => void;
 }) {
+  // the lists a link was asked for from this page: their join waits for the link to come back
+  const asked = useRef(new Set<string>());
+  const close = () => {
+    // closed before a link was asked for its list: nothing is waiting for one
+    if (list && !pendingKeptOnClose(list, asked.current)) dropPendingJoin();
+    onOpenChange(false);
+  };
   return (
-    <Dialog open={open && list !== null} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open && list !== null}
+      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+    >
       <DialogContent
         onOpenAutoFocus={(event) => {
           event.preventDefault();
@@ -50,7 +67,15 @@ export function JoinSign({
         }}
         className="sign max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] gap-0 overflow-x-hidden overflow-y-auto p-0 ring-0 sm:max-w-md"
       >
-        {list && <JoinSteps list={list} onClose={() => onOpenChange(false)} onHelp={onHelp} />}
+        {list && (
+          <JoinSteps
+            list={list}
+            notice={notice}
+            onSent={() => asked.current.add(listParam(list))}
+            onClose={close}
+            onHelp={onHelp}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -59,10 +84,14 @@ export function JoinSign({
 /** Mounted only while the sign is open, so each opening starts clean. */
 function JoinSteps({
   list,
+  notice: firstNotice,
+  onSent,
   onClose,
   onHelp,
 }: {
   list: ListKey;
+  notice: LinkNotice | null;
+  onSent: () => void;
   onClose: () => void;
   onHelp?: (city: string) => void;
 }) {
@@ -71,6 +100,8 @@ function JoinSteps({
   const { join } = useLists();
   const [joined, setJoined] = useState(false);
   const [failed, setFailed] = useState(false);
+  // said until a new link is asked for
+  const [notice, setNotice] = useState(firstNotice);
   const words = joinWords(t, list);
   const step = joinStep({ signedIn: session !== null, joined, failed });
   const askedFor = useRef<string | null>(null);
@@ -153,7 +184,7 @@ function JoinSteps({
                 {words.title}
               </DialogTitle>
             </div>
-            <DialogDescription className="sr-only">{t.lists.join.body}</DialogDescription>
+            <DialogDescription className="sr-only">{words.body}</DialogDescription>
             {step === "joining" ? (
               <p role="status" className="pt-4 text-[15px] text-paper">
                 {t.lists.join.signIn.verifying}
@@ -162,8 +193,12 @@ function JoinSteps({
               <SignIn
                 embedded
                 purpose="donor"
-                words={t.lists.join.signIn}
-                notice={null}
+                words={{ ...t.lists.join.signIn, body: words.body }}
+                notice={notice}
+                onSent={() => {
+                  setNotice(null);
+                  onSent();
+                }}
                 verifying={false}
                 list={listParam(list)}
                 returnUrl={homeReturnUrl(HOME_URL, window.location.origin)}

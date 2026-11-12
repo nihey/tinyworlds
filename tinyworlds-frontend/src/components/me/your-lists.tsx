@@ -85,7 +85,7 @@ export function YourLists({
                 type="button"
                 disabled={busy}
                 onClick={() => onLeave({ kind: "new" })}
-                aria-label={t.lists.leaveAria.replace("{city}", words.newCities)}
+                aria-label={words.leaveLabel.replace("{city}", words.newCities)}
                 className={LEAVE}
               >
                 {words.leave}

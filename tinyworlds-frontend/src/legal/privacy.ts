@@ -123,14 +123,14 @@ export const PRIVACY: LegalDocs = {
         id: "signing-in",
         title: "When you sign in",
         blocks: [
-          "Anyone may sign in with an email address, to see what they have given. We keep the address and when it last signed in. Each sign-in link and code works once, for 15 minutes; we store only a one-way hash of them, never the link or the code itself.",
+          'Anyone may sign in with an email address, to see what they have given or to join a list (below). We keep the address and when it last signed in, whether or not it has given, until you ask us to delete it. Each sign-in link and code works once, for 15 minutes; we store only a one-way hash of them, never the link or the code itself, and, with a link asked for from "Tell me", the list it is for.',
         ],
       },
       {
         id: "lists",
         title: "When you ask to be told",
         blocks: [
-          'Anyone may ask to hear when a city is built, or when new cities are built, by pressing "Tell me" and confirming their email address with a sign-in link or code. For each list you join we keep your address, which list it is, when you joined and the language of the page you joined from. We send:',
+          'Anyone may ask to hear when a city is built, or when new cities are built, by pressing "Tell me" and confirming their email address with a sign-in link or code. For each list you join we keep, beside your address, which list it is, when you joined and the language of the page you joined from. We send:',
           {
             items: [
               "one welcome mail, with three buildings from the cities already on the map;",
@@ -139,6 +139,7 @@ export const PRIVACY: LegalDocs = {
           },
           'Nothing else is sent through the lists. A city\'s list ends once its mail has gone out; "new cities" lasts until you leave it.',
           'You can leave at any time: every list mail has a "Leave this list" link that needs no sign-in, and your mail program\'s own unsubscribe button works too. You can also leave any list on [Your cities](me).',
+          "Leaving takes you off the list, and nothing more: your address stays, as for any sign-in (above), with a note of the list mails sent to it (when the welcome went, and which city each of the others was about, and when), so that nobody is told twice. Both stay until you ask us to delete them.",
         ],
       },
       {
@@ -171,8 +172,8 @@ export const PRIVACY: LegalDocs = {
                 text: "for as long as the site runs: they make up each city's funding and its list of benefactors, and they are the record of payments.",
               },
               {
-                term: "Your donor details",
-                text: "(email address, name, links): until you ask us to delete them.",
+                term: "Your address and donor details",
+                text: "(email address, name, links), whether you gave or only signed in: until you ask us to delete them.",
               },
               {
                 term: "Visits and quiz answers:",
@@ -183,8 +184,12 @@ export const PRIVACY: LegalDocs = {
                 text: "until you leave the list or, for a city, until its mail has gone out.",
               },
               {
+                term: "Notes of list mails",
+                text: "(which city each was about and when, and when the welcome went): until you ask us to delete your address, so that nobody is told twice.",
+              },
+              {
                 term: "Sign-in links and codes:",
-                text: "only as one-way hashes, for a day or until that address next asks for one, whichever is later.",
+                text: "only as one-way hashes, with the list a link was asked for, if any: for a day or until that address next asks for one, whichever is later.",
               },
             ],
           },
@@ -294,7 +299,7 @@ export const PRIVACY: LegalDocs = {
               "os prédios que você já jogou no Adivinhe o prédio, e o jogo que escolheu;",
               "o código da visita, e o que você escolheu no painel de doação enquanto está no pagamento (no armazenamento de sessão, que some quando a aba é fechada);",
               "se você entrar, sua sessão, por 7 dias;",
-              'se você clicar em "Me avise" antes de entrar, qual lista você pediu e quando (em tinyworlds.join): ele é lido e apagado quando o acesso termina, e ignorado se tiver mais de uma hora.',
+              'se você clicar em "Me avise" antes de entrar, qual lista você pediu e quando (em tinyworlds.join): ele é lido e apagado quando o acesso é concluído, e ignorado se tiver mais de uma hora.',
             ],
           },
           "Você pode apagá-las a qualquer momento nas configurações do navegador.",
@@ -328,22 +333,23 @@ export const PRIVACY: LegalDocs = {
         id: "signing-in",
         title: "Quando você entra",
         blocks: [
-          "Qualquer pessoa pode entrar com um e-mail, para ver o que doou. Guardamos o endereço e quando ele entrou pela última vez. Cada link e código de acesso funciona uma vez, por 15 minutos; guardamos só um hash irreversível deles, nunca o link ou o código em si.",
+          'Qualquer pessoa pode entrar com um e-mail, para ver o que doou ou para entrar em uma lista (abaixo). Guardamos o endereço e quando ele entrou pela última vez, tenha doado ou não, até você pedir que o apaguemos. Cada link e código de acesso funciona uma vez, por 15 minutos; guardamos só um hash irreversível deles, nunca o link ou o código em si, e, num link pedido pelo "Me avise", a lista a que ele se refere.',
         ],
       },
       {
         id: "lists",
         title: "Quando você pede para ser avisado",
         blocks: [
-          'Qualquer pessoa pode pedir para saber quando uma cidade for construída, ou quando novas cidades forem construídas, clicando em "Me avise" e confirmando o e-mail com um link ou código de acesso. Para cada lista em que você entra, guardamos seu endereço, qual é a lista, quando você entrou e o idioma da página de onde entrou. Enviamos:',
+          'Qualquer pessoa pode pedir para saber quando uma cidade for construída, ou quando novas cidades forem construídas, clicando em "Me avise" e confirmando o e-mail com um link ou código de acesso. Para cada lista em que você entra, guardamos, junto do seu endereço, qual é a lista, quando você entrou e o idioma da página de onde entrou. Enviamos:',
           {
             items: [
-              "um e-mail de boas-vindas, com três edifícios das cidades que já estão no mapa;",
+              "um e-mail de boas-vindas, com três prédios das cidades que já estão no mapa;",
               'um e-mail quando uma cidade que você espera for construída; para "novas cidades", um sempre que um novo mundo for adicionado ao mapa.',
             ],
           },
           'Nada mais é enviado pelas listas. A lista de uma cidade termina quando o e-mail dela é enviado; "novas cidades" dura até você sair.',
           'Você pode sair a qualquer momento: todo e-mail de lista tem um link "Sair desta lista" que não pede acesso, e o botão de cancelar inscrição do seu programa de e-mail também funciona. Você também pode sair de qualquer lista em [Suas cidades](me).',
+          "Sair de uma lista tira você dela, e só: seu endereço continua guardado, como em qualquer acesso (acima), com um registro dos e-mails de lista enviados a ele (quando foi o de boas-vindas, e de qual cidade cada um dos outros falava, e quando), para que ninguém seja avisado duas vezes. Os dois ficam até você pedir que os apaguemos.",
         ],
       },
       {
@@ -376,8 +382,8 @@ export const PRIVACY: LegalDocs = {
                 text: "enquanto o site existir: elas formam o financiamento de cada cidade e sua lista de benfeitores, e são o registro dos pagamentos.",
               },
               {
-                term: "Seus dados de doador",
-                text: "(e-mail, nome, links): até você pedir que os apaguemos.",
+                term: "Seu endereço e seus dados de doador",
+                text: "(e-mail, nome, links), tenha você doado ou apenas entrado: até você pedir que os apaguemos.",
               },
               {
                 term: "Visitas e respostas do quiz:",
@@ -388,8 +394,12 @@ export const PRIVACY: LegalDocs = {
                 text: "até você sair da lista ou, no caso de uma cidade, até o e-mail dela ser enviado.",
               },
               {
+                term: "Registro dos e-mails de lista",
+                text: "(de qual cidade cada um falava e quando, e quando foi o de boas-vindas): até você pedir que apaguemos seu endereço, para que ninguém seja avisado duas vezes.",
+              },
+              {
                 term: "Links e códigos de acesso:",
-                text: "só como hashes irreversíveis, por um dia ou até aquele endereço pedir outro, o que vier depois.",
+                text: "só como hashes irreversíveis, com a lista para a qual o link foi pedido, se houver: por um dia ou até aquele endereço pedir outro, o que vier depois.",
               },
             ],
           },
@@ -533,14 +543,14 @@ export const PRIVACY: LegalDocs = {
         id: "signing-in",
         title: "Cuando inicias sesión",
         blocks: [
-          "Cualquiera puede iniciar sesión con un correo, para ver lo que ha donado. Guardamos la dirección y cuándo entró por última vez. Cada enlace y código de acceso sirve una vez, durante 15 minutos; solo guardamos un hash irreversible de ellos, nunca el enlace ni el código.",
+          "Cualquiera puede iniciar sesión con un correo, para ver lo que ha donado o para unirse a una lista (abajo). Guardamos la dirección y cuándo entró por última vez, haya donado o no, hasta que nos pidas borrarla. Cada enlace y código de acceso sirve una vez, durante 15 minutos; solo guardamos un hash irreversible de ellos, nunca el enlace ni el código, y, en un enlace pedido desde «Avísame», la lista a la que corresponde.",
         ],
       },
       {
         id: "lists",
         title: "Cuando pides que te avisemos",
         blocks: [
-          "Cualquiera puede pedir que le avisen cuando se construya una ciudad, o cuando se construyan ciudades nuevas, pulsando «Avísame» y confirmando su correo con un enlace o código de acceso. De cada lista a la que te unes guardamos tu dirección, qué lista es, cuándo te uniste y el idioma de la página desde la que lo hiciste. Enviamos:",
+          "Cualquiera puede pedir que le avisen cuando se construya una ciudad, o cuando se construyan ciudades nuevas, pulsando «Avísame» y confirmando su correo con un enlace o código de acceso. De cada lista a la que te unes guardamos, junto a tu dirección, qué lista es, cuándo te uniste y el idioma de la página desde la que lo hiciste. Enviamos:",
           {
             items: [
               "un correo de bienvenida, con tres edificios de las ciudades que ya están en el mapa;",
@@ -549,6 +559,7 @@ export const PRIVACY: LegalDocs = {
           },
           "Por las listas no se envía nada más. La lista de una ciudad termina cuando se ha enviado su correo; «ciudades nuevas» dura hasta que te des de baja.",
           "Puedes darte de baja cuando quieras: todo correo de una lista trae un enlace «Salir de esta lista» que no pide iniciar sesión, y el botón de cancelar suscripción de tu programa de correo también funciona. También puedes salir de cualquier lista en [Tus ciudades](me).",
+          "Salir de una lista te quita de ella, y nada más: tu dirección sigue guardada, como en cualquier inicio de sesión (arriba), con una nota de los correos de las listas que se le enviaron (cuándo salió el de bienvenida, y de qué ciudad hablaba cada uno de los demás, y cuándo), para que a nadie se le avise dos veces. Ambas se guardan hasta que nos pidas borrarlas.",
         ],
       },
       {
@@ -581,8 +592,8 @@ export const PRIVACY: LegalDocs = {
                 text: "mientras exista el sitio: forman los fondos de cada ciudad y su lista de benefactores, y son el registro de los pagos.",
               },
               {
-                term: "Tus datos de donante",
-                text: "(correo, nombre, enlaces): hasta que nos pidas borrarlos.",
+                term: "Tu dirección y tus datos de donante",
+                text: "(correo, nombre, enlaces), hayas donado o solo iniciado sesión: hasta que nos pidas borrarlos.",
               },
               {
                 term: "Visitas y respuestas del juego:",
@@ -593,8 +604,12 @@ export const PRIVACY: LegalDocs = {
                 text: "hasta que salgas de la lista o, en el caso de una ciudad, hasta que se haya enviado su correo.",
               },
               {
+                term: "Nota de los correos de las listas",
+                text: "(de qué ciudad hablaba cada uno y cuándo, y cuándo salió el de bienvenida): hasta que nos pidas borrar tu dirección, para que a nadie se le avise dos veces.",
+              },
+              {
                 term: "Enlaces y códigos de acceso:",
-                text: "solo como hashes irreversibles, un día o hasta que esa dirección pida otro, lo que ocurra más tarde.",
+                text: "solo como hashes irreversibles, con la lista para la que se pidió el enlace, si la hay: un día o hasta que esa dirección pida otro, lo que ocurra más tarde.",
               },
             ],
           },

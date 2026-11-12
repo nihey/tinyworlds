@@ -161,16 +161,16 @@ src/
 │                        # list-counts.tsx (how many wait on each list: counts only)
 ├── components/lists/    # the waiting lists: join-sign.tsx (the sign "Tell me" opens),
 │                        # tell-me-button.tsx (a city's button and its "N waiting"),
-│                        # new-cities-button.tsx, leave-page.tsx (/lists/leave/),
-│                        # use-lists.ts (the donor's lists, and joining), use-join-return.ts
-│                        # (a join waiting for its sign-in link to be opened)
+│                        # new-cities-button.tsx, leave-page.tsx (/lists/leave/); their hooks
+│                        # are in hooks/: use-lists.ts (the donor's lists, and joining),
+│                        # use-join-return.ts (the front page opened from a join's link)
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/legal/    # the legal pages (legal-page.tsx, legal-text.tsx) and the footers'
 │                        # links to them (legal-links.tsx)
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
-│                        # useAdminSession, …
+│                        # useAdminSession, useLists, useJoinReturn, …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
@@ -647,19 +647,30 @@ canonical address.
 
 Anyone may ask to hear when a city is built, or when any new one is (root `CLAUDE.md`, the
 lists' bullet). Only with an API (`withApi`); `lib/lists.ts` is the pure part, `lib/lists-api.ts`
-(Apollo, lazy) the calls, `useLists` (`components/lists/use-lists.ts`) the donor's lists.
+(Apollo, lazy) the calls, `useLists` (`hooks/use-lists.ts`) the donor's lists.
 
 - **On the front page**: each city being funded (the "Build the next city" tile and the
-  ranking's cards, `CityFundCard`) has a **"Tell me"** button (`TellMeButton`; "Joined" with a
-  way to leave once on the list; a donor of the city is told without a list, and the button
-  says so) and shows **"N waiting"** (`waiting` of `cityMilestones`). The tile (`NextCityTile`)
+  ranking's cards, `CityFundCard`) has a **"Tell me"** button (`TellMeButton`; "You'll be told"
+  once on the list, and pressing it leaves: its label for screen readers starts with those
+  words, `leaveAria`; a donor of the city is told without a list, and the button says so) and shows **"N waiting"** (`waiting` of `cityMilestones`). The tile (`NextCityTile`)
   also has **"Tell me when new cities are built"** (`NewCitiesButton`).
 - **The join sign** (`JoinSign`): a signed-in donor joins at once; anyone else is asked for an
   address and confirms it with the sign-in link or code (`SignIn purpose="donor"`, the list
   carried in `magic-link`'s `list`, so the link joins server side wherever it is opened).
-  Before sending, `savePendingJoin` keeps which list, and when, in localStorage
-  (`tinyworlds.join`); `useJoinReturn` reads and removes it (`takePendingJoin`, ignored after
-  an hour) when the page opens from the link, and the sign opens on its last step.
+  Its body says what the list sends (`joinWords(…).body`: one mail for a city, one per new
+  city for new cities). When the sign opens, `savePendingJoin` keeps which list, and when, in
+  localStorage (`tinyworlds.join`); closed before a link was asked for that list
+  (`pendingKeptOnClose`), it forgets it (`dropPendingJoin`), so a link asked for on another
+  device never joins a list this browser only looked at.
+- **The front page opened from the link** (`hooks/use-join-return.ts`): the token leaves the
+  address, `verifyLink` trades it, and `takePendingJoin` (ignored after an hour) reads the
+  join waiting here. `joinReturnOf` says what shows: with a join waiting, the sign on that
+  list, on its last step when the link signed the visitor in, else asking again with why (the
+  `notice`, `linkNoticeOf`: expired or used, too many tries, no answer), a new link one press
+  away; with none (the link was opened on another device, and the API joined the list
+  itself), a toast: "You're signed in. Your lists are on Your cities." (never a promise of a
+  welcome mail: that goes once per person, only on a join), with a way to Your cities, and
+  the buttons show the lists; or, when the link failed, why.
 - **"Your lists"** on `/me/` and **`/lists/leave/`**: below.
 - **The admins' counts**: "The donation funnel and the admin pages" above.
 
