@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/en";
 import { parseMilestones } from "../donate";
 import {
   beginOp,
   cityListState,
   finishOp,
   isBusy,
+  joinStep,
+  joinWords,
+  homeReturnUrl,
   NO_OPS,
   listParam,
   NEW_CITIES,
@@ -178,5 +182,50 @@ describe("calls in flight", () => {
     const first = finishOp(b.ops, a.ticket, "load", true);
     expect(isBusy(first.ops)).toBe(true);
     expect(isBusy(finishOp(first.ops, b.ticket, "change", true).ops)).toBe(false);
+  });
+});
+
+describe("joinStep", () => {
+  it("asks to sign in until there is a session", () => {
+    expect(joinStep({ signedIn: false, joined: false, failed: false })).toBe("sign-in");
+  });
+  it("joins while signed in and not yet on the list", () => {
+    expect(joinStep({ signedIn: true, joined: false, failed: false })).toBe("joining");
+  });
+  it("is done once on the list", () => {
+    expect(joinStep({ signedIn: true, joined: true, failed: false })).toBe("done");
+  });
+  it("says so when the join failed", () => {
+    expect(joinStep({ signedIn: true, joined: false, failed: true })).toBe("failed");
+  });
+});
+
+describe("joinWords", () => {
+  const lisbon = { kind: "city", slug: "lisbon", name: "Lisbon" } as const;
+  it("fills a city's name into its title and body, and offers to help build it", () => {
+    const w = joinWords(en, lisbon);
+    expect(w.title).toBe("Hear when Lisbon is built");
+    expect(w.doneTitle).toBe("You're on Lisbon's list");
+    expect(w.doneBody("ana@example.com")).toContain("ana@example.com");
+    expect(w.doneBody("ana@example.com")).toContain("Lisbon");
+    expect(w.help).toBe("Help build Lisbon");
+  });
+  it("uses the new-cities forms, with nothing to help build", () => {
+    const w = joinWords(en, { kind: "new" });
+    expect(w.title).toBe("Hear when new cities are built");
+    expect(w.doneTitle).toBe("You're on the list for new cities");
+    expect(w.doneBody("ana@example.com")).toContain("ana@example.com");
+    expect(w.help).toBeNull();
+  });
+});
+
+describe("homeReturnUrl", () => {
+  it("is the site's root on its origin when the front page is at the root", () => {
+    expect(homeReturnUrl("/", "https://example.com")).toBe("https://example.com/");
+  });
+  it("is the front page's own address when that is absolute", () => {
+    expect(homeReturnUrl("https://front.example.com/", "https://example.com")).toBe(
+      "https://front.example.com/",
+    );
   });
 });

@@ -1,4 +1,5 @@
 import type { CityStatus } from "./donate";
+import type { Strings } from "@/i18n/types";
 
 /**
  * The lists a visitor can join to hear when a city is built: one per city still being funded,
@@ -153,3 +154,51 @@ export const isBusy = (ops: Ops): boolean => ops.pending > 0;
 
 /** A new session starts clean, and nothing begun under the old one can write. */
 export const restartOps = (ops: Ops): Ops => ({ version: ops.version + 1, pending: 0 });
+
+// ---------------------------------------------------------------------------------------------
+// the join sign
+// ---------------------------------------------------------------------------------------------
+
+/** Where the join sign is: asking to sign in, adding to the list, or finished (or failed). */
+export function joinStep(s: {
+  signedIn: boolean;
+  joined: boolean;
+  failed: boolean;
+}): "sign-in" | "joining" | "done" | "failed" {
+  if (!s.signedIn) return "sign-in";
+  if (s.joined) return "done";
+  return s.failed ? "failed" : "joining";
+}
+
+/** The sign's words for one list; `help` is the "Help build" button's label, null for new cities. */
+export function joinWords(
+  t: Strings,
+  list: ListKey,
+): { title: string; doneTitle: string; doneBody: (email: string) => string; help: string | null } {
+  const j = t.lists.join;
+  if (list.kind === "new") {
+    return {
+      title: j.newTitle,
+      doneTitle: j.doneNew,
+      doneBody: (email) => j.doneBodyNew.replace("{email}", email),
+      help: null,
+    };
+  }
+  const fill = (text: string) => text.replace("{city}", list.name);
+  return {
+    title: fill(j.cityTitle),
+    doneTitle: fill(j.doneCity),
+    doneBody: (email) => fill(j.doneBody.replace("{email}", email)),
+    help: fill(j.help),
+  };
+}
+
+/**
+ * Where a sign-in link brings the visitor back to: the front page's root, from wherever the
+ * sign opened (`homeUrl` is the site's HOME_URL: "/" or an absolute address).
+ */
+export function homeReturnUrl(homeUrl: string, origin: string): string {
+  return /^https?:\/\//i.test(homeUrl)
+    ? homeUrl
+    : origin + (homeUrl.startsWith("/") ? homeUrl : `/${homeUrl}`);
+}
