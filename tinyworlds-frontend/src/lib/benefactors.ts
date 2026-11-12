@@ -37,6 +37,8 @@ export interface CityBenefactors {
   worldId: string | null;
   goalCents: number;
   raisedCents: number;
+  /** How many people gave to it (a donor once, however many gifts); absent from an older API. */
+  benefactorCount?: number;
   /** One per stone: the number of the founder row that laid it, null while unlaid. */
   stones: (number | null)[];
   founders: FounderRow[];
@@ -123,6 +125,9 @@ export function parseCityBenefactors(
     worldId,
     goalCents,
     raisedCents,
+    ...(isInt(value.benefactorCount) && value.benefactorCount >= 0
+      ? { benefactorCount: value.benefactorCount }
+      : {}),
     stones,
     founders,
     benefactors,

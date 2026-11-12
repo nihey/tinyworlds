@@ -4,6 +4,7 @@ import {
   type FounderRow,
   type BenefactorRow,
 } from "./benefactors";
+import { broughtBy, type BroughtBy } from "./brought-by";
 import { API_URL, parseMilestones, type CityMilestone } from "./donate";
 import { apiOrigin } from "./links";
 import { parseWall, type WallEntry } from "./wall";
@@ -24,12 +25,12 @@ const LINK = "url title description icon image";
 
 export const HALL_QUERY = `query HallOfFame {
   benefactorWall { name amountCents cities { slug name worldId } links { ${LINK} } }
-  cityMilestones { id slug name raisedCents goalCents donations status worldId }
+  cityMilestones { id slug name raisedCents goalCents donations benefactorCount status worldId }
 }`;
 
 export const CITY_HALL_QUERY = `query CityHall($input: CityBenefactorsInput!) {
   cityBenefactors(input: $input) {
-    slug name status worldId goalCents raisedCents stones
+    slug name status worldId goalCents raisedCents stones benefactorCount
     founders { number name amountCents stones firstStone keystone links { ${LINK} } }
     benefactors { rank name amountCents links { ${LINK} } }
   }
@@ -91,10 +92,15 @@ export interface HallCity {
   status: CityMilestone["status"] | null;
   raisedCents: number | null;
   goalCents: number | null;
-  /** how many of the wall's entries gave to it: a named donor once, each unnamed gift once */
+  /**
+   * how many people gave to it: as the API counts them (a donor once) when it says, else the
+   * wall's entries for it (a named donor once, each unnamed gift once)
+   */
   people: number;
   /** the first few who are named there, the largest givers first */
   names: string[];
+  /** who brought it to the map, for a city that is there because of them; null otherwise */
+  broughtBy: BroughtBy | null;
 }
 
 /** How many names a city's tile shows. */
@@ -121,6 +127,7 @@ export function hallCities(data: HallData): HallCity[] {
           goalCents: known?.goalCents ?? null,
           people: 0,
           names: [],
+          broughtBy: known ? broughtBy(known) : null,
         };
         bySlug.set(where.slug, city);
       }
@@ -128,12 +135,36 @@ export function hallCities(data: HallData): HallCity[] {
       if (entry.name !== null && city.names.length < TILE_NAMES) city.names.push(entry.name);
     }
   }
+  // the API counts each donor once; the wall cannot tell an unnamed donor's two gifts apart
+  for (const city of bySlug.values()) {
+    const counted = listed.get(city.slug)?.benefactorCount;
+    if (counted !== undefined && counted > 0) city.people = counted;
+  }
   return [...bySlug.values()].sort(
     (a, b) =>
       (b.raisedCents ?? 0) - (a.raisedCents ?? 0) ||
       b.people - a.people ||
       a.name.localeCompare(b.name),
   );
+}
+
+/** The hall of fame in three figures. */
+export interface HallTotals {
+  /** everything given to the cities, in US cents */
+  cents: number;
+  /** everyone on the wall: a named donor once, each unnamed gift once */
+  people: number;
+  /** the cities on the map because of them */
+  built: number;
+}
+
+/** What the hall of fame's figures say: what was given, by how many, and what it built. */
+export function hallTotals(data: HallData): HallTotals {
+  return {
+    cents: data.cities.reduce((sum, city) => sum + city.raisedCents, 0),
+    people: data.wall.length,
+    built: data.cities.filter((city) => broughtBy(city) !== null).length,
+  };
 }
 
 /** The city a hall of fame's address asks for with `?city=`, or null. */
