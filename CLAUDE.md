@@ -113,6 +113,17 @@ Each sub-project has its own `CLAUDE.md`.
   the front page again, so what is baked is at most a day old. A city named since the build
   has no page yet: the web server sends its address to `/hall-of-fame/?city=<slug>`, which
   shows it all the same.
+- **Lists: anyone may ask to hear.** On a city being funded, "Tell me" puts an address on its
+  list; "Tell me when new cities are built" puts it on the list of every new world. Signing in
+  (a link or a code, `purpose: "donor"`) confirms the address, and the join rides on the link,
+  server side. A welcome mail follows, with three lit buildings from the cities already on the
+  map; one more mail goes out when the city is built (for "new cities", whenever a world is
+  added), and nothing else is sent through the lists. A city's list ends with its mail, "new
+  cities" lasts until the person leaves. Every list mail has a "Leave this list" link that
+  needs no sign-in (`/lists/leave/#t=<token>`, `leaveListWithToken`) and the mail client's own
+  unsubscribe (RFC 8058); lists are also left on "Your cities". A donor of a city is told
+  without a list. The cards say "N waiting" (`waiting`); admins see counts only, on `/admin/`,
+  never an address. The privacy policy covers all of it.
 - **Donors get two mails, and two more, once each.** Every donor in a city's hall of fame is
   told so by a mail sent by hand, once each (`npm run hall:announce -- --send` in the API's
   container; without `--send` it only says who would be told): which halls they are in and
@@ -120,7 +131,7 @@ Each sub-project has its own `CLAUDE.md`.
   **the owner's own note**, once each and by hand the same way (`npm run owner:note --
   --send`; run again, it reaches those who have given since): a thank-you from the owner, not
   from the site, with the owner's WhatsApp for whatever a donor wants to say. Who the owner is
-  (name, sender address, number) is the API's environment, never a tracked file. Otherwise:
+  (name, sender address, number) is the API's environment, never a tracked file. Otherwise (the lists' mails are above):
   once Stripe confirms a gift, the API thanks the donor by mail
   (how much closer their city is, its stones with theirs lit, how many people explore the
   cities, where they are listed); and once a city is built, `deploy/deploy.sh <world>` runs the
@@ -148,7 +159,8 @@ Each sub-project has its own `CLAUDE.md`.
   `/<world>` plus one for the front page. No server components fetch at request time; Apollo
   Client is used only where the API is (the Donate dialog, the front page's milestones).
 - **No accounts for visitors.** What the site calls for them is public and throttled. Auth
-  exists for admins and for donors (who sign in to see the cities they helped build), and
+  exists for admins and for donors (who sign in to see the cities they helped build, or to
+  confirm an address for a waiting list: still no account to make), and
   without passwords: a sign-in link or its code by email, then a JWT in local storage
   (`tinyworlds-api/CLAUDE.md`). Signing in is REST, as the global stack has it.
 - **Funnel steps go out with plain `fetch`**, not Apollo Client: every page sends one, and
@@ -346,7 +358,8 @@ GraphQL at `/api/graphql` (same origin in production):
 
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
-type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! benefactorCount: Int! status: CityStatus! worldId: String }
+type CityMilestone { id: ID! slug: String! name: String! raisedCents: Int! goalCents: Int! donations: Int! benefactorCount: Int! waiting: Int! status: CityStatus! worldId: String }
+# waiting: how many people are on the city's list ("Tell me when it is built")
 type BenefactorLink { url: String!  title: String!  description: String  icon: String  image: String }
 type WallCity { slug: String!  name: String!  worldId: String }
 type WallBenefactor { name: String  amountCents: Int!  cities: [WallCity!]!  links: [BenefactorLink!]!  lastGiftAt: DateTime! }
@@ -374,6 +387,7 @@ type Mutation {
   createDonationCheckout(input: CreateDonationCheckoutInput!): DonationCheckout!
   trackFunnelStep(input: TrackFunnelStepInput!): Boolean!
   trackPresence(input: TrackPresenceInput!): Boolean!               # a map, every 30 s while in view
+  leaveListWithToken(input: { token: String!, all: Boolean }): Boolean!   # a mail's leave link: no sign-in; true for any token of ours (even used twice, or after the city was built), false for one that is not; all: every list
   answerQuiz(input: AnswerQuizInput!): QuizTally!           # public, 30 a minute per address
 }
 # donors only (Authorization: Bearer <a donor's session>):
@@ -383,11 +397,15 @@ type Mutation {
 #   query    myLinks: MyLinks!                           # their links (each with its id), max, givenCents, picturesFromCents, hidden
 #   mutation addLink(input: { url: String! }): MyLink!   # reads the page; refreshLink(input: { id }) reads it again
 #   mutation removeLink(input: { id: ID! }): Boolean!
+#   query    myLists: MyLists!                           # { cities: [{ slug, name, status }], donated: [slug], newCities: Boolean }; donated: unbuilt cities they gave to (told without a list)
+#   mutation joinList(input: { city?: String, locale?: String }): MyLists!   # city omitted: "new cities"; once; a city that is built or unknown is not joined
+#   mutation leaveList(input: { city?: String }): MyLists!
 # admins only (Authorization: Bearer <an admin's session>):
 #   me, donationFunnel
 #   query    benefactorNames: [BenefactorName!]!         # newest listed gift first, at most 100; each with its links
 #   mutation setNameHidden(input: { donorId: ID!, hidden: Boolean! }): Boolean!
 #   mutation setLinksHidden(input: { donorId: ID!, hidden: Boolean! }): Boolean!
+#   query    listCounts: ListCounts!                     # { cities: [{ name, slug, waiting }] most first, newCities: Int }: counts only, never an address
 ```
 
 `amountCents` (100 to 1,000,000) fixes the amount; without it the donor chooses on Stripe's page
@@ -404,8 +422,8 @@ unnamed row). `benefactorCount`, on a milestone and on `cityBenefactors`, is how
 gave to the city in dollars: a donor once, however many gifts, and a gift that came without an
 address as one; `donations` counts the gifts. A link's `icon` and `image` are paths on the API's own host
 (`/api/link-images/<id>`, WebP, kept for good by a browser); `image` is null on the public
-lists until the donor has given US$10 in all. REST: `GET /api/link-images/<id>`, `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
-`POST /api/auth/magic-link { email, returnUrl, locale?, purpose? }` (always `202`), then
+lists until the donor has given US$10 in all. REST: `GET /api/link-images/<id>`, `GET /api/sight-pictures/<world>/<file>` (a lit building's picture as a PNG, for the mails), `POST /api/lists/unsubscribe?t=<token>` (a mail client's one-click leave, RFC 8058), `POST /api/stripe/webhook`, and signing in, for admins and donors alike:
+`POST /api/auth/magic-link { email, returnUrl, locale?, purpose?, list? }` (always `202`; `list` is a city's slug, or `*` for "new cities", on donor links only: the list is joined when the link or code is used, server side, so a link opened on another device still joins; a list that cannot be joined is dropped silently), then
 `POST /api/auth/verify` with `{ token }` or `{ email, code, purpose? }`, answered
 `{ accessToken, expiresAt, admin | donor: { id, email } }`. `purpose` is `"admin"` (the default)
 or `"donor"`; a session of one kind is `FORBIDDEN` on the other's queries. When the contract

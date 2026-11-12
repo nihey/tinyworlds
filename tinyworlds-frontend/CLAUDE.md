@@ -111,6 +111,7 @@ src/
 ├── app/                 # layout (fonts, metadata, theme script, accent), globals.css, and two
 │                        # pages: page.map.tsx (a world) and page.home.tsx (the front page);
 │                        # admin/page.home.tsx: the admin pages, in the front page's build only;
+│                        # lists/leave/page.home.tsx: what a mail's leave link opens;
 │                        # hall-of-fame/page.home.tsx and hall-of-fame/[city]/page.home.tsx:
 │                        # the hall of fame and a city's own, likewise; terms/page.home.tsx and
 │                        # privacy/page.home.tsx: the terms of service and the privacy policy
@@ -156,7 +157,13 @@ src/
 ├── components/sign-in/  # the one sign-in sheet (admins and donors): a link or a 6-digit code
 ├── components/admin/    # the admin pages: admin-app.tsx (signed in or not),
 │                        # funnel-report.tsx (the steps, the cities by visits, the days),
-│                        # names.tsx (donors' names and their links: hide and show)
+│                        # names.tsx (donors' names and their links: hide and show),
+│                        # list-counts.tsx (how many wait on each list: counts only)
+├── components/lists/    # the waiting lists: join-sign.tsx (the sign "Tell me" opens),
+│                        # tell-me-button.tsx (a city's button and its "N waiting"),
+│                        # new-cities-button.tsx, leave-page.tsx (/lists/leave/),
+│                        # use-lists.ts (the donor's lists, and joining), use-join-return.ts
+│                        # (a join waiting for its sign-in link to be opened)
 ├── components/consent/  # Google Tag Manager behind the cookie question
 ├── components/legal/    # the legal pages (legal-page.tsx, legal-text.tsx) and the footers'
 │                        # links to them (legal-links.tsx)
@@ -180,7 +187,10 @@ src/
                          # gave: the request, its answer, the two sides), hall.ts (the hall
                          # of fame's questions and answers, its cities and figures),
                          # hall-build.ts (the same, asked by the build to bake the pages),
-                         # brought-by.ts (pure: which cities their benefactors brought)
+                         # brought-by.ts (pure: which cities their benefactors brought),
+                         # lists.ts (pure: a list's key, the join waiting for a sign-in in
+                         # localStorage "tinyworlds.join", the leave link's states),
+                         # lists-api.ts (myLists, joinList, leaveList, leaveListWithToken; lazy)
 ```
 
 ## Targets: worlds and the front page
@@ -498,6 +508,11 @@ visit reached; `tinyworlds-api/CLAUDE.md` has the whole picture.
   with a table behind it; the latest donations. One period for everything (7, 30, 90 days,
   12 months: whole local days, `rangeOf`). One colour marks everything (`--taxi`), bars are
   thin, and every figure a bar stands for is written beside it or in the table.
+- **"Waiting to hear"** (`components/admin/list-counts.tsx`, `listCounts` through
+  `fetchListCounts`, parsed by `parseListCounts`): a table under the names, a row per city
+  (most waited for first) and a "New cities" row. Counts only, never an address; it loads on
+  its own, and a failed load says so (with a retry) rather than showing a table that claims
+  nobody waits.
 - There is nothing secret in the page itself: the numbers come from the API, which gives them
   to signed-in admins alone. Who the admins are is the API's `ADMIN_EMAILS`.
 
@@ -573,7 +588,8 @@ either build, like `HALL_URL`.
   the quiz's answers, Rybbit and Google Analytics behind the cookie question, what the
   browser keeps, what a donation, a donor, a link and a sign-in store, and where it goes.
   **Change it with any change to what the site or the API collects, keeps or sends
-  elsewhere**, move `LEGAL_UPDATED`, and tell donors by email when the change matters to
+  elsewhere** (the lists' addresses and mails, and the join kept in `localStorage` while a
+  sign-in link is on its way, are covered in `/privacy/#lists`), move `LEGAL_UPDATED`, and tell donors by email when the change matters to
   them (both texts promise this). The commitments in the terms (refunds within 30 days, a
   city that cannot be built offered elsewhere or refunded) are the owner's to change, not
   the code's.
@@ -626,6 +642,26 @@ canonical address.
   `HALL_URL`), and the mail that tells donors they are in it.
 - `HallFrame` is what both pages stand in: the wordmark home, "Your cities", the language,
   title and theme, the visit, and the donate sign.
+
+## The waiting lists (front page, `/me/`, `/lists/leave/`)
+
+Anyone may ask to hear when a city is built, or when any new one is (root `CLAUDE.md`, the
+lists' bullet). Only with an API (`withApi`); `lib/lists.ts` is the pure part, `lib/lists-api.ts`
+(Apollo, lazy) the calls, `useLists` (`components/lists/use-lists.ts`) the donor's lists.
+
+- **On the front page**: each city being funded (the "Build the next city" tile and the
+  ranking's cards, `CityFundCard`) has a **"Tell me"** button (`TellMeButton`; "Joined" with a
+  way to leave once on the list; a donor of the city is told without a list, and the button
+  says so) and shows **"N waiting"** (`waiting` of `cityMilestones`). The tile (`NextCityTile`)
+  also has **"Tell me when new cities are built"** (`NewCitiesButton`).
+- **The join sign** (`JoinSign`): a signed-in donor joins at once; anyone else is asked for an
+  address and confirms it with the sign-in link or code (`SignIn purpose="donor"`, the list
+  carried in `magic-link`'s `list`, so the link joins server side wherever it is opened).
+  Before sending, `savePendingJoin` keeps which list, and when, in localStorage
+  (`tinyworlds.join`); `useJoinReturn` reads and removes it (`takePendingJoin`, ignored after
+  an hour) when the page opens from the link, and the sign opens on its last step.
+- **"Your lists"** on `/me/` and **`/lists/leave/`**: below.
+- **The admins' counts**: "The donation funnel and the admin pages" above.
 
 ## "Your cities" (`/me/`)
 

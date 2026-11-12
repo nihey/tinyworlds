@@ -5,7 +5,8 @@ import type { LegalDocs } from "./types";
  * same links (`legal.test.ts` checks). It says what the code does: the funnel and the visits
  * (`lib/funnel.ts`, the API's `funnel/` and `visits/`), the quiz's answers, the two kinds of
  * analytics (`components/analytics.tsx`, `lib/consent.ts`), what the browser keeps, the
- * donations and donors (`tinyworlds-api/prisma/schema.prisma`), the links and the sign-in.
+ * donations and donors (`tinyworlds-api/prisma/schema.prisma`), the links, the sign-in and the
+ * lists people ask to join (`lib/lists.ts`, the API's `lists/`).
  * Change it with them.
  */
 export const PRIVACY: LegalDocs = {
@@ -18,6 +19,7 @@ export const PRIVACY: LegalDocs = {
       "Visits are counted with a random id that lives in one browser tab, not with cookies.",
       "Google Analytics' cookies are used only where allowed: in Europe we ask first, and anyone can say no.",
       "If you donate, Stripe handles the payment; we keep your email, what you gave and, if you choose, your name on a city.",
+      "If you ask to be told when a city is built, we keep your email on that list and send only its mails; each one has a link to leave.",
       "Write to {email} to see, correct or delete what we hold about you.",
     ],
     sections: [
@@ -86,7 +88,8 @@ export const PRIVACY: LegalDocs = {
               "your settings (language, theme, the map's switches) and your answer to the cookie question;",
               "the buildings you have already played in Guess the building, and the game you chose;",
               "the visit's id, and what you chose in the donate sign while you are at the checkout (in session storage, gone when the tab closes);",
-              "if you sign in, your session, for 7 days.",
+              "if you sign in, your session, for 7 days;",
+              'if you press "Tell me" before signing in, which list you asked for and when (under tinyworlds.join): it is read and removed once the sign-in completes, and ignored if it is more than an hour old.',
             ],
           },
           "You can clear them at any time in your browser's settings.",
@@ -105,7 +108,7 @@ export const PRIVACY: LegalDocs = {
               "the name you asked to be listed under, if you did.",
             ],
           },
-          "We use your email address to thank you for your gift, to tell you when a city you gave to is built, and to tell you, once, that you are in the Hall of Fame; the person who makes tinyworlds may also write to you once, from their own address, to thank you personally. We send no newsletters or marketing, and your email address is never shown on the site, to anyone.",
+          "We use your email address to thank you for your gift, to tell you when a city you gave to is built, and to tell you, once, that you are in the Hall of Fame; the person who makes tinyworlds may also write to you once, from their own address, to thank you personally. We send no newsletters or marketing beyond the lists you ask to join (below), and your email address is never shown on the site, to anyone.",
         ],
       },
       {
@@ -121,6 +124,21 @@ export const PRIVACY: LegalDocs = {
         title: "When you sign in",
         blocks: [
           "Anyone may sign in with an email address, to see what they have given. We keep the address and when it last signed in. Each sign-in link and code works once, for 15 minutes; we store only a one-way hash of them, never the link or the code itself.",
+        ],
+      },
+      {
+        id: "lists",
+        title: "When you ask to be told",
+        blocks: [
+          'Anyone may ask to hear when a city is built, or when new cities are built, by pressing "Tell me" and confirming their email address with a sign-in link or code. For each list you join we keep your address, which list it is, when you joined and the language of the page you joined from. We send:',
+          {
+            items: [
+              "one welcome mail, with three buildings from the cities already on the map;",
+              'one mail when a city you are waiting for is built; for "new cities", one whenever a new world is added to the map.',
+            ],
+          },
+          'Nothing else is sent through the lists. A city\'s list ends once its mail has gone out; "new cities" lasts until you leave it.',
+          'You can leave at any time: every list mail has a "Leave this list" link that needs no sign-in, and your mail program\'s own unsubscribe button works too. You can also leave any list on [Your cities](me).',
         ],
       },
       {
@@ -159,6 +177,10 @@ export const PRIVACY: LegalDocs = {
               {
                 term: "Visits and quiz answers:",
                 text: "kept, with nothing in them that points to you, to count visits and answers over time.",
+              },
+              {
+                term: "List memberships:",
+                text: "until you leave the list or, for a city, until its mail has gone out.",
               },
               {
                 term: "Sign-in links and codes:",
@@ -202,6 +224,7 @@ export const PRIVACY: LegalDocs = {
       "As visitas são contadas com um código aleatório que vive numa aba do navegador, não com cookies.",
       "Os cookies do Google Analytics só são usados onde é permitido: na Europa perguntamos antes, e qualquer pessoa pode recusar.",
       "Se você doar, o Stripe cuida do pagamento; guardamos seu e-mail, o que você doou e, se quiser, seu nome numa cidade.",
+      "Se você pedir para ser avisado quando uma cidade for construída, guardamos seu e-mail nessa lista e enviamos só os e-mails dela; todos têm um link para sair.",
       "Escreva para {email} para ver, corrigir ou apagar o que temos sobre você.",
     ],
     sections: [
@@ -270,7 +293,8 @@ export const PRIVACY: LegalDocs = {
               "suas configurações (idioma, tema, as opções do mapa) e sua resposta sobre os cookies;",
               "os prédios que você já jogou no Adivinhe o prédio, e o jogo que escolheu;",
               "o código da visita, e o que você escolheu no painel de doação enquanto está no pagamento (no armazenamento de sessão, que some quando a aba é fechada);",
-              "se você entrar, sua sessão, por 7 dias.",
+              "se você entrar, sua sessão, por 7 dias;",
+              'se você clicar em "Me avise" antes de entrar, qual lista você pediu e quando (em tinyworlds.join): ele é lido e apagado quando o acesso termina, e ignorado se tiver mais de uma hora.',
             ],
           },
           "Você pode apagá-las a qualquer momento nas configurações do navegador.",
@@ -289,7 +313,7 @@ export const PRIVACY: LegalDocs = {
               "o nome com que você pediu para aparecer, se pediu.",
             ],
           },
-          "Usamos seu e-mail para agradecer pela doação, para avisar quando uma cidade para a qual você doou for construída e para avisar, uma vez, que você está no Hall da Fama; a pessoa que faz o tinyworlds também pode escrever a você uma vez, do próprio endereço, para agradecer pessoalmente. Não enviamos newsletters nem marketing, e seu e-mail nunca aparece no site, para ninguém.",
+          "Usamos seu e-mail para agradecer pela doação, para avisar quando uma cidade para a qual você doou for construída e para avisar, uma vez, que você está no Hall da Fama; a pessoa que faz o tinyworlds também pode escrever a você uma vez, do próprio endereço, para agradecer pessoalmente. Não enviamos newsletters nem marketing além das listas em que você pede para entrar (abaixo), e seu e-mail nunca aparece no site, para ninguém.",
         ],
       },
       {
@@ -305,6 +329,21 @@ export const PRIVACY: LegalDocs = {
         title: "Quando você entra",
         blocks: [
           "Qualquer pessoa pode entrar com um e-mail, para ver o que doou. Guardamos o endereço e quando ele entrou pela última vez. Cada link e código de acesso funciona uma vez, por 15 minutos; guardamos só um hash irreversível deles, nunca o link ou o código em si.",
+        ],
+      },
+      {
+        id: "lists",
+        title: "Quando você pede para ser avisado",
+        blocks: [
+          'Qualquer pessoa pode pedir para saber quando uma cidade for construída, ou quando novas cidades forem construídas, clicando em "Me avise" e confirmando o e-mail com um link ou código de acesso. Para cada lista em que você entra, guardamos seu endereço, qual é a lista, quando você entrou e o idioma da página de onde entrou. Enviamos:',
+          {
+            items: [
+              "um e-mail de boas-vindas, com três edifícios das cidades que já estão no mapa;",
+              'um e-mail quando uma cidade que você espera for construída; para "novas cidades", um sempre que um novo mundo for adicionado ao mapa.',
+            ],
+          },
+          'Nada mais é enviado pelas listas. A lista de uma cidade termina quando o e-mail dela é enviado; "novas cidades" dura até você sair.',
+          'Você pode sair a qualquer momento: todo e-mail de lista tem um link "Sair desta lista" que não pede acesso, e o botão de cancelar inscrição do seu programa de e-mail também funciona. Você também pode sair de qualquer lista em [Suas cidades](me).',
         ],
       },
       {
@@ -343,6 +382,10 @@ export const PRIVACY: LegalDocs = {
               {
                 term: "Visitas e respostas do quiz:",
                 text: "guardadas, sem nada que aponte para você, para contar visitas e respostas ao longo do tempo.",
+              },
+              {
+                term: "Participação em listas:",
+                text: "até você sair da lista ou, no caso de uma cidade, até o e-mail dela ser enviado.",
               },
               {
                 term: "Links e códigos de acesso:",
@@ -386,6 +429,7 @@ export const PRIVACY: LegalDocs = {
       "Las visitas se cuentan con un código aleatorio que vive en una pestaña del navegador, no con cookies.",
       "Las cookies de Google Analytics solo se usan donde está permitido: en Europa preguntamos antes, y cualquiera puede decir que no.",
       "Si donas, Stripe gestiona el pago; guardamos tu correo, lo que donaste y, si quieres, tu nombre en una ciudad.",
+      "Si pides que te avisemos cuando se construya una ciudad, guardamos tu correo en esa lista y enviamos solo sus correos; todos traen un enlace para darte de baja.",
       "Escribe a {email} para ver, corregir o borrar lo que tenemos sobre ti.",
     ],
     sections: [
@@ -454,7 +498,8 @@ export const PRIVACY: LegalDocs = {
               "tus ajustes (idioma, tema, las opciones del mapa) y tu respuesta sobre las cookies;",
               "los edificios que ya has jugado en Adivina el edificio, y la partida que elegiste;",
               "el código de la visita, y lo que elegiste en el panel de donación mientras estás en el pago (en el almacenamiento de sesión, que desaparece al cerrar la pestaña);",
-              "si inicias sesión, tu sesión, durante 7 días.",
+              "si inicias sesión, tu sesión, durante 7 días;",
+              "si pulsas «Avísame» antes de iniciar sesión, qué lista pediste y cuándo (en tinyworlds.join): se lee y se borra cuando termina el inicio de sesión, y se ignora si tiene más de una hora.",
             ],
           },
           "Puedes borrarlas cuando quieras en los ajustes del navegador.",
@@ -473,7 +518,7 @@ export const PRIVACY: LegalDocs = {
               "el nombre con el que pediste aparecer, si lo pediste.",
             ],
           },
-          "Usamos tu correo para darte las gracias por la donación, para avisarte cuando se construya una ciudad a la que donaste y para decirte, una vez, que estás en el Salón de la Fama; la persona que hace tinyworlds también puede escribirte una vez, desde su propia dirección, para darte las gracias en persona. No enviamos boletines ni publicidad, y tu correo nunca se muestra en el sitio, a nadie.",
+          "Usamos tu correo para darte las gracias por la donación, para avisarte cuando se construya una ciudad a la que donaste y para decirte, una vez, que estás en el Salón de la Fama; la persona que hace tinyworlds también puede escribirte una vez, desde su propia dirección, para darte las gracias en persona. No enviamos boletines ni publicidad más allá de las listas a las que pides unirte (abajo), y tu correo nunca se muestra en el sitio, a nadie.",
         ],
       },
       {
@@ -489,6 +534,21 @@ export const PRIVACY: LegalDocs = {
         title: "Cuando inicias sesión",
         blocks: [
           "Cualquiera puede iniciar sesión con un correo, para ver lo que ha donado. Guardamos la dirección y cuándo entró por última vez. Cada enlace y código de acceso sirve una vez, durante 15 minutos; solo guardamos un hash irreversible de ellos, nunca el enlace ni el código.",
+        ],
+      },
+      {
+        id: "lists",
+        title: "Cuando pides que te avisemos",
+        blocks: [
+          "Cualquiera puede pedir que le avisen cuando se construya una ciudad, o cuando se construyan ciudades nuevas, pulsando «Avísame» y confirmando su correo con un enlace o código de acceso. De cada lista a la que te unes guardamos tu dirección, qué lista es, cuándo te uniste y el idioma de la página desde la que lo hiciste. Enviamos:",
+          {
+            items: [
+              "un correo de bienvenida, con tres edificios de las ciudades que ya están en el mapa;",
+              "un correo cuando se construya una ciudad que esperas; para «ciudades nuevas», uno cada vez que se añada un mundo nuevo al mapa.",
+            ],
+          },
+          "Por las listas no se envía nada más. La lista de una ciudad termina cuando se ha enviado su correo; «ciudades nuevas» dura hasta que te des de baja.",
+          "Puedes darte de baja cuando quieras: todo correo de una lista trae un enlace «Salir de esta lista» que no pide iniciar sesión, y el botón de cancelar suscripción de tu programa de correo también funciona. También puedes salir de cualquier lista en [Tus ciudades](me).",
         ],
       },
       {
@@ -527,6 +587,10 @@ export const PRIVACY: LegalDocs = {
               {
                 term: "Visitas y respuestas del juego:",
                 text: "se guardan, sin nada que apunte a ti, para contar visitas y respuestas a lo largo del tiempo.",
+              },
+              {
+                term: "Pertenencia a listas:",
+                text: "hasta que salgas de la lista o, en el caso de una ciudad, hasta que se haya enviado su correo.",
               },
               {
                 term: "Enlaces y códigos de acceso:",
