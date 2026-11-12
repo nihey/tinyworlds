@@ -5,6 +5,7 @@ import { FakePrisma } from '../../test/fake-prisma.js';
 import type { Env } from '../config/env.js';
 import { ListsService } from '../lists/lists.service.js';
 import {
+  benefactorCounts,
   CitiesService,
   inMilestoneOrder,
   type MilestoneRow,
@@ -17,6 +18,7 @@ const row = (over: Partial<MilestoneRow> & { name: string }): MilestoneRow => ({
   goalCents: 10_000,
   raisedCents: 0,
   donationCount: 0,
+  benefactors: 0,
   worldId: null,
   ...over,
 });
@@ -50,7 +52,12 @@ describe('inMilestoneOrder', () => {
 
   it('reports the number of donations under the name the API uses', () => {
     const [city] = inMilestoneOrder([
-      row({ name: 'Paris', raisedCents: 700, donationCount: 3 }),
+      row({
+        name: 'Paris',
+        raisedCents: 700,
+        donationCount: 3,
+        benefactors: 2,
+      }),
     ]);
     expect(city).toEqual({
       id: 'id-Paris',
@@ -59,10 +66,34 @@ describe('inMilestoneOrder', () => {
       raisedCents: 700,
       goalCents: 10_000,
       donations: 3,
+      benefactorCount: 2,
       status: 'PROPOSED',
       worldId: null,
       waiting: 0,
     });
+  });
+});
+
+describe('benefactorCounts', () => {
+  it('counts each donor once per city, and each gift without a donor as someone', () => {
+    const counts = benefactorCounts([
+      { cityId: 'lisbon', donorId: 'ana' },
+      { cityId: 'lisbon', donorId: 'ana' },
+      { cityId: 'lisbon', donorId: 'bo' },
+      { cityId: 'lisbon', donorId: null },
+      { cityId: 'lisbon', donorId: null },
+      { cityId: 'porto', donorId: 'ana' },
+    ]);
+    expect(counts).toEqual(
+      new Map([
+        ['lisbon', 4],
+        ['porto', 1],
+      ]),
+    );
+  });
+
+  it('knows no city nobody gave to', () => {
+    expect(benefactorCounts([]).get('lisbon')).toBeUndefined();
   });
 });
 

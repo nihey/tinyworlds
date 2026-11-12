@@ -40,7 +40,7 @@
 
 **Files:**
 - Modify: `tinyworlds-api/prisma/schema.prisma`
-- Create: `tinyworlds-api/prisma/migrations/20261112020000_city_lists/migration.sql`
+- Create: `tinyworlds-api/prisma/migrations/20261112030000_city_lists/migration.sql`
 - Modify: `tinyworlds-api/test/fake-prisma.ts` (the new tables and columns, with their unique rules)
 - Test: `tinyworlds-api/test/migrations.e2e-spec.ts`
 
@@ -53,7 +53,7 @@
   - `MagicLink.joinList String?` (`join_list`: a city slug, or `*` for new cities) and `MagicLink.joinLocale String?` (`join_locale`).
   - Back-relations: `Donor.listMembers`, `Donor.listNotices`, `City.listMembers`.
 
-- [ ] **Step 1: Write the failing migration test** in `test/migrations.e2e-spec.ts`: `it('counts every world already on the map as told to the lists')`. Apply every migration before `20261112020000_city_lists` and insert three cities:
+- [ ] **Step 1: Write the failing migration test** in `test/migrations.e2e-spec.ts`: `it('counts every world already on the map as told to the lists')`. Apply every migration before `20261112030000_city_lists` and insert three cities:
   - a `BUILT` one with `world_id`;
   - a `PROPOSED` one with a `world_id` (an imagined world's row);
   - a `PROPOSED` one without.

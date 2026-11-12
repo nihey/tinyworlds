@@ -68,8 +68,10 @@ the rest of the site it sets cookies, so the container waits for consent (`lib/c
 - A visitor whose browser is on a European time zone (or hides its zone: none, UTC) is asked
   first, by a sign at the foot of the page, and nothing from Google loads until they say yes.
   Anyone else gets the container at once. A no, from anyone, is kept and honoured everywhere.
+  The sign links the privacy policy, which says all of this.
 - The answer lives in `localStorage` (`tinyworlds.consent`, shared by every world). "Cookie
-  settings" (About in a map, the front page's footer) puts the question up again; a no then
+  settings" (About in a map, the footers of the front page, the hall of fame, "Your cities"
+  and the legal pages, and the privacy policy's own text) puts the question up again; a no then
   also tells the running tags and deletes the `_ga` cookies.
 - `loadTagManager` puts Google's consent defaults at the front of the data layer before
   `gtm.js` loads: analytics cookies denied in the EU, EEA, UK and Switzerland by Google's own
@@ -110,9 +112,14 @@ src/
 │                        # pages: page.map.tsx (a world) and page.home.tsx (the front page);
 │                        # admin/page.home.tsx: the admin pages, in the front page's build only;
 │                        # hall-of-fame/page.home.tsx and hall-of-fame/[city]/page.home.tsx:
-│                        # the hall of fame and a city's own, likewise
+│                        # the hall of fame and a city's own, likewise; terms/page.home.tsx and
+│                        # privacy/page.home.tsx: the terms of service and the privacy policy
 ├── site.ts              # what this build is (world or front page): id, name, home language,
-│                        # accent, GITHUB_URL, CONTACT_EMAIL, where the worlds and their cards are
+│                        # accent, GITHUB_URL, CONTACT_EMAIL, TERMS_URL, PRIVACY_URL, where the
+│                        # worlds and their cards are
+├── legal/               # the terms' and the privacy policy's texts, in the three languages
+│                        # (terms.ts, privacy.ts; types.ts, parts.ts: their links), the date
+│                        # (updated.ts) and the pages' metadata
 ├── worlds/              # one config per world + index.ts (`WORLDS`, `WORLD`, `IS_HOME`)
 ├── i18n/                # the interface's words: types.ts (the contract), en.ts, pt-BR.ts,
 │                        # es-ES.ts, locale.ts (which language), index.ts (`localeStore`)
@@ -138,9 +145,11 @@ src/
 │                        # benefactor-wall.tsx (everyone who gave: columns down the sides,
 │                        # or a strip) and drift.tsx (a list that drifts by)
 ├── components/benefactors/ # a city's benefactors (panel, sign, stone grid), the badges' pixel
-│                        # art, and benefactor-link.tsx (one of a benefactor's links)
-├── components/hall/     # the hall of fame: hall-of-fame.tsx (everyone, then the cities),
-│                        # city-hall.tsx (one city's), hall-cards.tsx, hall-frame.tsx
+│                        # art, benefactor-link.tsx (one of a benefactor's links) and
+│                        # brought-by.tsx (the gold plaque of a city its benefactors brought)
+├── components/hall/     # the hall of fame: hall-of-fame.tsx (figures, the cities brought by
+│                        # their benefactors, everyone, the other cities), city-hall.tsx (one
+│                        # city's), hall-cards.tsx, hall-frame.tsx
 ├── components/me/       # "Your cities" (/me/): me-app.tsx (signed in or not), me-page.tsx,
 │                        # your-cities.tsx, your-links.tsx, badges.tsx, keep-exploring.tsx,
 │                        # name-editor.tsx
@@ -149,6 +158,8 @@ src/
 │                        # funnel-report.tsx (the steps, the cities by visits, the days),
 │                        # names.tsx (donors' names and their links: hide and show)
 ├── components/consent/  # Google Tag Manager behind the cookie question
+├── components/legal/    # the legal pages (legal-page.tsx, legal-text.tsx) and the footers'
+│                        # links to them (legal-links.tsx)
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
@@ -167,8 +178,9 @@ src/
                          # load, and loading them), links.ts (pure: a benefactor's links as
                          # the API says them, what a link may be), wall.ts (everyone who
                          # gave: the request, its answer, the two sides), hall.ts (the hall
-                         # of fame's questions and answers), hall-build.ts (the same, asked
-                         # by the build to bake the pages)
+                         # of fame's questions and answers, its cities and figures),
+                         # hall-build.ts (the same, asked by the build to bake the pages),
+                         # brought-by.ts (pure: which cities their benefactors brought)
 ```
 
 ## Targets: worlds and the front page
@@ -197,6 +209,15 @@ src/
   "Benefactors" for a world the API knows a city for. Under the pointer the card lifts and is
   ringed in the world's own colour. `SmallWorldCard` is the same in a few words (picture, name,
   visits), for "Your cities".
+- **A city its benefactors brought is praised on its card** (`brought`, from
+  `broughtByWorld(milestones)` in `landing.tsx`): a gold bar along the card's top and, under
+  its words, the plaque (`BroughtByPlaque`: the founders' pixel flag, "Brought to you by 2
+  benefactors, who donated $35", the people and the sum in taxi yellow), which lies over the
+  card's link as the Benefactors button does, leads to the city's hall of fame and takes that
+  button's place. `broughtBy` (`lib/brought-by.ts`, pure) decides which: a city that is BUILT,
+  with its world, whose gifts met its goal; the people are the API's `benefactorCount` (a
+  donor once), or the gifts where an older API does not say. The sentence agrees with how many
+  they are in each language (`hall.broughtBy`, with `hall.people` inside it).
 - **The figures under the hero** (`site-numbers.tsx`, with an API): how many worlds (the
   registry's count, at once), every visit they have had and how many are exploring now
   (`siteTotals` over `worldVisits`; the latter only above `LIVE_SHOWN_ABOVE`), and how many
@@ -302,6 +323,8 @@ src/
 - **Contact.** `CONTACT_EMAIL` in `site.ts` is the one place the project's address lives: the
   front page's footer shows it (a `mailto:` in a localized sentence), and About in every map has
   a quiet "Contact" link.
+- **The terms of service and the privacy policy** (`/terms/`, `/privacy/`): see below. Every
+  footer links them (`LegalLinks`), and so do About in every map and the cookie question.
 - **Fictional worlds** (`fictional: true` on the `World`: Winterfell, King's Landing, Westeros) are places
   from a story, on a layout invented for the map. The flag does three things: the corner readout
   shows only the zoom (`viewReadout` in `lib/readout.ts`: the coordinates mean nothing) and says
@@ -521,18 +544,61 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   US$10 in all). On `/admin/`, each name comes with its links, pictures and all, and a second
   switch hides the links alone (`setLinksHidden`).
 
+## The terms of service and the privacy policy (`/terms/`, `/privacy/`)
+
+Two routes of the front page's build (`app/terms/page.home.tsx`, `app/privacy/page.home.tsx`),
+for everyone, search engines included, each with its own title, description and canonical
+address (`legal/metadata.ts`). `TERMS_URL` and `PRIVACY_URL` (`site.ts`) address them from
+either build, like `HALL_URL`.
+
+- **The texts are not in the dictionaries.** They are long, and every map downloads the
+  dictionaries: `legal/terms.ts` and `legal/privacy.ts` hold them in the three languages, and
+  each page hands its own to `LegalPage` as props, so a page's script carries one text and no
+  map carries either. Only the links' words and the page's frame are in `t.legal`. A page's
+  heading is the same as its link's words (a test checks).
+- **Shape.** A text (`LegalDoc`) is a title, a description, a few lines that sum it up ("In
+  short"), then sections with a fixed `id` each (the anchor, the same in every language:
+  `/privacy/#donating`), each of paragraphs and lists; a list's point may set a few words
+  apart (`{ term, text }`). Links are written `[words](target)`, a target being one of
+  `LINK_TARGETS` (`legal/parts.ts`: this site's pages, the cookie settings, the licences and
+  Stripe's and Google's policies), and `{email}` is `CONTACT_EMAIL`. `legal.test.ts` checks
+  that every language has the same sections, blocks and points with the same links in the
+  same places, and that nothing is left unmade.
+- **The page** (`components/legal/legal-page.tsx`): the wordmark home, the title and "Last
+  updated" on the fog (`LEGAL_UPDATED`, `legal/updated.ts`, written in the visitor's
+  language), the text on one long sign with "In short" first and the sections numbered in
+  Tiny5, the list of sections down the side from `lg` (sticky), and a footer. It asks nothing
+  of the API.
+- **The privacy policy says what the code does**: the visit and its steps, the presence beat,
+  the quiz's answers, Rybbit and Google Analytics behind the cookie question, what the
+  browser keeps, what a donation, a donor, a link and a sign-in store, and where it goes.
+  **Change it with any change to what the site or the API collects, keeps or sends
+  elsewhere**, move `LEGAL_UPDATED`, and tell donors by email when the change matters to
+  them (both texts promise this). The commitments in the terms (refunds within 30 days, a
+  city that cannot be built offered elsewhere or refunded) are the owner's to change, not
+  the code's.
+
 ## The hall of fame (`/hall-of-fame/`)
 
 Two routes of the front page's build (`page.home.tsx`, like `/me/` and `/admin/`), for
 everyone, search engines included: no `noindex`, each with its own title, description and
 canonical address.
 
-- **`/hall-of-fame/`** (`components/hall/hall-of-fame.tsx`): "Our Benefactors", everyone on
-  the wall as cards (`PersonCard`: name, sum, the cities, each a link to that city's hall,
-  and their links with pictures), then "City by city": a tile per city someone gave to
-  (`hallCities`: how many are in its hall, where it stands, the first names), each leading to
-  its own page; last, "Fund a city" and what the links are.
-- **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): the city's foundation (the
+- **`/hall-of-fame/`** (`components/hall/hall-of-fame.tsx`): the title, then three figures on
+  a sign with the gold bar (`HallFigures`, `hallTotals`: everything given to the cities,
+  everyone on the wall, the cities built with their gifts); "Built by benefactors", a gallery
+  of the cities their benefactors brought to the map (`BuiltCityCard`: the city's picture,
+  name, plaque and first names; the card leads to its hall, "Explore" over it to the map);
+  "Our Benefactors", everyone on the wall as cards, ranked from the largest gift
+  (`PersonCard`: place, name, sum, the cities, each a link to that city's hall, and their
+  links with pictures); then "More cities": a tile for every other city someone gave to
+  (`CityTile`: how many are in its hall, where it stands with a bar while it is funded, the
+  first names). `hallCities` gives each city its people (the API's count when it says, else
+  the wall's entries) and its `broughtBy`. Last, "Fund a city" and what the links are.
+- **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): a built city's picture
+  (beside the words on a wide screen, kept to its right side so the frame does not cut
+  through its wordmark: `MovingPicture`'s `focus`, above them on a narrow one), for a city its
+  benefactors brought their plaque in place of "raised of goal", the city's foundation (the
   sign's `StoneGrid` and legend), "Become a benefactor" and "Explore" for a built one, then
   its founders (`FounderCard`: number, badges, stones, sum, links) and its benefactors
   (`BenefactorCard`), all of them, as cards.

@@ -90,6 +90,9 @@ model Donor {
   /// When the donor was mailed that they are in the hall of fame (src/benefactors/hall-cli.ts);
   /// null until then. Set once, by the run that sends: a second run mails them nothing.
   hallMailedAt DateTime?    @map("hall_mailed_at")
+  /// When the donor had the owner's own note (src/benefactors/note-cli.ts); null until then.
+  /// Set once, by the run that sends, as `hallMailedAt` is.
+  noteMailedAt DateTime?    @map("note_mailed_at")
   /// When the donor was mailed the welcome to the lists (the first list they joined); null until then.
   welcomedAt   DateTime?    @map("welcomed_at")
   lastLoginAt  DateTime?    @map("last_login_at")

@@ -304,6 +304,22 @@ export interface Strings {
     everyone: string;
     byCity: string;
     byCityLine: string;
+    /** the cities on the map because people paid for them: the section, and its line */
+    builtBy: string;
+    builtByLine: string;
+    /**
+     * the plaque of a city its benefactors brought, by how many they are: `{people}` is
+     * `people` ("2 benefactors"), `{amount}` what they gave ("$35")
+     */
+    broughtBy: { one: string; other: string };
+    /** after a few names: how many more gave */
+    more: string;
+    /** the overall page's figures: what was given, by how many, and what it built */
+    figures: {
+      donated: string;
+      people: { one: string; other: string };
+      built: { one: string; other: string };
+    };
     /** on a city's tile: how many are in its hall */
     people: { one: string; other: string };
     built: string;
@@ -705,6 +721,21 @@ export interface Strings {
     stop: string;
     loading: string;
     empty: string;
+  };
+  /**
+   * The terms of service and the privacy policy (their texts are in src/legal/, not here: no
+   * map downloads them): the links to them, and the words around the texts.
+   */
+  legal: {
+    /** the links' words, in footers, About and the cookie question; also each page's name */
+    terms: string;
+    privacy: string;
+    /** "{date}": the day the texts last changed, written out */
+    updated: string;
+    /** above the list of the page's sections */
+    contents: string;
+    /** above the few lines that sum the page up */
+    summary: string;
   };
   errors: {
     answered: (url: string, status: number) => string;

@@ -2,13 +2,15 @@
 
 import { ArrowUpRight } from "lucide-react";
 import type { CSSProperties } from "react";
+import { BroughtByPlaque } from "@/components/benefactors/brought-by";
 import { PixelIcon } from "@/components/benefactors/pixel-badge";
 import { MovingPicture } from "@/components/home/moving-picture";
 import { Wordmark } from "@/components/map/wordmark";
 import { useI18n } from "@/hooks/use-i18n";
+import type { BroughtWorld } from "@/lib/brought-by";
 import { cn } from "@/lib/utils";
 import { visitsLine, type WorldCount } from "@/lib/visits";
-import { worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { hallCityUrl, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
 import type { World } from "@/worlds";
 
 /** A card lifts under the pointer and lights up in its world's own colour (`--card`). */
@@ -75,12 +77,17 @@ function VisitsLine({ count, className }: { count: WorldCount | undefined; class
  * its foot what can be done with it, in words: explore it, or see who paid for it. The card is
  * one link to the world (its name, stretched over the card); the benefactors' button lies over
  * it as its sibling, never inside it.
+ *
+ * A city its benefactors brought to the map says so: a gold bar along its top and, under its
+ * words, their plaque ("Brought to you by 2 benefactors, who donated $35"), which leads to the
+ * city's hall of fame and takes the benefactors' button's place.
  */
 export function WorldCard({
   world,
   count,
   showVisits,
   onBenefactors,
+  brought,
 }: {
   world: World;
   count: WorldCount | undefined;
@@ -88,11 +95,14 @@ export function WorldCard({
   showVisits: boolean;
   /** the world has a city the API knows: the card offers its benefactors */
   onBenefactors?: () => void;
+  /** the world's city is on the map because its benefactors paid for it: who they were */
+  brought?: BroughtWorld;
 }) {
   const { t, locale } = useI18n();
   const copy = world.copy[locale];
   return (
     <div className={CARD} style={lit(world)}>
+      {brought && <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />}
       <CardPicture world={world} alt={copy.cardAlt} />
       <div className="flex flex-1 flex-col px-4 pt-3.5 pb-2.5">
         <h3 className="text-lg leading-tight font-semibold text-paper">
@@ -102,6 +112,15 @@ export function WorldCard({
         </h3>
         <p className="pt-1 text-sm leading-snug text-paper-dim">{copy.card}</p>
         {showVisits && <VisitsLine count={count} className="pt-2" />}
+        {brought && (
+          <BroughtByPlaque
+            by={brought}
+            href={hallCityUrl(brought.slug)}
+            where={t.hall.openCity.replace("{city}", brought.name)}
+            // over the card's own link, as the benefactors' button is
+            className="relative z-10 mt-3"
+          />
+        )}
         <div className="mt-auto pt-3">
           <div className="flex min-h-10 items-center justify-between gap-3 border-t border-sign-line pt-2.5">
             <span
@@ -114,7 +133,7 @@ export function WorldCard({
                 strokeWidth={2.25}
               />
             </span>
-            {onBenefactors && (
+            {onBenefactors && !brought && (
               <button
                 type="button"
                 onClick={onBenefactors}

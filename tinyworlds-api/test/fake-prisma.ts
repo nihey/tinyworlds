@@ -370,6 +370,41 @@ export class FakePrisma {
       this.donations.push(row);
       return Promise.resolve(row);
     },
+    /** Only the shape the milestones ask for: by city and donor, counted, to shown cities in one currency. */
+    groupBy: (args: {
+      by: ['cityId', 'donorId'];
+      where: {
+        currency: string;
+        cityId: { not: null };
+        city: { hidden: false };
+      };
+      _count: { _all: true };
+    }): Promise<
+      {
+        cityId: string | null;
+        donorId: string | null;
+        _count: { _all: number };
+      }[]
+    > => {
+      const groups = new Map<
+        string,
+        { cityId: string; donorId: string | null; _count: { _all: number } }
+      >();
+      for (const d of this.donations) {
+        if (d.currency !== args.where.currency || d.cityId === null) continue;
+        const city = this.cities.find((c) => c.id === d.cityId);
+        if (!city || city.hidden) continue;
+        const key = `${d.cityId} ${d.donorId ?? ''}`;
+        const group = groups.get(key) ?? {
+          cityId: d.cityId,
+          donorId: d.donorId,
+          _count: { _all: 0 },
+        };
+        group._count._all++;
+        groups.set(key, group);
+      }
+      return Promise.resolve([...groups.values()]);
+    },
   };
 
   donor = {

@@ -7,6 +7,7 @@ import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
 import { BuildNextShort } from "@/components/donate/build-next";
 import { DonateDialog } from "@/components/donate/donate-dialog";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { Wordmark } from "@/components/map/wordmark";
 import { FOG_LINK, QUIET } from "@/components/styles";
 import { useGiving } from "@/hooks/use-giving";
@@ -172,6 +173,10 @@ export function MePage({
       </div>
 
       <KeepExploring />
+
+      <footer className="mt-auto flex flex-wrap gap-x-4 gap-y-1.5 text-xs leading-relaxed">
+        <LegalLinks className={FOG_LINK} cookies />
+      </footer>
 
       <BenefactorsSign
         open={benefactors.open}

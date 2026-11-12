@@ -14,6 +14,11 @@ copies of its pictures. And it
 keeps the answers of **Guess the building**, the map's quiz on its famous buildings. Other
 visitors have no accounts: what they call is public. ESM throughout (`.js` in import paths).
 
+**What this API keeps is told to visitors** in the site's privacy policy
+(`tinyworlds-frontend/src/legal/privacy.ts`, at `/privacy/`): a new column or table that holds
+something about a person, a new place data is sent, or a change in how long anything is kept
+changes that text too (and its date, `LEGAL_UPDATED`).
+
 ## Commands
 
 ```bash
@@ -39,6 +44,10 @@ npm run hall:announce -- --preview /tmp/mails   # the same, and writes each mail
 npm run hall:announce -- --test-to you@example.com   # sends the first of those mails to that address instead; nobody is marked told
 npm run hall:announce -- --send   # mails every donor not told yet, once each
 npm run hall:announce:dev -- …    # the same from a checkout, through tsx
+npm run owner:note        # in the built image (node dist/benefactors/note-cli.js): who would get the owner's own note; sends nothing. Needs OWNER_NAME, OWNER_MAIL_FROM, OWNER_WHATSAPP
+npm run owner:note -- --test-to you@example.com   # sends the first of those notes to that address instead; nobody is marked (also --preview <dir>)
+npm run owner:note -- --send      # writes to every donor who has not had it, once each: run it again to thank new donors
+npm run owner:note:dev -- …       # the same from a checkout, through tsx
 ```
 
 ## Structure
@@ -79,7 +88,9 @@ src/
 │   ├── benefactors.service.ts      # giftsOf (gifts with names only where shown), cityBenefactors, wall
 │   ├── announce.service.ts built-mail.ts   # a built city's donors told, once; the mail
 │   ├── hall-announce.ts hall-mail.ts       # every donor told they are in the hall of fame, once; the mail
-│   ├── announce-cli.ts backfill-cli.ts hall-cli.ts   # the commands compiled into the image
+│   ├── note-announce.ts note-mail.ts       # the owner's own note to every donor, once; the mail, ownerOf
+│   ├── once.ts once-cli.ts                 # what those two share: unmailed, mailOnce; runOnce (dry run, --preview, --test-to, --send)
+│   ├── announce-cli.ts backfill-cli.ts hall-cli.ts note-cli.ts   # the commands compiled into the image
 │   └── benefactors.resolver.ts my-giving.resolver.ts dto/ models/   # the public query; the donor's own
 ├── links/                          # the links donors show beside their names
 │   ├── link-url.ts                 # pure: cleanLinkUrl, isPublicUrl (https, a public host name, no port, no user)
@@ -134,7 +145,7 @@ always 200). `schema.gql` is the generated record of the schema.
 
 ```graphql
 enum CityStatus { PROPOSED FUNDED BUILDING BUILT }
-type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  status: CityStatus!  worldId: String
+type CityMilestone { id: ID!  slug: String!  name: String!  raisedCents: Int!  goalCents: Int!  donations: Int!  benefactorCount: Int!  status: CityStatus!  worldId: String
   waiting: Int! }                                              # how many are on its list
 input CreateDonationCheckoutInput { amountCents: Int  city: String  benefactorName: String  world: String!  locale: String!  returnUrl: String!  visitId: ID }
 type DonationCheckout { url: String! }
@@ -143,7 +154,7 @@ type BenefactorLink { url: String!  title: String!  description: String  icon: S
 type FounderRow { number: Int!  name: String  amountCents: Int!  stones: Int!  firstStone: Boolean!  keystone: Boolean!  links: [BenefactorLink!]! }
 type BenefactorRow { rank: Int!  name: String  amountCents: Int!  links: [BenefactorLink!]! }
 type CityBenefactors { slug: String!  name: String!  status: CityStatus!  worldId: String  goalCents: Int!  raisedCents: Int!
-  stones: [Int]!  founders: [FounderRow!]!  benefactors: [BenefactorRow!]! }
+  benefactorCount: Int!  stones: [Int]!  founders: [FounderRow!]!  benefactors: [BenefactorRow!]! }
 type WallCity { slug: String!  name: String!  worldId: String }
 type WallBenefactor { name: String  amountCents: Int!  cities: [WallCity!]!  links: [BenefactorLink!]!  lastGiftAt: DateTime! }
 
@@ -225,7 +236,11 @@ answer is `UNAUTHENTICATED`; with a session of the other kind it is `FORBIDDEN`,
 refuse the other kind, should one ever reach them).
 
 - `cityMilestones`: hidden cities left out; cities still to be built first (most raised first,
-  ties by name), built ones last.
+  ties by name), built ones last. `benefactorCount` is how many people gave to each, of the
+  gifts that count toward it (in dollars): a donor once however many gifts, a gift without a
+  donor (no address) as one (`benefactorCounts`, pure, in `cities.service.ts`; one `groupBy`
+  of the donations by city and donor). `cityBenefactors` answers the same count for its city.
+  The site praises a city with it once its benefactors brought it to the map.
 - `createDonationCheckout`: `city` is free text up to 60 characters (an existing name or a new
   one; omit for none), `world` matches `/^[a-z0-9]{3,20}$/`, `locale` is `en-US | pt-BR | es-ES`,
   `returnUrl` is a page on one of `ALLOWED_ORIGINS` with no query or hash, `visitId` (optional)
@@ -263,7 +278,7 @@ a donor's founding gifts share their first row; a named founder is not listed ag
 benefactors.
 
 `donors` holds one row per lower-case email (`display_name`, `name_hidden`, `links_hidden`,
-`hall_mailed_at`, `last_login_at`);
+`hall_mailed_at`, `note_mailed_at`, `last_login_at`);
 `donations.donor_id` ties a gift to it (null when Stripe gave no usable address) and
 `donations.listed` says the donor asked to be named for that gift. A name is shown only when the
 gift is listed, the donor has a name, and `name_hidden` is false; an admin hides one
@@ -505,7 +520,7 @@ itself, so this API keeps no copy of them. It keeps the answers and tallies them
 
 ## Mails (`mail/`)
 
-Six mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
+Seven mails, one look (the site's: a dark band with the pixel wordmark under a taxi-yellow bar,
 a white card on paper, yellow pill buttons, the pixel badges, a footer saying why the person got
 it), each in en-US, pt-BR and es-ES, each with a plain-text part. `MailModule` provides `MAILER`
 (`createMailer`: SMTP, or the log without `SMTP_HOST`/`MAIL_FROM`) to auth, donations,
@@ -514,8 +529,9 @@ benefactors and lists. `layout.ts` is the look, as pure functions of tables and 
 (a number drawn in Tiny5's pixels out of table cells, so it shows without pictures or fonts) and
 `codeBox`. **Every text is escaped** (`html.ts`: `fillHtml` escapes a template and each value
 that is not already markup): city names and display names are typed by donors. Each mail is a
-pure builder from typed facts to `{ subject, text, html }` (and `headers`, for the lists'):
-`signInMail`, `thanksMail`, `builtMail`, `hallMail`, `welcomeMail`, `listBuiltMail`.
+pure builder from typed facts to `{ subject, text, html }` (and `headers`, for the lists';
+`from`, for the owner's note): `signInMail`, `thanksMail`, `builtMail`, `hallMail`, `noteMail`,
+`welcomeMail`, `listBuiltMail`.
 
 Links and pictures are made from `SITE_URL` (an origin; default: the first of
 `ALLOWED_ORIGINS`): `/me/`, `/`, `/<world>/`, the pictures at `/email/wordmark.png`,
@@ -623,6 +639,27 @@ address.
   back if it does not, so the next run tries again; a mail server that is away stops the run
   at its first failure. A later `--send` reaches only those a first run could not, and those
   who have given since. Failures are reported by donor id, never by address.
+- **The owner's note** (`benefactors/note-mail.ts`, `note-announce.ts`, `note-cli.ts`). The
+  owner's own thank-you, **from the owner and not from the site**: `OWNER_MAIL_FROM` is its
+  sender (`Mail.from`, which the mailer puts in place of `MAIL_FROM`; the mail server must be
+  allowed to send for that address), `OWNER_NAME` signs it and names the band ("A note from
+  Robin"), and `OWNER_WHATSAPP`, written as the owner writes it, is shown and leads to a chat
+  (`https://wa.me/<its digits>`), in the sentence and as the button. None of the three is in
+  a tracked file, and the command refuses to run without all of them, naming what is missing
+  (`ownerOf`). It greets the donor by their name when they have one to show ("Hi Ana,"; "Hi,"
+  for one who gave none, or whose name an admin hid), thanks them for the cities they gave to
+  (the one they gave most to first, joined as their language joins a list) and says what
+  gifts do. The Portuguese is written so that it does not say whether the owner is a man or
+  a woman. Sent by hand, exactly as the hall of fame's mail is and to the same donors:
+  `npm run owner:note -- --send` in the container writes to every donor who has not had it
+  (`donors.note_mailed_at` is null), once each; **run it again to thank those who have given
+  since**. The two mails share their machinery and do not depend on each other: `once.ts`
+  (`unmailed`: the donors with a place in a hall who lack a mark; `mailOnce`: claim, send,
+  give back on failure, stop when the mail server is away) and `once-cli.ts` (`runOnce`: the
+  dry run, `--preview`, `--test-to`, `--send`, the exit codes; `onceMain`: the database and
+  the mailer from the environment). The migration that added `note_mailed_at` marked the
+  donors who had the first notes by hand on 2026-11-12 (those told about the hall of fame
+  before 01:03 UTC that day), so they are not written to twice.
 - **Sign-in** (`auth/sign-in-mail.ts`): see Signing in. The subject is unchanged ("Your
   tinyworlds code: 482 913"). A donor's mail that carries a list says what it is for instead
   of signing in to Your cities: the label "Confirm your email", "One step and you're on the
@@ -760,6 +797,7 @@ Validated at startup (`config/env.ts`); the server does not start with anything 
 | `JWT_SECRET` | required in production, and anywhere with an admin | signs the sessions, keys the codes' HMAC and signs the lists' leave links (rotating it invalidates every leave link already mailed); at least 32 characters |
 | `SMTP_HOST`, `MAIL_FROM` | required in production | the mail server that sends the mails (sign-in links, thank-yous, a city is built, the lists'), and the address they come from |
 | `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | `587`, none, none | 465 means TLS from the start, anything else STARTTLS |
+| `OWNER_NAME`, `OWNER_MAIL_FROM`, `OWNER_WHATSAPP` | none | the site's owner, for the note they send each donor once (`npm run owner:note`): how they sign, who the note is from (an address or `Name <address>` the mail server may send for), and their WhatsApp number with its country code, as they write it (`+1 555 010-0199`). Nothing else needs them; a number or sender that is not one stops the API from starting |
 | `SITE_URL` | the first of `ALLOWED_ORIGINS` | the site's origin, for every link and picture in a mail, and where the lists' mails read the famous buildings from (`/<world>/data/`); in production it (or that first origin) must be https, or the API does not start |
 | `PORT` | `4000` | |
 | `NODE_ENV` | `development` | GraphiQL and introspection are off in `production` |

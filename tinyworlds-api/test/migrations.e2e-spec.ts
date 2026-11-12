@@ -75,8 +75,39 @@ describe('the migrations', () => {
     ]);
   });
 
+  it("counts the donors who had the owner's note by hand as written to, and no other", async () => {
+    const migration = '20261112020000_note_mailed';
+    await upTo(migration);
+    // the first notes went out by hand, right after those donors were told about the hall
+    await db.query(`INSERT INTO donors (id, email, hall_mailed_at, updated_at) VALUES
+      (gen_random_uuid(), 'first@example.com', '2026-11-12 01:01:05', now()),
+      (gen_random_uuid(), 'later@example.com', '2026-11-12 09:30:00', now()),
+      (gen_random_uuid(), 'untold@example.com', NULL, now())`);
+    await db.query(sqlOf(migration));
+    const { rows } = await db.query<{
+      email: string;
+      hall_mailed_at: Date | null;
+      note_mailed_at: Date | null;
+    }>(
+      'SELECT email, hall_mailed_at, note_mailed_at FROM donors ORDER BY email',
+    );
+    expect(rows.map((row) => [row.email, row.note_mailed_at !== null])).toEqual(
+      [
+        ['first@example.com', true],
+        ['later@example.com', false],
+        ['untold@example.com', false],
+      ],
+    );
+    // nothing else of them changed
+    expect(rows.map((row) => row.hall_mailed_at !== null)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+
   it('counts every world already on the map as told to the lists', async () => {
-    const migration = '20261112020000_city_lists';
+    const migration = '20261112030000_city_lists';
     await upTo(migration);
     await db.query(`INSERT INTO cities (id, slug, name, status, goal_cents, world_id, updated_at) VALUES
       (gen_random_uuid(), 'new-york', 'New York', 'BUILT', 3000, 'tinynyc', now()),

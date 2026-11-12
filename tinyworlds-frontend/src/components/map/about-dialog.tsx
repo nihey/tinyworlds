@@ -1,6 +1,15 @@
 "use client";
 
-import { Code, Cookie, Heart, LayoutGrid, Mail, UserRound } from "lucide-react";
+import {
+  Code,
+  Cookie,
+  FileText,
+  Heart,
+  LayoutGrid,
+  Mail,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { BenefactorsPanel } from "@/components/benefactors/benefactors-panel";
 import {
   Dialog,
@@ -13,7 +22,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import { consentStore, GTM_ID } from "@/lib/consent";
 import { API_URL } from "@/lib/donate";
 import { cn } from "@/lib/utils";
-import { CONTACT_URL, GITHUB_URL, HOME_URL, ME_URL } from "@/site";
+import { CONTACT_URL, GITHUB_URL, HOME_URL, ME_URL, PRIVACY_URL, TERMS_URL } from "@/site";
 import { WORLD } from "@/worlds";
 import { Wordmark } from "./wordmark";
 
@@ -176,6 +185,14 @@ export function AboutDialog({
             <a href={CONTACT_URL} className={QUIET}>
               <Mail aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
               {t.about.contact}
+            </a>
+            <a href={TERMS_URL} className={QUIET}>
+              <FileText aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
+              {t.legal.terms}
+            </a>
+            <a href={PRIVACY_URL} className={QUIET}>
+              <ShieldCheck aria-hidden className="size-3.5 text-paper-dim" strokeWidth={2.25} />
+              {t.legal.privacy}
             </a>
             {GTM_ID && (
               <button

@@ -68,6 +68,16 @@ const emails = z
     return [...new Set(list)];
   });
 
+/** Who a mail may be from: an address, or `Name <address>`. */
+const SENDER =
+  /^(?:[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+|[^<>]+ <[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+>)$/;
+
+/** A phone number with its country code, as someone writes it: "+1 555 010-0199". */
+const isPhone = (text: string): boolean => {
+  const digits = text.replace(/\D/g, '').length;
+  return /^\+[\d\s().-]+$/.test(text) && digits >= 8 && digits <= 15;
+};
+
 /** The least a JWT secret may be: 32 characters. */
 export const JWT_SECRET_MIN = 32;
 
@@ -102,6 +112,21 @@ const baseSchema = z.object({
   SMTP_USER: optional,
   SMTP_PASSWORD: optional,
   MAIL_FROM: optional,
+  /**
+   * The site's owner, for the note they send each donor once (benefactors/note-cli.ts): how
+   * they sign it, who it is from (an address, or `Name <address>`: one the mail server may
+   * send for), and their WhatsApp number as they write it, country code first. The note is
+   * only sent with all three; nothing else needs them.
+   */
+  OWNER_NAME: optional,
+  OWNER_MAIL_FROM: optional.refine(
+    (from) => from === undefined || SENDER.test(from),
+    'OWNER_MAIL_FROM must be an address, or "Name <address>"',
+  ),
+  OWNER_WHATSAPP: optional.refine(
+    (number) => number === undefined || isPhone(number),
+    'OWNER_WHATSAPP must be a phone number with its country code, such as "+1 555 010-0199"',
+  ),
   /**
    * The site's origin, for every link and picture in a mail. Left out: the first of
    * ALLOWED_ORIGINS.

@@ -2,7 +2,9 @@
 
 import { Loader2, Mail } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { Wordmark } from "@/components/map/wordmark";
+import { FOG_LINK } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
 import type { SignInWords } from "@/i18n/types";
 import { normalizeCode, type AdminSession, type Purpose } from "@/lib/admin";
@@ -306,6 +308,10 @@ export function SignIn({
         <div aria-hidden className="h-[3px] bg-taxi" />
         <div className="px-5 pt-6 pb-6 sm:px-6">{content}</div>
       </div>
+      {/* the address asked for here is what the privacy policy is about */}
+      <footer className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 pt-6 text-xs leading-relaxed">
+        <LegalLinks className={FOG_LINK} />
+      </footer>
     </main>
   );
 }
