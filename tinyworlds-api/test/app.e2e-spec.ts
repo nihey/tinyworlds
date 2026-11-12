@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module.js';
 import { AnnounceService } from '../src/benefactors/announce.service.js';
 import { BenefactorsService } from '../src/benefactors/benefactors.service.js';
 import { announceHall, hallLetters } from '../src/benefactors/hall-announce.js';
+import { noteLetters, sendNotes } from '../src/benefactors/note-announce.js';
 import { MAILER } from '../src/mail/mailer.js';
 import { STRIPE } from '../src/donations/stripe.provider.js';
 import { configureHttp } from '../src/http.js';
@@ -2448,6 +2449,196 @@ describe('the API over HTTP', () => {
       // the second donor was never tried
       expect(mailer.attempts).toBe(tries + 1);
       expect(await told()).toEqual([]);
+    });
+  });
+
+  describe("the owner's note to donors", () => {
+    const SITE = 'https://example.com';
+    const OWNER = {
+      name: 'Robin',
+      from: 'Robin from tinyworlds <robin@example.com>',
+      whatsapp: '+1 555 010-0199',
+    };
+    const gift = (
+      id: string,
+      amount: number,
+      email: string | null,
+      locale: string,
+      name?: string,
+      city = 'Lisbon',
+      currency = 'usd',
+    ) =>
+      webhook({
+        id,
+        amount,
+        email,
+        currency,
+        metadata: {
+          app: 'tinyworlds',
+          world: 'tinynyc',
+          locale,
+          ...(city ? { city } : {}),
+          ...(name ? { benefactor_name: name } : {}),
+        },
+      }).expect(200);
+    /** The mails of this test so far. */
+    let start = 0;
+    beforeEach(() => {
+      start = mailer.sent.length;
+    });
+    afterEach(() => {
+      mailer.failWith = null;
+    });
+    /** The notes this test sent: the mails that are from the owner. */
+    const notes = () =>
+      mailer.sent.slice(start).filter((mail) => mail.from === OWNER.from);
+    /** Ana, named, who gave to Lisbon and Porto; Bo, who gave no name; a gift with no address. */
+    const give = async () => {
+      const before = mailer.sent.length;
+      await gift('cs_n1', 1200, 'ana@example.com', 'en-US', 'Ana');
+      await gift('cs_n2', 800, 'ana@example.com', 'pt-BR', undefined, 'Porto');
+      await gift('cs_n3', 500, 'bo@example.com', 'es-ES');
+      await gift('cs_n4', 700, null, 'en-US');
+      // their thank-yous go out on their own: wait for them, so they are not counted later
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 3));
+      start = mailer.sent.length;
+    };
+    const written = async () =>
+      (
+        await prisma.donor.findMany({
+          where: { noteMailedAt: { not: null } },
+          select: { email: true },
+          orderBy: { email: 'asc' },
+        })
+      ).map((donor) => donor.email);
+
+    it('says who would get the note, and sends nothing', async () => {
+      await give();
+      const letters = await noteLetters(prisma, SITE, OWNER);
+      expect(
+        letters.map(({ locale, cities, named, mail }) => ({
+          to: mail.to,
+          locale,
+          cities,
+          named,
+        })),
+      ).toEqual([
+        // the language of her latest gift
+        { to: 'ana@example.com', locale: 'pt-BR', cities: 2, named: true },
+        { to: 'bo@example.com', locale: 'es-ES', cities: 1, named: false },
+      ]);
+      expect(notes()).toEqual([]);
+      expect(await written()).toEqual([]);
+    });
+
+    it('writes to each donor once, from the owner, about the cities they gave to', async () => {
+      await give();
+      const run = await sendNotes(prisma, mailer, SITE, OWNER);
+      expect(run).toMatchObject({ letters: 2, failed: [], unsent: [] });
+      expect(run.sent).toHaveLength(2);
+
+      const [ana, bo] = notes();
+      expect(ana.to).toBe('ana@example.com');
+      expect(ana.subject).toBe('Um agradecimento por apoiar o tinyworlds');
+      expect(ana.text.startsWith('Olá, Ana,\n\n')).toBe(true);
+      // the city she gave most to first
+      expect(ana.text).toContain('pelo que você doou para Lisbon e Porto.');
+      expect(ana.text).toContain('+1 555 010-0199 (https://wa.me/15550100199)');
+      expect(bo.to).toBe('bo@example.com');
+      expect(bo.subject).toBe('Gracias por ayudar a construir Lisbon');
+      expect(bo.text.startsWith('Hola:\n\n')).toBe(true);
+      // each note is about its own donor only
+      expect(bo.html).not.toContain('Ana');
+      expect(bo.text).not.toContain('Porto');
+      expect(await written()).toEqual(['ana@example.com', 'bo@example.com']);
+
+      // a second run writes to nobody again
+      const again = await sendNotes(prisma, mailer, SITE, OWNER);
+      expect(again).toMatchObject({ letters: 0, sent: [] });
+      expect(notes()).toHaveLength(2);
+
+      // someone who gives later gets theirs from the next run, and only them
+      const before = mailer.sent.length;
+      await gift('cs_n5', 300, 'cy@example.com', 'en-US', 'Cy');
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+      const later = await sendNotes(prisma, mailer, SITE, OWNER);
+      expect(later.sent).toHaveLength(1);
+      expect(notes().at(-1)).toMatchObject({
+        to: 'cy@example.com',
+        from: OWNER.from,
+        subject: 'Thank you for helping build Lisbon',
+      });
+    });
+
+    it('goes out whether or not the donor was told about the hall of fame, and the other way round', async () => {
+      await give();
+      await announceHall(prisma, mailer, SITE);
+      expect(await written()).toEqual([]);
+      const run = await sendNotes(prisma, mailer, SITE, OWNER);
+      expect(run.sent).toHaveLength(2);
+      expect(notes()).toHaveLength(2);
+
+      // and a note keeps nobody from being told about the hall
+      const before = mailer.sent.length;
+      await gift('cs_n6', 300, 'cy@example.com', 'en-US', 'Cy');
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 1));
+      await sendNotes(prisma, mailer, SITE, OWNER);
+      expect((await announceHall(prisma, mailer, SITE)).sent).toHaveLength(1);
+    });
+
+    it('greets plainly a donor whose name an admin hid', async () => {
+      await give();
+      await prisma.donor.update({
+        where: { email: 'ana@example.com' },
+        data: { nameHidden: true },
+      });
+      const [ana] = await noteLetters(prisma, SITE, OWNER);
+      expect(ana.named).toBe(false);
+      expect(ana.mail.text.startsWith('Olá,\n\n')).toBe(true);
+      expect(ana.mail.html).not.toContain('Ana');
+    });
+
+    it('writes to nobody who gave to no city the site shows: a hidden city, another currency, no city', async () => {
+      const before = mailer.sent.length;
+      await gift('cs_y1', 900, 'hid@example.com', 'en-US', 'Hid', 'Nowhere');
+      await prisma.city.update({
+        where: { slug: 'nowhere' },
+        data: { hidden: true },
+      });
+      await gift(
+        'cs_y2',
+        5000,
+        'eur@example.com',
+        'en-US',
+        'Eva',
+        'Lisbon',
+        'eur',
+      );
+      await gift('cs_y3', 400, 'pro@example.com', 'en-US', undefined, '');
+      await vi.waitFor(() => expect(mailer.sent).toHaveLength(before + 3));
+      expect(await noteLetters(prisma, SITE, OWNER)).toEqual([]);
+      const run = await sendNotes(prisma, mailer, SITE, OWNER);
+      expect(run).toEqual({ letters: 0, sent: [], failed: [], unsent: [] });
+    });
+
+    it('gives a donor back when their note fails, so the next run tries again', async () => {
+      await give();
+      const lines: string[] = [];
+      mailer.failWith = new Error('550 mailbox unavailable');
+      const run = await sendNotes(prisma, mailer, SITE, OWNER, (line) =>
+        lines.push(line),
+      );
+      expect(run.sent).toEqual([]);
+      expect(run.failed).toHaveLength(2);
+      expect(await written()).toEqual([]);
+      // the failures are told by donor id, never by address
+      expect(lines).toHaveLength(2);
+      expect(lines.join('\n')).not.toContain('@');
+
+      mailer.failWith = null;
+      const again = await sendNotes(prisma, mailer, SITE, OWNER);
+      expect(again.sent).toHaveLength(2);
+      expect(notes()).toHaveLength(2);
     });
   });
 

@@ -189,4 +189,40 @@ describe('validateEnv', () => {
       expect(env.MAIL_FROM).toBeUndefined();
     }
   });
+  it("needs nothing of the site's owner, and keeps what it is told of them", () => {
+    const none = validateEnv(base);
+    expect(none.OWNER_NAME).toBeUndefined();
+    expect(none.OWNER_MAIL_FROM).toBeUndefined();
+    expect(none.OWNER_WHATSAPP).toBeUndefined();
+    const env = validateEnv({
+      ...base,
+      OWNER_NAME: ' Robin ',
+      OWNER_MAIL_FROM: 'Robin from tinyworlds <robin@example.com>',
+      OWNER_WHATSAPP: ' +1 555 010-0199 ',
+    });
+    expect(env.OWNER_NAME).toBe('Robin');
+    expect(env.OWNER_MAIL_FROM).toBe(
+      'Robin from tinyworlds <robin@example.com>',
+    );
+    // as the owner writes it: the mail shows it so
+    expect(env.OWNER_WHATSAPP).toBe('+1 555 010-0199');
+  });
+
+  it("refuses an owner's WhatsApp that is not a number with its country code", () => {
+    for (const number of ['555 010-0199', '+1 555 CALL-NOW', '+12'])
+      expect(() => validateEnv({ ...base, OWNER_WHATSAPP: number })).toThrow(
+        /OWNER_WHATSAPP/,
+      );
+  });
+
+  it("refuses an owner's address a mail could not come from", () => {
+    for (const from of ['Robin', 'robin@', 'Robin <robin>'])
+      expect(() => validateEnv({ ...base, OWNER_MAIL_FROM: from })).toThrow(
+        /OWNER_MAIL_FROM/,
+      );
+    expect(
+      validateEnv({ ...base, OWNER_MAIL_FROM: 'robin@example.com' })
+        .OWNER_MAIL_FROM,
+    ).toBe('robin@example.com');
+  });
 });
