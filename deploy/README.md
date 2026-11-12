@@ -82,7 +82,11 @@ change.
 
 `.github/workflows/deploy.yml` runs `deploy/deploy.sh release` on GitHub Actions for every push
 to `main`, once a day (to catch up with a run that failed), and by hand from the Actions tab
-(*Run workflow*, with *everything* to redeploy all of it). `release`:
+(*Run workflow*, with *everything* to redeploy all of it). The daily run passes `--fresh-home`:
+when nothing else is to deploy it still builds and uploads the front page, whose hall of fame
+is baked in from what the API says at that moment, so a name or a link added since is in the
+pages' HTML within a day (it is on the pages themselves at once: they ask the API when they
+open). `release`:
 
 1. reads which commits the server's API and viewers came from (`$DEPLOY_DIR/deployed/api`,
    `deployed/viewers`), and refuses if either is not in the commit being released (an older run
