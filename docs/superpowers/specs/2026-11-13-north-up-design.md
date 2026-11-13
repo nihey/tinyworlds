@@ -20,7 +20,7 @@ turning one back to its street grid.
 
 ## Non-goals
 
-- A rotate button for visitors (one orientation per world, chosen when it is drawn).
+- ~~A rotate button for visitors~~: superseded, see "Both orientations" below.
 - Arbitrary view angles (north up or the grid; a bearing of one's own is a small addition later).
 - Winterfell and King's Landing: laid out by code in their own grid, with a make-believe north;
   they stay as they are. Westeros is already north up.
@@ -76,6 +76,37 @@ turning one back to its street grid.
   (`Adding a city`, `Rules of the look`, `Gotchas`), the videos' if a framing rule changes.
 - **Tests**: the default view gives `northDeg` 0; a statue box keeps its compass orientation
   whatever the view; generated cities are unchanged.
+
+## Both orientations, for visitors (added after the checkpoint)
+
+The owner wants the original map kept **and shown**: a map opens north up, and the visitor can
+turn it to its street grid, the original drawing. This replaces the non-goal "a rotate button
+for visitors".
+
+- **Data**: a world turned both ways has two full data sets: the default view at
+  `data/<world>/` as today, the other one at `data/<world>/grid/` (manifest, tiles, overview,
+  places, hoods, life, sights and their pictures, texts, quiz). A full set, so the viewer only
+  changes its base path; the small JSON files are duplicated, which is cheap. The manifest gains
+  an optional `view: "north" | "grid"`: which way that set is turned.
+- **The original stays the original**: the 13 cities' `grid/` sets are today's data, copied as
+  they are from the main checkout (a grid scene from the new code is byte-identical to today's,
+  so nothing would change by drawing them again).
+- **Pipeline**: `--view <north|grid>` (or `TINY_VIEW`) draws a city turned the other way; when
+  it differs from the city's own `view`, the scene goes to `data/<city>/scene-<view>/` and the
+  output to `<out>/<view>/`. `all`, `wiki` and `quiz` follow it; `card` refuses it (cards are
+  the default view's). A generated city refuses any other view (its north is make-believe).
+- **Viewer**: the registry says which worlds can turn (`World.turn: "grid"`, the folder of the
+  other view; the 13 real cities). The compass becomes a button on those worlds: it turns the
+  map, keeping the spot and the zoom (the engine starts again on the other data set, as a
+  retry does). The choice is remembered in the visitor's preferences (local storage), not in
+  the shared link, so a link always opens north up. Tooltip and label in the three languages.
+  The About notes say north is up and that the compass turns the map to the street grid.
+- **Deploy**: `deploy.sh check` fails a world with `turn` whose `grid/manifest.json` is
+  missing; the release mirrors the server's `grid/manifest.json` too and refuses the same way.
+  The server holds about twice the data (≈ 5 GB → 10 GB).
+- **Cards, loops, heroes, the mails' pictures**: the default view's only.
+- **Where the work runs**: the CPU-heavy steps (pipeline renders, video renders) run on the
+  owner's second machine over ssh, not this one; results are copied back.
 
 ## Left to the builder
 

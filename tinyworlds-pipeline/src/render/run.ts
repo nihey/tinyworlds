@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import sharp from "sharp";
-import { CHUNK_TILES, CITY, DIRS, TILE } from "../config.js";
+import { CHUNK_TILES, CITY, DIRS, TILE, VIEW } from "../config.js";
 import { makeProjection } from "../projection.js";
 import { fogRange, orderJob } from "./bin.js";
 import { PAD, SUN_DROP, type ChunkJob } from "./chunk.js";
@@ -384,6 +384,7 @@ export async function renderAll(opts: RenderOptions = {}): Promise<void> {
     start: CITY.start,
     maxScale: CITY.maxScale,
     northDeg: Math.round(proj.northDeg * 10) / 10,
+    view: VIEW,
     geo: scene.geo,
     overview: { src: "overview.webp", width: crop.width, height: crop.height },
     attribution: CITY.attribution,

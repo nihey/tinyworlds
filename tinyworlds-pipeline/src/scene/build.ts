@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DuckDBBlobValue, DuckDBInstance, type DuckDBConnection, type DuckDBValue } from "@duckdb/node-api";
-import { CITY, DIRS } from "../config.js";
+import { CITY, DIRS, VIEW_DEG } from "../config.js";
 import type { Polygons } from "../cities/types.js";
 import { readAreas } from "../geom/geojson.js";
 import { GeomKind, readWkb } from "../geom/wkb.js";
@@ -16,7 +16,6 @@ import {
   type FogGrid,
   type Footprint,
 } from "./fog.js";
-import { viewDeg } from "../cities/view.js";
 import { distanceAlong, holdDecks, type DeckPath, type DeckRun } from "./decks.js";
 import { statueRing } from "./statues.js";
 import { hashString, mix, rand } from "./hash.js";
@@ -41,7 +40,7 @@ import { chooseStyle, type Style } from "./styles.js";
  *   fog      distance from the city, which decides where the map ends
  */
 
-export const GEO = makeGeo(CITY.origin.lon, CITY.origin.lat, viewDeg(CITY), CITY.k);
+export const GEO = makeGeo(CITY.origin.lon, CITY.origin.lat, VIEW_DEG, CITY.k);
 
 /** Line flags. */
 export const L_BRIDGE = 1;

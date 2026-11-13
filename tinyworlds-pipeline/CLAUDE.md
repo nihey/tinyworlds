@@ -50,6 +50,14 @@ npm run lint      # eslint + prettier --check   (lint:fix to fix)
 (`--shrink n` draws n times the area and averages it down, to judge the zoomed-out look).
 `TINY_CITY` in the environment is the same as `--city`.
 
+**Two views of a city.** A real city is drawn twice: its own view (`City.view`, north up by
+default) at `public/data/<city>/`, and turned the other way, to its street grid, at
+`public/data/<city>/grid/`, a full data set the viewer's compass turns to. `--view grid` (or
+`TINY_VIEW`) draws that one: its scene goes to `data/<city>/scene-grid/`, everything else into
+`grid/`; `all`, `wiki` and `quiz` follow it, `card` refuses it without `--out` (the cards are the
+city's own view), and a generated place refuses any other view. So a world is drawn with
+`npm run all -- --city <id>` and `npm run all -- --city <id> --view grid`.
+
 ## Stages
 
 ```
