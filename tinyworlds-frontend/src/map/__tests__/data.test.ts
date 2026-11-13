@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dataUrl, loadSights, loadSightTexts, parseFlights, resolveDataBase } from "../data";
+import {
+  dataUrl,
+  loadSights,
+  loadSightTexts,
+  parseFlights,
+  resolveDataBase,
+  setMapView,
+  viewDataBase,
+} from "../data";
 import { parseManifest } from "../manifest";
 
 describe("loading the sights", () => {
@@ -57,6 +65,29 @@ describe("dataUrl", () => {
 
   it("uses the active world's folder by default", () => {
     expect(dataUrl("manifest.json")).toBe("/data/tinynyc/manifest.json");
+  });
+
+  it("follows the view the map is turned to", () => {
+    try {
+      setMapView("grid");
+      expect(dataUrl("manifest.json")).toBe("/data/tinynyc/grid/manifest.json");
+      expect(dataUrl("tiles/0/1_2.webp", "b1")).toBe("/data/tinynyc/grid/tiles/0/1_2.webp?v=b1");
+      setMapView("north");
+      expect(dataUrl("manifest.json")).toBe("/data/tinynyc/manifest.json");
+    } finally {
+      setMapView("north");
+    }
+  });
+});
+
+describe("viewDataBase", () => {
+  it("is the world's own folder north up, and the grid set inside it turned", () => {
+    expect(viewDataBase("/tinynyc/data", "north", "grid")).toBe("/tinynyc/data");
+    expect(viewDataBase("/tinynyc/data", "grid", "grid")).toBe("/tinynyc/data/grid");
+  });
+
+  it("stays in the world's folder for a world drawn one way only", () => {
+    expect(viewDataBase("/tinywesteros/data", "grid", undefined)).toBe("/tinywesteros/data");
   });
 });
 

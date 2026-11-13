@@ -16,7 +16,12 @@ export interface Prefs {
   life: boolean;
   /** the interface's language; "auto" follows the browser */
   lang: LocalePref;
+  /** which way the map is turned, in a world drawn both ways (`World.turn`): north up, or to its street grid */
+  view: MapView;
 }
+
+/** North up, or turned to the city's street grid (the map as it was first drawn). */
+export type MapView = "north" | "grid";
 
 /** One namespace per world (and one for the front page), so worlds on one origin keep their own settings. */
 export const PREFS_KEY = `${SITE_ID}.prefs`;
@@ -29,6 +34,7 @@ export const DEFAULT_PREFS: Prefs = {
   theme: "system",
   life: true,
   lang: "auto",
+  view: "north",
 };
 
 /** Keeps what is valid in a stored value and fills the rest with defaults. */
@@ -44,6 +50,7 @@ export function sanitizePrefs(value: unknown): Prefs {
     out.tiltStrength = Math.min(100, Math.max(0, Math.round(v.tiltStrength)));
   if (v.theme === "system" || v.theme === "light" || v.theme === "dark") out.theme = v.theme;
   if (v.lang === "auto" || isLocale(v.lang)) out.lang = v.lang;
+  if (v.view === "north" || v.view === "grid") out.view = v.view;
   return out;
 }
 

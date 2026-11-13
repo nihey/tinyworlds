@@ -14,6 +14,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/hooks/use-i18n";
+import type { MapView } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { SITE_ID } from "@/site";
 import { Compass } from "./compass";
@@ -50,6 +51,10 @@ const Rule = ({ className }: { className?: string }) => (
 
 interface ToolColumnProps {
   northDeg: number;
+  /** which way the map is turned, in a world drawn both ways */
+  view?: MapView;
+  /** absent in a world drawn one way: then the compass only says where north is */
+  onTurn?: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onWholeMap: () => void;
@@ -69,6 +74,8 @@ interface ToolColumnProps {
 /** The strip of round buttons down the right edge, under the compass. */
 export function ToolColumn({
   northDeg,
+  view,
+  onTurn,
   onZoomIn,
   onZoomOut,
   onWholeMap,
@@ -90,7 +97,7 @@ export function ToolColumn({
       className={cn("sign z-10 flex flex-col items-center gap-0.5 p-1", className)}
       style={style}
     >
-      <Compass northDeg={northDeg} />
+      <Compass northDeg={northDeg} view={view} onTurn={onTurn} />
       <Rule />
       {/* fingers pinch; the zoom buttons are for mice and keyboards */}
       <ToolButton label={t.tools.zoomIn} hint="+" onClick={onZoomIn} className="max-sm:hidden">

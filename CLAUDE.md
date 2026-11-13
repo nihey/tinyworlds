@@ -177,8 +177,11 @@ Each sub-project has its own `CLAUDE.md`.
 ## Adding a world
 
 1. Pipeline: `tinyworlds-pipeline/src/cities/<id>.ts` (see that project's `CLAUDE.md`), then
-   `npm run all -- --city <id>` and `npm run cli -- --city <id> card`.
-2. Viewer: `tinyworlds-frontend/src/worlds/<id>.ts` and its registry entry.
+   `npm run all -- --city <id>`, `npm run all -- --city <id> --view grid` (a real city: the
+   view turned to its street grid, which the compass turns to) and
+   `npm run cli -- --city <id> card`.
+2. Viewer: `tinyworlds-frontend/src/worlds/<id>.ts` (`turn: "grid"` for a real city) and its
+   registry entry.
 3. API: mark the city `BUILT` with its `worldId` (a line in `seed-data.ts`; the seed runs
    whenever the API starts; see `tinyworlds-api/CLAUDE.md`).
 4. Videos: `npm run plates -- <id> && npm run loops -- <id>` in `tinyworlds-videos` gives the world its
@@ -212,8 +215,16 @@ data/<world>/
 ├── sights.json              # buildings that light up under the pointer (worlds with sights)
 ├── sights/<hash>.webp       # each of them drawn on its own, nothing in front of it
 ├── sights.<locale>.json     # their Wikipedia openings: en-US, pt-BR, es-ES
-└── quiz.<locale>.json       # Guess the building's questions (worlds with sights)
+├── quiz.<locale>.json       # Guess the building's questions (worlds with sights)
+└── grid/                    # a world drawn both ways: all of the above again, turned to its
+                             # street grid (the map as it was first drawn)
 ```
+
+**Two views.** A real city is drawn north up (its folder) and turned to its street grid
+(`grid/`, a full data set of its own: the pipeline's `--view grid`). The viewer's compass turns
+the map from one to the other (`World.turn`), starting again on the other set where the map
+was. The files that are in lon/lat (places, hoods, life, the texts, the quiz) are the same in
+both; the tiles, the minimap and the sights' outlines and pictures are not.
 
 ### Map space and projection
 
@@ -229,8 +240,10 @@ X = (p + q) · k
 Y = (q − p) · k/2 − h · kz          // h = metres above ground
 ```
 
-β is the bearing of the city's street grid, so its streets run at exact 2:1 pixel slopes. True
-north points `manifest.northDeg` clockwise from screen-up.
+β is the bearing the view is turned to: 45°, which puts true north straight up
+(`manifest.northDeg` 0), unless the world is turned to its street grid (the pipeline's
+`view: "grid"`), whose streets then run at exact 2:1 pixel slopes. True north points
+`manifest.northDeg` clockwise from screen-up.
 
 ### manifest.json
 
@@ -252,6 +265,7 @@ interface Manifest {
   start: { lon: number; lat: number; scale: number };                 // first view
   maxScale: number;             // deepest zoom, screen px per map px
   northDeg: number;
+  view?: "north" | "grid";      // which way this data set is turned (absent: written before views)
   geo: { lon0: number; lat0: number; betaDeg: number; k: number; kz: number };
   overview: { src: string; width: number; height: number };           // image spans `bounds`
   attribution: string[];        // shown as they are, in every interface language

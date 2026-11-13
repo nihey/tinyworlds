@@ -50,6 +50,14 @@ npm run lint      # eslint + prettier --check   (lint:fix to fix)
 (`--shrink n` draws n times the area and averages it down, to judge the zoomed-out look).
 `TINY_CITY` in the environment is the same as `--city`.
 
+**Two views of a city.** A real city is drawn twice: its own view (`City.view`, north up by
+default) at `public/data/<city>/`, and turned the other way, to its street grid, at
+`public/data/<city>/grid/`, a full data set the viewer's compass turns to. `--view grid` (or
+`TINY_VIEW`) draws that one: its scene goes to `data/<city>/scene-grid/`, everything else into
+`grid/`; `all`, `wiki` and `quiz` follow it, `card` refuses it without `--out` (the cards are the
+city's own view), and a generated place refuses any other view. So a world is drawn with
+`npm run all -- --city <id>` and `npm run all -- --city <id> --view grid`.
+
 ## Stages
 
 ```
@@ -72,11 +80,12 @@ src/
 │   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts;
 │   │                  # aroundPoints(): parts of town the data knows only as named points
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
+│   ├── view.ts        # which way the map is turned: north up (default) or the street grid (viewDeg)
 │   ├── tinywinterfell.ts, tinykingslanding.ts   # two places that do not exist, laid out by code
 │   └── tinywesteros.ts (+ .land.ts, .places.ts)  # a whole imagined world as a toy-scale diorama
 ├── config.ts          # which city this process draws (CITY) and its directories (DIRS)
 ├── env.ts             # city-independent settings (tile size, Overture release, user agent)
-├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px
+├── projection.ts      # lon/lat → grid metres (uptown p, crosstown q) → 2:1 map px; turnGrid
 ├── sources/           # DataSource providers: overture.ts (DuckDB over public S3), nycOpenData.ts,
 │                      # ibge.ts (census areas), openBuildings.ts (satellite height raster),
 │                      # overtureAreas.ts (localities and neighbourhoods from Overture's divisions,
@@ -95,6 +104,7 @@ src/
 │   ├── synthetic.ts   # the builder a generated city draws on; its scene and its index
 │   ├── medieval.ts    # pure helpers for generated places: walls, towers, lanes, rows of houses
 │   ├── worldkit.ts    # pure helpers for generated worlds: coasts, a land mask, mountains, model kits
+│   ├── statues.ts     # a statue piece's footprint, turned from the street grid onto the view
 │   └── hash.ts store.ts sinks.ts
 ├── render/
 │   ├── palette.ts     # ~80 materials × 6 shades; shading only ever moves along a ramp
@@ -128,7 +138,10 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
 
 1. `src/cities/<id>.ts` implementing `City` (see `types.ts`; every field is documented there), and
    an entry in `src/cities/index.ts`. The decisions that matter:
-   - `origin`, `betaDeg` (the street grid's bearing: measure it, don't guess) and `bbox`;
+   - `origin`, `gridDeg` (the street grid's bearing: measure it, don't guess; statues are written
+     along it and the street-grid view is turned to it) and `bbox`. Leave `view` alone: a real
+     city is drawn north up and, with `--view grid`, turned to its streets (see "Two views of a
+     city" above); `view: "grid"` is only for a world shown on its street grid alone;
    - `limits`: polygons that are "the city" (`geojson`), or the built-up part of an Overture
      division (`built-up`) for a municipality that is mostly farmland, or of the whole bounding
      box (`built-up` with no division) for a metropolis that ignores its municipal limits. A park
@@ -176,7 +189,8 @@ after and `cmp` them (they should be byte-identical unless the change was meant 
 A city with a `synthetic` function has no data at all: `fetch` finds nothing to do, `scene` and
 `index` call the function instead of reading Overture, and `render` and `card` cannot tell the
 difference. `generatedCity()` in `cities/generated.ts` fills in the rest of the `City` contract
-(origin 0/0, `betaDeg` 0 unless the spec gives one, `k` 2, no sources), so a generator is one file:
+(origin 0/0, `gridDeg` 0 unless the spec gives one and always `view: "grid"`, since the place is
+laid out on that grid; `k` 2, no sources), so a generator is one file:
 
 ```ts
 export const tinywinterfell = generatedCity({
@@ -234,7 +248,7 @@ set it apart from the two generated cities.
   every place is a model far bigger than it should be: a castle is ~100 units across, a great
   city ~400, a mountain a pyramid ~150 wide. Forests are the renderer's own scattered trees,
   which at this scale read as texture. Think of pieces on a war table.
-- **North is up.** `betaDeg: 45` (a `generatedCity` option) turns the grid 45° from the compass,
+- **North is up.** `gridDeg: 45` (a `generatedCity` option) turns the grid 45° from the compass,
   so `manifest.northDeg` is 0. The layout is written in world coordinates, `e` east and `n`
   north, and converted with `toPQ(e, n)`: `p = (e + n)/√2`, `q = (e − n)/√2` (`toEN` goes back,
   `pathPQ` does a flat path). Models are still built along the grid, where boxes draw best, so
@@ -451,20 +465,26 @@ whose shadows reach it, and margins for both.
 - No anti-aliasing and no colour outside the palette at level 0. Coarser levels are averaged.
 - Light comes from the upper left (sun bearing 254°): left walls lit, right walls shaded, shadows
   fall straight to the right.
-- The view is aligned to the city's street grid (`betaDeg`: Manhattan's avenues at 28.9°,
-  Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°, the Los Angeles
-  basin's at −0.1°, measured over 3,000 km of streets; Dallas' compass grid at 0.2°, a quarter
-  of its 3,200 km of streets, rather than Uptown's at 45.3°, which would stand every freeway on
-  end; Cincinnati's downtown, Over-the-Rhine and Covington at −11.1°, so the view looks across
-  the river at the skyline; Pittsburgh at 61°, the Golden Triangle's second grid and the whole
-  box's strongest bearing, so the view looks from Mount Washington across the Monongahela at
-  the Point; Philadelphia's grid at −8.1°, so City Hall stands at the hub and the Parkway leads
-  the eye up to the Art Museum; Colorado Springs' downtown and Old North End at 2.3°, General
-  Palmer's grid, rather than the section-line roads' 0°; Truckee's downtown at 71.1°, the grid
-  that follows the railroad, 14% of the core's streets, rather than the compass grid that peaks
-  over the whole box (0.3°, 6%: Donner Pass Road, the lake shore, Glenshire), so the view looks
-  across the river and the tracks at Commercial Row with north near the top) so its streets are exact 2:1 lines. Measure it as the peak of the
-  streets' bearings modulo 90°, weighted by length.
+- **North is up.** Every world is drawn with true north straight up (`view`, default
+  `"north"`: the projection's β is 45°, `NORTH_UP_DEG` in `cities/view.ts`, so
+  `manifest.northDeg` is 0). A compass grid's streets then run straight across and straight up
+  the screen and its buildings show their roofs and south walls; a tilted grid (Manhattan's)
+  runs at its own angle.
+- **The street grid is still measured** (`gridDeg`), because statues are written along it and
+  every real city's second view, `grid/`, is turned to it, which puts its streets on exact 2:1
+  lines (every world was drawn only that way until November 2026). The grids: Manhattan's avenues at
+  28.9°, Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°, the Los
+  Angeles basin's at −0.1°, measured over 3,000 km of streets; Dallas' compass grid at 0.2°, a
+  quarter of its 3,200 km of streets, rather than Uptown's at 45.3°, which would stand every
+  freeway on end; Cincinnati's downtown, Over-the-Rhine and Covington at −11.1°, so the grid
+  view looks across the river at the skyline; Pittsburgh at 61°, the Golden Triangle's second
+  grid and the whole box's strongest bearing, so the grid view looks from Mount Washington
+  across the Monongahela at the Point; Philadelphia's grid at −8.1°, so City Hall stands at the
+  hub and the Parkway leads the eye up to the Art Museum; Colorado Springs' downtown and Old
+  North End at 2.3°, General Palmer's grid, rather than the section-line roads' 0°; Truckee's
+  downtown at 71.1°, the grid that follows the railroad, 14% of the core's streets, rather than
+  the compass grid that peaks over the whole box (0.3°, 6%: Donner Pass Road, the lake shore,
+  Glenshire). Measure it as the peak of the streets' bearings modulo 90°, weighted by length.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
@@ -499,7 +519,10 @@ whose shadows reach it, and margins for both.
   set from a pixel face in `tinylax.landmarks.ts`), in patina, gold or white. Dallas has two:
   the lower half of Reunion Tower's ball, stepped in under the dome the data draws, and the
   Margaret Hunt Hill Bridge's arch, boxes stepped along the bridge (`huntHillArch` turns the
-  bridge's bearing into the grid's, so it follows `betaDeg`).
+  bridge's bearing into the grid's, so it follows `gridDeg`). Statues are written along the
+  street grid and the scene turns each onto the view's grid (`statueRing` in `scene/statues.ts`,
+  by the view's bearing less `gridDeg`), so they stand the same way on the ground whichever way
+  the map is turned.
 - **Towers mapped as buildings.** Cincinnati's Roebling Bridge has detailed towers in the
   building data, not bridge supports, so nothing would string cables between them: the city
   names the span in `suspensions` (the two tower tops, the cables' height, how far out they are
@@ -552,7 +575,8 @@ have no floors mapped (the Academy's halls, the Broadmoor).
 
 - DuckDB: filtering local Parquet on the `bbox` struct column crashes this DuckDB build; filter on
   `ST_X(ST_Centroid(geometry))` instead.
-- Changing `k`, the origin or `betaDeg` moves every pixel: re-run `scene`, `render` and `index`.
+- Changing `k`, the origin, `view` or (for a city turned to its grid, or with statues) `gridDeg`
+  moves pixels: re-run `scene`, `render`, `index` and `card`.
   Share links survive because the viewer's URL hash is in lon/lat.
 - Colour indices are `Uint16` (more than 256 palette entries).
 - Overture's land cover comes at several generalisation levels stacked on each other: only

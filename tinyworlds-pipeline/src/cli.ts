@@ -3,7 +3,7 @@ import { Command } from "commander";
 import path from "node:path";
 import sharp from "sharp";
 import { CITIES } from "./cities/index.js";
-import { CITY, DIRS } from "./config.js";
+import { CITY, DIRS, OTHER_VIEW, VIEW } from "./config.js";
 import { buildIndex } from "./index/build.js";
 import { buildWiki } from "./index/wiki.js";
 import { writeQuiz } from "./index/write-quiz.js";
@@ -23,7 +23,9 @@ program
   .name("tinyworlds")
   .description("Open data in, an isometric pixel-art city out.")
   // read in config.ts before anything else runs; declared here so it is accepted and documented
-  .option("-c, --city <id>", `which city to draw: ${Object.keys(CITIES).join(" | ")}`, CITY.id);
+  .option("-c, --city <id>", `which city to draw: ${Object.keys(CITIES).join(" | ")}`, CITY.id)
+  // read in config.ts too: the other view's scene and data go beside the city's own
+  .option("--view <view>", "which way to turn the map: north | grid (default: the city's own)", VIEW);
 
 program
   .command("fetch")
@@ -130,6 +132,9 @@ program
   .description("Render the share card (the Open Graph image) into the frontend's public/og")
   .option("--out <file>", "where to write it (default: ../tinyworlds-frontend/public/og/<city>.jpg)")
   .action(async (opts: { out?: string }) => {
+    if (OTHER_VIEW && !opts.out) {
+      throw new Error(`The share card is ${CITY.id}'s own view: give --out to cut one from the ${VIEW} view`);
+    }
     await renderCard({ out: opts.out });
   });
 

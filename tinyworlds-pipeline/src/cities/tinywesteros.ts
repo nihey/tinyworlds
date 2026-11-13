@@ -2456,7 +2456,7 @@ export const tinywesteros = generatedCity({
   id: "tinywesteros",
   title: "Westeros and Essos",
   accent: "#d9b45a",
-  betaDeg: 45,
+  gridDeg: 45,
   start: { p: startP, q: startQ, scale: 0.12 },
   card: { p: cardP, q: cardQ, shrink: 18 },
   // the frame cuts the edge; the fog only has to stay clear of it

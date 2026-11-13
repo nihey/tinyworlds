@@ -38,7 +38,7 @@ export const tinyorl: City = {
   title: "Orlando",
   // the fountain of Lake Eola
   origin: { lon: -81.3725, lat: 28.54388 },
-  betaDeg: -0.5,
+  gridDeg: -0.5,
   k: 2,
   bbox: { west: -81.63, south: 28.33, east: -81.26, north: 28.62 },
   // Lake Eola with the downtown towers behind it

@@ -288,6 +288,8 @@ export const esES: Strings = {
     downRight: "El norte queda abajo a la derecha",
     downLeft: "El norte queda abajo a la izquierda",
     letter: "N",
+    toGrid: "Girar el mapa hacia la cuadrícula de calles",
+    toNorth: "Girar el mapa con el norte arriba",
   },
   share: {
     copied: "Enlace copiado",

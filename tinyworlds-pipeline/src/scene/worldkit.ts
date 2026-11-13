@@ -11,7 +11,7 @@ import type { Look, SyntheticBuilder } from "./synthetic.js";
  *
  * A world is drawn with north up, so its geography is written in world coordinates (`e` east,
  * `n` north) and turned into the builder's grid metres here: with the grid at 45° to the compass
- * (`betaDeg: 45`), `p = (e + n)/√2` runs up-right on screen and `q = (e − n)/√2` down-right, which
+ * (`gridDeg: 45`), `p = (e + n)/√2` runs up-right on screen and `q = (e − n)/√2` down-right, which
  * puts east to the right and north straight up. The models themselves are built along the grid,
  * where the renderer draws boxes at their best, so every kit below works in grid metres.
  *

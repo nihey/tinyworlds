@@ -73,6 +73,12 @@ export interface World {
    * sign under "more cities" starts the game. Without it the viewer never asks for the files.
    */
   quiz?: boolean;
+  /**
+   * It is drawn both ways: north up (its data folder) and turned to its street grid, the way
+   * the map was first drawn (a full data set in `grid/` inside it). The compass turns the map
+   * from one to the other. Without it the compass only says where north is.
+   */
+  turn?: "grid";
   /** How queries are read. This follows the language of the map's names, not the interface's. */
   search: SearchRules;
 }
