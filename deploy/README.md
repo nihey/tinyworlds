@@ -59,7 +59,9 @@ Any host that can run containers works.
 
 The front page is `site/index.html`; each world is a folder beside it (`site/tinynyc/`,
 `site/tinyrao/`). `nginx.conf` matches worlds by pattern, so adding one needs no configuration
-change.
+change. An address with nothing behind it is answered with the front page's `site/404.html`
+(`error_page`, status 404), which reads the address and offers what it can; a missing tile,
+index or script keeps nginx's plain 404.
 
 **API**
 

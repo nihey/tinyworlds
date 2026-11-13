@@ -10,6 +10,8 @@ export const esES: Strings = {
     startSomewhere: "Empieza por aquí",
     nothing: "No hay nada en el mapa con ese nombre.",
     stillLoading: "Los lugares aún se están cargando…",
+    openMap: "Abrir el mapa de {city}",
+    otherMap: "Otro mapa",
   },
   tools: {
     navLabel: "Herramientas del mapa",
@@ -66,6 +68,8 @@ export const esES: Strings = {
     ranking: "Construye la próxima ciudad",
     funded: "Meta alcanzada",
     rankingEmpty: "Todavía no hay donaciones: la primera pone su ciudad en cabeza.",
+    rankingEmptyWaiting:
+      "Todavía no hay donaciones, así que las ciudades van según cuántas personas las esperan. La primera donación pone su ciudad en cabeza.",
     donateTo: "Donar para {city}",
     benefactorsOf: "Benefactores de {city}",
     visits: { one: "{n} visita", other: "{n} visitas" },
@@ -135,6 +139,7 @@ export const esES: Strings = {
     amount: "Importe",
     customAmount: "Otro importe, en dólares",
     customPlaceholder: "Otro",
+    amountRange: "Cualquier importe de {min} a {max}.",
     progress: "{raised} de {goal}",
     preview: "{raised} + {added} de {goal}",
     fills: "Con esto se llena la barra: la ciudad se construye.",
@@ -175,6 +180,7 @@ export const esES: Strings = {
         },
       },
       stonesLaid: "{laid} de {total} piedras colocadas",
+      goal: "Meta: {goal}",
       firstUnclaimed: "La Primera Piedra sigue sin dueño",
       raised: "{amount} recaudados",
       fundedInFull: "Meta alcanzada",
@@ -647,6 +653,17 @@ export const esES: Strings = {
     updated: "Actualizado el {date}",
     contents: "En esta página",
     summary: "En resumen",
+  },
+  notFound: {
+    title: "No hay nada en esta dirección",
+    body: "Puede que la página se haya movido, o que la dirección tenga una errata. Todas las ciudades del mapa están en la portada.",
+    everyCity: "Ver todas las ciudades",
+    cityTitle: "{city} todavía no está en el mapa",
+    cityBody:
+      "Una ciudad se construye cuando las donaciones para ella llegan a {goal}, las más financiadas primero.",
+    cityHas: "{city} ya tiene {raised}.",
+    cityNone: "Nadie ha donado a {city} todavía: la primera donación coloca su Primera Piedra.",
+    worldBody: "¿Buscas {city}? Su mapa está aquí:",
   },
   errors: {
     answered: (url, status) => `${url} respondió ${status}`,

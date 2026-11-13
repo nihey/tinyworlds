@@ -24,6 +24,26 @@ export interface SearchIndex {
   suggest(limit?: number): Place[];
 }
 
+/**
+ * The rank the pipeline gives a point of interest (`index/build.ts`): a pin from crowd-sourced
+ * places, the least sure kind of entry. One that bears the name of a better-ranked entry is a
+ * copy of it, often dropped kilometres away ("Magic Kingdom" at a hotel, "Epcot" downtown).
+ */
+export const PIN_RANK = 34;
+
+/** The kinds of entry that are one thing in one spot, so two of one name are likely one thing. */
+const FOLDED: ReadonlySet<Place["t"]> = new Set(["landmark", "place", "museum"]);
+
+/** Two entries of one name closer than this are one place listed twice. */
+const SAME_PLACE_KM = 1;
+
+/** Ground distance in km, near enough for a city. */
+function km(a: Place, b: Place): number {
+  const x = (a.lon - b.lon) * Math.cos(((a.lat + b.lat) / 360) * Math.PI) * 111.32;
+  const y = (a.lat - b.lat) * 110.57;
+  return Math.hypot(x, y);
+}
+
 /** Matches nothing: for languages that do not write "d'" or "l'" onto the next word. */
 const NO_ELISION = /(?!)/g;
 
@@ -87,6 +107,8 @@ function wordMatch(token: string, word: string): 0 | 1 | 2 | 3 {
 interface Entry {
   place: Place;
   name: string;
+  /** the name without the city's own words at its end ("magic kingdom" of "Magic Kingdom Orlando Fl") */
+  core: string;
   words: string[];
   context: string[];
   /** first letters of the words, with and without the small ones: "moma" and "mma" */
@@ -95,12 +117,32 @@ interface Entry {
 
 export function createSearchIndex(places: Place[], rules: SearchRules = WORLD.search): SearchIndex {
   const initialsSkip = new Set(rules.initialsSkip);
+  // longest first, so "orlando fl" goes before "fl" would leave "orlando"
+  const home = (rules.home ?? [])
+    .map((words) => normalize(words, rules))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  /** A normalized name without the city's own words at its end; never nothing. */
+  const withoutHome = (text: string): string => {
+    let rest = text;
+    for (let cut = true; cut;) {
+      cut = false;
+      for (const words of home)
+        if (rest.endsWith(` ${words}`)) {
+          rest = rest.slice(0, -words.length - 1);
+          cut = true;
+        }
+    }
+    return rest;
+  };
+
   const entries: Entry[] = places.map((place) => {
     const name = normalize(place.n, rules);
     const words = name.split(" ").filter(Boolean);
     return {
       place,
       name,
+      core: withoutHome(name),
       words,
       context: place.b ? normalize(place.b, rules).split(" ").filter(Boolean) : [],
       initials: [
@@ -114,6 +156,40 @@ export function createSearchIndex(places: Place[], rules: SearchRules = WORLD.se
   });
 
   const byRank = [...places].sort((a, b) => b.r - a.r || a.n.localeCompare(b.n));
+  // the copies: an entry of the same name as a better-ranked one (once the city's own words at
+  // the end are dropped) that is a pin, or stands within a kilometre of it, is that one again
+  const leads = new Map<string, Place>();
+  const copyOf = new Map<Place, Place>();
+  for (const entry of [...entries].sort((a, b) => b.place.r - a.place.r)) {
+    if (!FOLDED.has(entry.place.t)) continue;
+    const lead = leads.get(entry.core);
+    if (!lead) leads.set(entry.core, entry.place);
+    else if (
+      (entry.place.r <= PIN_RANK && entry.place.r < lead.r) ||
+      km(entry.place, lead) < SAME_PLACE_KM
+    )
+      copyOf.set(entry.place, lead);
+  }
+
+  /**
+   * One row per place: a copy that matched gives way to the entry it copies, which then stands
+   * where the copy matched best ("Magic Kingdom Orlando Fl" becomes the Magic Kingdom); a copy
+   * of something the query did not find is left out.
+   */
+  function fold(hits: SearchHit[]): SearchHit[] {
+    const found = new Set(hits.map((hit) => hit.place));
+    const shown = new Set<Place>();
+    const out: SearchHit[] = [];
+    for (const hit of hits) {
+      const lead = copyOf.get(hit.place);
+      if (lead && !found.has(lead)) continue;
+      const place = lead ?? hit.place;
+      if (shown.has(place)) continue;
+      shown.add(place);
+      out.push(lead ? { place, tier: hit.tier } : hit);
+    }
+    return out;
+  }
 
   function tierOf(entry: Entry, query: string, tokens: string[][]): MatchTier | 0 {
     if (entry.name === query) return 6;
@@ -168,10 +244,19 @@ export function createSearchIndex(places: Place[], rules: SearchRules = WORLD.se
     search(rawQuery, limit = 8) {
       const query = normalize(rawQuery, rules);
       if (!query) return [];
-      const tokens = query.split(" ").map((t) => [t, ...(rules.abbreviations[t] ?? [])]);
+      const tokensOf = (text: string) =>
+        text.split(" ").map((t) => [t, ...(rules.abbreviations[t] ?? [])]);
+      const tokens = tokensOf(query);
+      // "magic kingdom orlando fl" is also read as "magic kingdom", a tier below what was typed
+      const bare = withoutHome(query);
+      const bareTokens = bare !== query ? tokensOf(bare) : null;
       const hits: SearchHit[] = [];
       for (const entry of entries) {
-        const tier = tierOf(entry, query, tokens);
+        let tier = tierOf(entry, query, tokens);
+        if (bareTokens) {
+          const loose = tierOf(entry, bare, bareTokens);
+          if (loose >= 3 && loose - 1 > tier) tier = (loose - 1) as MatchTier;
+        }
         if (tier) hits.push({ place: entry.place, tier });
       }
       hits.sort(
@@ -181,7 +266,7 @@ export function createSearchIndex(places: Place[], rules: SearchRules = WORLD.se
           a.place.n.length - b.place.n.length ||
           a.place.n.localeCompare(b.place.n),
       );
-      return hits.slice(0, limit);
+      return fold(hits).slice(0, limit);
     },
     suggest(limit = 6) {
       return byRank.slice(0, limit);

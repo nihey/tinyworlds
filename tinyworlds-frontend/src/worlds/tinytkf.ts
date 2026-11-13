@@ -84,6 +84,8 @@ export const tinytkf: World = {
   sights: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["truckee", "ca", "california", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-80" is read as "i 80", "SR 89" as "sr 89"

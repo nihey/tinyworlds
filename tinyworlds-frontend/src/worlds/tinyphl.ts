@@ -84,6 +84,8 @@ export const tinyphl: World = {
   quiz: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["philadelphia", "philly", "pa", "pennsylvania", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-95" is read as "i 95", "PA 611" as "pa 611"

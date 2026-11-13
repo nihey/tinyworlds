@@ -1,13 +1,16 @@
 "use client";
 
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, Map as MapGlyph, Search, X } from "lucide-react";
 import { useId, useMemo, useState, type KeyboardEvent, type RefObject } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/hooks/use-i18n";
 import { cn } from "@/lib/utils";
+import { siteEvent } from "@/lib/site-events";
 import type { Place } from "@/map/manifest";
+import { findWorlds } from "@/map/other-worlds";
 import type { SearchIndex } from "@/map/search";
-import { HOME_URL } from "@/site";
+import { HOME_URL, SITE_ID, worldUrl } from "@/site";
+import type { World } from "@/worlds";
 import { PlaceBullet, placeLabel } from "./place-types";
 import { Wordmark } from "./wordmark";
 
@@ -26,9 +29,27 @@ interface SearchSignProps {
   style?: React.CSSProperties;
 }
 
+/** A row of the results: a place on this map, or another map the query names. */
+type Row = { kind: "place"; place: Place } | { kind: "world"; world: World };
+
+/** The round badge of another map: a map, in that world's colours. */
+function WorldBullet({ world }: { world: World }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full"
+      style={{ background: world.accent.color, color: world.accent.ink }}
+    >
+      <MapGlyph size={14} strokeWidth={2.4} />
+    </span>
+  );
+}
+
 /**
  * The sign in the corner: the way back to the front page, the wordmark, and a search box that
- * opens downwards into results.
+ * opens downwards into results. Besides this map's places, a search that names another of the
+ * site's maps offers it ("Winterfell" on the map of Westeros opens Winterfell's own), placed
+ * among the places by how well it matches.
  */
 export function SearchSign({
   index,
@@ -42,22 +63,39 @@ export function SearchSign({
   style,
 }: SearchSignProps) {
   const listId = useId();
-  const { t, copy } = useI18n();
+  const { t, copy, locale } = useI18n();
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(0);
 
   const typed = query.trim() !== "";
-  const results = useMemo<Place[]>(() => {
-    if (!index) return [];
-    return typed ? index.search(query, 8).map((hit) => hit.place) : index.suggest(6);
+  const results = useMemo<Row[]>(() => {
+    if (!typed) return index ? index.suggest(6).map((place) => ({ kind: "place", place })) : [];
+    const places = index ? index.search(query, 8) : [];
+    const worlds = findWorlds(query, SITE_ID);
+    // a map comes before the places that match less well than its name does
+    const rows: Row[] = [];
+    let next = 0;
+    for (const hit of places) {
+      while (next < worlds.length && worlds[next].tier > hit.tier)
+        rows.push({ kind: "world", world: worlds[next++].world });
+      rows.push({ kind: "place", place: hit.place });
+    }
+    for (const hit of worlds.slice(next)) rows.push({ kind: "world", world: hit.world });
+    return rows;
   }, [index, query, typed]);
 
   const open = focused && !unavailable && (results.length > 0 || typed);
   const current = Math.min(active, results.length - 1);
 
-  const choose = (place: Place) => {
-    onQueryChange(place.n);
-    onChoose(place);
+  const choose = (row: Row) => {
+    if (row.kind === "world") {
+      // another build of the site: the page is left for it
+      siteEvent("explore_more", { world: SITE_ID });
+      window.location.assign(worldUrl(row.world.id));
+      return;
+    }
+    onQueryChange(row.place.n);
+    onChoose(row.place);
     inputRef.current?.blur();
   };
 
@@ -184,29 +222,39 @@ export function SearchSign({
             {t.search.startSomewhere}
           </p>
         )}
-        {results.map((place, i) => {
+        {results.map((row, i) => {
+          const on = i === current;
+          const world = row.kind === "world" ? row.world : null;
+          const place = row.kind === "place" ? row.place : null;
           return (
             <div
-              key={`${place.t}:${place.n}:${place.lon}:${place.lat}`}
+              key={
+                world ? `world:${world.id}` : `${place?.t}:${place?.n}:${place?.lon}:${place?.lat}`
+              }
               id={`${listId}-${i}`}
               role="option"
-              aria-selected={i === current}
-              onPointerMove={() => i !== current && setActive(i)}
-              onClick={() => choose(place)}
+              aria-selected={on}
+              onPointerMove={() => !on && setActive(i)}
+              onClick={() => choose(row)}
+              data-rybbit-event={world ? "explore_more" : undefined}
+              data-rybbit-prop-world={world ? SITE_ID : undefined}
               className={cn(
                 "relative flex cursor-pointer items-center gap-3 py-1.5 pr-3.5 pl-3.5",
-                i === current && "bg-sign-raised",
+                on && "bg-sign-raised",
               )}
             >
-              {i === current && (
+              {on && (
                 <span aria-hidden className="absolute inset-y-1 left-0 w-[3px] rounded-r bg-taxi" />
               )}
-              <PlaceBullet type={place.t} />
+              {world && <WorldBullet world={world} />}
+              {place && <PlaceBullet type={place.t} />}
               <span className="min-w-0 flex-1 truncate text-[14.5px] leading-tight font-medium">
-                {place.n}
+                {world && t.search.openMap.replace("{city}", world.copy[locale].city)}
+                {place?.n}
               </span>
               <span className="max-w-[45%] shrink-0 truncate text-xs text-paper-dim">
-                {place.b && place.b !== place.n ? place.b : placeLabel(place.t, t, copy)}
+                {world && t.search.otherMap}
+                {place && (place.b && place.b !== place.n ? place.b : placeLabel(place.t, t, copy))}
               </span>
             </div>
           );

@@ -82,6 +82,15 @@ export const tinyvlc: World = {
   accent: { color: "#ffa62b", ink: "#241300" },
   search: {
     ...ES_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: [
+      "valencia",
+      "valencian community",
+      "comunitat valenciana",
+      "comunidad valenciana",
+      "espana",
+      "spain",
+    ],
     abbreviations: {
       ...ES_RULES.abbreviations,
       // how the city's best-known places are shortened

@@ -112,6 +112,7 @@ src/
 │                        # pages: page.map.tsx (a world) and page.home.tsx (the front page);
 │                        # admin/page.home.tsx: the admin pages, in the front page's build only;
 │                        # lists/leave/page.home.tsx: what a mail's leave link opens;
+│                        # not-found.home.tsx: the site's 404.html (an address that leads nowhere);
 │                        # hall-of-fame/page.home.tsx and hall-of-fame/[city]/page.home.tsx:
 │                        # the hall of fame and a city's own, likewise; terms/page.home.tsx and
 │                        # privacy/page.home.tsx: the terms of service and the privacy policy
@@ -129,6 +130,7 @@ src/
 │   ├── projection.ts    # lon/lat ↔ map px
 │   ├── bitset.ts tiles.ts hash.ts hoods.ts data.ts
 │   ├── search.ts search-rules.ts   # matching; per-language abbreviations and number forms
+│   ├── other-worlds.ts  # the site's other maps a search names ("Winterfell" on Westeros)
 │   ├── engine.ts        # MapEngine
 │   ├── life.ts          # ferries and flights
 │   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
@@ -198,6 +200,15 @@ src/
 - `next.config.ts` makes exactly one of `page.map.tsx` / `page.home.tsx` a page (through
   `pageExtensions`), by `NEXT_PUBLIC_WORLD`. So the front page ships no map engine and a map
   ships no front page. Do not import one from the other.
+- **An address that leads nowhere** gets the front page's `404.html` (`app/not-found.home.tsx`,
+  `components/home/not-found-page.tsx`; `error_page` in `deploy/nginx.conf`, still a 404,
+  `noindex`). A world's address is easy to guess, so the page reads it (`guessAddress` in
+  `lib/not-found.ts`): `/tinyparis/` (or `/paris/`, `/tinysaopaulo/`) names a city that is not
+  built, by the ranking's names and slugs or the catalogue's spellings, and the page says so,
+  with what it has of its goal and "Donate to Paris", which opens the donate sign with it
+  chosen; `/tinynewyork/` or a page under a world (`/tinynyc/old/`) links to that world's map;
+  anything else says there is nothing there, with the list of cities and the empty lot's
+  "A city that is not here?". Nothing is guessed while it is prerendered.
 - **`src/worlds/`** is the registry: `WORLDS` lists every world in the order the front page shows
   them. Adding a world = one file there, one entry in `WORLDS`, a data set and a share card
   (`public/og/<id>.jpg`); the front page, the build check and the tests follow.
@@ -323,6 +334,14 @@ src/
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
   link back to the front page (`NEXT_PUBLIC_HOME_URL`).
+- **The search knows the other maps** (`findWorlds` in `map/other-worlds.ts`): a query that
+  names another world, in any of the interface's languages and typed loosely ("Winterfell",
+  "Invernalia", "kingslanding", "dall"), adds "Open the Winterfell map" to the results, in that
+  world's colours, ranked among the places by how well its name matches (a whole name comes
+  before places that only start with the query). Choosing it leaves for that world's own build.
+  So the map of Westeros leads to the detailed Winterfell and King's Landing, and they back to
+  it; any map leads to any city by its name. At most two, from three letters; never the map
+  it is on. Analytics hook: `explore_more`, as the banner.
 - **The invitation to the other places** (`components/map/explore-banner.tsx`): a small sign
   under the search box, "13 more cities and worlds to explore", linking to the front page's
   list (`placesUrl` in `lib/explore.ts`: `/#cities`). Most visitors land on one map and never
@@ -382,6 +401,20 @@ src/
   found. A world adds its own shorthand on top (`tinyvlc`: "ruzafa" ↔ "Russafa", "malvarrosa").
   An alternate written `=word` only matches a whole word. Names and queries are always compared
   unaccented.
+- **One row per place.** Overture's points of interest (rank 34 in `places.json`, `PIN_RANK`)
+  include pins people dropped under a famous name, kilometres off: Orlando has the Magic
+  Kingdom four times, "Epcot" downtown. `createSearchIndex` folds them: among landmarks,
+  places and museums, an entry with the same name as a better-ranked one is a copy of it when
+  it is a pin, or stands within a kilometre of it (the curated entry and the building of the same
+  name). A copy that matched gives way to the entry it copies, which takes its place in the
+  list; a copy of something the query did not find is left out. Parks, streets, stations and
+  areas are never folded: they share names across a city.
+- **The city's own words** (`home` in a world's rules: "orlando", "fl", "florida", "usa") are
+  what people add after a place's name. At the end of a query they are also read past, a tier
+  below what was typed ("Magic Kingdom Orlando FL" finds the Magic Kingdom, "Orlando Magic"
+  still finds the arena first), and at the end of a name they do not make it another place
+  ("Magic Kingdom Orlando Fl" is a copy of the Magic Kingdom). Only at the end: "New York
+  Public Library" and "La Brea" keep their words. The fictional worlds have none.
 - **Accent.** `--taxi` / `--taxi-ink` are set on `<html>` from `SITE_ACCENT` (taxi yellow for
   tinynyc and the front page, `#ff7a3d` for tinyrao, `#3ccfc0` for tinyorl, `#b9a2ff` for tinyfte,
   `#ffa62b` for tinyvlc, `#ff4fa3` for tinylas, `#55aaff` for tinylax, `#6ee05a` for tinydal,
@@ -404,8 +437,8 @@ Optional, and never in the way: with nothing configured there is no heart, no di
 - **The API** (`NEXT_PUBLIC_API_URL`, `tinyworlds-api`): `cityMilestones` lists the cities being
   funded (each is built when its bar is full) and `createDonationCheckout` opens a checkout for
   `{ city, amountCents, world, locale, returnUrl }`: the city is one being funded, any other
-  (≤ 60 chars) or none; `amountCents` is what was chosen here (US$1 to US$10,000, whole
-  dollars). The checkout returns to `returnUrl?donated=1|0`; `useDonationReturn` thanks the donor
+  (≤ 60 chars) or none; `amountCents` is what was chosen here (US$1 to US$10,000, cents and
+  all). The checkout returns to `returnUrl?donated=1|0`; `useDonationReturn` thanks the donor
   and removes the marker.
 - **The donate sign** (`components/donate/donate-dialog.tsx`), with the API:
   - `city-picker.tsx`: a searchable combobox (Popover + cmdk `Command`, filtering done by
@@ -416,7 +449,13 @@ Optional, and never in the way: with nothing configured there is no heart, no di
     city; "Other city…" turns the control into a text field. The catalogue's `alt` spellings
     ("Londres", "Lisboa") only help the search: what is sent is the English `name`, so one city
     does not collect under two names.
-  - `amount-picker.tsx`: chips for US$5/10/25/50/100 and a field for any other whole amount.
+  - `amount-picker.tsx`: chips for US$5/10/25/50/100 and a field for any other amount, read
+    by `parseAmountCents`: a separator followed by one or two digits at the end is the decimal
+    point in every language ("7.50", "7,5"), otherwise "." and "," group thousands, except that
+    in English "." is always the point; rounded to the cent. Nothing typed is ever quietly
+    changed into another sum: outside US$1 to US$10,000 the field is marked, a line says the
+    limits and Donate waits. The button and the preview write the amount with `formatAmount`
+    ("Donate $7.50"); totals elsewhere keep `formatUsd`'s whole dollars.
   - `funding-preview.tsx`: the chosen city's bar with the donation about to be made added to
     it in stripes (`previewBar`), and what that means: it fills the bar, or lands above the
     goal. With no city chosen there is no bar, only a line.
@@ -437,9 +476,13 @@ Optional, and never in the way: with nothing configured there is no heart, no di
     joins the group if its gifts ever reach its goal, which is why the card never says
     "built by". Six before a "show all" of their own (`BUILT_LIMIT`).
   - **Funded** (`FUNDED` and `BUILDING`), as before.
-  - **Being funded**, numbered, most funded first, eight before "show all"
-    (`RANKING_LIMIT`), and last an empty lot, "A city that is not here?", which opens the
-    donate sign with no city chosen.
+  - **Being funded**, most funded first and, among equals, the most people waiting for it
+    (`waiting`: "Tell me" is the free vote), eight before "show all" (`RANKING_LIMIT`), and
+    last an empty lot, "A city that is not here?", which opens the donate sign with no city
+    chosen. **Only a city with money has a number**: a place among cities at nothing would mean
+    nothing. A city nobody has given to shows its goal ("$30 goal"), not "$0 of $30"; while
+    nobody has given to any, a line says the order is how many are waiting (when some are) and
+    that the first donation puts its city at the top.
 - **A city's card** shows its bar as **its foundation, a stone per dollar** (`StoneWall`,
   `cityStones` in `lib/stones.ts`: `ceil(goal / 100)` stones, `floor(raised / 100)` laid, all
   of them once the goal is reached; fifteen to a row, the first and last marked like the

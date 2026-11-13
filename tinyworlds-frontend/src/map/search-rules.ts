@@ -22,6 +22,13 @@ export interface SearchRules {
    * found. Without this the apostrophe is simply dropped ("Patrick's" → "patricks").
    */
   elision?: RegExp;
+  /**
+   * How the place names itself after another name: the city, its state, its country ("Magic
+   * Kingdom Orlando FL", "Wynn Las Vegas"). Trailing ones say nothing about which place is
+   * meant: a query ending in them is also read without them, and an entry whose name only adds
+   * them to another's is that other (see `createSearchIndex`). Written as the search normalizes.
+   */
+  home?: string[];
 }
 
 export const EN_RULES: SearchRules = {

@@ -83,6 +83,8 @@ export const tinydal: World = {
   quiz: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["dallas", "tx", "texas", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-35E" is read as "i 35e", "IH 30" as "ih 30", "SH 183" as "sh 183"

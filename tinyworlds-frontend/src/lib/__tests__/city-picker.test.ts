@@ -379,6 +379,22 @@ describe("rankCities", () => {
     ]);
   });
 
+  it("puts the cities more people are waiting for first among those with the same money", () => {
+    const zero = [
+      city({ name: "Paris", waiting: 2 }),
+      city({ name: "Austin" }),
+      city({ name: "London", waiting: 5 }),
+      city({ name: "Lima", raisedCents: 100 }),
+    ];
+    // money still comes first: one dollar is ahead of five people waiting
+    expect(rankCities(zero).ranked.map((c) => c.name)).toEqual([
+      "Lima",
+      "London",
+      "Paris",
+      "Austin",
+    ]);
+  });
+
   it("keeps built cities out of the funded and the ranked", () => {
     const { funded, ranked } = rankCities(cities);
     const built = ["New York", "Cincinnati", "Dallas", "Orlando"];

@@ -81,6 +81,8 @@ export const tinyrao: World = {
   accent: { color: "#ff7a3d", ink: "#1f0d03" },
   search: {
     ...PT_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["ribeirao preto", "ribeirao", "rp", "sp", "sao paulo", "brasil", "brazil"],
     abbreviations: {
       ...PT_RULES.abbreviations,
       rib: ["ribeirao"],

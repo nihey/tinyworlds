@@ -201,7 +201,11 @@ export function BuildNext({
             <div className="pt-5" />
           )}
           {!anyRaised && ranked.length > 0 && (
-            <p className="pb-2 text-sm leading-relaxed text-taxi">{t.home.rankingEmpty}</p>
+            <p className="pb-2 text-sm leading-relaxed text-taxi">
+              {ranked.some((city) => city.waiting > 0)
+                ? t.home.rankingEmptyWaiting
+                : t.home.rankingEmpty}
+            </p>
           )}
           <ol className={GRID}>
             {shownRanked.map((city, i) => (

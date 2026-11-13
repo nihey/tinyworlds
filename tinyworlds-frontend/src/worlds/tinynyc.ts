@@ -81,6 +81,8 @@ export const tinynyc: World = {
   quiz: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["new york city", "new york", "nyc", "ny", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       bklyn: ["brooklyn"],

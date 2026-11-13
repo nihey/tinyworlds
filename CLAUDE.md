@@ -141,6 +141,11 @@ Each sub-project has its own `CLAUDE.md`.
   (`tinyworlds-frontend/public/email/`), the city's picture its real share card; `SITE_URL` is
   where they are. A mail never holds up or undoes a donation, a deploy or a sign-in, and goes
   only to the person's own address (`tinyworlds-api/CLAUDE.md`, Mails).
+- **An address that leads nowhere is answered.** A world's address is easy to guess, so the web
+  server answers any address it has nothing for with the front page's `404.html` (still a 404),
+  which reads it: a city that is not built (`/tinyparis/`) is offered to fund, with Donate opening
+  on it; a map's name or a page under one links to that map; anything else leads to the cities
+  (`tinyworlds-frontend/CLAUDE.md`, Targets).
 - **The front page moves.** Its hero goes round every world, one slide each, and each world's
   card plays a short silent loop; all are made by `tinyworlds-videos` from the world's own
   tiles and play over a still. They are the front page's own files, so nothing but its build
@@ -265,7 +270,9 @@ type Place = {
   t: "borough" | "hood" | "landmark" | "park" | "bridge" | "museum" | "station" | "street" | "place";
   lon: number; lat: number;
   b?: string;                   // context line: borough, zone, …
-  r: number;                    // rank, higher first on ties
+  r: number;                    // rank, higher first on ties; 34 is a point of interest (a pin
+                                // from crowd-sourced places, the least sure: the viewer's search
+                                // folds one that bears a better-ranked entry's name into it)
   s?: number;                   // suggested scale when flying there
 };
 // file: { places: Place[] }
