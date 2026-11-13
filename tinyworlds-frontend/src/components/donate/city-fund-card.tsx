@@ -31,7 +31,10 @@ type NameLevel = "h3" | "h4";
 
 interface CityFundCardProps {
   city: CityMilestone;
-  /** its place among the cities still collecting; none for one that reached its goal */
+  /**
+   * its place among the cities still collecting; none for one that reached its goal. Shown only
+   * once the city has money: a place among cities at nothing would mean nothing
+   */
   place?: number;
   onDonate: (city: string) => void;
   onBenefactors: (slug: string) => void;
@@ -58,7 +61,9 @@ export function CityFundCard({
 }: CityFundCardProps) {
   const { t, locale } = useI18n();
   const stones = cityStones(city.raisedCents, city.goalCents);
-  const sum = t.donate.progress
+  const given = city.raisedCents > 0;
+  // "$0 of $30" on every card says nothing: until the first gift, what it takes
+  const sum = (given ? t.donate.progress : t.donate.build.goal)
     .replace("{raised}", formatUsd(city.raisedCents, locale))
     .replace("{goal}", formatUsd(city.goalCents, locale));
   const status = statusLabel(city, t);
@@ -70,15 +75,17 @@ export function CityFundCard({
         {place === undefined ? (
           <BadgeCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-taxi" strokeWidth={2.5} />
         ) : (
-          <span
-            aria-hidden
-            className={cn(
-              "shrink-0 text-sm leading-5 font-bold tabular-nums",
-              place <= 3 && city.raisedCents > 0 ? "text-taxi" : "text-paper-dim",
-            )}
-          >
-            {place}
-          </span>
+          given && (
+            <span
+              aria-hidden
+              className={cn(
+                "shrink-0 text-sm leading-5 font-bold tabular-nums",
+                place <= 3 ? "text-taxi" : "text-paper-dim",
+              )}
+            >
+              {place}
+            </span>
+          )
         )}
         <Name className={NAME}>{city.name}</Name>
         <span className={cn(SUM, "leading-5")}>{sum}</span>
@@ -90,7 +97,7 @@ export function CityFundCard({
             <span className="font-semibold text-taxi">{status}</span>
             <span>· {donations}</span>
           </>
-        ) : city.raisedCents > 0 ? (
+        ) : given ? (
           <span>
             {t.donate.build.stonesLaid
               .replace("{laid}", String(stones.laid))

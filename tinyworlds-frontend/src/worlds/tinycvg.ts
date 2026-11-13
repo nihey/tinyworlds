@@ -83,6 +83,8 @@ export const tinycvg: World = {
   quiz: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["cincinnati", "oh", "ohio", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-71" is read as "i 71", "SR 562" as "sr 562", "US 52" stays as it is

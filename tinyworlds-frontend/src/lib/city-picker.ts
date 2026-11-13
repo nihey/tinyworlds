@@ -194,8 +194,9 @@ export interface Ranking {
  * wait, and the ones still collecting.
  */
 export function rankCities(milestones: CityMilestone[]): Ranking {
+  // money first; among equals, how many people asked to hear when it is built (the free vote)
   const byFunding = (a: CityMilestone, b: CityMilestone) =>
-    b.raisedCents - a.raisedCents || a.name.localeCompare(b.name);
+    b.raisedCents - a.raisedCents || b.waiting - a.waiting || a.name.localeCompare(b.name);
   const open = milestones.filter(selectable);
   return {
     built: milestones

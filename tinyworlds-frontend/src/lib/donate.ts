@@ -164,7 +164,7 @@ export const CITY_MAX = 60;
 // amounts
 // ---------------------------------------------------------------------------------------------
 
-/** Whole US dollars: what the chips offer, and the limits of what may be typed. */
+/** Whole US dollars: what the chips offer, and the limits of what may be given (the API's). */
 export const AMOUNT_PRESETS = [5, 10, 25, 50, 100] as const;
 export const AMOUNT_MIN = 1;
 export const AMOUNT_MAX = 10000;
@@ -175,14 +175,45 @@ export function clampAmount(dollars: number): number {
   return Math.min(AMOUNT_MAX, Math.max(AMOUNT_MIN, Math.round(dollars)));
 }
 
+/** Whether an amount in cents may be given: from US$1 to US$10,000. */
+export const amountInRange = (cents: number): boolean =>
+  Number.isFinite(cents) && cents >= AMOUNT_MIN * 100 && cents <= AMOUNT_MAX * 100;
+
 /**
- * What someone typed as an amount → whole dollars within the limits, or null when there is no
- * number in it. "25", "$25" and "25.00" are all twenty-five: only the whole part is read.
+ * What someone typed as an amount → US cents, rounded to the cent, or null when there is no
+ * number in it. It is not held to the limits: the sign says when it is outside them, rather than
+ * quietly giving something else. A separator followed by one or two digits at the end is the
+ * decimal point, whatever the language ("7.50", "7,5", "1.000,50", "1,000.50"); otherwise "." and
+ * "," group thousands ("1,000", "1.000"), except that in English a "." is always the decimal
+ * point. "$", spaces and anything else that is no digit are ignored.
  */
-export function parseAmount(text: string): number | null {
-  const whole = /\d+/.exec(text)?.[0];
-  if (!whole) return null;
-  return clampAmount(Number(whole));
+export function parseAmountCents(text: string, locale: Locale): number | null {
+  const kept = text.replace(/[^\d.,]/g, "");
+  if (!/\d/.test(kept)) return null;
+  let whole = kept;
+  let fraction = "";
+  const tail = /^(.*)[.,](\d{1,2})$/.exec(kept);
+  if (tail) {
+    whole = tail[1];
+    fraction = tail[2];
+  } else if (locale === "en-US" && kept.includes(".")) {
+    const point = kept.lastIndexOf(".");
+    whole = kept.slice(0, point);
+    fraction = kept.slice(point + 1);
+  }
+  const digits = (part: string) => part.replace(/[.,]/g, "") || "0";
+  return Math.round(Number(`${digits(whole)}.${digits(fraction)}`) * 100);
+}
+
+/** An amount being given, the way the visitor's language writes it: with cents only when it has some ("$7.50", "$10"). */
+export function formatAmount(cents: number, locale: Locale): string {
+  const digits = cents % 100 === 0 ? 0 : 2;
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(cents / 100);
 }
 
 export interface CheckoutInput {
@@ -208,7 +239,7 @@ export function chosenCity(choice: Choice): string | null {
 
 export function checkoutInput(
   choice: Choice,
-  amountDollars: number | null,
+  amountCents: number | null,
   world: string,
   locale: Locale,
   returnUrl: string,
@@ -217,7 +248,12 @@ export function checkoutInput(
 ): CheckoutInput {
   return {
     city: chosenCity(choice),
-    amountCents: amountDollars === null ? null : clampAmount(amountDollars) * 100,
+    amountCents:
+      amountCents === null
+        ? null
+        : Number.isFinite(amountCents)
+          ? Math.min(AMOUNT_MAX * 100, Math.max(AMOUNT_MIN * 100, Math.round(amountCents)))
+          : AMOUNT_MIN * 100,
     world,
     locale,
     returnUrl,

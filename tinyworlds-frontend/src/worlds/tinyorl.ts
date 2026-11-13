@@ -81,6 +81,8 @@ export const tinyorl: World = {
   accent: { color: "#3ccfc0", ink: "#04211e" },
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["orlando", "fl", "florida", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-4" is read as "i 4", "SR 408" as "sr 408"

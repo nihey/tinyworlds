@@ -81,6 +81,8 @@ export const tinyfte: World = {
   accent: { color: "#b9a2ff", ink: "#1a1038" },
   search: {
     ...ES_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["el calafate", "calafate", "santa cruz", "patagonia", "argentina"],
     abbreviations: {
       ...ES_RULES.abbreviations,
       // the town's main street and the park people come for

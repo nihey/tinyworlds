@@ -86,6 +86,8 @@ export const tinycos: World = {
   quiz: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["colorado springs", "co", "colorado", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-25" is read as "i 25"

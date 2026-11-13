@@ -16,12 +16,16 @@ import { cleanName } from "@/lib/benefactors";
 import { defaultGoal, findMilestone, previewBar, withGoal } from "@/lib/city-picker";
 import {
   AMOUNT_DEFAULT,
+  AMOUNT_MAX,
+  AMOUNT_MIN,
   API_URL,
+  amountInRange,
   checkoutInput,
   chosenCity,
   donateMode,
+  formatAmount,
   formatUsd,
-  parseAmount,
+  parseAmountCents,
   paymentLinkFor,
   returnUrlOf,
   type Choice,
@@ -68,6 +72,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
   const cityLabel = useId();
   const amountLabel = useId();
   const nameHintId = useId();
+  const amountHintId = useId();
   const link = paymentLinkFor(locale, SITE_ID);
   const { state: list, cities } = useMilestones();
   const [choice, setChoice] = useState<Choice>(
@@ -90,8 +95,12 @@ function DonateBody({ city: opening }: { city: string | null }) {
 
   const mode = donateMode({ api: API_URL !== "", link: link !== null, list, checkoutFailed });
   // what is typed counts as soon as it is a number; until then the last chip stands
-  const amount = (custom !== "" ? parseAmount(custom) : null) ?? preset;
-  const amountCents = amount * 100;
+  const typedCents = custom !== "" ? parseAmountCents(custom, locale) : null;
+  const amountCents = typedCents ?? preset * 100;
+  // an amount outside the limits is said so, never quietly changed into another
+  const amountOff = !amountInRange(amountCents);
+  // in dollars, for the page analytics
+  const amount = amountCents / 100;
   const name = chosenCity(choice);
   const known = name ? findMilestone(cities, name) : null;
   // the chosen city as it stands: one nobody has given to yet stands at zero
@@ -115,7 +124,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
       // with the visit, so the API can note that it reached the checkout, and which donation it made
       const input = checkoutInput(
         choice,
-        amount,
+        amountCents,
         SITE_ID,
         locale,
         returnUrlOf(window.location),
@@ -204,8 +213,9 @@ function DonateBody({ city: opening }: { city: string | null }) {
               </span>
               <AmountPicker
                 labelledBy={amountLabel}
-                amount={amount}
+                preset={preset}
                 custom={custom}
+                invalid={amountOff ? { describedBy: amountHintId } : undefined}
                 onPreset={(dollars) => {
                   setPreset(dollars);
                   setCustom("");
@@ -215,6 +225,17 @@ function DonateBody({ city: opening }: { city: string | null }) {
                 locale={locale}
                 t={t}
               />
+              {amountOff && (
+                <p
+                  id={amountHintId}
+                  role="status"
+                  className="pt-2 text-[13px] leading-snug text-taxi"
+                >
+                  {t.donate.amountRange
+                    .replace("{min}", formatUsd(AMOUNT_MIN * 100, locale))
+                    .replace("{max}", formatUsd(AMOUNT_MAX * 100, locale))}
+                </p>
+              )}
             </div>
 
             {name && (
@@ -233,8 +254,8 @@ function DonateBody({ city: opening }: { city: string | null }) {
             <button
               type="button"
               onClick={checkout}
-              disabled={pending || needsName}
-              aria-describedby={needsName ? nameHintId : undefined}
+              disabled={pending || needsName || amountOff}
+              aria-describedby={needsName ? nameHintId : amountOff ? amountHintId : undefined}
               aria-busy={pending}
               data-rybbit-event="donate_checkout"
               data-rybbit-prop-world={SITE_ID}
@@ -249,7 +270,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
               )}
               {pending
                 ? t.donate.pending
-                : t.donate.actionAmount.replace("{amount}", formatUsd(amountCents, locale))}
+                : t.donate.actionAmount.replace("{amount}", formatAmount(amountCents, locale))}
             </button>
             {checkoutFailed && (
               <p role="alert" className="pt-3 text-center text-xs leading-relaxed text-paper">

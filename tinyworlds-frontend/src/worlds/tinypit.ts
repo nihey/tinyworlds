@@ -84,6 +84,8 @@ export const tinypit: World = {
   quiz: true,
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["pittsburgh", "pgh", "pa", "pennsylvania", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-376" is read as "i 376", "SR 28" as "sr 28", "PA 65" as "pa 65"

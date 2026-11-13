@@ -81,6 +81,8 @@ export const tinylax: World = {
   accent: { color: "#55aaff", ink: "#001a3a" },
   search: {
     ...EN_RULES,
+    // what follows a place's name to say which city it is in: read past at the end of a query
+    home: ["los angeles", "la", "ca", "california", "usa", "united states"],
     abbreviations: {
       ...EN_RULES.abbreviations,
       // "I-10" is read as "i 10", "SR 110" as "sr 110"

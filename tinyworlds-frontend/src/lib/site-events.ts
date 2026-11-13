@@ -27,7 +27,7 @@ export type SiteEventName =
 export interface SiteEventProps {
   world: string;
   city?: string | null;
-  /** whole US dollars */
+  /** US dollars, cents as a fraction (7.5) */
   amount?: number | null;
 }
 

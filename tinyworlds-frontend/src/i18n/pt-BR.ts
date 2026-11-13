@@ -10,6 +10,8 @@ export const ptBR: Strings = {
     startSomewhere: "Comece por aqui",
     nothing: "Nada no mapa com esse nome.",
     stillLoading: "Ainda carregando os lugares…",
+    openMap: "Abrir o mapa de {city}",
+    otherMap: "Outro mapa",
   },
   tools: {
     navLabel: "Ferramentas do mapa",
@@ -66,6 +68,8 @@ export const ptBR: Strings = {
     ranking: "Construa a próxima cidade",
     funded: "Meta batida",
     rankingEmpty: "Ainda não há doações: a primeira coloca a cidade no topo.",
+    rankingEmptyWaiting:
+      "Ainda não há doações, então as cidades seguem quantas pessoas estão esperando por elas. A primeira doação coloca a cidade no topo.",
     donateTo: "Doar para {city}",
     benefactorsOf: "Benfeitores de {city}",
     visits: { one: "{n} visita", other: "{n} visitas" },
@@ -135,6 +139,7 @@ export const ptBR: Strings = {
     amount: "Valor",
     customAmount: "Outro valor, em dólares",
     customPlaceholder: "Outro",
+    amountRange: "Qualquer valor de {min} a {max}.",
     progress: "{raised} de {goal}",
     preview: "{raised} + {added} de {goal}",
     fills: "Com isso a barra enche: a cidade vai ser construída.",
@@ -175,6 +180,7 @@ export const ptBR: Strings = {
         },
       },
       stonesLaid: "{laid} de {total} pedras assentadas",
+      goal: "Meta: {goal}",
       firstUnclaimed: "A Pedra Fundamental ainda não tem dono",
       raised: "{amount} arrecadados",
       fundedInFull: "Meta batida",
@@ -650,6 +656,17 @@ export const ptBR: Strings = {
     updated: "Atualizado em {date}",
     contents: "Nesta página",
     summary: "Em resumo",
+  },
+  notFound: {
+    title: "Nada neste endereço",
+    body: "A página pode ter mudado de lugar, ou o endereço pode ter um erro de digitação. Todas as cidades do mapa estão na página inicial.",
+    everyCity: "Ver todas as cidades",
+    cityTitle: "{city} ainda não está no mapa",
+    cityBody:
+      "Uma cidade é construída quando as doações para ela chegam a {goal}, as mais financiadas primeiro.",
+    cityHas: "{city} já tem {raised}.",
+    cityNone: "Ninguém doou para {city} ainda: a primeira doação assenta a Pedra Fundamental.",
+    worldBody: "Procurando {city}? O mapa está aqui:",
   },
   errors: {
     answered: (url, status) => `${url} respondeu ${status}`,
