@@ -932,13 +932,18 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
   says where north is and what pressing it does (`compass.toGrid`, `compass.toNorth`); in any
   other world it only says where north is.
 - **Turning** (`turn` in `map-app.tsx`) writes the view's centre and zoom into the address bar,
-  empties the session and flips `prefs.view`; the session's effect, which depends on the view,
+  empties the session and flips the tab's `view`; the session's effect, which depends on it,
   points every data URL at the other set (`setMapView`, `viewDataBase` in `map/data.ts`) and
   starts the engine again from the address bar, as a shared link would. A game of Guess the
   building ends first. Nothing of one view is mixed with the other's: `dataUrl()` follows the
   view by default, so the minimap and the quiz follow too.
 - **Remembered per world** in the visitor's preferences (`prefs.view`, `"north"` by default), not
-  in the shared link: a link always opens north up.
+  in the shared link: a link always opens north up. The tab reads it once, when it opens (the
+  view is in no markup before the map is in, so the page still hydrates as prerendered): turning
+  the map in one tab leaves the others as they are.
+- **A street-grid view that does not load** gives way to north up and is forgotten
+  (`prefs.view` back to `"north"`), so no visitor is left on a view whose map never comes and
+  whose compass, the one way out, is never drawn.
 - The About notes say so in each language: north is up, and the compass turns the map the way
   it was first drawn.
 

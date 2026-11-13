@@ -349,6 +349,16 @@ upload() {
       same_render "$target (street grid)" "$data/grid" "$base_path/data/grid" "grid" || return
     fi
   fi
+  # a world drawn both ways sends its street-grid view with its data: without it here, --delete
+  # would empty the server's grid/ and leave its manifest pointing at tiles that are gone
+  if [[ "$target" != "home" && "$mode" != "--no-data" && "$mode" != "--index" ]] &&
+    grep -q 'turn: "grid"' "$FRONTEND/src/worlds/$target.ts" 2>/dev/null &&
+    [[ ! -f "$data/grid/manifest.json" ]]; then
+    echo "Not sending $target's data: it is drawn both ways, and its street-grid view is not" \
+      "here ($data/grid/). Draw it first: 'npm run all -- --city $target --view grid'" \
+      "in tinyworlds-pipeline." >&2
+    return 1
+  fi
   if [[ "$mode" != "--data" ]]; then
     if [[ "$target" == "home" ]]; then
       # the worlds live in folders beside the front page: replace its own files, delete nothing else

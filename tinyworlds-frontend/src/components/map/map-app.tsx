@@ -104,8 +104,15 @@ export function MapApp() {
   const quizSheet = useMediaQuery("(max-width: 895.98px)");
 
   const engine = session?.engine ?? null;
-  // which way the map is turned: north up, or (in a world drawn both ways) to its street grid
-  const view: MapView = WORLD.turn && prefs.view === "grid" ? "grid" : "north";
+  // which way the map is turned: north up, or (in a world drawn both ways) to its street grid.
+  // This tab's own: the stored choice is read once, so turning the map in another tab leaves
+  // this one as it is. Read before the first effect (nothing of it is in the markup until the
+  // map is in, so the page still hydrates as prerendered) to ask for one view only.
+  const [view, setView] = useState<MapView>(() =>
+    WORLD.turn && typeof window !== "undefined" && prefsStore.getSnapshot().view === "grid"
+      ? "grid"
+      : "north",
+  );
 
   // Load the manifest, then start the engine on the two canvases; places and hoods follow.
   // Turning the map starts it all again on the other view's data, where the map was.
@@ -174,6 +181,13 @@ export function MapApp() {
         }
       } catch (error) {
         if (abort.signal.aborted) return;
+        // a street-grid view that will not load gives way to the map north up, and is forgotten:
+        // no visitor is left on a view whose map never comes, with no compass to leave it by
+        if (view === "grid") {
+          prefsStore.set({ view: "north" });
+          setView("north");
+          return;
+        }
         setFailed(true);
         setErrorMessage(error instanceof Error ? error.message : String(error));
       }
@@ -240,7 +254,9 @@ export function MapApp() {
     setHasHoods(false);
     setSights([]);
     setLit(null);
-    setPrefs({ view: view === "grid" ? "north" : "grid" });
+    const next = view === "grid" ? "north" : "grid";
+    setView(next);
+    setPrefs({ view: next });
   };
   // a round holds its building lit: the map's own sign for it waits until it is answered
   const quizRound = ["loading", "asking", "answered"].includes(quiz.state.phase);

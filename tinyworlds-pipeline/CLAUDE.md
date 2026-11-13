@@ -139,8 +139,9 @@ The renderer (`render/`) never imports the city: everything it needs is in the s
 1. `src/cities/<id>.ts` implementing `City` (see `types.ts`; every field is documented there), and
    an entry in `src/cities/index.ts`. The decisions that matter:
    - `origin`, `gridDeg` (the street grid's bearing: measure it, don't guess; statues are written
-     along it), `view` (north up, the default, or `"grid"` to turn the map to the streets: see
-     "Rules of the look") and `bbox`;
+     along it and the street-grid view is turned to it) and `bbox`. Leave `view` alone: a real
+     city is drawn north up and, with `--view grid`, turned to its streets (see "Two views of a
+     city" above); `view: "grid"` is only for a world shown on its street grid alone;
    - `limits`: polygons that are "the city" (`geojson`), or the built-up part of an Overture
      division (`built-up`) for a municipality that is mostly farmland, or of the whole bounding
      box (`built-up` with no division) for a metropolis that ignores its municipal limits. A park
@@ -469,9 +470,9 @@ whose shadows reach it, and margins for both.
   `manifest.northDeg` is 0). A compass grid's streets then run straight across and straight up
   the screen and its buildings show their roofs and south walls; a tilted grid (Manhattan's)
   runs at its own angle.
-- **The street grid is still measured** (`gridDeg`), because statues are written along it and a
-  city may be turned to it instead with `view: "grid"`, which puts its streets on exact 2:1
-  lines (every world was drawn that way until November 2026). The grids: Manhattan's avenues at
+- **The street grid is still measured** (`gridDeg`), because statues are written along it and
+  every real city's second view, `grid/`, is turned to it, which puts its streets on exact 2:1
+  lines (every world was drawn only that way until November 2026). The grids: Manhattan's avenues at
   28.9°, Ribeirão Preto's central grid at 38.97°, Orlando's compass grid at −0.5°, the Los
   Angeles basin's at −0.1°, measured over 3,000 km of streets; Dallas' compass grid at 0.2°, a
   quarter of its 3,200 km of streets, rather than Uptown's at 45.3°, which would stand every
