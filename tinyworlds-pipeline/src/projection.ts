@@ -40,6 +40,19 @@ export interface Projection {
   northDeg: number;
 }
 
+/**
+ * A point in the metres of a grid of one bearing → the same point on the ground in the metres of
+ * a grid turned `deg` further clockwise: how something written along a city's street grid is
+ * placed on a view turned elsewhere. (q, p) is (east, north) turned by the bearing, so turning
+ * the grid is one more rotation of (q, p).
+ */
+export function turnGrid(p: number, q: number, deg: number): [number, number] {
+  if (deg === 0) return [p, q];
+  const sin = Math.sin(deg * RAD);
+  const cos = Math.cos(deg * RAD);
+  return [q * sin + p * cos, q * cos - p * sin];
+}
+
 export function makeGeo(lon0: number, lat0: number, betaDeg: number, k: number): Geo {
   return { lon0, lat0, betaDeg, k, kz: k * Math.sqrt(1.5) };
 }

@@ -7,6 +7,7 @@ import { tinykingslanding } from "./tinykingslanding.js";
 import { tinywesteros } from "./tinywesteros.js";
 import { tinywinterfell } from "./tinywinterfell.js";
 import type { City } from "./types.js";
+import { viewDeg } from "./view.js";
 
 /** Run a city's generator and keep what it drew. */
 function run(city: City): {
@@ -90,7 +91,11 @@ describe("lonLatOf", () => {
   });
 
   it("opens tinywesteros a little north-east of King's Landing, at the origin of its sketch", () => {
-    expect(tinywesteros.betaDeg).toBe(45);
+    expect(tinywesteros.view).toBe("grid");
+    expect(viewDeg(tinywesteros)).toBe(45);
+    // the places laid out along the compass stay turned the way they were drawn
+    expect(viewDeg(tinywinterfell)).toBe(0);
+    expect(viewDeg(tinykingslanding)).toBe(0);
     expect(tinywesteros.start.lon).toBeGreaterThan(0);
     expect(tinywesteros.start.lon).toBeLessThan(0.01);
     expect(tinywesteros.start.lat).toBeGreaterThan(0);

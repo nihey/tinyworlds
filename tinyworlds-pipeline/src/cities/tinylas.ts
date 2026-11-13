@@ -38,7 +38,7 @@ export const tinylas: City = {
   title: "Las Vegas",
   // the fountains of the Bellagio
   origin: { lon: -115.17661, lat: 36.11311 },
-  betaDeg: 0,
+  gridDeg: 0,
   k: 2,
   bbox: { west: -115.26, south: 36.05, east: -115.06, north: 36.24 },
   // the middle of the Strip

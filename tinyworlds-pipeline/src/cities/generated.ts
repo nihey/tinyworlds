@@ -32,8 +32,11 @@ export interface GeneratedCity {
   fog: { start: number; end: number };
   flora: City["flora"];
   attribution: string[];
-  /** Bearing of the grid's `p` axis (default 0: `p` is north). 45 puts compass north straight up. */
-  betaDeg?: number;
+  /**
+   * Bearing of the grid's `p` axis (default 0: `p` is north). 45 puts compass north straight up.
+   * The place is laid out on this grid, so the map is always turned to it (`view: "grid"`).
+   */
+  gridDeg?: number;
   /** End the map at the bounding rectangle of its limits, with a clean edge and no dissolve. */
   framed?: boolean;
   generate: (builder: SyntheticBuilder) => void;
@@ -41,12 +44,13 @@ export interface GeneratedCity {
 
 /** Fill in everything a `City` must have that a generated one never uses. */
 export function generatedCity(spec: GeneratedCity): City {
-  const betaDeg = spec.betaDeg ?? 0;
+  const betaDeg = spec.gridDeg ?? 0;
   return {
     id: spec.id,
     title: spec.title,
     origin: { lon: 0, lat: 0 },
-    betaDeg,
+    gridDeg: betaDeg,
+    view: "grid",
     k: 2,
     bbox: { west: -0.1, south: -0.1, east: 0.1, north: 0.1 },
     start: { ...lonLatOf(spec.start.p, spec.start.q, betaDeg), scale: spec.start.scale },

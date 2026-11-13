@@ -44,7 +44,7 @@ export const tinyrao: City = {
   // Praça XV de Novembro
   origin: { lon: -47.80872, lat: -21.17516 },
   // the "quadrilátero central" runs 39° east of north; north ends up 12° right of screen-up
-  betaDeg: 38.97,
+  gridDeg: 38.97,
   k: 2,
   bbox: { west: -47.99, south: -21.37, east: -47.64, north: -21.05 },
   // the Theatro Pedro II and the square in front of it

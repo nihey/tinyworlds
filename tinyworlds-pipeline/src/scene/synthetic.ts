@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { viewDeg } from "../cities/view.js";
 import { CITY, DIRS } from "../config.js";
 import { makeGeo, makeProjection } from "../projection.js";
 import { R } from "../render/palette.js";
@@ -132,7 +133,7 @@ export function generate(): Generated {
   return out;
 }
 
-const geoOf = () => makeGeo(CITY.origin.lon, CITY.origin.lat, CITY.betaDeg, CITY.k);
+const geoOf = () => makeGeo(CITY.origin.lon, CITY.origin.lat, viewDeg(CITY), CITY.k);
 
 /** The scene of a generated city: the same arrays a real city's scene has, straight from the generator. */
 export async function buildSyntheticScene(opts: { log?: (msg: string) => void } = {}): Promise<void> {

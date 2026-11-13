@@ -229,8 +229,10 @@ X = (p + q) · k
 Y = (q − p) · k/2 − h · kz          // h = metres above ground
 ```
 
-β is the bearing of the city's street grid, so its streets run at exact 2:1 pixel slopes. True
-north points `manifest.northDeg` clockwise from screen-up.
+β is the bearing the view is turned to: 45°, which puts true north straight up
+(`manifest.northDeg` 0), unless the world is turned to its street grid (the pipeline's
+`view: "grid"`), whose streets then run at exact 2:1 pixel slopes. True north points
+`manifest.northDeg` clockwise from screen-up.
 
 ### manifest.json
 

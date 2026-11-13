@@ -65,14 +65,14 @@ const HUNT_HILL_MIDDLE: [number, number] = [-96.82243, 32.77993];
 /**
  * The Margaret Hunt Hill Bridge's white arch: one steel tube standing over the middle of the deck,
  * along it, 120 metres high over a 183-metre span. Built from boxes stepped along the bridge, so
- * it needs the grid's bearing to know which way the bridge runs on it.
+ * it needs the street grid's bearing (`gridDeg`) to know which way the bridge runs on it.
  */
-export function huntHillArch(betaDeg: number): Statue {
+export function huntHillArch(gridDeg: number): Statue {
   const lat0 = (HUNT_HILL_MIDDLE[1] * Math.PI) / 180;
   const east = (HUNT_HILL_EAST[0] - HUNT_HILL_WEST[0]) * Math.cos(lat0);
   const north = HUNT_HILL_EAST[1] - HUNT_HILL_WEST[1];
   const len = Math.hypot(east, north);
-  const b = (betaDeg * Math.PI) / 180;
+  const b = (gridDeg * Math.PI) / 180;
   // a metre along the bridge, in metres uptown (p) and crosstown (q)
   const up = (east * Math.sin(b) + north * Math.cos(b)) / len;
   const uq = (east * Math.cos(b) - north * Math.sin(b)) / len;

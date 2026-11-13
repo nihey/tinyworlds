@@ -16,7 +16,9 @@ import {
   type FogGrid,
   type Footprint,
 } from "./fog.js";
+import { viewDeg } from "../cities/view.js";
 import { distanceAlong, holdDecks, type DeckPath, type DeckRun } from "./decks.js";
+import { statueRing } from "./statues.js";
 import { hashString, mix, rand } from "./hash.js";
 import { loadHeights } from "./heights.js";
 import { buildSyntheticScene } from "./synthetic.js";
@@ -39,7 +41,7 @@ import { chooseStyle, type Style } from "./styles.js";
  *   fog      distance from the city, which decides where the map ends
  */
 
-export const GEO = makeGeo(CITY.origin.lon, CITY.origin.lat, CITY.betaDeg, CITY.k);
+export const GEO = makeGeo(CITY.origin.lon, CITY.origin.lat, viewDeg(CITY), CITY.k);
 
 /** Line flags. */
 export const L_BRIDGE = 1;
@@ -1758,26 +1760,15 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       `${spans} suspension spans, ${cantilevers.length} cantilever`,
   );
 
-  // ---- statues: what is not a building, so is not in the data
+  // ---- statues: what is not a building, so is not in the data. Written along the street grid,
+  // turned onto the view's.
+  const statueTurn = GEO.betaDeg - CITY.gridDeg;
   for (const statue of CITY.statues) {
     const [p, q] = proj.toGrid(statue.lon, statue.lat);
     const from = volumes.count;
     statue.pieces.forEach((piece, i) => {
-      const pc = p + piece.dp;
-      const qc = q + piece.dq;
       addShape(
-        "r" in piece
-          ? disc(pc, qc, piece.r, 8)
-          : [
-              pc - piece.hp,
-              qc - piece.hq,
-              pc + piece.hp,
-              qc - piece.hq,
-              pc + piece.hp,
-              qc + piece.hq,
-              pc - piece.hp,
-              qc + piece.hq,
-            ],
+        statueRing(piece, p, q, statueTurn),
         mix(i, 1886),
         statue.base + piece.to,
         statue.base + piece.from,
