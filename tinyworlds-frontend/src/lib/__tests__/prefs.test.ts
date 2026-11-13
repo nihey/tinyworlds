@@ -22,6 +22,13 @@ describe("sanitizePrefs", () => {
     });
   });
 
+  it("opens the map north up until the visitor turns it to the street grid", () => {
+    expect(DEFAULT_PREFS.view).toBe("north");
+    expect(sanitizePrefs({ view: "grid" }).view).toBe("grid");
+    expect(sanitizePrefs({ view: "north" }).view).toBe("north");
+    expect(sanitizePrefs({ view: "south" }).view).toBe("north");
+  });
+
   it("follows the browser's language unless one was chosen", () => {
     expect(DEFAULT_PREFS.lang).toBe("auto");
     expect(sanitizePrefs({ lang: "es-ES" }).lang).toBe("es-ES");

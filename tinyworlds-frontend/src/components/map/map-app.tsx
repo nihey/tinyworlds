@@ -16,7 +16,7 @@ import {
 } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
-import { prefsStore } from "@/lib/prefs";
+import { prefsStore, type MapView } from "@/lib/prefs";
 import { quizKey } from "@/lib/quiz";
 import { cn } from "@/lib/utils";
 import { textsFor } from "@/lib/sight-sign";
@@ -28,6 +28,7 @@ import {
   loadPlaces,
   loadSights,
   loadSightTexts,
+  setMapView,
 } from "@/map/data";
 import type { Sight, SightTexts } from "@/map/sights";
 import type { Locale } from "@/i18n/locale";
@@ -103,14 +104,18 @@ export function MapApp() {
   const quizSheet = useMediaQuery("(max-width: 895.98px)");
 
   const engine = session?.engine ?? null;
+  // which way the map is turned: north up, or (in a world drawn both ways) to its street grid
+  const view: MapView = WORLD.turn && prefs.view === "grid" ? "grid" : "north";
 
   // Load the manifest, then start the engine on the two canvases; places and hoods follow.
+  // Turning the map starts it all again on the other view's data, where the map was.
   useEffect(() => {
     const canvas = canvasRef.current;
     const marks = marksRef.current;
     if (!canvas || !marks) return;
     const abort = new AbortController();
     let started: MapEngine | null = null;
+    setMapView(view);
 
     (async () => {
       try {
@@ -178,7 +183,7 @@ export function MapApp() {
       abort.abort();
       started?.destroy();
     };
-  }, [attempt]);
+  }, [attempt, view]);
 
   const retry = () => {
     setErrorMessage(null);
@@ -221,6 +226,22 @@ export function MapApp() {
     compact: quizSheet,
   });
   const quizOn = quiz.state.phase !== "off";
+
+  // The compass turns the map (a world drawn both ways): the other view opens on the same spot
+  // and zoom, read from the address bar as a shared link would be. A game ends first: its
+  // building's outline belongs to the view it was lit in.
+  const turn = () => {
+    if (!engine) return;
+    if (quizOn) quiz.stop();
+    writeHash(formatHash({ ...engine.getCentre(), scale: engine.getView().scale }));
+    setSession(null);
+    setPlaces(null);
+    setPlacesFailed(false);
+    setHasHoods(false);
+    setSights([]);
+    setLit(null);
+    setPrefs({ view: view === "grid" ? "north" : "grid" });
+  };
   // a round holds its building lit: the map's own sign for it waits until it is answered
   const quizRound = ["loading", "asking", "answered"].includes(quiz.state.phase);
   const quizArticle = quiz.sight && litSight?.id === quiz.sight.id ? litText : undefined;
@@ -452,6 +473,8 @@ export function MapApp() {
           </div>
           <ToolColumn
             northDeg={session.manifest.northDeg}
+            view={view}
+            onTurn={WORLD.turn ? turn : undefined}
             onZoomIn={() => engine.zoomStep(1)}
             onZoomOut={() => engine.zoomStep(-1)}
             onWholeMap={() => engine.fitAll()}

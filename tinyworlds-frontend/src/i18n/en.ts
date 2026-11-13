@@ -280,6 +280,8 @@ export const en: Strings = {
     downRight: "North is down and to the right",
     downLeft: "North is down and to the left",
     letter: "N",
+    toGrid: "Turn the map to the street grid",
+    toNorth: "Turn the map north up",
   },
   share: {
     copied: "Link copied",

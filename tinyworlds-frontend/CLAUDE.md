@@ -922,6 +922,26 @@ end it with the map where it was.
   (`peopleNote`: an admin's browser is not counted). A polite live region tells a screen
   reader the verdict, then the score (`liveLine`).
 
+## Two views: north up and the street grid
+
+Every map opens **north up**. A world drawn both ways (`turn: "grid"` on the `World`: the
+thirteen real cities) also has its street-grid view, the map as it was first drawn, as a full
+data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
+
+- **The compass is the switch** (`compass.tsx`): in such a world it is a button whose tooltip
+  says where north is and what pressing it does (`compass.toGrid`, `compass.toNorth`); in any
+  other world it only says where north is.
+- **Turning** (`turn` in `map-app.tsx`) writes the view's centre and zoom into the address bar,
+  empties the session and flips `prefs.view`; the session's effect, which depends on the view,
+  points every data URL at the other set (`setMapView`, `viewDataBase` in `map/data.ts`) and
+  starts the engine again from the address bar, as a shared link would. A game of Guess the
+  building ends first. Nothing of one view is mixed with the other's: `dataUrl()` follows the
+  view by default, so the minimap and the quiz follow too.
+- **Remembered per world** in the visitor's preferences (`prefs.view`, `"north"` by default), not
+  in the shared link: a link always opens north up.
+- The About notes say so in each language: north is up, and the compass turns the map the way
+  it was first drawn.
+
 ## Design
 
 Every panel is a black enamel "sign" (`sign` utility) with paper-white lettering and the world's

@@ -366,6 +366,10 @@ export interface Strings {
     downLeft: string;
     /** the letter at the needle's tip */
     letter: string;
+    /** in a world drawn both ways, what pressing the compass does: from north up… */
+    toGrid: string;
+    /** …and back */
+    toNorth: string;
   };
   share: {
     copied: string;

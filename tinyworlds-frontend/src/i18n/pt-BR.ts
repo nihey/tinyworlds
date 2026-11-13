@@ -288,6 +288,8 @@ export const ptBR: Strings = {
     downRight: "O norte fica para baixo e à direita",
     downLeft: "O norte fica para baixo e à esquerda",
     letter: "N",
+    toGrid: "Girar o mapa para a grade de ruas",
+    toNorth: "Girar o mapa com o norte para cima",
   },
   share: {
     copied: "Link copiado",
