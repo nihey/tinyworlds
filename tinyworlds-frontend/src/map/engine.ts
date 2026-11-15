@@ -23,6 +23,7 @@ import {
   type Sight,
   type SightShape,
 } from "./sights";
+import { addSample, emptyEstimate, initialPolicy, type LoadPolicy, type NetworkEstimate } from "./network";
 import { levelForScale, planTiles, Pyramid, tileKey, type TileRequest } from "./tiles";
 
 /**
@@ -111,7 +112,6 @@ interface Tile {
 
 type Wanted = TileRequest;
 
-const MAX_LOADS = 6;
 const FADE_MS = 180;
 const STALE_MS = 700; // a download nobody has asked for in this long is cancelled
 const SETTLE_MS = 220;
@@ -179,6 +179,8 @@ export class MapEngine {
   private readonly tiles = new Map<string, Tile>();
   private readonly tries = new Map<string, number>();
   private inflight = 0;
+  private policy: LoadPolicy = initialPolicy();
+  private estimate: NetworkEstimate = emptyEstimate();
 
   // motion
   private inertia: { vx: number; vy: number } | null = null;
@@ -251,6 +253,7 @@ export class MapEngine {
     this.reducedMotion = options.reducedMotion ?? false;
     this.projection = createProjection(options.manifest.geo);
     this.pyramid = new Pyramid(options.manifest);
+    this.policy = initialPolicy(typeof location !== "undefined" ? location.hostname : undefined);
 
     const ctx = this.canvas.getContext("2d");
     const mctx = this.marks.getContext("2d");
@@ -872,7 +875,7 @@ export class MapEngine {
     if (this.wanted.length === 0) return;
     this.wanted.sort((a, b) => a.pri - b.pri || a.dist - b.dist);
     for (const w of this.wanted) {
-      if (this.inflight >= MAX_LOADS) break;
+      if (this.inflight >= this.policy.maxLoads) break;
       this.load(w.z, w.tx, w.ty, now, false);
     }
   }
@@ -895,12 +898,16 @@ export class MapEngine {
     this.tiles.set(key, tile);
     this.inflight++;
 
-    fetch(this.tileUrl(z, tx, ty), { signal: abort.signal })
+    const started = performance.now();
+    fetch(this.tileUrl(z, tx, ty), { signal: abort.signal, priority: pinned ? "high" : "low" } as RequestInit)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
       })
-      .then((blob) => createImageBitmap(blob))
+      .then((blob) => {
+        this.estimate = addSample(this.estimate, blob.size, performance.now() - started);
+        return createImageBitmap(blob);
+      })
       .then((bitmap) => {
         if (this.destroyed || this.tiles.get(key) !== tile) {
           bitmap.close();
