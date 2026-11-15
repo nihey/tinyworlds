@@ -136,7 +136,7 @@ export class Pyramid {
 export const tileKey = (z: number, tx: number, ty: number): string => `${z}/${tx}_${ty}`;
 
 /** One tile around the view is fetched ahead, so a short pan does not start from blank. */
-export const PREFETCH_RING = 0;
+export const PREFETCH_RING = 1;
 
 /** Coarser tiles that contain (z, tx, ty), nearest parent first. */
 export function ancestors(
