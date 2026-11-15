@@ -23,7 +23,7 @@ import {
   type Sight,
   type SightShape,
 } from "./sights";
-import { addSample, emptyEstimate, initialPolicy, type LoadPolicy, type NetworkEstimate } from "./network";
+import { addSample, emptyEstimate, initialPolicy, policyFor, type LoadPolicy, type NetworkEstimate } from "./network";
 import { levelForScale, planTiles, Pyramid, tileKey, type TileRequest } from "./tiles";
 
 /**
@@ -179,8 +179,14 @@ export class MapEngine {
   private readonly tiles = new Map<string, Tile>();
   private readonly tries = new Map<string, number>();
   private inflight = 0;
+  private basePolicy: LoadPolicy = initialPolicy();
   private policy: LoadPolicy = initialPolicy();
   private estimate: NetworkEstimate = emptyEstimate();
+  private vx = 0;
+  private vy = 0;
+  private lastViewX = 0;
+  private lastViewY = 0;
+  private lastViewT = 0;
 
   // motion
   private inertia: { vx: number; vy: number } | null = null;
@@ -253,7 +259,8 @@ export class MapEngine {
     this.reducedMotion = options.reducedMotion ?? false;
     this.projection = createProjection(options.manifest.geo);
     this.pyramid = new Pyramid(options.manifest);
-    this.policy = initialPolicy(typeof location !== "undefined" ? location.hostname : undefined);
+    this.basePolicy = initialPolicy(typeof location !== "undefined" ? location.hostname : undefined);
+    this.policy = { ...this.basePolicy };
 
     const ctx = this.canvas.getContext("2d");
     const mctx = this.marks.getContext("2d");
@@ -585,6 +592,30 @@ export class MapEngine {
     this.maxTiles = clamp(cols * rows * 3, 64, 320);
   }
 
+  private trackMotion(now: number): void {
+    const v = this.view;
+    if (this.lastViewT) {
+      const dt = now - this.lastViewT;
+      if (dt > 0) {
+        const instVx = ((v.x - this.lastViewX) * v.scale * 1000) / dt;
+        const instVy = ((v.y - this.lastViewY) * v.scale * 1000) / dt;
+        this.vx = this.vx * 0.55 + instVx * 0.45;
+        this.vy = this.vy * 0.55 + instVy * 0.45;
+      }
+    }
+    this.lastViewX = v.x;
+    this.lastViewY = v.y;
+    this.lastViewT = now;
+    if (!this.inMotion) {
+      this.vx *= 0.5;
+      this.vy *= 0.5;
+      if (Math.hypot(this.vx, this.vy) < 20) {
+        this.vx = 0;
+        this.vy = 0;
+      }
+    }
+  }
+
   /** Keeps the view on the map and refreshes the visible rectangle. */
   private constrain(): void {
     const v = this.view;
@@ -620,6 +651,10 @@ export class MapEngine {
     return !!(this.inertia || this.zoomTarget || this.flight);
   }
 
+  private get inMotion(): boolean {
+    return !!(this.drag || this.inertia || this.zoomTarget || this.flight);
+  }
+
   // ---- frame loop ------------------------------------------------------------------------
 
   private readonly frame = (now: number): void => {
@@ -631,6 +666,7 @@ export class MapEngine {
 
     this.advance(now, dt);
     this.constrain();
+    this.trackMotion(now);
     this.dropSightsOutOfView();
 
     const lifeRuns = this.life && this.sceneLayers.size > 0 && !this.reducedMotion;
@@ -739,6 +775,8 @@ export class MapEngine {
       if (tile.state === "error" && now >= tile.retryAt) this.tiles.delete(key);
     }
 
+    const speed = Math.hypot(this.vx, this.vy);
+    this.policy = policyFor(this.basePolicy, this.estimate, this.inMotion, speed);
     const plan = planTiles(
       pyramid,
       v,
@@ -747,6 +785,7 @@ export class MapEngine {
         const tile = this.tiles.get(key);
         return tile?.state === "ready" && !!tile.bitmap;
       },
+      { deferNative: this.policy.deferNative, ring: this.policy.ring },
     );
     for (const r of plan.retain) {
       const tile = this.tiles.get(tileKey(r.z, r.tx, r.ty));
