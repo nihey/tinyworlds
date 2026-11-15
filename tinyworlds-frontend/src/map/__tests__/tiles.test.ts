@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { levelForScale, Pyramid, tileKey } from "../tiles";
+import { ancestors, levelForScale, planTiles, Pyramid, tileKey } from "../tiles";
 
 /** row-major, LSB-first, like the pipeline writes it */
 function bitset(cols: number, rows: number, has: (tx: number, ty: number) => boolean): string {
@@ -82,5 +82,98 @@ describe("Pyramid", () => {
 
   it("names tiles the way the files are named", () => {
     expect(tileKey(2, 10, 7)).toBe("2/10_7");
+  });
+});
+
+describe("ancestors", () => {
+  it("walks to coarser tiles, nearest first", () => {
+    expect(ancestors(0, 5, 3, 3)).toEqual([
+      { z: 1, tx: 2, ty: 1 },
+      { z: 2, tx: 1, ty: 0 },
+      { z: 3, tx: 0, ty: 0 },
+    ]);
+  });
+  it("is empty at the top of the pyramid", () => {
+    expect(ancestors(3, 0, 0, 3)).toEqual([]);
+  });
+});
+
+describe("Pyramid.pad and count", () => {
+  it("grows a range by a margin, clamped to the grid", () => {
+    const r = pyramid.range(0, { left: 0, top: 0, right: 512, bottom: 512 });
+    expect(r).toEqual({ z: 0, tx0: 4, ty0: 2, tx1: 4, ty1: 2 });
+    expect(pyramid.pad(r, 1)).toEqual({ z: 0, tx0: 3, ty0: 1, tx1: 5, ty1: 3 });
+  });
+  it("counts the tiles that exist", () => {
+    expect(pyramid.count(0)).toBe(31);
+    expect(pyramid.count(1)).toBe(8);
+  });
+});
+
+describe("planTiles", () => {
+  const view = {
+    left: 0,
+    top: 0,
+    right: 512,
+    bottom: 512,
+    x: 256,
+    y: 256,
+    scale: 1,
+    dpr: 1,
+  };
+
+  it("asks for the visible tile, then its parents, and keeps a cached parent", () => {
+    const plan = planTiles(
+      pyramid,
+      view,
+      () => false,
+      () => false,
+    );
+    expect(plan.z).toBe(0);
+    expect(plan.wanted.some((w) => w.z === 0 && w.tx === 4 && w.ty === 2 && w.pri === 0)).toBe(
+      true,
+    );
+    expect(plan.wanted.some((w) => w.z === 1 && w.tx === 2 && w.ty === 1 && w.pri === 1)).toBe(
+      true,
+    );
+    expect(plan.wanted.some((w) => w.pri === 2 && w.z === 0)).toBe(true);
+
+    const ready = new Set(["0/4_2", "1/2_1"]);
+    const kept = planTiles(
+      pyramid,
+      view,
+      (key) => ready.has(key),
+      (key) => ready.has(key),
+    );
+    expect(kept.wanted.some((w) => w.z === 0 && w.tx === 4 && w.ty === 2)).toBe(false);
+    expect(kept.retain).toContainEqual({ z: 1, tx: 2, ty: 1 });
+  });
+
+  it("can skip the ring when asked", () => {
+    const none = planTiles(pyramid, view, () => false, () => false, { ring: 0 });
+    expect(none.wanted.every((w) => w.pri !== 2)).toBe(true);
+  });
+
+  it("stretches the ring in the direction of a pan", () => {
+    const plain = planTiles(pyramid, view, () => false, () => false, { ring: 1 });
+    const ahead = planTiles(pyramid, view, () => false, () => false, {
+      ring: 1,
+      aheadTx: 2,
+    });
+    const maxTx = (plan: typeof plain) =>
+      Math.max(
+        0,
+        ...plan.wanted.filter((w) => w.pri === 2 && w.z === 0).map((w) => w.tx),
+      );
+    expect(maxTx(ahead)).toBeGreaterThan(maxTx(plain));
+  });
+
+  it("can skip native tiles while a pan is in flight", () => {
+    const deferred = planTiles(pyramid, view, () => false, () => false, {
+      ring: 0,
+      deferNative: true,
+    });
+    expect(deferred.wanted.some((w) => w.z === 0)).toBe(false);
+    expect(deferred.wanted.some((w) => w.z === 1)).toBe(true);
   });
 });
