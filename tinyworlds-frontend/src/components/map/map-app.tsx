@@ -141,14 +141,24 @@ export function MapApp() {
         window.tinyworld = live; // a handle for the console: tinyworld.flyTo({ lon, lat })
         setSession({ manifest, engine: live });
 
-        // the map is usable without these; search and lines arrive when they arrive
-        loadPlaces(manifest.indexes, abort.signal)
-          .then((loaded) => {
-            if (!abort.signal.aborted) setPlaces(loaded);
-          })
-          .catch(() => {
-            if (!abort.signal.aborted) setPlacesFailed(true);
-          });
+        // the map is usable without these; search arrives once the first tiles are in
+        let placesAsked = false;
+        const askPlaces = () => {
+          if (placesAsked || abort.signal.aborted) return;
+          placesAsked = true;
+          offFirstTile();
+          loadPlaces(manifest.indexes, abort.signal)
+            .then((loaded) => {
+              if (!abort.signal.aborted) setPlaces(loaded);
+            })
+            .catch(() => {
+              if (!abort.signal.aborted) setPlacesFailed(true);
+            });
+        };
+        const offFirstTile = live.on("coverage", (info) => {
+          if (info.ready > 0) askPlaces();
+        });
+        setTimeout(askPlaces, 1200);
         loadHoods(manifest.indexes, abort.signal)
           .then((hoods) => {
             if (abort.signal.aborted) return;
