@@ -100,6 +100,9 @@ interface SightPicture {
 
 interface Tile {
   key: string;
+  z: number;
+  tx: number;
+  ty: number;
   state: "loading" | "ready" | "error";
   bitmap: ImageBitmap | null;
   readyAt: number;
@@ -113,7 +116,6 @@ interface Tile {
 type Wanted = TileRequest;
 
 const FADE_MS = 180;
-const STALE_MS = 700; // a download nobody has asked for in this long is cancelled
 const SETTLE_MS = 220;
 const ZOOM_STEP = 1.5;
 const NICE_SCALES = [0.125, 0.25, 0.5, 1, 1.5, 2, 3, 4];
@@ -759,6 +761,8 @@ export class MapEngine {
   // ---- tiles -----------------------------------------------------------------------------
 
   private readonly wanted: Wanted[] = [];
+  private readonly keepKeys = new Set<string>();
+  private planZ = 0;
 
   /** Draws the visible tiles; returns whether any is still fading in. */
   private drawTiles(now: number): boolean {
@@ -799,6 +803,10 @@ export class MapEngine {
     }
     this.wanted.length = 0;
     this.wanted.push(...plan.wanted);
+    this.planZ = plan.z;
+    this.keepKeys.clear();
+    for (const r of plan.retain) this.keepKeys.add(tileKey(r.z, r.tx, r.ty));
+    for (const w of plan.wanted) this.keepKeys.add(tileKey(w.z, w.tx, w.ty));
 
     const z = plan.z;
     const range = plan.range;
@@ -908,12 +916,16 @@ export class MapEngine {
 
   /** Starts the nearest downloads, and cancels the ones the view has moved away from. */
   private pump(now: number): void {
+    const staleMs = this.policy.staleMs;
     for (const tile of this.tiles.values()) {
-      if (tile.state === "loading" && !tile.pinned && now - tile.wantedAt > STALE_MS) {
-        tile.abort?.abort();
-        this.tiles.delete(tile.key);
-        this.inflight--;
-      }
+      if (tile.state !== "loading" || tile.pinned) continue;
+      const leftover = !this.keepKeys.has(tile.key);
+      // a zoom leaves finer in-flight tiles behind immediately; a pan waits a beat
+      const stale = leftover && (tile.z < this.planZ || now - tile.wantedAt > staleMs);
+      if (!stale) continue;
+      tile.abort?.abort();
+      this.tiles.delete(tile.key);
+      this.inflight--;
     }
     if (this.wanted.length === 0) return;
     this.wanted.sort((a, b) => a.pri - b.pri || a.dist - b.dist);
@@ -929,6 +941,9 @@ export class MapEngine {
     const abort = new AbortController();
     const tile: Tile = {
       key,
+      z,
+      tx,
+      ty,
       state: "loading",
       bitmap: null,
       readyAt: 0,
