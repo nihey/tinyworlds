@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { CITIES } from "./cities/index.js";
@@ -17,7 +18,7 @@ import { renderAll } from "./render/run.js";
 import { loadScene } from "./render/scene.js";
 import { buildScene } from "./scene/build.js";
 import { fetchAll } from "./sources/index.js";
-import { buildWalk } from "./walk/build.js";
+import { buildWalk, stampWalk } from "./walk/build.js";
 
 const program = new Command();
 program
@@ -152,7 +153,14 @@ program
   )
   .option("--out <dir>", "output directory (default: the frontend's public/data)")
   .option("--around <lon,lat,metres>", "only write the squares near a point; the others are kept")
-  .action(async (opts: { out?: string; around?: string }) => {
+  .option("--stamp", "only write the version of the walk folder already there into the manifest", false)
+  .action(async (opts: { out?: string; around?: string; stamp: boolean }) => {
+    if (opts.stamp) {
+      const out = path.resolve(opts.out ?? DIRS.out);
+      if (!fs.existsSync(path.join(out, "walk", "walk.json")))
+        throw new Error(`walk: no walk/walk.json in ${out}`);
+      return stampWalk(out, (m) => console.log(m));
+    }
     const a = opts.around?.split(",").map(Number);
     await buildWalk({ out: opts.out, around: a ? { lon: a[0], lat: a[1], radius: a[2] } : undefined });
   });

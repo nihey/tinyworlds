@@ -141,9 +141,13 @@ export function closeTunnels(tunnels: Tunnel[], onMap: (e: number, n: number) =>
   return out;
 }
 
-/** The scene's fog: how far a point (e, n) is from the city, and where the map ends. */
-function fogOf(scene: Scene, geo: Geo): { distance: (e: number, n: number) => number; end: number } {
-  const f = scene.meta.fog as Omit<FogGrid, "d"> & { end: number };
+/** The scene's fog: how far a point (e, n) is from the city, where the map starts to fade and
+ * where it ends. */
+function fogOf(
+  scene: Scene,
+  geo: Geo,
+): { distance: (e: number, n: number) => number; start: number; end: number } {
+  const f = scene.meta.fog as Omit<FogGrid, "d"> & { start: number; end: number };
   const grid: FogGrid = {
     p0: f.p0,
     q0: f.q0,
@@ -155,7 +159,11 @@ function fogOf(scene: Scene, geo: Geo): { distance: (e: number, n: number) => nu
   const b = (geo.betaDeg * Math.PI) / 180;
   const sinB = Math.sin(b);
   const cosB = Math.cos(b);
-  return { distance: (e, n) => fogAt(grid, e * sinB + n * cosB, e * cosB - n * sinB), end: f.end };
+  return {
+    distance: (e, n) => fogAt(grid, e * sinB + n * cosB, e * cosB - n * sinB),
+    start: f.start,
+    end: f.end,
+  };
 }
 
 /** The squares whose centres the fog leaves on the map (those `keep` allows). */
@@ -242,7 +250,8 @@ function straight(pts: number[], a: number, b: number): boolean {
   for (let v = a + 1; v < b; v++) {
     const ve = pts[v * 3] - pts[a * 3];
     const vn = pts[v * 3 + 1] - pts[a * 3 + 1];
-    const t = long > 0 ? (ve * de + vn * dn) / long : 0;
+    // clamped: a vertex past either end, doubling back along the line, is never on it
+    const t = long > 0 ? Math.min(1, Math.max(0, (ve * de + vn * dn) / long)) : 0;
     if (Math.hypot(ve - de * t, vn - dn * t) > STRAIGHT) return false;
     if (Math.abs(pts[a * 3 + 2] + dz * t - pts[v * 3 + 2]) > STRAIGHT) return false;
   }
@@ -414,8 +423,11 @@ export function walkVersion(walk: string): string {
   return hash.digest("hex").slice(0, 12);
 }
 
-/** Names the walk's version in the manifest (`walk`); a folder with no manifest yet is left alone. */
-function stampWalk(out: string, log: (m: string) => void): void {
+/**
+ * Names the walk's version in the manifest (`walk`), from the walk folder on disk; a folder with
+ * no manifest yet is left alone.
+ */
+export function stampWalk(out: string, log: (m: string) => void): void {
   const file = path.join(out, "manifest.json");
   if (!fs.existsSync(file)) return;
   const manifest = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
@@ -486,10 +498,11 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
   for (const sq of squares.values()) masks.set(cellKey(sq.i, sq.j), sq.mask);
   lap(`${squares.size} squares on the map${opts.around ? " round the point" : ""}`);
 
-  // the tunnels, closed where a portal is off the map
+  // the tunnels, closed where a portal is past the whole map, where the fog starts (the Holland
+  // and Lincoln tunnels' New Jersey ends), or has no square
   const tunnels = closeTunnels(
     net.tunnels,
-    (e, n) => fog.distance(e, n) < fog.end && squares.has(num(Math.floor(e / CELL), Math.floor(n / CELL))),
+    (e, n) => fog.distance(e, n) < fog.start && squares.has(num(Math.floor(e / CELL), Math.floor(n / CELL))),
   );
   const closed = tunnels
     .filter((t) => t.b === null)

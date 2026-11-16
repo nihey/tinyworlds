@@ -8,7 +8,7 @@ import { cellExists, parseWalkIndex } from "../../../tinyworlds-frontend/src/wal
 import { EARTH_RADIUS, makeGeo } from "../projection.js";
 import { F_FLOATING, G, Roof } from "../scene/kinds.js";
 import { writeScene, type Arr } from "../scene/store.js";
-import { buildWalk, closeTunnels, deckAtFromScene, shapeOf } from "./build.js";
+import { buildWalk, closeTunnels, deckAtFromScene, shapeOf, stampWalk } from "./build.js";
 import type { Tunnel } from "./network.js";
 import type { Segment } from "./segments.js";
 
@@ -58,13 +58,17 @@ function volumes(): Record<string, Arr> {
 
 /**
  * Land from −300 to 300 m both ways, water round it, ten piers in a row east of it (the hash ties
- * boats to the tenth); a street drawn by the map; the fog's grid keeps p and q within ±487 m.
+ * boats to the tenth); a street drawn by the map; the fog's grid keeps p and q within ±487 m, and
+ * past q = 300 m it is where the map fades (2,000 m from the city: past fog.start, short of its end).
  */
 function writeTestScene(dir: string): void {
   const f32 = (a: number[]) => Float32Array.from(a);
   const piers = Array.from({ length: 10 }, (_, p) => rectEN(320, -200 + 40 * p, 360, -190 + 40 * p));
   const rings = [rectEN(-300, -300, 300, 300), ...piers];
   const fogSide = 40;
+  const fog = new Float32Array(fogSide * fogSide);
+  for (let y = 0; y < fogSide; y++)
+    for (let x = 0; x < fogSide; x++) if (-500 + (y + 0.5) * 25 > 300) fog[y * fogSide + x] = 2000;
   writeScene(
     dir,
     {
@@ -88,7 +92,7 @@ function writeTestScene(dir: string): void {
       "cab.start": Uint32Array.of(0),
       "cab.xyz": f32([]),
       "cab.kind": Uint8Array.of(),
-      "fog.d": new Float32Array(fogSide * fogSide),
+      "fog.d": fog,
     },
     {
       geo,
@@ -162,6 +166,32 @@ const segments = (): Segment[] => [
     [
       ["t2", 0],
       ["t3", 1],
+    ],
+  ),
+  // a tunnel from the land to a portal on the map where it fades (q 424 m)
+  road(
+    "Way In Two",
+    [-100, -200, 0, -200],
+    [
+      ["u0", 0],
+      ["u1", 1],
+    ],
+  ),
+  road(
+    "Tunnel Two",
+    [0, -200, 400, -200],
+    [
+      ["u1", 0],
+      ["u2", 1],
+    ],
+    { flags: [{ values: ["is_tunnel"] }] },
+  ),
+  road(
+    "Way Out Two",
+    [400, -200, 500, -200],
+    [
+      ["u2", 0],
+      ["u3", 1],
     ],
   ),
 ];
@@ -241,10 +271,36 @@ describe("buildWalk", () => {
     expect(piers["moor.xy"]!.length).toBe(12);
 
     // the tunnel's far portal is off the map: closed there
-    expect(index.tunnels).toHaveLength(1);
-    expect(index.tunnels[0].b).toBeNull();
-    expect(index.tunnels[0].a[0]).toBeCloseTo(100, 6);
-    expect(index.tunnels[0].a[1]).toBeCloseTo(-100, 6);
+    const tunnel = index.tunnels.find((t) => t.name === "Tunnel")!;
+    expect(tunnel.b).toBeNull();
+    expect(tunnel.a[0]).toBeCloseTo(100, 6);
+    expect(tunnel.a[1]).toBeCloseTo(-100, 6);
+  });
+
+  it("closes a tunnel at a portal past where the fog starts, short of where the map ends", async () => {
+    const out = freshOut("fading");
+    await buildWalk({ out, scene: sceneDir, segments: segments(), log: quiet });
+    const index = parseWalkIndex(JSON.parse(fs.readFileSync(path.join(out, "walk", "walk.json"), "utf8")));
+    expect(index.tunnels.map((t) => t.name).sort()).toEqual(["Tunnel", "Tunnel Two"]);
+    // its far end's square is on the map and written, but the tunnel is closed there
+    expect(fs.existsSync(path.join(out, "walk", "cells", "2_-1.bin"))).toBe(true);
+    const two = index.tunnels.find((t) => t.name === "Tunnel Two")!;
+    expect(two.b).toBeNull();
+    expect(two.a[0]).toBeCloseTo(0, 6);
+    expect(two.a[1]).toBeCloseTo(-200, 6);
+  });
+
+  it("stamps the version of the walk folder already there", async () => {
+    const out = freshOut("stamp");
+    await buildWalk({ out, scene: sceneDir, segments: segments(), log: quiet });
+    const version = manifest(out).walk;
+    fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify({ ...manifest(out), walk: "old" }));
+    stampWalk(out, quiet);
+    expect(manifest(out).walk).toBe(version);
+    fs.rmSync(path.join(out, "walk", "cells", "0_0.bin"));
+    stampWalk(out, quiet);
+    expect(manifest(out).walk).toMatch(/^[0-9a-f]{12}$/);
+    expect(manifest(out).walk).not.toBe(version);
   });
 
   it("names the same version twice, and an update round a point keeps the rest", async () => {
@@ -398,6 +454,11 @@ describe("shapeOf", () => {
         expect(d).toBeLessThanOrEqual(0.1);
       }
     }
+  });
+
+  it("never drops a vertex that doubles back past either end of the line", () => {
+    expect(shapeOf([0, 0, 0, 120, 0, 0, 100, 0, 0])).toEqual([0, 1, 2]);
+    expect(shapeOf([0, 0, 0, -20, 0, 0, 100, 0, 0])).toEqual([0, 1, 2]);
   });
 
   it("keeps both vertices where who builds the deck changes", () => {

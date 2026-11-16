@@ -33,6 +33,21 @@ interface Grid {
   chunk: number;
 }
 
+/**
+ * What a new manifest keeps of the one it replaces: the street walk's version. The walk is cut
+ * from the scene, not the tiles, so a new render leaves it standing (the indexes' version is
+ * stamped again by `index`, which runs after the render). An unreadable manifest keeps nothing.
+ */
+export function keptFromManifest(file: string): { walk?: string } {
+  if (!fs.existsSync(file)) return {};
+  try {
+    const old = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
+    return typeof old.walk === "string" ? { walk: old.walk } : {};
+  } catch {
+    return {};
+  }
+}
+
 function makeGrid(scene: Scene): Grid {
   const chunk = TILE * CHUNK_TILES;
   const { minX, minY, maxX, maxY } = scene.bounds;
@@ -387,6 +402,7 @@ export async function renderAll(opts: RenderOptions = {}): Promise<void> {
     geo: scene.geo,
     overview: { src: "overview.webp", width: crop.width, height: crop.height },
     attribution: CITY.attribution,
+    ...keptFromManifest(path.join(out, "manifest.json")),
   };
   fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest));
   log(`render: manifest written, ${levels} levels, minimap ${crop.width}×${crop.height} from level ${oz}`);

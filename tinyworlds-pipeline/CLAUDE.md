@@ -5,24 +5,24 @@ viewer: a pyramid of isometric pixel-art tiles plus search and overlay indexes. 
 queue; run it by hand when the data or the drawing rules change. One process draws one city,
 chosen with `--city` (default `tinynyc`).
 
-| City               | Full run (20 cores) | Output               |
-| ------------------ | ------------------- | -------------------- |
-| `tinynyc`          | ≈ 5 min             | 0.8 GB, 30,000 files |
-| `tinyrao`          | ≈ 2.5 min           | 0.3 GB, 11,000 files |
-| `tinyorl`          | ≈ 4 min             | 1.1 GB, 29,000 files |
-| `tinyfte`          | seconds             | a few MB             |
-| `tinyvlc`          | ≈ 1 min             | 0.2 GB               |
-| `tinylas`          | ≈ 1 min             | 0.2 GB               |
-| `tinylax`          | ≈ 4 min             | 0.7 GB, 23,000 files |
-| `tinydal`          | ≈ 1.5 min (+ wiki)  | 0.3 GB, 10,500 files |
-| `tinycvg`          | ≈ 1 min (+ wiki)    | 0.2 GB, 6,300 files  |
-| `tinypit`          | ≈ 1 min (+ wiki)    | 0.2 GB, 5,200 files  |
-| `tinyphl`          | ≈ 1.5 min (+ wiki)  | 0.1 GB, 5,300 files  |
-| `tinycos`          | ≈ 2 min (+ wiki)    | 0.4 GB, 11,700 files |
-| `tinytkf`          | ≈ 1 min (+ wiki)    | 0.2 GB, 4,200 files  |
-| `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
-| `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
-| `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
+| City               | Full run (20 cores)      | Output                                             |
+| ------------------ | ------------------------ | -------------------------------------------------- |
+| `tinynyc`          | ≈ 5 min (+ walk 3.5 min) | 0.8 GB, 30,000 files (+ walk 118 MB, 37,246 files) |
+| `tinyrao`          | ≈ 2.5 min                | 0.3 GB, 11,000 files                               |
+| `tinyorl`          | ≈ 4 min                  | 1.1 GB, 29,000 files                               |
+| `tinyfte`          | seconds                  | a few MB                                           |
+| `tinyvlc`          | ≈ 1 min                  | 0.2 GB                                             |
+| `tinylas`          | ≈ 1 min                  | 0.2 GB                                             |
+| `tinylax`          | ≈ 4 min                  | 0.7 GB, 23,000 files                               |
+| `tinydal`          | ≈ 1.5 min (+ wiki)       | 0.3 GB, 10,500 files                               |
+| `tinycvg`          | ≈ 1 min (+ wiki)         | 0.2 GB, 6,300 files                                |
+| `tinypit`          | ≈ 1 min (+ wiki)         | 0.2 GB, 5,200 files                                |
+| `tinyphl`          | ≈ 1.5 min (+ wiki)       | 0.1 GB, 5,300 files                                |
+| `tinycos`          | ≈ 2 min (+ wiki)         | 0.4 GB, 11,700 files                               |
+| `tinytkf`          | ≈ 1 min (+ wiki)         | 0.2 GB, 4,200 files                                |
+| `tinywinterfell`   | 3 s (no fetch)           | 4 MB, 230 files                                    |
+| `tinykingslanding` | 8 s (no fetch)           | 21 MB, 730 files                                   |
+| `tinywesteros`     | ≈ 2 min (no fetch)       | 0.2 GB, 14,100 files                               |
 
 ## Commands
 
@@ -39,6 +39,7 @@ npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wiki
 npm run cli -- --city tinynyc quiz [--list] [--force-views]   # quiz.<locale>.json: Guess the building's questions
 npm run cli -- --city tinynyc walk [--out <dir>]   # the street walk: walk/cells/*.bin, walk/walk.json, manifest.walk
 npm run cli -- --city tinynyc walk --around -73.9857,40.7580,600   # only the squares near a point
+npm run cli -- --city tinynyc walk --stamp      # only the version of the walk folder there, into the manifest
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
@@ -47,7 +48,8 @@ npm test          # vitest
 npm run lint      # eslint + prettier --check   (lint:fix to fix)
 ```
 
-`npm run cli` compiles with `tsc` first; worker threads load the compiled `dist/render/worker.js`.
+`npm run cli` compiles with `tsc` first and gives Node a 16 GB heap (New York's `walk` peaks
+around 6 GB, past Node's default); worker threads load the compiled `dist/render/worker.js`.
 `preview` is the tool for tuning the look: it renders one rectangle to a PNG in ~100 ms
 (`--shrink n` draws n times the area and averages it down, to judge the zoomed-out look).
 `TINY_CITY` in the environment is the same as `--city`.
@@ -472,11 +474,11 @@ and fetches nothing.
   `Roof.Deck`), found through a 25 m grid. The run says how many vertices on them stand above
   them: in New York 22 of 7,353, all ends of footways where several meet and find different
   steps of the deck (the vertex takes the highest), at most 1.5 m over.
-- **Tunnels.** A portal off the map (its fog past `fog.end`, or no square there) is closed: that
-  end is `null`, the open one first, and a tunnel with no portal on the map is left out. New
-  York keeps 122 of its 155 (33 have no portal on the map); one is closed, City Place's
-  underpass in Edgewater. The Holland and Lincoln tunnels stay open: their New Jersey portals
-  are 2.0 and 1.6 km from the city, inside the map's fog.
+- **Tunnels.** A portal is open where the map is whole: its fog under `fog.start`, in a square
+  that is written. Anywhere else it is closed by a barrier: that end is `null`, the open one
+  first, and a tunnel with no open portal is left out. So the Holland and Lincoln tunnels are
+  closed at their New Jersey portals (2.0 and 1.6 km from the city, where the map fades), as
+  are a few underpasses past the city line in Nassau and New Jersey.
 - **`--around lon,lat,metres`** writes only the squares within that distance of a point and
   leaves the others as they are; the version is still a hash of every file. It reads the whole
   city all the same (node numbers are the whole city's, and a square's shore and boats need
@@ -485,8 +487,12 @@ and fetches nothing.
 - A value that does not fit its array (a vertex 3.2 km from its square's corner, a volume below
   the ground, a ring of more than 65,535 vertices) stops the run with the square and the array
   named, rather than writing a wrong square.
-- New York, the whole city: about 35,600 squares on the map; run it on a machine with room
-  (`npm run build && node --max-old-space-size=24000 dist/cli.js --city tinynyc walk`).
+- **`--stamp`** only writes the version of the walk folder already there into the manifest (for a
+  walk made elsewhere and copied in). `render` keeps the manifest's `walk` when it writes a new
+  manifest: the walk is cut from the scene, not the tiles.
+- New York, the whole city: 212 s, 37,246 squares, 117.7 MB gzipped (before gzip the largest
+  arrays are `shore`, 148 MB, and `vol.xy`, 34 MB), 1,719 boats; the largest square is 22 kB.
+  It peaks around 6 GB of memory, which the `cli` script's heap allows.
 
 ## How a tile is drawn (`render/chunk.ts`)
 

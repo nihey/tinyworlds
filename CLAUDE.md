@@ -59,9 +59,10 @@ Each sub-project has its own `CLAUDE.md`.
   file says `walk: true`) cuts the map's own scene and Overture's streets into squares of 200 m
   (`walk/`, below): the buildings, ground and trees the map draws, its bridges with their decks
   at the map's heights and overpasses ramped to theirs, the network traffic and people follow
-  (lights, one-way streets, crosswalks, tunnels; a tunnel whose far end is off the map is closed
-  there), land and water, and boats tied at the piers. Only squares on the map are written. The
-  viewer loads the squares round you as you go, and nothing of the walk loads until one opens.
+  (lights, one-way streets, crosswalks, tunnels; a tunnel whose far end is where the map fades,
+  as the Holland and Lincoln tunnels' New Jersey ends are, is closed there), land and water,
+  and boats tied at the piers. Only squares on the map are written. The viewer loads the
+  squares round you as you go, and nothing of the walk loads until one opens.
 - **The API exists for donations** (and keeps the answers of "Guess the building", below). Each proposed city is built when donations for it reach
   its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
