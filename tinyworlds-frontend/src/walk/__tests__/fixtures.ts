@@ -1,4 +1,4 @@
-import type { ElevatedWay, Volume, WalkCell } from "../cell";
+import type { ElevatedWay, RoadNode, StreetEdge, Volume, WalkCell } from "../cell";
 import { CELL } from "../geo";
 import type { WalkIndex } from "../walk-index";
 import { WalkWorld } from "../world";
@@ -83,4 +83,67 @@ export function worldOf(...cells: WalkCell[]): WalkWorld {
 /** `count` empty squares in a row eastwards from (0, 0): open land (or water) to drive (or sail) far along. */
 export function strip(count: number, parts: Partial<WalkCell> = {}): WalkCell[] {
   return Array.from({ length: count }, (_, i) => makeCell(i, 0, parts));
+}
+
+/** A street node: no lights, no tunnel, bearing 0, unless `opts` says. */
+export function roadNode(id: number, e: number, n: number, opts: Partial<RoadNode> = {}): RoadNode {
+  return { id, e, n, z: 0, lights: false, portal: false, bearing: 0, ...opts };
+}
+
+/** A street from node a to node b through [e, n] (or [e, n, z]) points: two-way, residential, 10 m wide unless `opts` says. */
+export function streetEdge(
+  a: number,
+  b: number,
+  pts: number[][],
+  opts: Partial<StreetEdge> = {},
+): StreetEdge {
+  const flat = Float32Array.from(pts.flatMap(([e, n, z = 0]) => [e, n, z]));
+  let length = 0;
+  for (let q = 3; q < flat.length; q += 3)
+    length += Math.hypot(flat[q] - flat[q - 3], flat[q + 1] - flat[q - 2]);
+  return {
+    key: `${a}-${b}`,
+    a,
+    b,
+    cls: 5,
+    link: false,
+    ow: 0,
+    elevated: false,
+    width: 10,
+    pts: flat,
+    length,
+    ...opts,
+  };
+}
+
+/** The squares these streets touch, as the pipeline files them: each with every street that touches it and the nodes those end at. */
+export function fileStreets(nodes: RoadNode[], streets: StreetEdge[]): WalkCell[] {
+  const byId = new Map(nodes.map((nd) => [nd.id, nd]));
+  const cells = new Map<string, WalkCell>();
+  for (const s of streets) {
+    const keys = new Set<string>();
+    const p = s.pts;
+    for (let q = 3; q < p.length; q += 3) {
+      const len = Math.hypot(p[q] - p[q - 3], p[q + 1] - p[q - 2]);
+      const steps = Math.max(1, Math.ceil(len / 2));
+      for (let k = 0; k <= steps; k++) {
+        const e = p[q - 3] + ((p[q] - p[q - 3]) * k) / steps;
+        const n = p[q - 2] + ((p[q + 1] - p[q - 2]) * k) / steps;
+        keys.add(`${Math.floor(e / CELL)}_${Math.floor(n / CELL)}`);
+      }
+    }
+    for (const key of keys) {
+      let c = cells.get(key);
+      if (!c) {
+        const [i, j] = key.split("_").map(Number);
+        cells.set(key, (c = makeCell(i, j)));
+      }
+      c.streets.push(s);
+      for (const id of [s.a, s.b]) {
+        const nd = byId.get(id);
+        if (nd && !c.nodes.includes(nd)) c.nodes.push(nd);
+      }
+    }
+  }
+  return [...cells.values()];
 }
