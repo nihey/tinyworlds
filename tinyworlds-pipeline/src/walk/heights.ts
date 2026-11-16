@@ -11,6 +11,11 @@
  * only rails; tunnels are left out and stay at 0). A vertex's height is the highest of its own
  * target and every neighbour's height less the slope times the distance, found by spreading
  * from the highest down (a max-heap), so only what rises is ever visited.
+ *
+ * The map's deck is exact: a vertex on it stands at its height and nothing moves it, and no
+ * vertex off it stands higher than a ramp climbing from it (a cap spread outward from the decks
+ * before the heights are). The deck climbs from the shore far faster than a ramp may, so near
+ * the shore the cap wins: the approach comes down to meet it, steeper where it must.
  */
 import type { Piece } from "./pieces.js";
 
@@ -157,26 +162,61 @@ function graphOf(pieces: Piece[], slope: number, linkSlope: number): Graph {
 const raised = (p: Piece, k: number): boolean => p.bridge[k] || p.level[k] > 0;
 
 /** What each vertex must reach (the map's deck, or its level's height), and whether it is the
- * map's deck. */
+ * map's deck: a vertex any piece finds on a deck stands at that deck, whatever the levels say. */
 function targetsOf(pieces: Piece[], g: Graph, deckAt: DeckAt): { target: Float64Array; onDeck: Uint8Array } {
   const target = new Float64Array(g.size);
-  const onDeck = new Uint8Array(g.size);
+  const deck = new Float64Array(g.size).fill(-Infinity);
   pieces.forEach((p, i) => {
     if (p.tunnel) return;
     for (let k = 0; k < p.level.length; k++) {
       if (!raised(p, k)) continue;
       const v = g.vert[g.off[i] + k];
-      const deck = deckAt(p.pts[k * 2], p.pts[k * 2 + 1]);
-      if (deck !== null) onDeck[v] = 1;
-      const t = deck ?? Math.max(p.level[k], 1) * LEVEL_HEIGHT;
-      if (t > target[v]) target[v] = t;
+      const d = deckAt(p.pts[k * 2], p.pts[k * 2 + 1]);
+      if (d !== null) deck[v] = Math.max(deck[v], d);
+      else target[v] = Math.max(target[v], Math.max(p.level[k], 1) * LEVEL_HEIGHT);
     }
   });
+  const onDeck = new Uint8Array(g.size);
+  for (let v = 0; v < g.size; v++)
+    if (deck[v] > -Infinity) {
+      onDeck[v] = 1;
+      target[v] = deck[v];
+    }
   return { target, onDeck };
 }
 
-/** Spreads heights from the vertices given, highest first; a height never comes down. */
-function rise(g: Graph, z: Float64Array, from: Iterable<number>): void {
+/**
+ * The highest each vertex may stand: its deck on the map's deck, else the least of every deck's
+ * height plus a ramp's climb from it (spread outward from the decks, not through them, out to
+ * `limit`, above which nothing stands anyway).
+ */
+function capsOf(g: Graph, target: Float64Array, onDeck: Uint8Array, limit: number): Float64Array {
+  const cap = new Float64Array(g.size).fill(Infinity);
+  const heap = new Heap();
+  for (let v = 0; v < g.size; v++)
+    if (onDeck[v]) {
+      cap[v] = target[v];
+      heap.push(-cap[v], v);
+    }
+  while (heap.size > 0) {
+    const cu = -heap.topKey;
+    const u = heap.pop();
+    if (cu > cap[u]) continue;
+    for (let x = g.start[u]; x < g.start[u + 1]; x++) {
+      const v = g.to[x];
+      const c = cu + g.drop[x];
+      if (!onDeck[v] && c < cap[v] && c <= limit) {
+        cap[v] = c;
+        heap.push(-c, v);
+      }
+    }
+  }
+  return cap;
+}
+
+/** Spreads heights from the vertices given, highest first, each up to its cap; a height never
+ * comes down. */
+function rise(g: Graph, z: Float64Array, cap: Float64Array, from: Iterable<number>): void {
   const heap = new Heap();
   for (const v of from) heap.push(z[v], v);
   while (heap.size > 0) {
@@ -184,8 +224,8 @@ function rise(g: Graph, z: Float64Array, from: Iterable<number>): void {
     const u = heap.pop();
     if (zu < z[u]) continue;
     for (let x = g.start[u]; x < g.start[u + 1]; x++) {
-      const c = zu - g.drop[x];
       const v = g.to[x];
+      const c = Math.min(zu - g.drop[x], cap[v]);
       if (c > z[v]) {
         z[v] = c;
         heap.push(c, v);
@@ -345,7 +385,7 @@ function liftOverCrossings(
   });
 
   const headroom = CLEARANCE + SLAB;
-  const lifted: number[] = [];
+  const lifted = new Set<number>();
   pieces.forEach((p, i) => {
     if (levels[i] === 0) return;
     const m = p.pts.length / 2;
@@ -392,13 +432,13 @@ function liftOverCrossings(
             }
             const ramp = sl * slopes[q.link ? 1 : 0];
             if (Math.min(reach.dist[a] + t * ramp, reach.dist[b] + (1 - t) * ramp) < headroom) continue;
-            if (target[v] <= z[v]) lifted.push(v);
+            lifted.add(v);
             target[v] = need;
           }
         }
     }
   });
-  return lifted;
+  return [...lifted];
 }
 
 /** The height of every vertex of every piece, metres above the land (tunnels at 0). */
@@ -411,10 +451,20 @@ export function solveHeights(
   const linkSlope = opts.linkSlope ?? LINK_RAMP;
   const g = graphOf(pieces, slope, linkSlope);
   const { target, onDeck } = targetsOf(pieces, g, deckAt);
-  const z = Float64Array.from(target);
+  // nothing stands higher than the highest target plus a headroom for every round
+  const cap = capsOf(
+    g,
+    target,
+    onDeck,
+    target.reduce((a, b) => Math.max(a, b), 0) + (CLEARANCE + SLAB) * ROUNDS,
+  );
+  const z = new Float64Array(g.size);
   const sources: number[] = [];
-  for (let v = 0; v < g.size; v++) if (target[v] > 0) sources.push(v);
-  rise(g, z, sources);
+  for (let v = 0; v < g.size; v++) {
+    z[v] = Math.min(target[v], cap[v]);
+    if (z[v] > 0) sources.push(v);
+  }
+  rise(g, z, cap, sources);
 
   // a piece's level: the highest along it, a bridge with no level at one, the ground at 0
   const levels = Int32Array.from(pieces, (p) => {
@@ -428,8 +478,8 @@ export function solveHeights(
   for (let round = 0; round < ROUNDS; round++) {
     const lifted = liftOverCrossings(pieces, levels, g, z, target, onDeck, ext, reach, [slope, linkSlope]);
     if (lifted.length === 0) break;
-    for (const v of lifted) z[v] = Math.max(z[v], target[v]);
-    rise(g, z, lifted);
+    for (const v of lifted) z[v] = Math.max(z[v], Math.min(target[v], cap[v]));
+    rise(g, z, cap, lifted);
   }
 
   const all = new Float32Array(g.off[pieces.length]);

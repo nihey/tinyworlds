@@ -235,7 +235,33 @@ describe("solveHeights", () => {
     const under = piece("u0", "u1", line(200, -100, 200, 100));
     const deck = (e: number): number | null => (e >= 150 && e <= 250 ? 4 : null);
     const z = solveHeights([b, under], deck);
-    expect(z[0][20]).toBe(4);
+    for (let i = 0; i < b.pts.length / 2; i++) {
+      const d = deck(b.pts[i * 2]);
+      if (d !== null) expect(z[0][i]).toBe(Math.fround(d));
+    }
+  });
+
+  it("an overland approach comes down to meet a low deck near the shore", () => {
+    // the scene's deck: 0 within 10 m of the shore (e = 0), then up to 41 m 220 m out
+    const deck = (e: number): number | null => {
+      if (e < 0) return null;
+      const t = Math.min(1, Math.max(0, (e - 10) / 210));
+      return 41 * t * t * (3 - 2 * t);
+    };
+    const approach = levelOn(piece("l", "s", line(-300, 0, 0, 0)), -300, 0);
+    const bridge = piece("s", "x", line(0, 0, 400, 0));
+    bridge.bridge = bridge.bridge.map(() => true);
+    const z = solveHeights([approach, bridge], deck);
+    for (let i = 0; i < bridge.pts.length / 2; i++)
+      expect(z[1][i]).toBe(Math.fround(deck(bridge.pts[i * 2])!));
+    expect(z[0].at(-1)).toBe(0);
+    for (let i = 0; i < approach.pts.length / 2; i++) {
+      const d = -approach.pts[i * 2];
+      if (d <= 50) expect(z[0][i]).toBeLessThanOrEqual(0.08 * d + 1e-6);
+    }
+    // inland it is an overpass again
+    expect(z[0][20]).toBeCloseTo(6.5, 6);
+    expect(z[0][0]).toBeCloseTo(6.5, 6);
   });
 
   it("keeps tunnels out, and rails to rails", () => {
