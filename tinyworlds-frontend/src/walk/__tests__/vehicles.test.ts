@@ -329,6 +329,31 @@ describe("walls and damage", () => {
     expect(vehicleBlocked("bus", 54.5, 100, EAST, 0, w)).toBe(true);
     expect(vehicleBlocked("sedan", -10, 100, EAST, 0, w)).toBe(true);
   });
+
+  it("grazes the edge of the data and drives on along it, hit only by the speed into it", () => {
+    const w = worldOf(...strip(3));
+    // 10 degrees off the north edge, a little short of it
+    const yaw = (80 * Math.PI) / 180;
+    const v = car("sedan", 100, 199, yaw, 30);
+    const r = run(v, gas, w, 1, () =>
+      expect(vehicleBlocked(v.kind, v.e, v.n, v.yaw, v.z, w)).toBe(false),
+    );
+    expect(r.impact).toBeCloseTo(30 * Math.sin((10 * Math.PI) / 180), 0);
+    expect(r.wrecked).toBe(false);
+    expect(v.state).toBe("driven");
+    expect(v.damage).toBeLessThan(0.2);
+    expect(Math.hypot(v.v, v.vs)).toBeGreaterThan(15);
+    expect(v.e).toBeGreaterThan(120);
+  });
+
+  it("eases back into the data when found over its edge", () => {
+    const w = worldOf(...strip(3));
+    const v = car("sedan", 100, 199.9, NORTH, 0);
+    expect(vehicleBlocked(v.kind, v.e, v.n, v.yaw, v.z, w)).toBe(true);
+    run(v, gas, w, 0.5);
+    expect(vehicleBlocked(v.kind, v.e, v.n, v.yaw, v.z, w)).toBe(false);
+    expect(v.n + CARS.sedan.length / 2 - CARS.sedan.width / 2).toBeLessThan(200);
+  });
 });
 
 describe("decks", () => {
@@ -397,6 +422,49 @@ describe("decks", () => {
     expect(r.fell).toBeCloseTo(landing, 0);
     expect(v.damage).toBeCloseTo(2 * (r.fell - 3) * 0.022, 6);
     expect(r.impact).toBe(0);
+  });
+
+  /** Lets a car fall for two seconds: how many steps said it landed, and the hardest landing. */
+  const drop = (v: Vehicle, w: WalkWorld) => {
+    let landings = 0;
+    let fell = 0;
+    for (let f = 0; f < 120; f++) {
+      const ev = stepCar(v, null, w, 1 / 60);
+      if (ev.fell > 0) landings++;
+      fell = Math.max(fell, ev.fell);
+    }
+    return { landings, fell };
+  };
+
+  it("comes down by a deck's rail onto the deck, never onto the rail", () => {
+    const w = worldOf(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay([
+            [0, 100, 5],
+            [200, 100, 5],
+          ]),
+        ],
+      }),
+    );
+    // its middle half a metre inside the deck's north edge, its side over the rail
+    const v = car("sedan", 100, 104.5, EAST, 0, 8);
+    v.state = "loose";
+    const r = drop(v, w);
+    expect(v.z).toBe(5);
+    expect(r.landings).toBe(1);
+    expect(r.fell).toBeCloseTo(Math.sqrt(2 * 13 * 3), 0);
+  });
+
+  it("rests on a low building's top it comes down on, landing once", () => {
+    const w = worldOf(makeCell(0, 0, { volumes: [boxVolume(90, 90, 110, 110, 0, 5)] }));
+    const v = car("sedan", 100, 100, EAST, 0, 9);
+    v.state = "loose";
+    const r = drop(v, w);
+    expect(v.z).toBeGreaterThan(4.9);
+    expect(v.z).toBeLessThan(5.15);
+    expect(r.landings).toBe(1);
+    expect(r.fell).toBeCloseTo(Math.sqrt(2 * 13 * 4), 0);
   });
 
   it("does not sink on a bridge over the water", () => {

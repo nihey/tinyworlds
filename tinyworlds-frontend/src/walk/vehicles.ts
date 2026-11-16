@@ -189,6 +189,10 @@ export const STEP_UP = 0.5;
 const SNAP = 0.25;
 /** A falling car lands on what it crossed this step, never on a deck above it. */
 const LAND_EPS = 0.02;
+/** The radius of a car's middle, for what holds it up from below. */
+const MIDDLE = 0.05;
+/** Slower than this, m/s, a car held on a building's top is settling, not landing. */
+const SETTLE = 1;
 /** As the world's walls: a volume no higher than this above the floor is not in the way. */
 const WALL_EPS = 0.05;
 /** A vehicle found inside a wall is eased out of it this far a step. */
@@ -687,13 +691,23 @@ function ground(v: Vehicle, world: VehicleWorld, h: number, out: VehicleEvents) 
     fell = -v.vz;
     v.z = land.z;
   } else if (
-    // coming down onto a building's top: it holds the car up
+    // coming down with its middle onto a building's top: the building holds it up (a deck's rail,
+    // or a building it only overhangs, does not: it falls on past them)
     v.vz < 0 &&
-    vehicleBlocked(v.kind, v.e, v.n, v.yaw, v.z, world) &&
-    !vehicleBlocked(v.kind, v.e, v.n, v.yaw, prevZ, world)
+    world.blocked(v.e, v.n, MIDDLE, v.z, SIZES[v.kind].height) &&
+    !world.blocked(v.e, v.n, MIDDLE, prevZ, SIZES[v.kind].height)
   ) {
-    fell = -v.vz;
-    v.z = prevZ;
+    // down to the top (as far as the walls let it, found as a blocked move is); held there it
+    // settles a hair each step, and only the first touch is a landing
+    let lo = v.z;
+    let hi = prevZ;
+    for (let i = 0; i < BISECT; i++) {
+      const mid = (lo + hi) / 2;
+      if (world.blocked(v.e, v.n, MIDDLE, mid, SIZES[v.kind].height)) lo = mid;
+      else hi = mid;
+    }
+    fell = -v.vz > SETTLE ? -v.vz : 0;
+    v.z = hi;
   } else return;
   v.vz = 0;
   out.fell = Math.max(out.fell, fell);

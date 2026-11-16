@@ -183,7 +183,9 @@ export class WalkWorld {
   /**
    * The way out of the nearest wall a body touches: a unit vector from the wall towards the body
    * (from the body to the wall's nearest edge when it is inside it), or null when it touches none.
-   * What a car needs to slide along a wall and to know how hard it hit it.
+   * Outside the data (its edge, or a square that failed to load, is a wall too) it is the way back
+   * in, towards the nearest square beside it that is loaded. What a car needs to slide along a wall
+   * and to know how hard it hit it.
    */
   wallNormal(
     e: number,
@@ -192,12 +194,34 @@ export class WalkWorld {
     zFeet: number,
     height: number,
   ): [number, number] | null {
+    if (!this.inData(e, n)) return this.wayIn(e, n);
     const hit = this.nearestWall(e, n, radius, zFeet, height);
     if (!hit) return null;
     const ne = hit.inside ? hit.px - e : e - hit.px;
     const nn = hit.inside ? hit.py - n : n - hit.py;
     const len = Math.hypot(ne, nn);
     return len > 1e-6 ? [ne / len, nn / len] : null;
+  }
+
+  /** From a point outside the data, the unit way to the nearest of the loaded squares round its own, or null when none is. */
+  private wayIn(e: number, n: number): [number, number] | null {
+    const i = Math.floor(e / CELL);
+    const j = Math.floor(n / CELL);
+    let best = Infinity;
+    let out: [number, number] | null = null;
+    for (let di = -1; di <= 1; di++)
+      for (let dj = -1; dj <= 1; dj++) {
+        if ((di === 0 && dj === 0) || !this.has(i + di, j + dj)) continue;
+        const qe = Math.max((i + di) * CELL, Math.min((i + di + 1) * CELL, e));
+        const qn = Math.max((j + dj) * CELL, Math.min((j + dj + 1) * CELL, n));
+        const d = Math.hypot(qe - e, qn - n);
+        if (d >= best) continue;
+        best = d;
+        // on the boundary itself: straight across it
+        const len = d > 1e-9 ? d : Math.hypot(di, dj);
+        out = d > 1e-9 ? [(qe - e) / len, (qn - n) / len] : [di / len, dj / len];
+      }
+    return out;
   }
 
   /** The railings of every elevated way near the point: both edges, 1 m high, open where ways meet. */

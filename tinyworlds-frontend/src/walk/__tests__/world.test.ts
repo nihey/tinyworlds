@@ -133,6 +133,29 @@ describe("walls", () => {
     expect(w.has(1, 0)).toBe(false);
   });
 
+  it("points back into the data from outside it, across the edge crossed", () => {
+    const w = world(makeCell(0, 0));
+    const near = (got: [number, number] | null, want: [number, number]) => {
+      expect(got).not.toBeNull();
+      expect(got![0]).toBeCloseTo(want[0], 9);
+      expect(got![1]).toBeCloseTo(want[1], 9);
+    };
+    near(w.wallNormal(201, 50, 0.4, 0, 1.8), [-1, 0]);
+    near(w.wallNormal(50, -3, 0.4, 0, 1.8), [0, 1]);
+    near(w.wallNormal(200, 50, 0.4, 0, 1.8), [-1, 0]);
+    // past a corner: towards it
+    near(w.wallNormal(203, 204, 0.4, 0, 1.8), [-0.6, -0.8]);
+    // a square and more away: no way in to tell
+    expect(w.wallNormal(450, 50, 0.4, 0, 1.8)).toBeNull();
+  });
+
+  it("slides a walker along the edge of the data", () => {
+    const w = world(makeCell(0, 0));
+    const [e, n] = w.slide(199, 50, 201, 52, 0.4, 0, 1.8);
+    expect(e).toBeCloseTo(199, 9);
+    expect(n).toBeCloseTo(52, 9);
+  });
+
   it("loses a removed square's walls", () => {
     const w = world(makeCell(0, 0, { volumes: [boxVolume(50, 50, 80, 80)] }), makeCell(1, 0));
     expect(w.blocked(60, 60, 0.4, 0, 1.8)).toBe(true);
