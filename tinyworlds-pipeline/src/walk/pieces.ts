@@ -98,7 +98,10 @@ export function piecesOf(segments: Segment[]): Piece[] {
       if (kind === "walk" && a === b) continue;
 
       const mid = (s0 + s1) / 2 / total;
-      if (kind === "walk" && covers(seg.flags, mid, hasFlag(...WALK_OUT))) continue;
+      const underground =
+        covers(seg.flags, mid, hasFlag("is_tunnel")) || covers(seg.levels, mid, (r) => (r.value ?? 0) < 0);
+      // nobody strolls through a tunnel: only street and rail tunnels stay, for their portals
+      if (kind === "walk" && (underground || covers(seg.flags, mid, hasFlag(...WALK_OUT)))) continue;
       if (kind === "rail" && covers(seg.flags, mid, hasFlag("is_abandoned", "is_disused"))) continue;
 
       // the connectors, and the segment's own vertices between them, with their distance along it
@@ -142,8 +145,7 @@ export function piecesOf(segments: Segment[]): Piece[] {
         pts: flat,
         bridge,
         level,
-        tunnel:
-          covers(seg.flags, mid, hasFlag("is_tunnel")) || covers(seg.levels, mid, (r) => (r.value ?? 0) < 0),
+        tunnel: underground,
       });
     }
   });

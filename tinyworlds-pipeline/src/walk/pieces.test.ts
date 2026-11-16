@@ -95,6 +95,14 @@ describe("piecesOf", () => {
     expect(piecesOf([seg({ cls: "footway", flags: [{ values: ["is_indoor"] }] })])).toHaveLength(0);
   });
 
+  it("leaves walking pieces in tunnels out, and keeps street tunnels", () => {
+    expect(piecesOf([seg({ cls: "footway", flags: [{ values: ["is_tunnel"] }] })])).toHaveLength(0);
+    expect(piecesOf([seg({ cls: "footway", levels: [{ value: -1 }] })])).toHaveLength(0);
+    const ps = piecesOf([seg({ flags: [{ values: ["is_tunnel"] }] })]);
+    expect(ps).toHaveLength(2);
+    expect(ps.every((p) => p.tunnel)).toBe(true);
+  });
+
   it("drops closed streets, abandoned rails and slivers", () => {
     expect(piecesOf([seg({ access: [{ access_type: "denied" }] })])).toHaveLength(0);
     expect(
