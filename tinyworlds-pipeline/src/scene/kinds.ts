@@ -79,6 +79,9 @@ PAINT_RANK[G.RedRock] = G.Rock + 0.5; // rock, of another colour
 /** Ways (roads, paths, rails) start at this rank. */
 export const WAY_RANK = G.Pier + 0.5;
 
+/** Line flags: a bridge's deck, drawn by the map as a volume; the walk makes its own way of it. */
+export const L_BRIDGE = 1;
+
 export const isWater = (kind: number): boolean => kind === G.Water || kind === G.Lake;
 
 /** How a wall is drawn. */

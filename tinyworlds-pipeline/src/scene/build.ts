@@ -21,7 +21,7 @@ import { hashString, mix, rand } from "./hash.js";
 import { loadHeights } from "./heights.js";
 import { buildSyntheticScene } from "./synthetic.js";
 import { cantileverTruss, type Truss } from "./truss.js";
-import { F_FLOATING, F_NO_OUTLINE, G, Pattern, Roof } from "./kinds.js";
+import { F_FLOATING, F_NO_OUTLINE, G, L_BRIDGE, Pattern, Roof } from "./kinds.js";
 import { nearestBridge, type Owners } from "./owners.js";
 import { LineSink, PolySink } from "./sinks.js";
 import { f32, u32, u8, writeScene } from "./store.js";
@@ -41,8 +41,7 @@ import { chooseStyle, type Style } from "./styles.js";
 
 export const GEO = makeGeo(CITY.origin.lon, CITY.origin.lat, CITY.betaDeg, CITY.k);
 
-/** Line flags. */
-export const L_BRIDGE = 1;
+export { L_BRIDGE };
 
 // ---------------------------------------------------------------------------------------------
 // projection scratch
