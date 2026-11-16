@@ -3,7 +3,7 @@ import { Crowd, type Person } from "../people";
 import { CYCLE, greenLeft, signal } from "../lights";
 import type { WalkEdge } from "../cell";
 import { newVehicle, type Vehicle } from "../vehicles";
-import { makeCell, waterRect, worldOf } from "./fixtures";
+import { boxVolume, makeCell, waterRect, worldOf } from "./fixtures";
 
 /** A walking edge through [e, n] points. */
 function walkEdge(a: number, b: number, pts: number[][], opts: Partial<WalkEdge> = {}): WalkEdge {
@@ -281,6 +281,28 @@ describe("the water", () => {
     expect(world.isWater(p.e, p.n)).toBe(false);
   });
 
+  it("a jump aside never takes anyone into the water", () => {
+    const walks = [
+      walkEdge(1, 2, [
+        [20, 98],
+        [180, 98],
+      ]),
+    ];
+    const world = worldOf(makeCell(0, 0, { walks, mask: waterRect(0, 0, 0, 100, 200, 200) }));
+    const crowd = new Crowd(world, constant(0.1));
+    const p = crowd.addAt("1-2", 60)!;
+    // a car coming from the west just south of them: the way clear of it is north, into the water
+    const car = carAt(p.e - 8, p.n - 0.3, 10, Math.PI / 2);
+    let dodged = false;
+    for (let k = 0; k < 120; k++) {
+      crowd.step(0.02, GREEN_T, { e: p.e, n: p.n }, k === 0 ? [car] : []);
+      if (p.state === "dodging") dodged = true;
+      expect(world.isWater(p.e, p.n)).toBe(false);
+    }
+    expect(dodged).toBe(true);
+    expect(p.state).not.toBe("swimming");
+  });
+
   it("someone knocked into the water swims out", () => {
     const walks = [
       walkEdge(1, 2, [
@@ -301,6 +323,30 @@ describe("the water", () => {
     }
     expect(swam).toBe(true);
     expect(world.isWater(p.e, p.n)).toBe(false);
+  });
+});
+
+describe("walls", () => {
+  it("walking back to the line after a fall never passes through a wall", () => {
+    const walks = [
+      walkEdge(1, 2, [
+        [20, 20],
+        [180, 20],
+      ]),
+    ];
+    const world = worldOf(makeCell(0, 0, { walks, volumes: [boxVolume(0, 24, 200, 28)] }));
+    const crowd = new Crowd(world, constant(0.5));
+    const p = crowd.addAt("1-2", 80)!;
+    // thrown over the building: lying on its far side
+    p.e = 100;
+    p.n = 35;
+    p.state = "down";
+    p.downFor = 0.05;
+    for (let k = 0; k < 200; k++) {
+      crowd.step(0.05, GREEN_T, { e: 100, n: 30 }, []);
+      expect(world.blocked(p.e, p.n, 0.3, 0, 1.7)).toBe(false);
+      expect(p.n).toBeGreaterThan(28);
+    }
   });
 });
 

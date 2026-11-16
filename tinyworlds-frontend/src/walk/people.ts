@@ -496,10 +496,34 @@ export class Crowd {
       w.next = null;
       w.s = Math.min(w.s, w.way.len);
     }
+    const back = Math.abs(w.off) > 0.01;
+    const pe = w.e;
+    const pn = w.n;
     if (w.off !== 0) w.off -= clamp(w.off, -RETURN * dt, RETURN * dt);
     this.place(w);
+    if (back) this.keepOut(w, pe, pn);
     w.phase += w.v * dt * 3.6;
     if (!running) w.state = held && w.v < STILL ? "waiting" : "walking";
+  }
+
+  /**
+   * Walking back to the line from where a jump or a fall left them: the move from (pe, pn) slides
+   * along walls and never enters the water, and their offset from the line becomes what is left.
+   */
+  private keepOut(w: Walker, pe: number, pn: number): void {
+    let [se, sn] = this.world.slide(pe, pn, w.e, w.n, BODY, w.z, 1.7);
+    if (w.z <= 0.5 && this.world.isWater(se, sn) && !this.world.isWater(pe, pn)) {
+      se = pe;
+      sn = pn;
+    }
+    if (se === w.e && sn === w.n) return;
+    const x = w.dir > 0 ? w.s : w.way.len - w.s;
+    const o = this.sample(w.way, x, this.out);
+    const te = o[3] * w.dir;
+    const tn = o[4] * w.dir;
+    w.off = (se - o[0]) * tn - (sn - o[1]) * te - w.side;
+    w.e = se;
+    w.n = sn;
   }
 
   /** The edge a person takes at the end of theirs: straight on if it can, never back unless a dead end. */
@@ -533,7 +557,7 @@ export class Crowd {
 
   /** A jump aside: free movement for a moment, then back to the line. */
   private dodge(w: Walker, dt: number): boolean {
-    this.drift(w, dt, 0);
+    this.drift(w, dt, 0, false);
     w.dodgeFor -= dt;
     if (w.dodgeFor <= 0) {
       w.dodgeFor = 0;
@@ -547,7 +571,7 @@ export class Crowd {
 
   /** Lying where a knock left them; then up, running scared, back to a line. */
   private lie(w: Walker, dt: number): boolean {
-    this.drift(w, dt, KNOCK_DECAY);
+    this.drift(w, dt, KNOCK_DECAY, true);
     if (this.world.isWater(w.e, w.n) && w.z <= 0.5) {
       w.state = "swimming";
       w.swimTo = null;
@@ -564,12 +588,13 @@ export class Crowd {
     return true;
   }
 
-  /** Free movement with the velocity (ve, vn), slowed by `decay` m/s²; stopped by a wall, a wall of the data or the edge of a deck. */
-  private drift(w: Walker, dt: number, decay: number): void {
+  /** Free movement with the velocity (ve, vn), slowed by `decay` m/s²; stopped by a wall, the edge of the data, the edge of a deck, and (unless `intoWater`: only a knock may do that) the water. */
+  private drift(w: Walker, dt: number, decay: number, intoWater: boolean): void {
     const ne = w.e + w.ve * dt;
     const nn = w.n + w.vn * dt;
     const stop =
       this.world.blocked(ne, nn, BODY, w.z, 1.7) ||
+      (!intoWater && w.z <= 0.5 && this.world.isWater(ne, nn)) ||
       (w.z > 0.5 && this.world.surfaceUnder(ne, nn, w.z, 0.6).z < w.z - 0.5);
     if (stop) {
       w.ve = 0;
