@@ -301,8 +301,12 @@ signs give way while walking.
   map's rank order;
 - decks, ramps, parapets and columns in concrete and asphalt from the palette, the lane lines
   carried up onto them; cables as thin lines in their steel;
-- water as an opaque surface in the map's water colours with a slow pixel shimmer, hiding
-  whatever is under it; the shore a low edge (quay stone along paved land and piers, a bank
+- water as an opaque surface in the map's water colours, hiding whatever is under it, and not
+  flat: the owner asked for water "prettier according to" a write-up of layered pixel-art water,
+  so it is built in layers, each picking a palette colour per pixel (no blending): darker away
+  from the shore, lighter where it mirrors the sky, the city reflected in three flat tones with
+  whole-pixel wobble, a shallow band and lapping dashes along the near shores, a quiet dark far
+  side, glints and ripple rings, all on one 5 s loop; the shore a low edge (quay stone along paved land and piers, a bank
   elsewhere);
 - trees as upright pixel billboards;
 - sky and a fog from 140 m to 560 m; squares within 3 load, beyond 4.5 unload;
