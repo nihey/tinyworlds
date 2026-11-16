@@ -113,6 +113,27 @@ describe("jumping and falling", () => {
     expect(p.sinceHurt).toBeLessThan(3);
   });
 
+  it("lands on the ground, hurt, when steered back under the deck stepped off", () => {
+    const w = world(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay([
+            [0, 50, 10],
+            [60, 50, 10],
+          ]),
+        ],
+      }),
+    );
+    const p = newPlayer(64, 50, 10, EAST);
+    run(p, fwd, w, 0.5);
+    expect(p.airFrom).not.toBeNull();
+    p.yaw = -EAST;
+    const ev = run(p, fwd, w, 3);
+    expect(p.z).toBe(0);
+    expect(ev.landed).toBe("ground");
+    expect(ev.hurt).toBeCloseTo(fallDamage(10, "ground"), 0);
+  });
+
   it("is killed by a 20 m fall", () => {
     const w = world(
       makeCell(0, 0, {

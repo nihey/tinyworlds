@@ -27,6 +27,8 @@ const CLIMB = 0.8;
 const CLIMB_PROBE = 0.5;
 /** Stepping down less than this keeps you on the ground (ramps, curbs) instead of falling. */
 const SNAP = 0.1;
+/** How far above the feet a surface still counts as the one just crossed. */
+const LAND_EPS = 0.02;
 const MAX_DT = 0.1;
 const SUBSTEP = 0.02;
 
@@ -162,9 +164,15 @@ function footStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
   if (p.airFrom === null) return;
 
   p.vz -= GRAVITY * h;
+  const prevZ = p.z;
   p.z += p.vz * h;
   p.airFrom = Math.max(p.airFrom, p.z);
-  surf = w.surfaceUnder(p.e, p.n, p.launch, JUMP_REACH);
+  // what we may land on is what we crossed this step: never a deck above our feet (a faller drifting
+  // back under the deck they left stays under it); only a car's roof, within the jump's reach
+  surf = w.surfaceUnder(p.e, p.n, prevZ, LAND_EPS);
+  const roof = w.roofs?.(p.e, p.n);
+  if (roof != null && roof > surf.z && roof <= Math.min(prevZ, p.launch) + JUMP_REACH)
+    surf = { z: roof, kind: "roof" };
   if (p.vz <= 0 && p.z <= surf.z) {
     const hurt = fallDamage(p.airFrom - surf.z, surf.kind);
     if (hurt > 0) {
