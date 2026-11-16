@@ -27,7 +27,7 @@ chosen with `--city` (default `tinynyc`).
 ## Commands
 
 ```bash
-npm run all -- --city tinyrao        # fetch → scene → render → index
+npm run all -- --city tinyrao        # fetch → scene → render → index (→ wiki, quiz, walk where the city has them)
 npm run cli -- --city tinyrao fetch [--force]   # raw data into data/<city>/raw (skips what is there)
 npm run cli -- --city tinyrao scene             # raw data → data/<city>/scene (typed arrays in map px)
 npm run cli -- --city tinyrao render            # scene → ../tinyworlds-frontend/public/data/<city>
@@ -37,6 +37,8 @@ npm run cli -- --city tinyrao index             # places.json, hoods.json, life.
                                                 # and the indexes' version in manifest.json (`indexes`)
 npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
 npm run cli -- --city tinynyc quiz [--list] [--force-views]   # quiz.<locale>.json: Guess the building's questions
+npm run cli -- --city tinynyc walk [--out <dir>]   # the street walk: walk/cells/*.bin, walk/walk.json, manifest.walk
+npm run cli -- --city tinynyc walk --around -73.9857,40.7580,600   # only the squares near a point
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
@@ -107,6 +109,7 @@ src/
 │   ├── plate.ts       # a picture cut from a world's finished tiles (any world, no scene needed)
 │   ├── home-card.ts   # the front page's share card: six cities in leaning slices, from their tiles
 │   ├── bin.ts run.ts worker.ts pyramid.ts encode.ts scene.ts
+├── walk/              # the street walk's squares (see "Street walk")
 └── index/
     ├── build.ts       # search index, area outlines, ferry routes and flights (from data)
     ├── sights.ts      # which search entries are sights and what they are called; sights.json
@@ -429,6 +432,61 @@ change to the rules below.
   viewer has `sights` and no `quiz`. The files are written all the same.
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
+
+## Street walk (`walk/`)
+
+The `walk` step (run last by `all` for a city whose file says `walk: true`: New York) writes the
+viewer's street walk into `walk/` of the world's data folder: the city in squares of 200 m of
+metres east and north of the projection's origin, one gzipped file of typed arrays each
+(`walk/cells/<i>_<j>.bin`), the index (`walk/walk.json`) and their version in the manifest
+(`walk`). The contract is in the root `CLAUDE.md`. It reads the scene and `raw/segment.parquet`
+and fetches nothing.
+
+| File                       | Does                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `grid.ts`                  | world space (e, n), squares, map px to metres                                |
+| `format.ts`                | a square's file; `packed` refuses a value its typed array cannot hold        |
+| `clip.ts`, `cut.ts`        | the scene cut into squares: volumes by their centre, ground split by         |
+|                            | quadtree, the map's ways clipped to the square grown by 30 m, trees, cables  |
+| `mask.ts`, `shore.ts`      | land and water per 2 m cell, painted in the map's order; the distance from   |
+|                            | each water cell to the land, across squares (an exact distance transform     |
+|                            | over 512 m round each square)                                                |
+| `segments.ts`, `pieces.ts` | Overture's segments, cut at their connectors and densified to 10 m           |
+| `heights.ts`               | bridges at the map's decks exactly, overpasses at their level × 6.5 m, ramps |
+|                            | of 8% (12% on links), 4.5 m clear over the ways below                        |
+| `network.ts`               | nodes (numbered for the whole city), streets, walks, elevated ways, lights,  |
+|                            | tunnels                                                                      |
+| `moorings.ts`              | boats along the piers the hash picks, every 12 m on the water side           |
+| `build.ts`                 | the step: the map's decks for the heights, which squares, filing, the files  |
+
+- **Which squares.** A square is written when the fog leaves its centre on the map (`fog.end`),
+  or when it holds something the map draws (volumes, ways, trees, cables). Ground alone does not
+  count: the harbour's polygons reach tens of kilometres past the map. A square on the map with
+  no ground at all is water, as the map paints it. Streets, walks and elevated ways are filed
+  under every written square their strip touches, boats under the one they float in.
+- **Ways keep the vertices their shape needs** (`shapeOf`): the pieces are cut every 10 m for
+  the heights, but a vertex within 0.1 m of the line through its neighbours, in plan and height,
+  is left out of the file (both ends of a change of who builds an elevated deck stay). That
+  takes a quarter to a third off a dense square.
+- **The map's decks** (`deckAtFromScene`): the tops of the floating deck volumes (`F_FLOATING`,
+  `Roof.Deck`), found through a 25 m grid. The run says how many vertices on them stand above
+  them: in New York 22 of 7,353, all ends of footways where several meet and find different
+  steps of the deck (the vertex takes the highest), at most 1.5 m over.
+- **Tunnels.** A portal off the map (its fog past `fog.end`, or no square there) is closed: that
+  end is `null`, the open one first, and a tunnel with no portal on the map is left out. New
+  York keeps 122 of its 155 (33 have no portal on the map); one is closed, City Place's
+  underpass in Edgewater. The Holland and Lincoln tunnels stay open: their New Jersey portals
+  are 2.0 and 1.6 km from the city, inside the map's fog.
+- **`--around lon,lat,metres`** writes only the squares within that distance of a point and
+  leaves the others as they are; the version is still a hash of every file. It reads the whole
+  city all the same (node numbers are the whole city's, and a square's shore and boats need
+  the masks round it): Times Square at 600 m takes 20 to 45 s and 3 GB, 40 squares, 0.2 MB; the
+  7 × 7 squares round it come to 0.27 MB.
+- A value that does not fit its array (a vertex 3.2 km from its square's corner, a volume below
+  the ground, a ring of more than 65,535 vertices) stops the run with the square and the array
+  named, rather than writing a wrong square.
+- New York, the whole city: about 35,600 squares on the map; run it on a machine with room
+  (`npm run build && node --max-old-space-size=24000 dist/cli.js --city tinynyc walk`).
 
 ## How a tile is drawn (`render/chunk.ts`)
 

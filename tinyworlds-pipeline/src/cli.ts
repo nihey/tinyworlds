@@ -17,6 +17,7 @@ import { renderAll } from "./render/run.js";
 import { loadScene } from "./render/scene.js";
 import { buildScene } from "./scene/build.js";
 import { fetchAll } from "./sources/index.js";
+import { buildWalk } from "./walk/build.js";
 
 const program = new Command();
 program
@@ -145,8 +146,22 @@ program
   });
 
 program
+  .command("walk")
+  .description(
+    "Cut the city into the street walk's 200 m squares: walk/cells/, walk/walk.json, manifest.walk",
+  )
+  .option("--out <dir>", "output directory (default: the frontend's public/data)")
+  .option("--around <lon,lat,metres>", "only write the squares near a point; the others are kept")
+  .action(async (opts: { out?: string; around?: string }) => {
+    const a = opts.around?.split(",").map(Number);
+    await buildWalk({ out: opts.out, around: a ? { lon: a[0], lat: a[1], radius: a[2] } : undefined });
+  });
+
+program
   .command("all")
-  .description("fetch, scene, render, index and (where a city has sights) wiki and quiz, in order")
+  .description(
+    "fetch, scene, render, index, (where a city has sights) wiki and quiz, and (where it has a walk) walk, in order",
+  )
   .action(async () => {
     await fetchAll({ force: false });
     await buildScene();
@@ -156,6 +171,7 @@ program
       await buildWiki();
       await writeQuiz();
     }
+    if (CITY.walk) await buildWalk();
   });
 
 await program.parseAsync();

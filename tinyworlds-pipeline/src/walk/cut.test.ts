@@ -157,4 +157,20 @@ describe("squareArrays", () => {
     expect(arrays["tree.xy"]).toBeUndefined();
     expect(arrays.mask).toBeInstanceOf(Uint8Array);
   });
+
+  it("refuses a value its array cannot hold, naming the square and the array", () => {
+    const fresh = () => cutScene(scene(), geo).get("1_0")!;
+    const far = fresh();
+    far.vol.xy[0] = 40000; // 4 km from the square's corner: past an i16 of decimetres
+    expect(() => squareArrays(far)).toThrow(RangeError);
+    expect(() => squareArrays(far)).toThrow(/1_0.*vol\.xy/);
+
+    const sunk = fresh();
+    sunk.vol.base[0] = -5;
+    expect(() => squareArrays(sunk)).toThrow(/1_0.*vol\.base/);
+
+    const long = fresh();
+    long.gnd.verts[0] = 70000;
+    expect(() => squareArrays(long)).toThrow(/1_0.*gnd\.verts/);
+  });
 });

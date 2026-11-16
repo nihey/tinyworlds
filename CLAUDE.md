@@ -54,6 +54,14 @@ Each sub-project has its own `CLAUDE.md`.
 
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
+- **New York can be walked.** The street walk is the city at street level, in 3D: on foot, at
+  the wheel and in the water. It is static too: the pipeline's `walk` step (for a world whose
+  file says `walk: true`) cuts the map's own scene and Overture's streets into squares of 200 m
+  (`walk/`, below): the buildings, ground and trees the map draws, its bridges with their decks
+  at the map's heights and overpasses ramped to theirs, the network traffic and people follow
+  (lights, one-way streets, crosswalks, tunnels; a tunnel whose far end is off the map is closed
+  there), land and water, and boats tied at the piers. Only squares on the map are written. The
+  viewer loads the squares round you as you go, and nothing of the walk loads until one opens.
 - **The API exists for donations** (and keeps the answers of "Guess the building", below). Each proposed city is built when donations for it reach
   its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
@@ -408,6 +416,7 @@ south-west corner. **World dm**: `i32` decimetres from the origin.
 | `way.xy` | i16 | vertex ×2 | clipped to the square grown by 30 m, local dm |
 | `tree.xy` `tree.kind` | i16 ×2, u8 | tree | |
 | `mask` | u8 | 1 or 1251 | `[0]`: 0 all land, 1 all water, 2 mixed, then 1250 bytes: 100 × 100 cells of 2 m from the south-west, bit `x + 100y` LSB-first, 1 = water |
+| `shore` | u8 | 0 or 10000 | for a square with any water: per 2 m cell (as the mask), the distance to the nearest land in 2 m steps, 0 on land, capped at 255, measured over the whole city (across squares; a square with no file counts as land, the map's edge); absent for an all-land square |
 | `node.id` | u32 | node | city-wide; every node an edge of this square ends at |
 | `node.xyz` | i32 | ×3 | world dm |
 | `node.flags` | u8 | | bit0 lights, bit1 tunnel portal |

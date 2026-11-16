@@ -22,6 +22,36 @@ function typeOf(a: CellArrays[string]): string {
 
 const pad4 = (n: number) => (n + 3) & ~3;
 
+const INTS = {
+  u8: [Uint8Array, 0, 0xff],
+  u16: [Uint16Array, 0, 0xffff],
+  i16: [Int16Array, -0x8000, 0x7fff],
+  u32: [Uint32Array, 0, 0xffffffff],
+  i32: [Int32Array, -0x80000000, 0x7fffffff],
+} as const;
+
+export type IntType = keyof typeof INTS;
+
+/**
+ * Integers into a typed array of the type the contract gives them, refusing any value the array
+ * would wrap or clamp (a corrupt square is worse than none): the error names the square and the
+ * array.
+ */
+export function packed(
+  square: string,
+  name: string,
+  type: IntType,
+  values: ArrayLike<number>,
+): CellArrays[string] {
+  const [Ctor, lo, hi] = INTS[type];
+  for (let k = 0; k < values.length; k++) {
+    const v = values[k];
+    if (!(v >= lo && v <= hi) || !Number.isInteger(v))
+      throw new RangeError(`walk: square ${square}: ${name}[${k}] = ${v} does not fit ${type}`);
+  }
+  return Ctor.from(values);
+}
+
 export function encodeCell(i: number, j: number, arrays: CellArrays): Buffer {
   const names = Object.keys(arrays);
   const header = Buffer.from(

@@ -192,6 +192,11 @@ export interface City {
      */
     areaByDistrict?: boolean;
   };
+  /**
+   * The street walk: the `walk` step (run last by `all`) cuts the city into the 200 m squares the
+   * viewer's walk mode loads, from the scene and Overture's segments (`segment.parquet`).
+   */
+  walk?: boolean;
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };
   trees: {

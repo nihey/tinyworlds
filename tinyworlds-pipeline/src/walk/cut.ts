@@ -7,7 +7,7 @@
 import { L_BRIDGE, PAINT_RANK } from "../scene/kinds.js";
 import type { Arr } from "../scene/store.js";
 import { clipPolyline, splitByCells } from "./clip.js";
-import type { CellArrays } from "./format.js";
+import { packed, type CellArrays, type IntType } from "./format.js";
 import { CELL, cellKey, type Geo } from "./grid.js";
 import { maskOf, type MaskPolygon } from "./mask.js";
 
@@ -295,42 +295,46 @@ export function cutScene(
   return out;
 }
 
-const clamp16 = (v: number): number => (v < -32768 ? -32768 : v > 32767 ? 32767 : v);
-
-/** A square as the encoder takes it; arrays with nothing in them are left out, `mask` is always there. */
+/**
+ * A square as the encoder takes it; arrays with nothing in them are left out, `mask` is always
+ * there. A value its array cannot hold (a vertex past ±3.2 km, a volume below the ground, a ring of
+ * more than 65,535 vertices) is a RangeError naming the square, never a silently wrong square.
+ */
 export function squareArrays(sq: SceneSquare): CellArrays {
-  const all: CellArrays = {
-    "vol.rings": Uint16Array.from(sq.vol.rings),
-    "vol.verts": Uint16Array.from(sq.vol.verts),
-    "vol.xy": Int16Array.from(sq.vol.xy, clamp16),
-    "vol.base": Uint16Array.from(sq.vol.base),
-    "vol.top": Uint16Array.from(sq.vol.top),
-    "vol.roofH": Uint16Array.from(sq.vol.roofH),
-    "vol.roofShape": Uint8Array.from(sq.vol.roofShape),
-    "vol.wall": Uint8Array.from(sq.vol.wall),
-    "vol.roof": Uint8Array.from(sq.vol.roof),
-    "vol.glass": Uint8Array.from(sq.vol.glass),
-    "vol.pattern": Uint8Array.from(sq.vol.pattern),
-    "vol.flags": Uint8Array.from(sq.vol.flags),
-    "vol.seed": Uint32Array.from(sq.vol.seed),
-    "cab.verts": Uint16Array.from(sq.cab.verts),
-    "cab.kind": Uint8Array.from(sq.cab.kind),
-    "cab.xyz": Int32Array.from(sq.cab.xyz),
-    "gnd.kind": Uint8Array.from(sq.gnd.kind),
-    "gnd.order": Uint32Array.from(sq.gnd.order),
-    "gnd.rings": Uint16Array.from(sq.gnd.rings),
-    "gnd.verts": Uint16Array.from(sq.gnd.verts),
-    "gnd.xy": Int16Array.from(sq.gnd.xy, clamp16),
-    "way.kind": Uint8Array.from(sq.way.kind),
-    "way.width": Uint16Array.from(sq.way.width),
-    "way.order": Uint32Array.from(sq.way.order),
-    "way.verts": Uint16Array.from(sq.way.verts),
-    "way.xy": Int16Array.from(sq.way.xy, clamp16),
-    "tree.xy": Int16Array.from(sq.tree.xy, clamp16),
-    "tree.kind": Uint8Array.from(sq.tree.kind),
-  };
+  const key = cellKey(sq.i, sq.j);
+  const fields: [string, IntType, number[]][] = [
+    ["vol.rings", "u16", sq.vol.rings],
+    ["vol.verts", "u16", sq.vol.verts],
+    ["vol.xy", "i16", sq.vol.xy],
+    ["vol.base", "u16", sq.vol.base],
+    ["vol.top", "u16", sq.vol.top],
+    ["vol.roofH", "u16", sq.vol.roofH],
+    ["vol.roofShape", "u8", sq.vol.roofShape],
+    ["vol.wall", "u8", sq.vol.wall],
+    ["vol.roof", "u8", sq.vol.roof],
+    ["vol.glass", "u8", sq.vol.glass],
+    ["vol.pattern", "u8", sq.vol.pattern],
+    ["vol.flags", "u8", sq.vol.flags],
+    ["vol.seed", "u32", sq.vol.seed],
+    ["cab.verts", "u16", sq.cab.verts],
+    ["cab.kind", "u8", sq.cab.kind],
+    ["cab.xyz", "i32", sq.cab.xyz],
+    ["gnd.kind", "u8", sq.gnd.kind],
+    ["gnd.order", "u32", sq.gnd.order],
+    ["gnd.rings", "u16", sq.gnd.rings],
+    ["gnd.verts", "u16", sq.gnd.verts],
+    ["gnd.xy", "i16", sq.gnd.xy],
+    ["way.kind", "u8", sq.way.kind],
+    ["way.width", "u16", sq.way.width],
+    ["way.order", "u32", sq.way.order],
+    ["way.verts", "u16", sq.way.verts],
+    ["way.xy", "i16", sq.way.xy],
+    ["tree.xy", "i16", sq.tree.xy],
+    ["tree.kind", "u8", sq.tree.kind],
+  ];
   const out: CellArrays = {};
-  for (const [name, a] of Object.entries(all)) if (a.length > 0) out[name] = a;
+  for (const [name, type, values] of fields)
+    if (values.length > 0) out[name] = packed(key, name, type, values);
   out.mask = sq.mask;
   return out;
 }

@@ -70,3 +70,12 @@ export function maskOf(polys: MaskPolygon[], i: number, j: number, paintRank: Fl
   for (let b = 0; b < water.length; b++) if (water[b]) out[1 + (b >> 3)] |= 1 << (b & 7);
   return out;
 }
+
+/** Whether a square's mask is water at a point, in metres east and north of its south-west corner. */
+export function waterAt(mask: Uint8Array, de: number, dn: number): boolean {
+  if (mask[0] !== 2) return mask[0] === 1;
+  const x = Math.min(SIDE - 1, Math.max(0, Math.floor(de / CELL_M)));
+  const y = Math.min(SIDE - 1, Math.max(0, Math.floor(dn / CELL_M)));
+  const b = x + SIDE * y;
+  return ((mask[1 + (b >> 3)] >> (b & 7)) & 1) === 1;
+}
