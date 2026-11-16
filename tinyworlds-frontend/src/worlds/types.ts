@@ -73,6 +73,15 @@ export interface World {
    * sign under "more cities" starts the game. Without it the viewer never asks for the files.
    */
   quiz?: boolean;
+  /**
+   * Its data has the street walk (walk/): the little person on the map opens a walk at street
+   * level, on foot, at the wheel or on the water. Without it the viewer never asks for the files.
+   */
+  walk?: boolean;
+  /**
+   * Speeds in the walk are in miles per hour (the country drives by them). Absent: km/h.
+   */
+  units?: "imperial";
   /** How queries are read. This follows the language of the map's names, not the interface's. */
   search: SearchRules;
 }

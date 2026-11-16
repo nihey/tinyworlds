@@ -1,4 +1,6 @@
 import type { PlaceType } from "@/map/manifest";
+import type { ActionId } from "@/walk/controls";
+import type { BoatKind, CarKind } from "@/walk/kinds";
 
 /** The words of one sign-in sheet: the admin's and, later, the donor's. */
 export interface SignInWords {
@@ -726,6 +728,92 @@ export interface Strings {
     stop: string;
     loading: string;
     empty: string;
+  };
+  /**
+   * The street walk: the person on the map, the signs of the walk, the controls menu and the
+   * wasted screen. Hint templates take "{forward}", "{jump}"... (an action's id) and are filled
+   * with the key's label; "{key}", "{vehicle}", "{n}" and "{max}" are filled where they are shown.
+   */
+  walk: {
+    /** the tool-column button: the little person, and what it does */
+    person: string;
+    personHint: string;
+    /** while the person is held over the map */
+    dropHere: string;
+    /** after tapping the person on a touch screen */
+    tapMap: string;
+    /** the sign when nothing walkable is near where it was dropped */
+    noStreet: string;
+    loading: string;
+    failed: string;
+    noWebgl: string;
+    /** leaves the walk for the map */
+    back: string;
+    /** the controls menu: its title, its reset, the wait for a key, an empty slot, its close button */
+    controls: string;
+    resetControls: string;
+    pressKey: string;
+    unbound: string;
+    closeMenu: string;
+    groups: { foot: string; drive: string; any: string };
+    actions: Record<ActionId, string>;
+    /** the names of keys that are not a letter or a digit */
+    keys: {
+      space: string;
+      leftShift: string;
+      rightShift: string;
+      leftCtrl: string;
+      rightCtrl: string;
+      leftAlt: string;
+      rightAlt: string;
+      up: string;
+      down: string;
+      left: string;
+      right: string;
+      enter: string;
+      tab: string;
+      backspace: string;
+      capsLock: string;
+    };
+    /** the corner sign's line for each way of moving, with the actions' ids as placeholders */
+    hints: { foot: string; swim: string; drive: string; sail: string };
+    /** near a vehicle: "{key}" is the key to get in, "{vehicle}" a name from `vehicles` */
+    getIn: string;
+    vehicles: Record<CarKind | BoatKind, string>;
+    /** "{n}" is the speed */
+    speed: { mph: string; kmh: string };
+    /** the bars' labels: the walker's life, a vehicle's damage, and "Life {n} of {max}" for screen readers */
+    life: string;
+    lifeLabel: string;
+    damage: string;
+    wrecked: string;
+    /** brief messages */
+    messages: {
+      slowDown: string;
+      noRoom: string;
+      tunnelClosed: string;
+      sinking: string;
+      edge: string;
+    };
+    /** the wasted screen's word, and what a screen reader hears */
+    wasted: string;
+    wastedSaid: string;
+    /** the settings: the pixel size and the sound switch */
+    pixel: string;
+    sound: string;
+    /** before the mouse is captured */
+    clickToLook: string;
+    /** the map beside the walk: a click on it takes you there */
+    mapGoThere: string;
+    /** the touch buttons */
+    touch: {
+      jump: string;
+      enter: string;
+      exit: string;
+      horn: string;
+      camera: string;
+      brake: string;
+    };
   };
   /**
    * The terms of service and the privacy policy (their texts are in src/legal/, not here: no

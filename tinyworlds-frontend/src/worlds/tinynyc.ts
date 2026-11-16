@@ -79,6 +79,8 @@ export const tinynyc: World = {
   accent: { color: "#f7c21b", ink: "#1a1503" },
   sights: true,
   quiz: true,
+  walk: true,
+  units: "imperial",
   search: {
     ...EN_RULES,
     abbreviations: {
