@@ -107,6 +107,17 @@ describe("walls", () => {
     expect(w.slide(5, 5, 6, 6, 0.4, 0, 1.8)).toEqual([6, 6]);
   });
 
+  it("points out of the wall a body touches, from outside it and from inside", () => {
+    const w = world(makeCell(0, 0, { volumes: [boxVolume(10, -50, 20, 150)] }));
+    for (const e of [9.8, 10.2]) {
+      const [ne, nn] = w.wallNormal(e, 50, 0.4, 0, 1.8)!;
+      expect(ne).toBeCloseTo(-1, 9);
+      expect(nn).toBeCloseTo(0, 9);
+    }
+    expect(w.wallNormal(5, 50, 0.4, 0, 1.8)).toBeNull();
+    expect(w.wallNormal(9.8, 50, 0.4, 40, 1.8)).toBeNull();
+  });
+
   it("stays put in a corner", () => {
     const w = world(makeCell(0, 0, { volumes: [boxVolume(10, 10, 20, 20)] }));
     const [e, n] = w.slide(9, 9, 10.5, 10.5, 0.4, 0, 1.8);

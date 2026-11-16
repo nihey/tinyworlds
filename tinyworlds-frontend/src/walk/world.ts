@@ -165,26 +165,39 @@ export class WalkWorld {
     height: number,
   ): [number, number] {
     if (!this.blocked(e1, n1, radius, zFeet, height)) return [e1, n1];
-    const hit = this.nearestWall(e1, n1, radius, zFeet, height);
-    if (hit) {
-      // away from the wall: from its nearest edge point to where we would be (the other way when inside it)
-      let ne = hit.inside ? hit.px - e1 : e1 - hit.px;
-      let nn = hit.inside ? hit.py - n1 : n1 - hit.py;
-      const len = Math.hypot(ne, nn);
-      if (len > 1e-6) {
-        ne /= len;
-        nn /= len;
-        const de = e1 - e0;
-        const dn = n1 - n0;
-        const into = de * ne + dn * nn;
-        const se = e0 + de - (into < 0 ? into * ne : 0);
-        const sn = n0 + dn - (into < 0 ? into * nn : 0);
-        if (!this.blocked(se, sn, radius, zFeet, height)) return [se, sn];
-      }
+    const normal = this.wallNormal(e1, n1, radius, zFeet, height);
+    if (normal) {
+      const [ne, nn] = normal;
+      const de = e1 - e0;
+      const dn = n1 - n0;
+      const into = de * ne + dn * nn;
+      const se = e0 + de - (into < 0 ? into * ne : 0);
+      const sn = n0 + dn - (into < 0 ? into * nn : 0);
+      if (!this.blocked(se, sn, radius, zFeet, height)) return [se, sn];
     }
     if (!this.blocked(e1, n0, radius, zFeet, height)) return [e1, n0];
     if (!this.blocked(e0, n1, radius, zFeet, height)) return [e0, n1];
     return [e0, n0];
+  }
+
+  /**
+   * The way out of the nearest wall a body touches: a unit vector from the wall towards the body
+   * (from the body to the wall's nearest edge when it is inside it), or null when it touches none.
+   * What a car needs to slide along a wall and to know how hard it hit it.
+   */
+  wallNormal(
+    e: number,
+    n: number,
+    radius: number,
+    zFeet: number,
+    height: number,
+  ): [number, number] | null {
+    const hit = this.nearestWall(e, n, radius, zFeet, height);
+    if (!hit) return null;
+    const ne = hit.inside ? hit.px - e : e - hit.px;
+    const nn = hit.inside ? hit.py - n : n - hit.py;
+    const len = Math.hypot(ne, nn);
+    return len > 1e-6 ? [ne / len, nn / len] : null;
   }
 
   /** The railings of every elevated way near the point: both edges, 1 m high, open where ways meet. */

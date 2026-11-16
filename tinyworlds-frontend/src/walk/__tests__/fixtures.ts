@@ -1,5 +1,7 @@
 import type { ElevatedWay, Volume, WalkCell } from "../cell";
 import { CELL } from "../geo";
+import type { WalkIndex } from "../walk-index";
+import { WalkWorld } from "../world";
 
 /** A square with nothing in it, all land; `parts` fills in what a test needs. */
 export function makeCell(i: number, j: number, parts: Partial<WalkCell> = {}): WalkCell {
@@ -69,4 +71,16 @@ export function waterRect(i: number, j: number, e0: number, n0: number, e1: numb
         bits[(x + 100 * y) >> 3] |= 1 << ((x + 100 * y) & 7);
     }
   return { mode: 2 as const, bits };
+}
+
+/** A world made of these squares. */
+export function worldOf(...cells: WalkCell[]): WalkWorld {
+  const w = new WalkWorld({} as WalkIndex);
+  for (const c of cells) w.add(c);
+  return w;
+}
+
+/** `count` empty squares in a row eastwards from (0, 0): open land (or water) to drive (or sail) far along. */
+export function strip(count: number, parts: Partial<WalkCell> = {}): WalkCell[] {
+  return Array.from({ length: count }, (_, i) => makeCell(i, 0, parts));
 }
