@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { WalkCell } from "../cell";
 import { bodyOf } from "../collide";
 import { Ferries } from "../ferries";
-import { enToLonLat, type WalkGeo } from "../geo";
+import { enToLonLat, lonLatToEN, type WalkGeo } from "../geo";
 import { wrap } from "../math";
-import { newVehicle, nextVehicleId, stepBoat } from "../vehicles";
+import { BOATS, newVehicle, nextVehicleId, sizeFor, stepBoat } from "../vehicles";
 import { makeCell, waterRect, worldOf } from "./fixtures";
 
 const geo: WalkGeo = { lon0: -74, lat0: 40.7, betaDeg: 45, k: 2, kz: 2.45 };
@@ -24,6 +24,40 @@ function harbour(): ReturnType<typeof worldOf> {
   return worldOf(...cells);
 }
 
+describe("which boat is the Staten Island ferry", () => {
+  it("is the St. George route whose other end is nearest Whitehall, in lower Manhattan", () => {
+    const stGeorge = [-74.07417, 40.64609];
+    const batteryPark = [-74.01807, 40.71516];
+    const ferries = new Ferries(
+      [
+        { name: "St. George – Bay Ridge", path: [...stGeorge, -74.03816, 40.63991] },
+        { name: "St. George – Battery Park City", path: [...stGeorge, ...batteryPark] },
+        { name: "Sunset Park – Rockaway", path: [-74.02648, 40.6463, -73.83174, 40.58419] },
+      ],
+      geo,
+    );
+    // out along their routes, away from St. George where both begin
+    ferries.step(
+      200,
+      1,
+      worldOf(),
+      true,
+      () => false,
+      () => true,
+    );
+    const orange = ferries.boats().filter((b) => b.color === 1);
+    expect(orange).toHaveLength(1);
+    const [se, sn] = lonLatToEN(geo, stGeorge[0], stGeorge[1]);
+    const [be, bn] = lonLatToEN(geo, batteryPark[0], batteryPark[1]);
+    const { e, n } = orange[0];
+    expect(Math.hypot(e - se, n - sn)).toBeGreaterThan(500);
+    // on the line from St. George to Battery Park City (1.6 km from Whitehall; Bay Ridge is 7 km)
+    const off =
+      Math.abs((be - se) * (n - sn) - (bn - sn) * (e - se)) / Math.hypot(be - se, bn - sn);
+    expect(off).toBeLessThan(1);
+  });
+});
+
 describe("the Staten Island ferry", () => {
   const ferries = new Ferries(
     [
@@ -40,6 +74,9 @@ describe("the Staten Island ferry", () => {
     const body = bodyOf(staten);
     expect(body.hl).toBe(45);
     expect(body.hw).toBe(10);
+    // as much taller and heavier as it is longer
+    expect(sizeFor(staten).height).toBeCloseTo(BOATS.ferry.height * 3, 5);
+    expect(sizeFor(staten).mass).toBeCloseTo(BOATS.ferry.mass * 3, 5);
     const other = boats.find((b) => b !== staten)!;
     expect(other.size).toBeUndefined();
     expect(bodyOf(other).hl).toBe(15);

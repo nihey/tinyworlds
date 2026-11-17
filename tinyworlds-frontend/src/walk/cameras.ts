@@ -144,10 +144,11 @@ export class Cameras {
     const back = behind ? Math.PI : 0;
     const jig = () => (this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 0.6 : 0);
     if (this.mode === "wheel") {
-      // a boat of its own size (the long ferry) has its wheelhouse as far along, and as high
-      const kind = sizeOf(v.kind);
-      const eh = EYES[v.kind][0] * (s.width / kind.width);
-      const ef = EYES[v.kind][1] * (s.length / kind.length);
+      // a boat of its own size (the long ferry) has its wheelhouse as far along and as high as
+      // its model, stretched with its length
+      const longer = s.length / sizeOf(v.kind).length;
+      const eh = EYES[v.kind][0] * longer;
+      const ef = EYES[v.kind][1] * longer;
       const side = v.boat ? 0 : -0.36;
       const sy = Math.sin(v.yaw);
       const cy = Math.cos(v.yaw);

@@ -1,6 +1,6 @@
 import type { BoatKind, CarKind } from "./kinds";
 import { GRAVITY } from "./player";
-import { clamp } from "./math";
+import { clamp, smooth } from "./math";
 import { PARAPET_HEIGHT, WATER_Z, type Parapet, type WalkWorld } from "./world";
 
 /**
@@ -180,11 +180,25 @@ export function sizeOf(kind: CarKind | BoatKind): Size {
 }
 
 const own = new WeakMap<{ length: number; width: number }, Size>();
-/** A vehicle's box: its own when it has one, else its kind's. */
+/**
+ * A vehicle's box: its own when it has one (its height and its weight then go with its length:
+ * the long ferry is as much taller and heavier), else its kind's.
+ */
 export function sizeFor(v: Vehicle): Size {
   if (!v.size) return SIZES[v.kind];
   let s = own.get(v.size);
-  if (!s) own.set(v.size, (s = { ...SIZES[v.kind], length: v.size.length, width: v.size.width }));
+  if (!s) {
+    const kind = SIZES[v.kind];
+    const longer = v.size.length / kind.length;
+    s = {
+      ...kind,
+      length: v.size.length,
+      width: v.size.width,
+      height: kind.height * longer,
+      mass: kind.mass * longer,
+    };
+    own.set(v.size, s);
+  }
   return s;
 }
 
@@ -272,7 +286,6 @@ const HEAVE = 0.12;
 const ROLL = 0.06;
 
 const toward0 = (x: number, by: number) => (x > 0 ? Math.max(0, x - by) : Math.min(0, x + by));
-const smooth = (t: number) => t * t * (3 - 2 * t);
 /** Read through a call: a step can sink what the type checker saw afloat. */
 const isSunk = (v: Vehicle) => v.state === "sunk";
 

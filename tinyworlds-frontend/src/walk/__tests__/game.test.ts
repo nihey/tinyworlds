@@ -9,6 +9,7 @@ import { PARTICLE_RAMPS } from "../render/particles";
 import { WalkSound } from "../sound";
 import { PAINT_RED, parkedOn, starterCar } from "../traffic";
 import { fireDamage } from "../health";
+import { bodyOf, overlap } from "../collide";
 import { applyDamage, newVehicle, nextVehicleId, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
 import { WalkWorld } from "../world";
@@ -166,6 +167,81 @@ describe("bumping into what stands still", () => {
       expect(now().life).toBe(100);
       expect(now().mode).toBe("swim");
     }
+  });
+});
+
+describe("the long ferry", () => {
+  /** Open water round (100, 100) and a 90 × 20 m ferry lying there, bow north. */
+  const lying = () => {
+    const water = { mask: { mode: 1 as const, bits: null } };
+    const parts: Record<string, Partial<WalkCell>> = {};
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) parts[`${i}_${j}`] = water;
+    const ferry = newVehicle(nextVehicleId(), "ferry", 100, 100, 0, "parked", 1);
+    ferry.size = { length: 90, width: 20 };
+    return { cells: area(-1, -1, 1, 1, parts), ferry };
+  };
+
+  it("is solid at its far ends: a swimmer sprinting at its bow stays outside it", () => {
+    const { cells, ferry } = lying();
+    // 6 m beyond the bow, swimming south at it
+    const { game } = play(cells, { start: { e: 100, n: 151, yaw: Math.PI }, vehicles: [ferry] });
+    game.sim(0.1);
+    game.keyDown("ShiftLeft");
+    game.keyDown("KeyW");
+    game.sim(5);
+    expect(game.position().n).toBeGreaterThan(145 + 0.3);
+  });
+
+  /** How deep two hulls are in each other (0 apart). */
+  const depth = (a: Vehicle, b: Vehicle) => overlap(bodyOf(a), bodyOf(b))?.depth ?? 0;
+
+  it("is hit where it is, though its middle is far from you", () => {
+    const { cells } = lying();
+    // lying east–west, its middle 60 m east of you and its stern at e = 115; a speedboat near you
+    // runs at its stern
+    const ferry = newVehicle(nextVehicleId(), "ferry", 160, 100, Math.PI / 2, "parked", 1);
+    ferry.size = { length: 90, width: 20 };
+    const boat = newVehicle(nextVehicleId(), "speedboat", 95, 100, Math.PI / 2, "loose");
+    boat.v = 15;
+    const { game } = play(cells, { start: { e: 100, n: 120 }, vehicles: [ferry, boat] });
+    let deepest = 0;
+    for (let k = 0; k < 120; k++) {
+      game.sim(1 / 30);
+      deepest = Math.max(deepest, depth(ferry, boat));
+    }
+    expect(boat.e).toBeLessThan(115);
+    expect(deepest).toBeLessThan(0.5);
+  });
+
+  it("shoves what lies ahead of its bow when you drive it, never through it", () => {
+    const { cells, ferry } = lying();
+    // a motorboat moored across its way, 52 m ahead of its middle, 5.3 m off its bow
+    const moored = newVehicle(nextVehicleId(), "motorboat", 100, 152, Math.PI / 2, "parked");
+    const { game, now } = play(cells, {
+      start: { e: 111.5, n: 100 },
+      vehicles: [ferry, moored],
+    });
+    game.sim(0.1);
+    game.keyDown("KeyF");
+    game.keyUp("KeyF");
+    game.sim(0.1);
+    expect(now().mode).toBe("boat");
+    game.keyDown("KeyW");
+    let deepest = 0;
+    for (let k = 0; k < 360; k++) {
+      game.sim(1 / 30);
+      deepest = Math.max(deepest, depth(ferry, moored));
+    }
+    expect(moored.state).not.toBe("parked");
+    expect(deepest).toBeLessThan(0.5);
+  });
+
+  it("is boarded from beside its ends too", () => {
+    const { cells, ferry } = lying();
+    // beside its bow quarter, 1.5 m off its side
+    const { game, now } = play(cells, { start: { e: 111.5, n: 143 }, vehicles: [ferry] });
+    game.sim(0.1);
+    expect(now().near?.kind).toBe("ferry");
   });
 });
 
@@ -545,6 +621,35 @@ describe("tunnels", () => {
 });
 
 describe("boats", () => {
+  it("tied with a corner over the pier are set clear of it, and sail away", () => {
+    // the pier's edge at e = 100; a speedboat (2.4 m wide) tied with its side 1.2 m over it
+    const quay = (i: number, j: number) => waterRect(i, j, 100, j * 200, 200, j * 200 + 200);
+    const water = { mask: { mode: 1 as const, bits: null } };
+    const cells = area(-1, -1, 2, 1, {
+      "0_-1": { mask: quay(0, -1) },
+      "0_0": { mask: quay(0, 0), moorings: [{ e: 100, n: 100, heading: 0, kind: "speedboat" }] },
+      "0_1": { mask: quay(0, 1) },
+      "1_-1": water,
+      "1_0": water,
+      "1_1": water,
+      "2_-1": water,
+      "2_0": water,
+      "2_1": water,
+    });
+    const { game, now } = play(cells, { start: { e: 99, n: 100, yaw: Math.PI / 2 } });
+    game.sim(0.2);
+    const boat = game.vehicles().find((v) => v.kind === "speedboat")!;
+    expect(boat.e).toBeGreaterThanOrEqual(100 + 1.2);
+    expect(boat.e).toBeLessThan(104);
+    game.keyDown("KeyF");
+    game.keyUp("KeyF");
+    game.sim(0.1);
+    expect(now().mode).toBe("boat");
+    game.keyDown("KeyW");
+    game.sim(3);
+    expect(boat.n).toBeGreaterThan(110);
+  });
+
   it("are taken from a pier, left onto it, sailed out, left into the water and taken again from it", () => {
     // land west of e = 100, the water east of it; a speedboat tied alongside, bow north
     const quay = (i: number, j: number) => waterRect(i, j, 100, j * 200, 200, j * 200 + 200);

@@ -1,7 +1,7 @@
 import type { StreetEdge, WalkCell } from "./cell";
 import { parkedOn, type KerbSpot } from "./traffic";
-import { newVehicle, nextVehicleId, type Vehicle } from "./vehicles";
-import type { WalkWorld } from "./world";
+import { BOATS, newVehicle, nextVehicleId, vehicleBlocked, type Vehicle } from "./vehicles";
+import { WATER_Z, type WalkWorld } from "./world";
 
 /**
  * The vehicles the game keeps itself: the cars parked along the streets round you (the same every
@@ -10,6 +10,11 @@ import type { WalkWorld } from "./world";
  * No three.js.
  */
 
+/** A moored hull over its pier is set this much farther out at a time, at most this far, m. */
+const CLEAR_STEP = 0.25;
+const CLEAR_MAX = 4;
+/** ...and clear of it for this far along it, ahead or astern, m: so it can sail off. */
+const SAIL_OFF = 8;
 /** Streets this near you get their parked cars, m; beyond the second they are let go. */
 const PARK_REACH = 500;
 const PARK_DROP = 600;
@@ -52,29 +57,88 @@ export class Fleet {
   far: Vehicle[] = [];
   private streets = new Map<string, { box: Box; cars: Vehicle[] }>();
   private moored = new Map<string, Vehicle[]>();
+  /** squares in whose moorings no boat is tied yet: their neighbours are not all in */
+  private waiting = new Map<string, WalkCell>();
   /** where a parked car or a moored boat came from, and the spot it leaves empty when it goes */
   private home = new WeakMap<Vehicle, { list: Vehicle[]; tag: string }>();
   private vacated = new Set<string>();
 
   constructor(private readonly world: WalkWorld) {}
 
-  /** A square came in: its moorings get their boats (but the spots left empty). */
+  /** A square came in: its moorings get their boats once the squares round it are in too. */
   moor(c: WalkCell): void {
-    const list: Vehicle[] = [];
-    c.moorings.forEach((m, k) => {
-      const tag = `m:${c.key}#${k}`;
-      if (this.vacated.has(tag)) return;
-      const paint = ((c.i * 73856093) ^ (c.j * 19349663) ^ (k * 83492791)) >>> 0;
-      const v = newVehicle(nextVehicleId(), m.kind, m.e, m.n, m.heading, "parked", paint & 7);
-      this.home.set(v, { list, tag });
-      list.push(v);
-    });
-    this.moored.set(c.key, list);
+    this.moored.delete(c.key);
+    if (c.moorings.length > 0) this.waiting.set(c.key, c);
   }
 
   /** A square went: its moored boats go with it. */
   unmoor(key: string): void {
     this.moored.delete(key);
+    this.waiting.delete(key);
+  }
+
+  /**
+   * Ties the boats of the squares whose neighbours are all in (`ready`: in, or with no data to
+   * come), so that where the water is can be told all round them (but the spots left empty).
+   */
+  tie(ready: (i: number, j: number) => boolean): void {
+    for (const [key, c] of this.waiting) {
+      let all = true;
+      for (let di = -1; di <= 1 && all; di++)
+        for (let dj = -1; dj <= 1 && all; dj++) all = ready(c.i + di, c.j + dj);
+      if (!all) continue;
+      this.waiting.delete(key);
+      const list: Vehicle[] = [];
+      c.moorings.forEach((m, k) => {
+        const tag = `m:${c.key}#${k}`;
+        if (this.vacated.has(tag)) return;
+        const at = this.clear(m.kind, m.e, m.n, m.heading);
+        if (!at) return;
+        const paint = ((c.i * 73856093) ^ (c.j * 19349663) ^ (k * 83492791)) >>> 0;
+        const v = newVehicle(nextVehicleId(), m.kind, at[0], at[1], m.heading, "parked", paint & 7);
+        this.home.set(v, { list, tag });
+        list.push(v);
+      });
+      this.moored.set(key, list);
+    }
+  }
+
+  /**
+   * Where a boat tied along a pier floats clear of it, free to sail off: where it is, or set out
+   * from the pier (the side of it that is water) a quarter metre at a time until its whole hull is
+   * on the water and stays so 4 m ahead or astern along the pier (whose edge, in 2 m steps, is
+   * ragged); null when 4 m out it still is not (it is left out).
+   */
+  private clear(
+    kind: "speedboat" | "motorboat",
+    e: number,
+    n: number,
+    heading: number,
+  ): [number, number] | null {
+    const w = this.world;
+    const ue = Math.sin(heading);
+    const un = Math.cos(heading);
+    const afloat = (ce: number, cn: number) => !vehicleBlocked(kind, ce, cn, heading, WATER_Z, w);
+    const sails = (ce: number, cn: number, way: number) => {
+      for (let d = 1; d <= SAIL_OFF; d++)
+        if (!afloat(ce + ue * way * d, cn + un * way * d)) return false;
+      return true;
+    };
+    const free = (ce: number, cn: number) =>
+      afloat(ce, cn) && (sails(ce, cn, 1) || sails(ce, cn, -1));
+    if (free(e, n)) return [e, n];
+    // the pier runs along the boat: out from it is across the heading, on the water's side
+    const re = un;
+    const rn = -ue;
+    const look = BOATS[kind].width / 2 + 1;
+    const sides = [1, -1].filter((s) => w.isWater(e + re * s * look, n + rn * s * look));
+    for (const s of sides.length > 0 ? sides : [1, -1])
+      for (let d = CLEAR_STEP; d <= CLEAR_MAX + 1e-9; d += CLEAR_STEP) {
+        const ce = e + re * s * d;
+        const cn = n + rn * s * d;
+        if (free(ce, cn)) return [ce, cn];
+      }
+    return null;
   }
 
   /**

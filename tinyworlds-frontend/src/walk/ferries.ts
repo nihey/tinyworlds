@@ -16,6 +16,8 @@ export type LifeRoutes = LifeFile["ferries"];
 
 const SPEED = 7;
 const STATEN_SPEED = 8;
+/** Whitehall Terminal, lower Manhattan: where the Staten Island Ferry docks (lon, lat). */
+const WHITEHALL = [-74.013, 40.701] as const;
 /** The Staten Island boat's own box, m: three times a ferry's length, twice its beam. */
 const STATEN_SIZE = { length: 90, width: 20 };
 /** Seconds a ferry waits at each end. */
@@ -140,10 +142,23 @@ export class Ferries {
         boat: null,
       });
     });
-    // the Staten Island route's boat is the long orange one: by its name (St. George is its
-    // terminal), else the longest route
+    // the Staten Island route's boat is the long orange one: of the routes from St. George (its
+    // terminal), the one whose other end is nearest Whitehall, where the real one docks in
+    // Manhattan; with none, the longest route
+    const [we, wn] = lonLatToEN(geo, WHITEHALL[0], WHITEHALL[1]);
+    const toWhitehall = (r: Route) => {
+      const last = r.pts.length - 2;
+      return Math.min(
+        Math.hypot(r.pts[0] - we, r.pts[1] - wn),
+        Math.hypot(r.pts[last] - we, r.pts[last + 1] - wn),
+      );
+    };
+    const fromStGeorge = this.routes.filter((r) => /staten island|st\.? george/i.test(r.name));
     const staten =
-      this.routes.find((r) => /staten island|st\.? george/i.test(r.name)) ??
+      fromStGeorge.reduce<Route | undefined>(
+        (a, b) => (!a || toWhitehall(b) < toWhitehall(a) ? b : a),
+        undefined,
+      ) ??
       this.routes.reduce<Route | undefined>((a, b) => (!a || b.len > a.len ? b : a), undefined);
     if (staten) {
       staten.staten = true;

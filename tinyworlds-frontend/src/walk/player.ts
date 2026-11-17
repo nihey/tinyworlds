@@ -3,12 +3,13 @@ import { WATER_Z, type Surface, type WalkWorld } from "./world";
 
 export const WALK = 4.5;
 export const SPRINT = 11;
-export const JUMP = 5.2;
+/** Up at this speed, m/s: 1.62 m at the top with gravity 13, enough for a sedan's roof. */
+export const JUMP = 6.5;
 export const GRAVITY = 13;
 /** The step a walker takes up onto a curb or a stair. */
 export const STEP_UP = 0.3;
-/** What a jump can land on, above where it left the ground (a car's roof, a ledge). */
-export const JUMP_REACH = 1.15;
+/** What a jump can land on, above where it left the ground (a sedan's roof, a ledge; not an SUV's). */
+export const JUMP_REACH = 1.6;
 export const SWIM = 1.6;
 export const SWIM_SPRINT = 3;
 export const RADIUS = 0.35;

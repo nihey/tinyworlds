@@ -51,6 +51,12 @@ export function span(v: Vehicle): [number, number] {
   return [v.boat ? v.z - 1 : v.z, v.z + h];
 }
 
+/** How far a vehicle reaches from its middle: half its own box's diagonal. */
+export function halfDiagonal(v: Vehicle): number {
+  const s = sizeFor(v);
+  return Math.hypot(s.length, s.width) / 2;
+}
+
 export const moving = (v: Vehicle) => v.v !== 0 || v.vs !== 0 || v.w !== 0 || v.vz !== 0;
 
 export interface CrashHooks {
@@ -66,8 +72,7 @@ export interface CrashHooks {
 }
 
 const cellsOf = (v: Vehicle) => {
-  const s = sizeFor(v);
-  const r = Math.hypot(s.length, s.width) / 2;
+  const r = halfDiagonal(v);
   const out: number[] = [];
   for (let x = Math.floor((v.e - r) / BUCKET); x <= Math.floor((v.e + r) / BUCKET); x++)
     for (let y = Math.floor((v.n - r) / BUCKET); y <= Math.floor((v.n + r) / BUCKET); y++)
@@ -154,7 +159,8 @@ export function bumped(
   let worst: { closing: number; ne: number; nn: number } | null = null;
   for (const v of nearby) {
     if (v.state === "sunk" || v.state === "sinking") continue;
-    if (Math.abs(v.e - p.e) > 20 || Math.abs(v.n - p.n) > 20) continue;
+    const reach = halfDiagonal(v) + RADIUS + 1;
+    if (Math.abs(v.e - p.e) > reach || Math.abs(v.n - p.n) > reach) continue;
     const [lo, hi] = span(v);
     if (p.z >= hi - 0.05 || p.z + HEIGHT <= lo) continue;
     const b = fromBox(v, p.e, p.n);

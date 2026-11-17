@@ -1,4 +1,4 @@
-import { fromBox, span } from "./crashes";
+import { fromBox, halfDiagonal, span } from "./crashes";
 import { HEIGHT, RADIUS, STEP_UP, type Player } from "./player";
 import { sizeFor, type Vehicle } from "./vehicles";
 import { WATER_Z, type WalkWorld } from "./world";
@@ -48,7 +48,8 @@ export function toTake(p: Player, nearby: Vehicle[]): Vehicle | null {
   for (const v of nearby) {
     if (v.state === "wrecked" || v.state === "sinking" || v.state === "sunk") continue;
     if (p.mode === "swim" && !v.boat) continue;
-    if (Math.abs(v.e - p.e) > 40 || Math.abs(v.n - p.n) > 40) continue;
+    const near = halfDiagonal(v) + REACH + 1;
+    if (Math.abs(v.e - p.e) > near || Math.abs(v.n - p.n) > near) continue;
     if (Math.abs(v.z - p.z) > 2.5) continue;
     const d = Math.max(0, fromBox(v, p.e, p.n).d);
     if (d <= bestD) {
@@ -63,7 +64,8 @@ export function toTake(p: Player, nearby: Vehicle[]): Vehicle | null {
 function occupied(nearby: Vehicle[], e: number, n: number, z: number, except: Vehicle): boolean {
   for (const v of nearby) {
     if (v === except || v.state === "sunk") continue;
-    if (Math.abs(v.e - e) > 20 || Math.abs(v.n - n) > 20) continue;
+    const near = halfDiagonal(v) + RADIUS + 1;
+    if (Math.abs(v.e - e) > near || Math.abs(v.n - n) > near) continue;
     const [lo, hi] = span(v);
     if (z >= hi || z + HEIGHT <= lo) continue;
     if (fromBox(v, e, n).d < RADIUS) return true;

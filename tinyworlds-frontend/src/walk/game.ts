@@ -3,7 +3,7 @@ import type { Strings } from "@/i18n/types";
 import { Cameras, MOUSE } from "./cameras";
 import type { WalkCell } from "./cell";
 import { actionsOf, type ActionId, type Bindings } from "./controls";
-import { CRUNCH, bumped, collide, fromBox, moving } from "./crashes";
+import { CRUNCH, bumped, collide, fromBox, halfDiagonal, moving } from "./crashes";
 import { EXIT_SPEED, swimOut, toTake, wayOut, type Spot } from "./doors";
 import { Ferries, onRoute, type LifeRoutes } from "./ferries";
 import { Fleet, within } from "./fleet";
@@ -147,8 +147,8 @@ const COLLIDE_REACH = 250;
 /** Within this of you, loose vehicles move (and hit) in steps of at most CLOSE_STEP, with yours. */
 const CLOSE = 30;
 const CLOSE_STEP = 0.02;
-/** What they may hit reaches this much farther (half a bus, and some). */
-const CLOSE_REACH = 15;
+/** How far a vehicle may move in a frame (and some): what it may hit is looked for this much farther. */
+const CLOSE_MARGIN = 10;
 const ROOF_REACH = 15;
 /**
  * A car's roof holds you up (and its side stops you) this far beyond its body: a little more than
@@ -205,8 +205,9 @@ export class WalkGame {
   private roofCars: Vehicle[] = [];
   private gatherIn = 0;
   private parkIn = 0;
-  /** where you were as this frame's short steps began */
-  private closeAt = { e: 0, n: 0 };
+  /** what moves in short steps this frame (worked out as it begins), and how far they reach from you */
+  private closeSet = new Set<Vehicle>();
+  private closeReach = 0;
 
   // input
   private keys = new Set<string>();
@@ -537,6 +538,7 @@ export class WalkGame {
       );
     }
     this.gather();
+    // the rest: what moved once this frame, against anything it may reach
     this.collisions(COLLIDE_REACH, (v) => !this.isClose(v));
     this.follow();
     this.youAndVehicles();
@@ -622,6 +624,7 @@ export class WalkGame {
         this.fleet.unmoor(key);
         this.posts.delete(key);
       }
+    this.fleet.tie((i, j) => this.world.has(i, j) || !cellExists(this.ix, i, j));
   }
 
   /** The signals of the crossings whose node is in this square (its streets are all here too). */
@@ -1065,24 +1068,38 @@ export class WalkGame {
     }
   }
 
-  /** The vehicles that move in short steps: what you drive, and what is loose within 30 m. */
+  /** Whether a vehicle moves in short steps this frame: what you drive, and what was loose within 30 m as it began. */
   private isClose(v: Vehicle): boolean {
-    return v === this.yours || within(v, this.closeAt, CLOSE);
+    return this.closeSet.has(v);
   }
 
   /**
    * What you drive, and the loose vehicles near you, moved in steps of 0.02 s at most, each step
-   * answering the hits it brings: so nothing fast passes through anything near you.
+   * answering the hits it brings (against everything their hulls may reach, a long ferry's far
+   * end too): so nothing fast passes through anything near you. Which they are is settled as the
+   * frame begins, so none is stepped twice or not at all.
    */
   private closeSteps(h: number, playing: boolean): void {
-    this.closeAt = this.focus();
+    const me = this.focus();
+    this.closeSet = new Set();
+    this.closeReach = 0;
+    const yours = playing ? this.yours : null;
+    for (const v of yours ? [yours, ...this.fleet.free] : this.fleet.free)
+      if (v === yours || (v !== this.yours && within(v, me, CLOSE))) {
+        this.closeSet.add(v);
+        const from = Math.max(Math.abs(v.e - me.e), Math.abs(v.n - me.n));
+        this.closeReach = Math.max(this.closeReach, from + halfDiagonal(v));
+      }
     const subs = Math.max(1, Math.ceil(h / CLOSE_STEP - 1e-9));
     const hs = h / subs;
     for (let k = 0; k < subs; k++) {
-      if (playing && this.yours) this.driveStep(hs);
-      for (const v of this.fleet.free)
-        if (v !== this.yours && this.isClose(v)) this.stepFree(v, hs);
-      this.collisions(CLOSE + CLOSE_REACH, (v) => this.isClose(v));
+      // what you drive (once you are out of it, as it sinks, it goes on with nobody at the wheel)
+      if (yours) {
+        if (this.yours === yours) this.driveStep(hs);
+        else this.stepFree(yours, hs);
+      }
+      for (const v of this.closeSet) if (v !== yours) this.stepFree(v, hs);
+      this.collisions(this.closeReach + CLOSE_MARGIN, (v) => this.isClose(v));
     }
   }
 
@@ -1121,8 +1138,8 @@ export class WalkGame {
   // ---------- what hits what, and what comes of it ----------
 
   /**
-   * Every pair of vehicles within `reach` of you that touch, one of them moving and `which` (those
-   * stepped together): see `crashes.ts`.
+   * Every pair of vehicles that touch, one of them moving and `which` (those stepped together),
+   * among those whose hulls come within `reach` of you: see `crashes.ts`.
    */
   private collisions(reach: number, which: (v: Vehicle) => boolean): void {
     const me = this.focus();
@@ -1131,7 +1148,7 @@ export class WalkGame {
         v.state !== "sunk" &&
         v.state !== "sinking" &&
         !(v === this.yours && this.tunnel) &&
-        within(v, me, reach) &&
+        within(v, me, reach + halfDiagonal(v)) &&
         !(v.state === "traffic" && !v.boat && this.traffic.squeezing(v)),
     );
     collide(list, {

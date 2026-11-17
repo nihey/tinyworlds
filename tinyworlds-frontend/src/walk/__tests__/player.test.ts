@@ -64,7 +64,7 @@ describe("walking", () => {
 });
 
 describe("jumping and falling", () => {
-  it("lands after about 0.8 s on flat ground, unhurt", () => {
+  it("lands after about 1 s on flat ground, unhurt", () => {
     const w = world(makeCell(0, 0));
     const p = newPlayer(20, 20, 0, 0);
     stepFoot(p, { ...none, jump: true }, w, 1 / 60);
@@ -73,23 +73,24 @@ describe("jumping and falling", () => {
       stepFoot(p, none, w, 1 / 60);
       t += 1 / 60;
     }
-    expect(t).toBeGreaterThan(0.75);
-    expect(t).toBeLessThan(0.9);
+    // 2 × 6.5 / 13
+    expect(t).toBeGreaterThan(0.95);
+    expect(t).toBeLessThan(1.1);
     expect(p.z).toBe(0);
     expect(p.life).toBe(100);
   });
 
-  it("lands on a 1.1 m roof but not a 1.3 m one", () => {
+  it("lands on a sedan's 1.45 m roof from the ground, but not an SUV's 1.8 m one", () => {
     for (const [roof, expected] of [
-      [1.1, 1.1],
-      [1.3, 0],
+      [1.45, 1.45],
+      [1.8, 0],
     ]) {
       const w = world(makeCell(0, 0));
       w.roofs = (e) => (e >= 22 ? roof : null);
       const p = newPlayer(20, 20, 0, EAST);
       run(p, { ...fwd, jump: true }, w, 1.5, true);
       expect(p.z).toBeCloseTo(expected, 3);
-      if (roof > 1.2) expect(p.e).toBeLessThan(22);
+      if (roof > 1.6) expect(p.e).toBeLessThan(22);
       else expect(p.e).toBeGreaterThanOrEqual(22);
     }
   });

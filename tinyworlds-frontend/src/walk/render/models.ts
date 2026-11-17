@@ -921,13 +921,13 @@ export class WalkModels {
     if (v.state === "sunk") return;
     const pool = this.pools.get(v.kind);
     if (!pool) return;
-    // a vehicle of its own size (the long ferry) is its kind's model stretched to it: as much
-    // higher as it is wider
+    // a vehicle of its own size (the long ferry) is its kind's model stretched to it, as much
+    // taller as it is longer (as `sizeFor` has its height)
     let scale = this.one;
     if (v.size) {
       const kind = sizeOf(v.kind);
-      const across = v.size.width / kind.width;
-      scale = this.stretch.set(across, across, v.size.length / kind.length);
+      const longer = v.size.length / kind.length;
+      scale = this.stretch.set(v.size.width / kind.width, longer, longer);
     }
     const i = this.place(pool, v.e, v.z + v.heave, v.n, v.yaw, 0, -v.roll, scale);
     pool.attrs.ramp.array[i] = this.paint(v);
