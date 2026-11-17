@@ -998,7 +998,8 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   sideways by whole pixels the farther they are under their foot (a pixel whose own texel is
   sky takes a neighbour's that sways onto it, `mirrorSource`, so a cable is not dotted), a
   shade fewer at a time with the fog along the mirrored path); **the shore** (the first metre
-  of land a shade darker, not on a pier; on a near, lit shore a light lapping line two or three cells out, a pixel or
+  of land a shade darker, not on a pier nor on what is painted over one, a plaza or a path on
+  it; on a near, lit shore a light lapping line two or three cells out, a pixel or
   two wide, in dashes travelling along it; on a quiet one, farther than 150 m or facing away
   from the sun, a dark line where it meets the water instead; a broken light line at the
   waterline of what stands in the water, bridge piers, piles and boats, whose walls reach down
@@ -1017,18 +1018,30 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   over 1 s is a gap); the automatic quality's first step lets it go too.
   `view.setReflections(on)` sets it again, `view.reflections` says whether it is on.
 - **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
-  than the gaps between its lines). Where they do, you are on the way whose line you are
-  nearest, as a share of its half-width, among those about as high as the highest within reach,
-  and you stay on yours while about as near (`surfaceUnder`'s `on`): at a fork you take the
-  branch you steer along, never the one rising beside it. A way's round end counts only where
-  no way holds the point beside its line, or where it stands well above them (the outside of a
-  bend), so where one way ends and the next goes on down there is no ledge. A deck holds you
-  0.5 m past its rails. A rail opens where another way's deck is within 3 m of it (`JOIN_HEIGHT`:
-  a car and a rail, so no rail of one roadway stands in another's lanes on a steep hump), is
-  closed round the outside of a bend, and each square gives the pieces along its own stretch,
-  so none is missing where a way crosses into the next square. In a way's strip, from 1.5 m
-  under its deck (a car's nose on a steep ramp) to 5 m over it, no volume is a wall: the
-  towers' openings, the Queensboro's columns under its upper deck.
+  than the gaps between its lines), so which deck you are on is told by your history and your
+  direction (`surfaceUnder`'s `on` and `going`). You stay on the way you are on while its strip
+  holds you, whatever rises or falls beside it; another takes over only where the two are one
+  surface (within 0.2 m for a car, 0.09 m for a walker: less than either's snap down) and goes
+  your way clearly better (a car's direction is where it will point in half a second, so a
+  driver turning onto a branch at a fork gets it). Coming off a way's end or edge, landing or
+  put down, you are on the deck nearest your height that fits best: nearest its line as a share
+  of its half-width, its direction nearest yours, of the kind you were on (footway after
+  footway); a car goes onto a footway only where no roadway is, and ties go to the deck nearest
+  your height, never to the higher. A car (and a walker) keeps the way it was last on through
+  the air and comes down on it. A way's round end counts only where no way holds the point
+  beside its line, where it stands well above them (the outside of a bend), or where it is
+  nearer your height than what is beside (the outside of a joint, a ledge the data leaves
+  between two ways' ends), so where one way ends and the next goes on down there is no ledge.
+  A deck holds you 0.5 m past its rails. **A rail stands for a body on its own way** unless what
+  lies 0.8 m past it (a deck, the ground) is within 0.5 m of the deck: where a branch parts from
+  yours, its rail holds you on yours. For anyone else a rail is open where another way's deck is
+  within 3 m of it (`JOIN_HEIGHT`: a car and a rail), so a car on the other way, in whose lanes
+  it lies, passes. Rails are closed round the outside of a bend, and each square gives the
+  pieces along its own stretch, so none is missing where a way crosses into the next square.
+  In a way's strip, from 0.5 m under its deck (three times its grade there, a car's nose on a
+  steep ramp, where that is more) to 5 m over it, no volume is a wall: the towers' openings, the
+  Queensboro's columns under its upper deck; at a gentle ramp's foot that reaches only its
+  first 6 m.
 - **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
   try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
   one cannot bind a key to two clashing actions). The pixel size and the sound last for the

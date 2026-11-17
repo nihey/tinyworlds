@@ -15,7 +15,7 @@ import {
   type Vehicle,
   type VehicleEvents,
 } from "../vehicles";
-import type { WalkWorld } from "../world";
+import { deckAt, type WalkWorld } from "../world";
 import { boxVolume, deckWay, makeCell, strip, waterRect, worldOf } from "./fixtures";
 
 const EAST = Math.PI / 2;
@@ -556,6 +556,71 @@ describe("decks", () => {
     expect(v.z).toBeCloseTo(5.3, 5);
   });
 
+  it("stays on the road where a footway starts on its line and climbs away, from a standing start", () => {
+    // the footway's first metre is the road's line: no way to tell them apart there but the height
+    const w = worldOf(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay(
+            [
+              [0, 50, 5],
+              [190, 50, 5],
+            ],
+            13,
+          ),
+          deckWay(
+            [
+              [0, 50, 5],
+              [100, 50, 13],
+            ],
+            2.5,
+            1,
+          ),
+        ],
+      }),
+    );
+    const v = car("taxi", 1, 50, EAST, 0, 5);
+    run(v, { ...gas, throttle: 0.4 }, w, 6, () => {
+      expect(v.z).toBeCloseTo(5, 5);
+    });
+    expect(v.e).toBeGreaterThan(40);
+  });
+
+  it("keeps a car on its roadway where a footway along its edge lane drops away beside it", () => {
+    // a 17 m roadway at 21 m, and along its edge lane (6.3 m off its line) a 2.5 m footway 0.65 m
+    // lower that falls away at 30% (the Manhattan Bridge's Brooklyn end)
+    const w = worldOf(
+      ...strip(2, {
+        elevated: [
+          deckWay(
+            [
+              [0, 100, 21],
+              [400, 100, 21],
+            ],
+            17,
+          ),
+          deckWay(
+            [
+              [60, 106.3, 20.35],
+              [80, 106.3, 14.35],
+              [200, 106.3, 14.35],
+            ],
+            2.5,
+            1,
+          ),
+        ],
+      }),
+    );
+    for (const speed of [15, 30]) {
+      const v = car("taxi", 20, 106.3, EAST, speed, 21);
+      const r = run(v, { ...gas, throttle: 0.3 }, w, 180 / speed);
+      expect(v.e).toBeGreaterThan(190);
+      expect(v.z).toBe(21);
+      expect(r.fell).toBe(0);
+      expect(r.impact).toBe(0);
+    }
+  });
+
   it("does not sink on a bridge over the water", () => {
     const w = worldOf(
       ...strip(3, {
@@ -573,6 +638,120 @@ describe("decks", () => {
     expect(r.sank).toBe(0);
     expect(v.state).toBe("driven");
     expect(v.z).toBe(20);
+  });
+});
+
+describe("forks", () => {
+  /** A trunk X ending at (100, 100, 20); A goes on east at `aGrade`, B leaves `turn` degrees to
+   * its left (north) at `bGrade`, `bWidth` wide: their strips overlap for some 80 m. */
+  function fork(aGrade: number, bGrade: number, bWidth = 14, turn = 10) {
+    const r = (turn * Math.PI) / 180;
+    const a = deckWay(
+      [
+        [100, 100, 20],
+        [300, 100, 20 + aGrade * 200],
+      ],
+      14,
+    );
+    const b = deckWay(
+      [
+        [100, 100, 20],
+        [100 + 200 * Math.cos(r), 100 + 200 * Math.sin(r), 20 + bGrade * 200],
+      ],
+      bWidth,
+    );
+    const x = deckWay(
+      [
+        [0, 100, 20],
+        [100, 100, 20],
+      ],
+      14,
+    );
+    return { a, b, r, w: worldOf(...strip(2, { elevated: [x, a, b] })) };
+  }
+
+  /**
+   * A taxi steered (as a driver would, aiming some way ahead) along the line `off` metres to the
+   * left of X's and then of a branch's, from 60 m before the fork to 150 m past it: the hardest
+   * hit and landing, and how far it ever was from its own branch's deck once 20 m past the fork.
+   */
+  function follow(f: ReturnType<typeof fork>, branch: "a" | "b", off: number, speed: number) {
+    const dir = branch === "a" ? 0 : f.r;
+    const own = branch === "a" ? f.a : f.b;
+    const along = (e: number, n: number) =>
+      e <= 100 ? e - 100 : (e - 100) * Math.cos(dir) + (n - 100) * Math.sin(dir);
+    const lane = (s: number): [number, number] =>
+      s <= 0
+        ? [100 + s, 100 + off]
+        : [
+            100 + s * Math.cos(dir) - off * Math.sin(dir),
+            100 + s * Math.sin(dir) + off * Math.cos(dir),
+          ];
+    const [e0, n0] = lane(-60);
+    const v = car("taxi", e0, n0, EAST, speed, 20);
+    const wb = CARS.taxi.length * 0.6;
+    let impact = 0;
+    let fell = 0;
+    let off2 = 0;
+    for (let f2 = 0; f2 < 60 * 30 && along(v.e, v.n) < 150; f2++) {
+      const vabs = Math.abs(v.v);
+      const [te, tn] = lane(along(v.e, v.n) + Math.max(6, Math.min(25, 0.6 * vabs)));
+      let alpha = Math.atan2(te - v.e, tn - v.n) - v.yaw;
+      while (alpha > Math.PI) alpha -= 2 * Math.PI;
+      while (alpha < -Math.PI) alpha += 2 * Math.PI;
+      const delta = Math.atan((2 * wb * Math.sin(alpha)) / Math.hypot(te - v.e, tn - v.n));
+      const thr = Math.max(-1, Math.min(1, (speed - v.v) * 0.5));
+      const steer = Math.max(-1, Math.min(1, delta / (0.6 / (1 + vabs / 15))));
+      const ev = stepCar(
+        v,
+        { throttle: Math.max(0, thr), brake: Math.max(0, -thr), steer, handbrake: false },
+        f.w,
+        1 / 60,
+      );
+      impact = Math.max(impact, ev.impact);
+      fell = Math.max(fell, ev.fell);
+      if (along(v.e, v.n) > 20)
+        off2 = Math.max(off2, Math.abs(v.z - (deckAt(own, v.e, v.n) ?? -99)));
+    }
+    return { impact, fell, off: off2, past: along(v.e, v.n) };
+  }
+
+  const lanes = (half: number) => {
+    const edge = half - 2.2;
+    return [-edge, -edge / 2, 0, edge / 2, edge];
+  };
+
+  /** Every lane of the branches given, both speeds: those that hit, fell, stopped short or left their own deck. */
+  function wrong(f: ReturnType<typeof fork>, branches: ["a" | "b", number][]) {
+    const out: string[] = [];
+    for (const speed of [15, 30])
+      for (const [branch, half] of branches)
+        for (const off of lanes(half)) {
+          const r = follow(f, branch, off, speed);
+          if (r.impact > 0 || r.fell > 0 || r.past < 150 || r.off >= 0.05)
+            out.push(
+              `${branch} ${off.toFixed(1)} ${speed}: impact ${r.impact.toFixed(1)} fell ${r.fell.toFixed(1)} past ${r.past.toFixed(0)} off ${r.off.toFixed(2)}`,
+            );
+        }
+    return out;
+  }
+
+  it("keeps a car in any lane on the branch it steers along, the other rising beside it", () => {
+    expect(
+      wrong(fork(-0.04, 0.02), [
+        ["a", 7],
+        ["b", 7],
+      ]),
+    ).toEqual([]);
+  });
+
+  it("keeps a car on its own branch where a narrower one leaves it lower and falling faster", () => {
+    expect(
+      wrong(fork(-0.04, -0.08, 8.4), [
+        ["a", 7],
+        ["b", 4.2],
+      ]),
+    ).toEqual([]);
   });
 });
 

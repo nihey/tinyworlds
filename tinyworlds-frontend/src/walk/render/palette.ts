@@ -87,6 +87,8 @@ export const G = {
   RedRock: 45,
 } as const;
 export const isWaterKind = (kind: number) => kind === G.Water || kind === G.Lake;
+/** Added to a ground paint's pattern: no damp band by the water (a pier's deck, whatever paints it). */
+export const PAINT_DRY = 4;
 
 /**
  * Ground kind → paint: [colour ramp, shade, alternate ramp, shade, how often the alternate,

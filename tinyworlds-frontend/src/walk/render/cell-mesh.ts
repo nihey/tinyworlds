@@ -22,12 +22,14 @@ import {
   HIGH,
   isWaterKind,
   LIT,
+  PAINT_DRY,
   SHADE,
   SHADES,
   type Palette,
 } from "./palette";
 import {
   groundKindAt,
+  inRings,
   maskTexture,
   shoreFace,
   shoreField,
@@ -408,28 +410,49 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
       groundPaint(palette, G.Land),
     );
     const rank = index.paintRank;
+    // what is painted over a pier's deck (a plaza, a path on it) is the pier, not the shore: it
+    // gets no damp band
+    const piers = cell.ground.filter((g) => g.kind === G.Pier);
+    const dry = (paint: readonly number[], e: number, n: number) =>
+      piers.some((g) => inRings(g.rings, e, n))
+        ? [paint[0], paint[1], paint[2], paint[3] + PAINT_DRY]
+        : paint;
     const items: { rank: number; order: number; draw: () => void }[] = [];
     for (const g of cell.ground) {
       if (isWaterKind(g.kind)) continue;
+      let paint: readonly number[] = groundPaint(palette, g.kind);
+      if (g.kind !== G.Pier && piers.length && g.rings.length) {
+        // its first ring's middle (the mean of its corners)
+        const r = g.rings[0];
+        let e = 0;
+        let n = 0;
+        for (let k = 0; k < r.length; k += 2) [e, n] = [e + r[k], n + r[k + 1]];
+        paint = dry(paint, (e * 2) / r.length, (n * 2) / r.length);
+      }
       items.push({
         rank: rank[g.kind] ?? g.kind,
         order: g.order,
-        draw: () => flat(ground, g.rings, 0, groundPaint(palette, g.kind)),
+        draw: () => flat(ground, g.rings, 0, paint),
       });
     }
     for (const w of cell.ways)
       items.push({
         rank: (rank[w.kind] ?? w.kind) + 0.25,
         order: w.order,
-        draw: () => groundWay(w),
+        draw: () => groundWay(w, dry),
       });
     items.sort((a, b) => a.rank - b.rank || a.order - b.order);
     for (const it of items) it.draw();
   }
 
-  function groundWay(w: GroundWay) {
-    const paint = groundPaint(palette, w.kind);
+  function groundWay(
+    w: GroundWay,
+    dry: (paint: readonly number[], e: number, n: number) => readonly number[],
+  ) {
     const p = w.pts;
+    // its middle vertex
+    const m = Math.floor(p.length / 4) * 2;
+    const paint = dry(groundPaint(palette, w.kind), p[m], p[m + 1]);
     let along = 0;
     for (let k = 2; k + 1 < p.length; k += 2) {
       const L = Math.hypot(p[k] - p[k - 2], p[k + 1] - p[k - 1]);

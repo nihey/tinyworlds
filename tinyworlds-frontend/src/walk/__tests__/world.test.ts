@@ -128,11 +128,13 @@ describe("surfaces", () => {
       1,
     );
     const w = world(makeCell(0, 0, { elevated: [road, path] }));
-    // both lines are one: the way you are on, else the higher
+    // both lines are one: the way you are on, else the one nearest your height (never the
+    // higher just for being higher)
     expect(w.surfaceUnder(2, 50, 5, 0.3, road)).toMatchObject({ z: 5, way: road });
-    expect(w.surfaceUnder(2, 50, 5, 0.3).way).toBe(path);
-    // beside the path, on the road's own lanes: the road, whichever you were on
-    expect(w.surfaceUnder(2, 51, 5, 0.3, path)).toMatchObject({ z: 5, way: road });
+    expect(w.surfaceUnder(2, 50, 5, 0.3).way).toBe(road);
+    expect(w.surfaceUnder(2, 50, 5.16, 0.3).way).toBe(path);
+    // past the path's edge, on the road's own lanes: the road, whichever you were on
+    expect(w.surfaceUnder(2, 52, 5, 0.3, path)).toMatchObject({ z: 5, way: road });
     const p = newPlayer(5, 50, 5, Math.PI / 2);
     for (let i = 0; i < 100; i++)
       stepFoot(p, { forward: 1, strafe: 0, turn: 0, sprint: false, jump: false }, w, 0.05);
@@ -375,13 +377,34 @@ describe("a bridge's towers", () => {
     expect(w.blocked(100, 109, 0.35, 0, 1.8)).toBe(true);
     // at the deck's height but out past its edge (5 m, and 0.3 m to spare)
     expect(w.blocked(100, 106, 0.35, 30, 1.8)).toBe(true);
-    // on the deck, from 1.5 m under it (a car's nose on a steep ramp) to 5 m over it, it is
-    // open; higher or lower, the tower is there again
+    // on the deck, from 0.5 m under it to 5 m over it, it is open; higher or lower, the tower
+    // is there again
     expect(w.blocked(100, 105.2, 0.35, 30, 1.8)).toBe(false);
-    expect(w.blocked(100, 100, 0.35, 28.6, 1.8)).toBe(false);
+    expect(w.blocked(100, 100, 0.35, 29.6, 1.8)).toBe(false);
     expect(w.blocked(100, 100, 0.35, 34.9, 1.8)).toBe(false);
     expect(w.blocked(100, 100, 0.35, 35.2, 1.8)).toBe(true);
-    expect(w.blocked(100, 100, 0.35, 28.4, 1.8)).toBe(true);
+    expect(w.blocked(100, 100, 0.35, 29.4, 1.8)).toBe(true);
+  });
+
+  it("opens no further down a gentle ramp's foot than its first few metres", () => {
+    // an 8% ramp up from the ground, its strip over a building's corner beside it
+    const w = world(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay([
+            [0, 100, 0],
+            [100, 100, 8],
+          ]),
+        ],
+        volumes: [boxVolume(0, 103, 100, 120, 0, 10)],
+      }),
+    );
+    // on the ground in the strip: open where the deck is within half a metre (6 m), the
+    // building's wall past that
+    expect(w.blocked(5, 104, 0.35, 0, 1.8)).toBe(false);
+    for (const e of [8, 12, 20]) expect(w.blocked(e, 104, 0.35, 0, 1.8)).toBe(true);
+    // on the deck itself, open all the way up
+    for (const e of [12, 20, 60]) expect(w.blocked(e, 104, 0.35, e * 0.08, 1.8)).toBe(false);
   });
 });
 
@@ -431,11 +454,46 @@ describe("parapets", () => {
         .parapets(50, 0, 3)
         .filter((r) => Math.abs((r.n0 + r.n1) / 2) < 0.5 && r.z > 17.5 - 0.95 && r.z < 17.5 + 1.45);
     expect(touched(1.8)).toEqual([]);
+    // nor for a car on the low one
+    const pair = (lift: number) => world(makeCell(0, 0, { elevated: [low, high(lift)] }));
+    expect(
+      pair(1.8)
+        .parapets(50, 0, 3, low)
+        .filter((r) => Math.abs((r.n0 + r.n1) / 2) < 0.5),
+    ).toEqual([]);
     // 4 m apart, the higher one's rail stays where it is
-    const closed = world(makeCell(0, 0, { elevated: [low, high(4)] }))
+    const closed = pair(4)
       .parapets(50, 0, 3)
       .filter((r) => Math.abs((r.n0 + r.n1) / 2) < 0.5);
     expect(closed.length).toBeGreaterThan(0);
+  });
+
+  it("holds a car on the higher of two overlapping ways by its own rail, where the other is out of a step", () => {
+    // as above: for a car on the high way, its south rail stands where the low one lies 1.8 m
+    // under what is past it, and is open where they are within half a metre
+    const low = deckWay(
+      [
+        [0, 100, 35],
+        [100, 100, 0],
+      ],
+      14,
+    );
+    const high = (lift: number) =>
+      deckWay(
+        [
+          [0, 107, 35 + lift],
+          [100, 107, lift],
+        ],
+        14,
+      );
+    const rail = (lift: number) => {
+      const h = high(lift);
+      return world(makeCell(0, 0, { elevated: [low, h] }))
+        .parapets(50, 100, 3, h)
+        .filter((r) => Math.abs((r.n0 + r.n1) / 2 - 100) < 0.5);
+    };
+    expect(rail(1.8).length).toBeGreaterThan(0);
+    expect(rail(0.3)).toEqual([]);
   });
 
   it("leaves no gap in a rail where its way crosses into the next square", () => {

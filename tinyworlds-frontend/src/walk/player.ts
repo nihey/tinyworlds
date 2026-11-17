@@ -52,7 +52,8 @@ export interface Player {
   /** the height of the surface last stood on: what a jump's reach counts from */
   launch: number;
   bob: number;
-  /** the elevated way stood on, kept so a walker follows their own where ways overlap */
+  /** the elevated way stood on (in the air: last stood on), kept so a walker follows their own
+   * where ways overlap, and comes down on it */
   on?: ElevatedWay;
 }
 
@@ -149,12 +150,19 @@ function footStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
     if (!air) p.bob += h * speed * 1.7;
   }
 
-  let surf = w.surfaceUnder(p.e, p.n, base, reach, air ? undefined : p.on);
+  let surf = w.surfaceUnder(
+    p.e,
+    p.n,
+    base,
+    reach,
+    air ? undefined : p.on,
+    wi ? { de: wi.de, dn: wi.dn } : null,
+  );
   if (!air) {
     if (p.z - surf.z > SNAP) {
+      // off an edge or down a step: in the air, still last on the way it left (`on`)
       p.airFrom = p.z;
       p.vz = 0;
-      p.on = undefined;
     } else {
       p.z = surf.z;
       p.launch = surf.z;
@@ -163,7 +171,6 @@ function footStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
       if (input.jump) {
         p.vz = JUMP;
         p.airFrom = p.z;
-        p.on = undefined;
       }
     }
   }
@@ -175,7 +182,7 @@ function footStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
   p.airFrom = Math.max(p.airFrom, p.z);
   // what we may land on is what we crossed this step: never a deck above our feet (a faller drifting
   // back under the deck they left stays under it); only a car's roof, within the jump's reach
-  surf = w.surfaceUnder(p.e, p.n, prevZ, LAND_EPS);
+  surf = w.surfaceUnder(p.e, p.n, prevZ, LAND_EPS, p.on, wi ? { de: wi.de, dn: wi.dn } : null);
   const roof = w.roofs?.(p.e, p.n);
   if (roof != null && roof > surf.z && roof <= Math.min(prevZ, p.launch) + JUMP_REACH)
     surf = { z: roof, kind: "roof" };

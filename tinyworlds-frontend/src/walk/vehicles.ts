@@ -2,7 +2,7 @@ import type { ElevatedWay } from "./cell";
 import type { BoatKind, CarKind } from "./kinds";
 import { GRAVITY } from "./player";
 import { clamp, smooth } from "./math";
-import { PARAPET_HEIGHT, WATER_Z, type Parapet, type WalkWorld } from "./world";
+import { PARAPET_HEIGHT, WATER_Z, type Going, type Parapet, type WalkWorld } from "./world";
 
 /**
  * Cars and boats: their kinds, arcade handling, walls, falls, damage and sinking. No three.js, no
@@ -417,13 +417,21 @@ function unit(se: number, sn: number): [number, number] | null {
   return len >= 0.5 ? [se / len, sn / len] : null;
 }
 
-/** A car at height z near (e, n): buildings and the parapets of decks it is level with stop it. */
-function carShape(world: VehicleWorld, kind: CarKind, z: number, e: number, n: number): Shape {
+/** A car at height z near (e, n), on the way `on` (or last on it, in the air): buildings and the
+ * parapets that stand for it (`WalkWorld.parapets`) of decks it is level with stop it. */
+function carShape(
+  world: VehicleWorld,
+  kind: CarKind,
+  z: number,
+  e: number,
+  n: number,
+  on?: ElevatedWay,
+): Shape {
   const s = CARS[kind];
   const r = s.width / 2;
   const offs = CIRCLES[kind];
   const rails = world
-    .parapets(e, n, s.length / 2 + r + MAX_MOVE)
+    .parapets(e, n, s.length / 2 + r + MAX_MOVE, on)
     .filter((p) => p.z < z + s.height && p.z + PARAPET_HEIGHT > z + WALL_EPS);
   return {
     reach: s.length / 2,
@@ -707,9 +715,21 @@ function coast(v: Vehicle, vf: number, vl: number, h: number) {
   return [vf, vl];
 }
 
-/** Gravity, stepping up onto surfaces, following ramps, landing, and going into the water. */
+/** Seconds ahead a car's turn is followed to tell where it is headed. */
+const HEADED = 0.5;
+
+/** Where a car is headed, for which of overlapping ways it is on: where it will point in a moment,
+ * as it turns (at a fork a driver is already turning onto the branch as the car crosses the node). */
+function goingOf(v: Vehicle): Going {
+  const yaw = v.yaw + v.w * HEADED;
+  return { de: Math.sin(yaw), dn: Math.cos(yaw), car: true };
+}
+
+/** Gravity, stepping up onto surfaces, following ramps, landing, and going into the water. In the
+ * air a car keeps the way it was last on (`on`), whose rails still stand for it, until it lands. */
 function ground(v: Vehicle, world: VehicleWorld, h: number, out: VehicleEvents) {
-  const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP, v.on);
+  const going = goingOf(v);
+  const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP, v.on, going);
   // on its surface (a falling car is not, however near the ground: it lands)
   if (v.vz === 0 && v.z - surf.z <= SNAP) {
     if (surf.kind === "water") startSinking(v, out);
@@ -720,11 +740,10 @@ function ground(v: Vehicle, world: VehicleWorld, h: number, out: VehicleEvents) 
     }
     return;
   }
-  v.on = undefined;
   const prevZ = v.z;
   v.vz -= GRAVITY * h;
   v.z += v.vz * h;
-  const land = world.surfaceUnder(v.e, v.n, prevZ, LAND_EPS);
+  const land = world.surfaceUnder(v.e, v.n, prevZ, LAND_EPS, v.on, going);
   let fell = 0;
   if (v.vz <= 0 && v.z <= land.z) {
     if (land.kind === "water") {
@@ -752,6 +771,7 @@ function ground(v: Vehicle, world: VehicleWorld, h: number, out: VehicleEvents) 
     }
     fell = -v.vz > SETTLE ? -v.vz : 0;
     v.z = hi;
+    v.on = undefined;
   } else return;
   v.vz = 0;
   out.fell = Math.max(out.fell, fell);
@@ -779,7 +799,7 @@ function carStep(
     vf * sy + vl * cy,
     vf * cy - vl * sy,
     h,
-    carShape(world, v.kind as CarKind, v.z, v.e, v.n),
+    carShape(world, v.kind as CarKind, v.z, v.e, v.n, v.on),
   );
   if (moved.impact > 0) hit(v, moved.impact, out);
   setVelocity(v, moved.ve, moved.vn);
@@ -807,7 +827,7 @@ export function stepCar(
   const driver = v.state === "wrecked" || v.state === "sinking" ? null : input;
   if (!driver && v.state !== "sinking" && v.v === 0 && v.vs === 0 && v.w === 0 && v.vz === 0) {
     // at rest: nothing to do while the ground stays where it was
-    const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP, v.on);
+    const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP, v.on, goingOf(v));
     if (surf.kind !== "water" && surf.z === v.z) return out;
   }
   const steps = substeps(v, total, CARS[v.kind as CarKind].length / 2);

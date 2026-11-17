@@ -223,6 +223,21 @@ export function shoreSegments(bits: Uint8Array, side: number): [number, number, 
   return out;
 }
 
+/** Whether rings (flat e, n, even-odd) hold a point. */
+export function inRings(rings: Float32Array[], e: number, n: number): boolean {
+  let inside = false;
+  for (const r of rings) {
+    const k = r.length / 2;
+    for (let a = k - 1, b = 0; b < k; a = b++) {
+      const an = r[a * 2 + 1];
+      const bn = r[b * 2 + 1];
+      if (an > n !== bn > n && e < ((r[b * 2] - r[a * 2]) * (n - an)) / (bn - an) + r[a * 2])
+        inside = !inside;
+    }
+  }
+  return inside;
+}
+
 /**
  * The ground kind on top at a point (world metres): of the land polygons holding it, the one
  * painted last (highest rank, then latest in the scene); land where none does.
@@ -249,17 +264,7 @@ export function groundKindAt(c: WalkCell, paintRank: number[]) {
   return (e: number, n: number): number => {
     for (const { g, e0, n0, e1, n1 } of polys) {
       if (e < e0 || e > e1 || n < n0 || n > n1) continue;
-      let inside = false;
-      for (const r of g.rings) {
-        const k = r.length / 2;
-        for (let a = k - 1, b = 0; b < k; a = b++) {
-          const an = r[a * 2 + 1];
-          const bn = r[b * 2 + 1];
-          if (an > n !== bn > n && e < ((r[b * 2] - r[a * 2]) * (n - an)) / (bn - an) + r[a * 2])
-            inside = !inside;
-        }
-      }
-      if (inside) return g.kind;
+      if (inRings(g.rings, e, n)) return g.kind;
     }
     return G.Land;
   };

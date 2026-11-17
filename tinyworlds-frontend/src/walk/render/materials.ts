@@ -40,7 +40,7 @@ import {
   WOBBLE_STILL,
   WOBBLE_WAVE,
 } from "../water";
-import { DEEP, HALF, HIGH, LIT, OUTLINE, SHADE, SHADES, type Palette } from "./palette";
+import { DEEP, HALF, HIGH, LIT, OUTLINE, PAINT_DRY, SHADE, SHADES, type Palette } from "./palette";
 
 /**
  * The walk's shaders, ported from the spike (`walk.html`): every surface picks one palette
@@ -238,7 +238,8 @@ void main() {
  * middle of one over 9 m), the texels on the street grid. `paint` is [colour, alternate, how
  * often, pattern] as palette indices; `lane` is [across −1…1, width], `along` metres.
  * With GROUND, a square's ground: nothing outside the square, nothing where its mask is water,
- * and one shade darker on its first metre by the water (damp), but not on a pier's deck.
+ * and one shade darker on its first metre by the water (damp), but not on a pier's deck, nor on
+ * what is painted over one (a pattern of `PAINT_DRY` or more).
  */
 const FLAT_VERTEX = /* glsl */ `
 attribute vec4 paint; attribute vec2 lane; attribute float along;
@@ -272,6 +273,8 @@ void main() {
   ivec2 t = ivec2(floor(g));
   float r = float(hash2(t.x, t.y) & 1023u) / 1024.0;
   int pat = int(vPaint.w);
+  bool dry = pat >= ${PAINT_DRY};
+  pat = pat % ${PAINT_DRY};
   float idx = vPaint.x;
   if (pat == 0) { if (r < vPaint.z) idx = vPaint.y; }
   else if (pat == 1) { if ((t.x & 7) == 0 || (t.y & 7) == 0) idx = vPaint.y; }
@@ -286,7 +289,7 @@ void main() {
   if (masked > 0.5) {
     int c = int(idx + 0.5);
     vec2 uv = (vLocal + fromGrid(vec2(t) + 0.5) - en) / side;
-    if (texture2D(shore, uv).a * ${f(255 / 64)} < ${f(DAMP_STEPS)} && c / ${SHADES} != pierRamp && c % ${SHADES} > 0)
+    if (!dry && texture2D(shore, uv).a * ${f(255 / 64)} < ${f(DAMP_STEPS)} && c / ${SHADES} != pierRamp && c % ${SHADES} > 0)
       idx = float(c - 1);
   }
 #endif
