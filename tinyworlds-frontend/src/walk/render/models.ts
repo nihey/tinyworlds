@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import type { BoatKind, CarKind } from "../kinds";
 import type { Person } from "../people";
+import type { SignalPost } from "../signals";
 import type { Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
-import { FOG_FAR, FOG_NEAR, HORIZON } from "./materials";
+import { DRAIN, FOG_FAR, FOG_NEAR, GREY_RAMPS, HORIZON, greysOf } from "./materials";
 import { SHADES, type Palette } from "./palette";
 
 /**
@@ -33,6 +34,11 @@ const BAR_RED = 11;
 const BAR_BLUE = 12;
 const CABIN = 13;
 const DECK = 14;
+// the parts of a traffic signal
+const LAMP_RED = 15;
+const LAMP_YELLOW = 16;
+const LAMP_GREEN = 17;
+const HOUSING = 18;
 // the parts of a person
 const SHIRT = 0;
 const PANTS = 1;
@@ -104,12 +110,12 @@ const FIXED = [
   "darkStone",
   "cream",
   "taxi",
-  "mint",
+  "libertyGreen",
   "pier",
   "ferryOrange",
 ] as const;
 
-/** Every ramp the models paint with: the palette must have them all. */
+/** Every ramp the models paint with (and drain to): the palette must have them all. */
 export const MODEL_RAMPS: readonly string[] = [
   ...new Set<string>([
     ...CAR_PAINTS,
@@ -120,6 +126,7 @@ export const MODEL_RAMPS: readonly string[] = [
     ...HAIRS,
     ...Object.values(YOURS),
     ...FIXED,
+    ...GREY_RAMPS,
   ]),
 ];
 
@@ -585,11 +592,25 @@ function personModel(M: Shape) {
   M.limb = 0;
 }
 
+/** A traffic signal on its post, 4 m tall, its three lamps (red over yellow over green) facing forward. */
+function signalModel(M: Shape) {
+  M.box(-0.07, 0.07, 0, 3.0, -0.07, 0.07, TRIM);
+  M.box(-0.2, 0.2, 2.95, 4.05, -0.18, 0.18, HOUSING);
+  for (const [y, part] of [
+    [3.82, LAMP_RED],
+    [3.5, LAMP_YELLOW],
+    [3.18, LAMP_GREEN],
+  ])
+    M.box(-0.11, 0.11, y - 0.11, y + 0.11, -0.23, -0.17, { front: part });
+}
+
 // ---- the shaders
 
+/** The fog, then the drain to greys while you are down (as the city's surfaces have it). */
 const FOG = /* glsl */ `
 uniform vec3 fogColor; uniform float fogNear, fogFar;
-vec3 fogged(vec3 c, float d) { return mix(c, fogColor, smoothstep(fogNear, fogFar, d)); }
+${DRAIN}
+vec3 fogged(vec3 c, float d) { return drained(mix(c, fogColor, smoothstep(fogNear, fogFar, d))); }
 `;
 
 const PALETTE = /* glsl */ `
@@ -658,6 +679,11 @@ void main() {
   else if (p == ${BAR_BLUE}) c = !flash && !wrecked ? P(${r("carBlue")}, 5) : P(${r("carBlue")}, 1);
   else if (p == ${CABIN}) c = P(${r("carWhite")}, t);
   else if (p == ${DECK}) c = P(${r("pier")}, t);
+  // a signal: its lit lamp (0 red, 1 yellow, 2 green) shines, the others are dark
+  else if (p == ${LAMP_RED}) c = vLit == 0 ? P(${r("carRed")}, 5) : P(${r("darkStone")}, 1);
+  else if (p == ${LAMP_YELLOW}) c = vLit == 1 ? P(${r("taxi")}, 5) : P(${r("darkStone")}, 1);
+  else if (p == ${LAMP_GREEN}) c = vLit == 2 ? P(${r("libertyGreen")}, 5) : P(${r("darkStone")}, 1);
+  else if (p == ${HOUSING}) c = P(${r("taxi")}, t - 1);
   else c = P(${r("taxi")}, t - 1);
   gl_FragColor = vec4(fogged(c, length(vMV)), 1.0);
 }`;
@@ -796,6 +822,7 @@ export class WalkModels {
   private readonly at = new THREE.Vector3();
   private readonly one = new THREE.Vector3(1, 1, 1);
   private readonly yours: [number, number, number, number];
+  private readonly grey = { value: 0 };
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -810,6 +837,8 @@ export class WalkModels {
       fogColor: { value: HORIZON },
       fogNear: { value: FOG_NEAR },
       fogFar: { value: FOG_FAR },
+      grey: this.grey,
+      greys: { value: greysOf(palette) },
     };
     this.vehicleMat = new THREE.ShaderMaterial({
       uniforms: { ...shared, time: { value: 0 } },
@@ -835,6 +864,9 @@ export class WalkModels {
     const person = M.arrays();
     this.pools.set("person", new Pool(scene, person, PERSON_ATTRS, this.personMat, 64));
     this.pools.set("you", new Pool(scene, person, PERSON_ATTRS, this.personMat, 1));
+    const post = new Shape();
+    signalModel(post);
+    this.pools.set("signal", new Pool(scene, post.arrays(), VEHICLE_ATTRS, this.vehicleMat, 64));
     this.yours = [
       this.ramp(YOURS.top),
       this.ramp(YOURS.bottom),
@@ -928,6 +960,20 @@ export class WalkModels {
     pool.attrs.phase.array[i] = 0;
     pool.attrs.amp.array[i] = 0;
     (pool.attrs.cols.array as Float32Array).set(this.yours, i * 4);
+  }
+
+  /** A traffic signal on its post, `lit` its lamp that is on (0 red, 1 yellow, 2 green). */
+  signal(post: SignalPost, lit: 0 | 1 | 2): void {
+    const pool = this.pools.get("signal")!;
+    const i = this.place(pool, post.e, post.z, post.n, post.yaw, 0, 0);
+    pool.attrs.ramp.array[i] = 0;
+    pool.attrs.lit.array[i] = lit;
+    pool.attrs.dmg.array[i] = 0;
+  }
+
+  /** Drains the colours to the palette's greys, 0 (none) to 1 (all): the wasted sequence. */
+  setGrey(amount: number): void {
+    this.grey.value = Number.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
   }
 
   /** Ends a frame: what was put in is what is drawn; `time` (s) flashes the police lights. */

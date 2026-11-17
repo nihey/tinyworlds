@@ -1,35 +1,35 @@
 import type * as THREE from "three";
 import type { Strings } from "@/i18n/types";
-import type { LifeFile } from "../map/life";
-import type { StreetEdge, WalkCell } from "./cell";
-import { applyBody, bodyOf, overlap, resolve, type Body } from "./collide";
+import { Cameras, MOUSE } from "./cameras";
+import type { WalkCell } from "./cell";
 import { actionsOf, type ActionId, type Bindings } from "./controls";
-import { CELL, lonLatToEN } from "./geo";
+import { CRUNCH, bumped, collide, fromBox, moving } from "./crashes";
+import { EXIT_SPEED, swimOut, toTake, wayOut, type Spot } from "./doors";
+import { Ferries, onRoute, type LifeRoutes } from "./ferries";
+import { Fleet, within } from "./fleet";
+import { CELL } from "./geo";
 import { LIFE_MAX, fireDamage, hitDamage, regen } from "./health";
 import type { BoatKind, CarKind } from "./kinds";
 import { Crowd } from "./people";
 import {
-  EYE,
   HEIGHT,
   RADIUS,
   STEP_UP,
-  SWIM_EYE,
   newPlayer,
   stepFoot,
   type FootInput,
   type Player,
 } from "./player";
 import { FOG_FAR } from "./render/materials";
-import { EYES, WalkModels } from "./render/models";
+import { WalkModels } from "./render/models";
 import { makePalette, type Palette } from "./render/palette";
 import { WalkParticles } from "./render/particles";
+import { lampLit, signalPosts, type SignalPost } from "./signals";
 import type { WalkSound } from "./sound";
 import { comeTo } from "./spawn";
-import { RoadNet, Traffic, parkedOn, starterCar, type Blocker, type KerbSpot } from "./traffic";
+import { RoadNet, Traffic, starterCar, type Blocker, type KerbSpot } from "./traffic";
+import { portalCrossed } from "./tunnels";
 import {
-  applyDamage,
-  newVehicle,
-  nextVehicleId,
   sizeOf,
   stepBoat,
   stepCar,
@@ -41,26 +41,29 @@ import { cellExists, type WalkIndex } from "./walk-index";
 import { WASTED, wastedAt } from "./wasted";
 import type { WalkWorld } from "./world";
 
+export type { LifeRoutes } from "./ferries";
+
 /**
  * The walk as a game: the loop and everything it ties together. You on foot (walking, jumping,
  * swimming), the car or boat you drive, the loose cars and wrecks, the traffic, the people, the
- * boats at their moorings and the ferries on their routes; what hits what, what that costs, the
- * wrecks' fires, the sinking, your life and the wasted sequence; getting in and out; the two
- * cameras; the models, particles and sounds. No React and no DOM beyond the animation frame:
- * the screen hands it keys, pointer moves and touches, and draws its signs from `WalkState`.
+ * boats at their moorings and the ferries on their routes (`fleet.ts`, `ferries.ts`); what hits
+ * what and what that costs (`crashes.ts`), the wrecks' fires, the sinking, your life and the
+ * wasted sequence; getting in and out (`doors.ts`); tunnels (`tunnels.ts`); the cameras
+ * (`cameras.ts`); the models, particles, signals and sounds. No React and no DOM beyond the
+ * animation frame: the screen hands it keys, pointer moves and touches, and draws its signs from
+ * `WalkState`.
  */
 
-/** What the game needs of the view: its world, its scene and its camera (`WalkView` is one). */
+/** What the game needs of the view: its world, its scene, its camera and its colours (`WalkView` is one). */
 export interface GameView {
   readonly world: WalkWorld;
   readonly scene: THREE.Scene;
   setCamera(e: number, n: number, z: number, yaw: number, pitch: number, fov: number): void;
+  /** Drains the colours to the palette's greys, 0 to 1. */
+  setGrey(amount: number): void;
   update(dt: number): void;
   render(): void;
 }
-
-/** The ferries' routes, as `life.json` has them. */
-export type LifeRoutes = LifeFile["ferries"];
 
 export type WalkMessage = keyof Strings["walk"]["messages"];
 
@@ -113,32 +116,16 @@ declare global {
 const MAX_DT = 0.1;
 const SIM_STEP = 1 / 30;
 const WATER_Z = -0.6;
-// getting in and out
-const ENTER_REACH = 2.4;
-const EXIT_SPEED = 4;
-const EXIT_SIDE = 0.6;
-const EXIT_END = 0.7;
-/** A boat lets you off onto land this near its side, m. */
-const STEP_OFF = [0.5, 1, 1.5];
-/** Going in from a boat, this far out from its side. */
-const SWIM_OFF = 0.8;
-/** Out of the order the doors are tried in: the driver's side (the left), the other, the front, the back. */
-const DOORS: [number, number][] = [
-  [-1, 0],
-  [1, 0],
-  [0, 1],
-  [0, -1],
-];
-// hits
-/** Slower than this, m/s, a hit makes no crunch and no sparks. */
-const CRUNCH = 2.2;
+/** Faster than this, m/s, a move was a jump (a tunnel's far end), not a speed. */
+const JUMPED = 120;
+// you, hit
 /** A hit you survive knocks you down this long, s, and throws you this share of its speed. */
 const KNOCKED = 1.5;
 const THROWN = 0.6;
 const KNOCK_FRICTION = 6;
 /** After a hit, a touch only pushes for this long: one hit hurts once. */
 const HIT_COOL = 0.8;
-/** How hard a crash sounds at its loudest, and how far it is heard. */
+// what is heard and who runs
 const CRASH_LOUD = 25;
 const CRASH_HEAR = 80;
 const BOOM_HEAR = 150;
@@ -151,52 +138,28 @@ const FIRE_REACH = 5;
 const MESSAGE_FOR = 2.5;
 const HURT_FADE = 0.6;
 const JUMP_BUFFER = 0.2;
-// the cameras
-const FOV = 70;
-const LOOK_RETURN = 1.4;
-const LOOK_PITCH = -0.1;
-const FOLLOW = 3.2;
-/** Pointer movement to radians. */
-const MOUSE = 0.0021;
-/** What counts as in view, either side of where the camera looks (generous: a wide screen, a wide view). */
-const VIEW_HALF = 1.15;
 // what is kept round you
 const NEAR = 300;
 const GATHER_EVERY = 0.25;
-const PARK_REACH = 320;
-const PARK_DROP = 420;
 const PARK_EVERY = 1;
 const LOOSE_KEEP = 700;
 const COLLIDE_REACH = 250;
 const ROOF_REACH = 15;
 /** A car's roof holds you up this far beyond its body (your radius, nearly). */
 const ROOF_GROW = 0.3;
-const BUCKET = 16;
 const SMOKE_REACH = 150;
-// the ferries
-const FERRY_SPEED = 7;
-const STATEN_SPEED = 8;
-const FERRY_PAUSE = 15;
-const FERRY_MIN = 200;
 const FERRY_NEAR = 800;
 /** A route's boat taken away comes back no nearer to you than this, out of sight. */
 const FERRY_BACK = 400;
-/** Faster than this, m/s, a move was a jump (a tunnel's far end), not a speed. */
-const JUMPED = 120;
+/** Signals are drawn within the fog. */
+const SIGNAL_REACH = FOG_FAR + 30;
 // the start and teleports
 const SETTLE_REACH = 2;
 const PRIME_GIVE_UP = 6;
 const STARTER_GIVE_UP = 10;
 const STARTER_EVERY = 0.5;
-// tunnels
-const PORTAL_REACH = 3;
-/** A portal reaches this far either side of its middle: across the roadway. */
-const PORTAL_WIDE = 6;
-const TUNNEL_SPEED = 3;
-/** The dark lasts as the tunnel would at your speed, but never longer than this, s. */
-const TUNNEL_MAX = 8;
+/** Out of a tunnel, the far end's square is waited for this long at most, s. */
 const TUNNEL_WAIT = 10;
-const TUNNEL_OUT = 4;
 /** Where the edge of the data is looked for, ahead of you, m. */
 const EDGE_LOOK = 1.5;
 
@@ -205,132 +168,7 @@ const wrap = (a: number) => {
   const x = (((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   return x - Math.PI;
 };
-const smooth = (t: number) => t * t * (3 - 2 * t);
 const TOTAL = WASTED.wordAt + WASTED.holdFor + WASTED.fadeFor;
-
-type Box = [number, number, number, number];
-
-interface Eye {
-  e: number;
-  n: number;
-  z: number;
-  yaw: number;
-  pitch: number;
-  fov: number;
-}
-
-interface Spot {
-  e: number;
-  n: number;
-  z: number;
-  swim: boolean;
-}
-
-interface Ferry {
-  name: string;
-  /** e, n pairs */
-  pts: number[];
-  cum: number[];
-  len: number;
-  speed: number;
-  phase: number;
-  staten: boolean;
-  boat: Vehicle | null;
-}
-
-/**
- * Where a point is against a vehicle's box, in plan: `d` its distance outside the box (negative
- * inside it: how deep), (ne, nn) the unit way from the box out to the point.
- */
-function fromBox(v: Vehicle, e: number, n: number, grow = 0) {
-  const s = sizeOf(v.kind);
-  const hl = s.length / 2 + grow;
-  const hw = s.width / 2 + grow;
-  const sy = Math.sin(v.yaw);
-  const cy = Math.cos(v.yaw);
-  const de = e - v.e;
-  const dn = n - v.n;
-  const f = de * sy + dn * cy;
-  const r = de * cy - dn * sy;
-  const df = f - clamp(f, -hl, hl);
-  const dr = r - clamp(r, -hw, hw);
-  const d = Math.hypot(df, dr);
-  if (d > 1e-9) return { d, ne: (df * sy + dr * cy) / d, nn: (df * cy - dr * sy) / d };
-  // inside: out through the nearer side
-  const toEnd = hl - Math.abs(f);
-  const toSide = hw - Math.abs(r);
-  if (toEnd < toSide) {
-    const s1 = f >= 0 ? 1 : -1;
-    return { d: -toEnd, ne: sy * s1, nn: cy * s1 };
-  }
-  const s1 = r >= 0 ? 1 : -1;
-  return { d: -toSide, ne: cy * s1, nn: -sy * s1 };
-}
-
-/** A vehicle's height from its bottom (a boat's hull reaches under the water) to its roof. */
-function span(v: Vehicle): [number, number] {
-  const h = sizeOf(v.kind).height * (v.state === "wrecked" ? 0.85 : 1);
-  return [v.boat ? v.z - 1 : v.z, v.z + h];
-}
-
-const moving = (v: Vehicle) => v.v !== 0 || v.vs !== 0 || v.w !== 0 || v.vz !== 0;
-
-const boxes = new WeakMap<StreetEdge, Box>();
-function streetBox(s: StreetEdge): Box {
-  let b = boxes.get(s);
-  if (!b) {
-    b = [Infinity, Infinity, -Infinity, -Infinity];
-    for (let q = 0; q < s.pts.length; q += 3) {
-      b[0] = Math.min(b[0], s.pts[q]);
-      b[1] = Math.min(b[1], s.pts[q + 1]);
-      b[2] = Math.max(b[2], s.pts[q]);
-      b[3] = Math.max(b[3], s.pts[q + 1]);
-    }
-    boxes.set(s, b);
-  }
-  return b;
-}
-
-const boxDistance = (b: Box, e: number, n: number) =>
-  Math.hypot(Math.max(b[0] - e, 0, e - b[2]), Math.max(b[1] - n, 0, n - b[3]));
-
-/** Where a ferry is on its route at time t: out, a wait at the far end, back, a wait at the start. */
-function ferryPose(f: Ferry, t: number) {
-  const run = f.len / f.speed;
-  const cycle = 2 * (run + FERRY_PAUSE);
-  const c = (((t + f.phase * cycle) % cycle) + cycle) % cycle;
-  let d: number;
-  let back: boolean;
-  let speed = f.speed;
-  if (c < run) {
-    d = c * f.speed;
-    back = false;
-  } else if (c < run + FERRY_PAUSE) {
-    d = f.len;
-    back = false;
-    speed = 0;
-  } else if (c < 2 * run + FERRY_PAUSE) {
-    d = f.len - (c - run - FERRY_PAUSE) * f.speed;
-    back = true;
-  } else {
-    d = 0;
-    back = true;
-    speed = 0;
-  }
-  let lo = 0;
-  let hi = f.cum.length - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (f.cum[mid] <= d) lo = mid;
-    else hi = mid;
-  }
-  const seg = f.cum[hi] - f.cum[lo] || 1;
-  const k = clamp((d - f.cum[lo]) / seg, 0, 1);
-  const de = f.pts[hi * 2] - f.pts[lo * 2];
-  const dn = f.pts[hi * 2 + 1] - f.pts[lo * 2 + 1];
-  const yaw = Math.atan2(de, dn) + (back ? Math.PI : 0);
-  return { e: f.pts[lo * 2] + de * k, n: f.pts[lo * 2 + 1] + dn * k, yaw, speed };
-}
 
 export class WalkGame {
   readonly units: "imperial" | "metric";
@@ -344,29 +182,23 @@ export class WalkGame {
   private readonly palette: Palette;
   private readonly models: WalkModels;
   private readonly particles: WalkParticles;
+  private readonly cams: Cameras;
   private readonly net = new RoadNet();
   private readonly traffic: Traffic;
   private readonly crowd: Crowd;
+  private readonly fleet: Fleet;
+  private readonly ferries: Ferries;
   private readonly player: Player;
   private readonly startAt: { e: number; n: number };
 
   /** what you drive */
   private yours: Vehicle | null = null;
-  /** what the game keeps itself: loose cars, wrecks, what sinks, what you left, the starter */
-  private free: Vehicle[] = [];
-  /** the parked cars of the streets round you, by street */
-  private streets = new Map<string, { box: Box; cars: Vehicle[] }>();
-  /** the boats at their moorings, by square */
-  private moored = new Map<string, Vehicle[]>();
-  /** where a parked car or a moored boat came from, and the spot it leaves empty when it goes */
-  private home = new WeakMap<Vehicle, { list: Vehicle[]; tag: string }>();
-  private vacated = new Set<string>();
-  private ferries: Ferry[];
   private known = new Map<string, WalkCell>();
+  /** the signals of each square's crossings */
+  private posts = new Map<string, SignalPost[]>();
 
   // gathered
   private nearby: Vehicle[] = [];
-  private kept: Vehicle[] = [];
   private roofCars: Vehicle[] = [];
   private gatherIn = 0;
   private parkIn = 0;
@@ -380,17 +212,6 @@ export class WalkGame {
   private wantEnter = false;
   private wantExit = false;
   private hornOn = false;
-
-  // the cameras
-  private cam: "chase" | "wheel" = "chase";
-  private camYaw = 0;
-  private lookYaw = 0;
-  private lookPitch = LOOK_PITCH;
-  private lookIdle = LOOK_RETURN;
-  private fov = FOV;
-  private shake = 0;
-  private eye: Eye;
-  private downEye: Eye | null = null;
 
   // you
   private vel = { e: 0, n: 0 };
@@ -451,13 +272,14 @@ export class WalkGame {
     this.particles = new WalkParticles(opts.view.scene, this.palette);
     this.traffic = new Traffic(this.net, this.world, opts.ix.tunnels, this.random);
     this.crowd = new Crowd(this.world, this.random);
+    this.fleet = new Fleet(this.world);
+    this.ferries = new Ferries(opts.life, opts.ix.geo);
     const s = opts.start;
     this.player = newPlayer(s.e, s.n, s.z ?? 0, s.yaw);
     this.placeZ = s.z === undefined;
     this.startAt = { e: s.e, n: s.n };
     this.starterPending = opts.starter === true;
-    this.eye = { e: s.e, n: s.n, z: (s.z ?? 0) + EYE, yaw: s.yaw, pitch: 0, fov: FOV };
-    this.ferries = this.routes(opts.life);
+    this.cams = new Cameras({ e: s.e, n: s.n, z: s.z ?? 0, yaw: s.yaw }, opts.reduced);
     this.current = this.snapshot();
   }
 
@@ -503,12 +325,7 @@ export class WalkGame {
   /** The pointer moved (dx right, dy down, in pixels): you look round, or the camera does while you drive. */
   look(dx: number, dy: number): void {
     if (this.wasted || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
-    if (this.yours) {
-      this.lookYaw = clamp(this.lookYaw + dx * MOUSE, -3, 3);
-      this.lookPitch = clamp(this.lookPitch - dy * MOUSE, -0.7, 0.45);
-      this.lookIdle = 0;
-      return;
-    }
+    if (this.yours) return this.cams.look(dx, dy);
     const p = this.player;
     p.yaw = wrap(p.yaw + dx * MOUSE);
     p.pitch = clamp(p.pitch - dy * MOUSE, -1.4, 1.4);
@@ -615,6 +432,7 @@ export class WalkGame {
   dispose(): void {
     this.stop();
     this.sound.horn(false);
+    this.view.setGrey(0);
     this.models.dispose();
     this.particles.dispose();
     this.palette.texture.dispose();
@@ -635,10 +453,9 @@ export class WalkGame {
   vehicles(): Vehicle[] {
     const out = new Set<Vehicle>();
     if (this.yours) out.add(this.yours);
-    for (const v of this.free) out.add(v);
-    for (const st of this.streets.values()) for (const v of st.cars) out.add(v);
-    for (const list of this.moored.values()) for (const v of list) out.add(v);
-    for (const f of this.ferries) if (f.boat) out.add(f.boat);
+    for (const v of this.fleet.free) out.add(v);
+    for (const v of this.fleet.standing()) out.add(v);
+    for (const v of this.ferries.boats()) out.add(v);
     for (const v of this.traffic.cars) out.add(v);
     return [...out];
   }
@@ -646,7 +463,7 @@ export class WalkGame {
   /** Puts a vehicle in the world, kept by the game: for checks and the console. */
   add(v: Vehicle): void {
     if (v.state === "driven" || v.state === "traffic") v.state = "loose";
-    if (!this.free.includes(v)) this.free.push(v);
+    this.fleet.keep(v);
   }
 
   // ---------- the step ----------
@@ -661,13 +478,15 @@ export class WalkGame {
     this.t += h;
     this.syncSquares();
     this.settle(real);
-    if ((this.parkIn -= real) <= 0) {
+    if ((this.parkIn -= real) <= 0 && !this.starterPending) {
+      // nothing parks until the starter's spot is known
       this.parkIn = PARK_EVERY;
-      this.park();
+      this.fleet.park(this.focus(), this.starterSpot);
+      this.gatherIn = 0;
     }
     if ((this.gatherIn -= real) <= 0) {
       this.gatherIn = GATHER_EVERY;
-      this.gatherKept();
+      this.fleet.gather(this.focus());
     }
     this.gather();
     const p = this.player;
@@ -684,20 +503,29 @@ export class WalkGame {
     this.wantExit = false;
     this.horn();
     this.freeStep(h);
-    this.ferriesStep(h);
+    const me = this.focus();
+    for (const b of this.ferries.step(
+      this.t,
+      h,
+      this.world,
+      this.reduced,
+      (v) => within(v, me, FERRY_NEAR),
+      (e, n) => Math.hypot(e - me.e, n - me.n) >= FERRY_BACK && !this.cams.visible(e, n),
+    ))
+      if (b !== this.yours) this.fleet.keep(b);
     // the streets fill all at once when the squares round you are in, not piecemeal before
     if (this.primed) {
       this.trafficStep(h);
       this.crowd.step(
         h,
         this.t,
-        this.focus(),
+        me,
         this.nearby.filter((v) => !v.boat),
-        this.visible,
+        this.cams.visible,
       );
     }
     this.gather();
-    this.collide();
+    this.collisions();
     this.follow();
     this.youAndVehicles();
     if (h > 0 && !this.wasted && !this.tunnel) {
@@ -707,7 +535,10 @@ export class WalkGame {
       this.vel = Math.hypot(ve, vn) < JUMPED ? { e: ve, n: vn } : { e: 0, n: 0 };
     }
     this.watch();
-    this.effects(h);
+    for (const v of this.nearby)
+      if (within(v, this.focus(), SMOKE_REACH) && !(v === this.yours && this.tunnel))
+        this.particles.from(v, h);
+    this.particles.step(h);
     this.lifeStep(h);
     if (!this.wasted && p.life <= 0) this.goDown();
     if (this.wasted && wastedAt(this.wastedT, this.reduced).done) this.comeToNow();
@@ -724,11 +555,6 @@ export class WalkGame {
     return v ? { e: v.e, n: v.n } : { e: this.player.e, n: this.player.n };
   }
 
-  private near(v: { e: number; n: number }, r: number): boolean {
-    const f = this.focus();
-    return Math.abs(v.e - f.e) <= r && Math.abs(v.n - f.n) <= r;
-  }
-
   private held(a: ActionId): boolean {
     if (this.pressed.has(a)) return true;
     const [k0, k1] = this.bindings[a];
@@ -739,7 +565,7 @@ export class WalkGame {
     if (a === "jump") this.jumpFor = JUMP_BUFFER;
     else if (a === "enter") this.wantEnter = true;
     else if (a === "exit") this.wantExit = true;
-    else if (a === "camera") this.cam = this.cam === "chase" ? "wheel" : "chase";
+    else if (a === "camera") this.cams.toggle();
   }
 
   private say(m: WalkMessage): void {
@@ -755,23 +581,12 @@ export class WalkGame {
     this.hurtFlash = 1;
   }
 
-  /** Whether a point is about where the camera looks (or right beside it): nothing is brought in there. */
-  private readonly visible = (e: number, n: number): boolean => {
-    const c = this.eye;
-    const de = e - c.e;
-    const dn = n - c.n;
-    const d = Math.hypot(de, dn);
-    if (d < 8) return true;
-    if (d > FOG_FAR + 40) return false;
-    return Math.abs(wrap(Math.atan2(de, dn) - c.yaw)) < VIEW_HALF;
-  };
-
   /** The roof of a car under a point, for you on foot. */
   private readonly roofs = (e: number, n: number): number | null => {
     let best: number | null = null;
     for (const v of this.roofCars) {
       if (fromBox(v, e, n, ROOF_GROW).d > 0) continue;
-      const top = span(v)[1];
+      const top = v.z + sizeOf(v.kind).height * (v.state === "wrecked" ? 0.85 : 1);
       if (best === null || top > best) best = top;
     }
     return best;
@@ -779,33 +594,33 @@ export class WalkGame {
 
   // ---------- the squares, and what comes with them ----------
 
-  /** The road net and the moorings follow the squares the view has in. */
+  /** The road net, the moorings and the signals follow the squares the view has in. */
   private syncSquares(): void {
     for (const c of this.world.cells()) {
       if (this.known.get(c.key) === c) continue;
       this.known.set(c.key, c);
       this.net.add(c);
-      this.moor(c);
+      this.fleet.moor(c);
+      this.posts.set(c.key, this.signalsOf(c));
     }
     for (const [key, c] of this.known)
       if (!this.world.has(c.i, c.j)) {
         this.known.delete(key);
         this.net.remove(key);
-        this.moored.delete(key);
+        this.fleet.unmoor(key);
+        this.posts.delete(key);
       }
   }
 
-  private moor(c: WalkCell): void {
-    const list: Vehicle[] = [];
-    c.moorings.forEach((m, k) => {
-      const tag = `m:${c.key}#${k}`;
-      if (this.vacated.has(tag)) return;
-      const paint = ((c.i * 73856093) ^ (c.j * 19349663) ^ (k * 83492791)) >>> 0;
-      const v = newVehicle(nextVehicleId(), m.kind, m.e, m.n, m.heading, "parked", paint & 7);
-      this.home.set(v, { list, tag });
-      list.push(v);
-    });
-    this.moored.set(c.key, list);
+  /** The signals of the crossings whose node is in this square (its streets are all here too). */
+  private signalsOf(c: WalkCell): SignalPost[] {
+    const out: SignalPost[] = [];
+    for (const node of c.nodes) {
+      if (!node.lights) continue;
+      if (Math.floor(node.e / CELL) !== c.i || Math.floor(node.n / CELL) !== c.j) continue;
+      out.push(...signalPosts(node, c.streets, (edge) => this.net.junction(node.id, edge)));
+    }
+    return out;
   }
 
   /** Whether the squares round a point are in, or have no data to come. */
@@ -851,67 +666,23 @@ export class WalkGame {
       const got = starterCar(this.world, this.startAt);
       if (got) {
         this.starterSpot = got.spot;
-        this.free.push(got.car);
+        this.fleet.keep(got.car);
         this.starterPending = false;
         this.parkIn = 0;
       } else if (this.starterWait > STARTER_GIVE_UP) this.starterPending = false;
     }
   }
 
-  /** The streets round you get their parked cars (the same every visit), once each can tell where. */
-  private park(): void {
-    // the starter's spot is not known yet: nothing parks until it is
-    if (this.starterPending) return;
-    const me = this.focus();
-    const seen = new Set<string>();
-    for (const c of this.world.cells())
-      for (const s of c.streets) {
-        if (seen.has(s.key)) continue;
-        seen.add(s.key);
-        if (this.streets.has(s.key)) continue;
-        const box = streetBox(s);
-        if (boxDistance(box, me.e, me.n) > PARK_REACH) continue;
-        // null: the squares round it are not all in yet; asked again next time
-        const spots = parkedOn(s, this.world, this.starterSpot);
-        if (!spots) continue;
-        const cars: Vehicle[] = [];
-        for (const pc of spots) {
-          const tag = `s:${s.key}#${pc.spot}`;
-          if (this.vacated.has(tag)) continue;
-          const v = newVehicle(nextVehicleId(), pc.kind, pc.e, pc.n, pc.yaw, "parked", pc.color);
-          this.home.set(v, { list: cars, tag });
-          cars.push(v);
-        }
-        this.streets.set(s.key, { box, cars });
-      }
-    for (const [key, st] of this.streets)
-      if (!seen.has(key) || boxDistance(st.box, me.e, me.n) > PARK_DROP) this.streets.delete(key);
-    this.gatherIn = 0;
-  }
-
-  /** The parked cars and moored boats within 300 m: a few times a second is often enough. */
-  private gatherKept(): void {
-    const me = this.focus();
-    const out: Vehicle[] = [];
-    for (const st of this.streets.values()) {
-      if (boxDistance(st.box, me.e, me.n) > NEAR) continue;
-      for (const v of st.cars) if (this.near(v, NEAR)) out.push(v);
-    }
-    for (const list of this.moored.values())
-      for (const v of list) if (this.near(v, NEAR)) out.push(v);
-    this.kept = out;
-  }
-
   /** Every vehicle near you, once each. */
   private gather(): void {
     const out: Vehicle[] = [];
     const yours = this.yours;
+    const me = this.focus();
     if (yours) out.push(yours);
-    for (const v of this.free) if (v !== yours && this.near(v, NEAR)) out.push(v);
-    for (const v of this.kept) if (v.state === "parked") out.push(v);
+    for (const v of this.fleet.free) if (v !== yours && within(v, me, NEAR)) out.push(v);
+    for (const v of this.fleet.kept) if (v.state === "parked") out.push(v);
     for (const v of this.traffic.cars) if (v !== yours) out.push(v);
-    for (const f of this.ferries)
-      if (f.boat && f.boat !== yours && this.near(f.boat, FERRY_NEAR)) out.push(f.boat);
+    for (const v of this.ferries.boats()) if (v !== yours && within(v, me, FERRY_NEAR)) out.push(v);
     this.nearby = out;
     this.roofCars = out.filter(
       (v) =>
@@ -919,7 +690,7 @@ export class WalkGame {
         v !== yours &&
         v.state !== "sinking" &&
         v.state !== "sunk" &&
-        this.near(v, ROOF_REACH),
+        within(v, me, ROOF_REACH),
     );
   }
 
@@ -932,27 +703,6 @@ export class WalkGame {
         v.state !== "sunk" &&
         !(v === this.yours && this.tunnel),
     );
-  }
-
-  /** Takes a vehicle off whatever list held it (a street, a mooring, the free ones, a route). */
-  private detach(v: Vehicle): void {
-    const home = this.home.get(v);
-    if (home) {
-      const i = home.list.indexOf(v);
-      if (i >= 0) home.list.splice(i, 1);
-      this.vacated.add(home.tag);
-      this.home.delete(v);
-    }
-    const i = this.free.indexOf(v);
-    if (i >= 0) this.free.splice(i, 1);
-    for (const f of this.ferries) if (f.boat === v) f.boat = null;
-  }
-
-  /** A parked car or a moored boat that was hit: loose now, and the game's. */
-  private loosen(v: Vehicle): void {
-    this.detach(v);
-    v.state = "loose";
-    this.free.push(v);
   }
 
   // ---------- you ----------
@@ -1011,6 +761,7 @@ export class WalkGame {
       return;
     }
     const input = this.footInput();
+    // a car's roof is for you on foot alone: the vehicles step without it
     this.world.roofs = this.roofs;
     let ev;
     try {
@@ -1030,7 +781,12 @@ export class WalkGame {
       : stepCar(v, this.driveInput(), this.world, h);
     this.events(v, ev);
     this.follow();
-    if (v.state === "sunk" || (v.state === "sinking" && v.sink >= 1)) this.swimOut(v);
+    if (v.state === "sunk" || (v.state === "sinking" && v.sink >= 1)) {
+      // it has floated its moment: out you come, swimming
+      const spot = swimOut(v, this.world);
+      this.leaveVehicle(v);
+      this.stand(spot, v.yaw);
+    }
   }
 
   /** You go where what you drive goes. */
@@ -1047,33 +803,14 @@ export class WalkGame {
   private wants(): void {
     if (this.wantExit && this.yours) this.tryExit();
     else if (this.wantEnter && !this.yours) {
-      const v = this.nearest();
+      const v = toTake(this.player, this.nearby);
       if (v) this.enter(v);
     }
   }
 
-  /** The car or boat nearest you within 2.4 m that you could take: from the street, a pier, or the water beside a boat. */
-  private nearest(): Vehicle | null {
-    const p = this.player;
-    if (p.mode !== "foot" && p.mode !== "swim") return null;
-    let best: Vehicle | null = null;
-    let bestD = ENTER_REACH;
-    for (const v of this.nearby) {
-      if (v.state === "wrecked" || v.state === "sinking" || v.state === "sunk") continue;
-      if (p.mode === "swim" && !v.boat) continue;
-      if (Math.abs(v.e - p.e) > 40 || Math.abs(v.n - p.n) > 40) continue;
-      if (Math.abs(v.z - p.z) > 2.5) continue;
-      const d = Math.max(0, fromBox(v, p.e, p.n).d);
-      if (d <= bestD) {
-        bestD = d;
-        best = v;
-      }
-    }
-    return best;
-  }
-
   private enter(v: Vehicle): void {
-    this.detach(v);
+    this.fleet.detach(v);
+    this.ferries.release(v);
     v.state = "driven";
     v.stopFor = 0;
     this.yours = v;
@@ -1081,10 +818,7 @@ export class WalkGame {
     p.mode = "drive";
     p.vz = 0;
     p.airFrom = null;
-    this.camYaw = v.yaw;
-    this.lookYaw = 0;
-    this.lookPitch = LOOK_PITCH;
-    this.lookIdle = LOOK_RETURN;
+    this.cams.takeWheel(v);
     this.jumpFor = 0;
     this.follow();
   }
@@ -1092,7 +826,7 @@ export class WalkGame {
   private tryExit(): void {
     const v = this.yours!;
     if (Math.hypot(v.v, v.vs) >= EXIT_SPEED) return this.say("slowDown");
-    const spot = v.boat ? this.boatExit(v) : this.carExit(v);
+    const spot = wayOut(v, this.world, this.nearby);
     if (!spot) return this.say("noRoom");
     this.leaveVehicle(v);
     this.stand(spot, v.yaw);
@@ -1102,9 +836,8 @@ export class WalkGame {
   private leaveVehicle(v: Vehicle): void {
     this.yours = null;
     if (v.state === "driven") v.state = "loose";
-    if (!this.free.includes(v)) this.free.push(v);
-    this.shake = 0;
-    this.fov = FOV;
+    this.fleet.keep(v);
+    this.cams.leaveWheel();
   }
 
   private stand(spot: Spot, yaw: number): void {
@@ -1120,123 +853,23 @@ export class WalkGame {
     p.mode = spot.swim ? "swim" : "foot";
   }
 
-  /** Whether another vehicle stands at a point (with room for you) at that height. */
-  private occupied(e: number, n: number, z: number, except: Vehicle): boolean {
-    for (const v of this.nearby) {
-      if (v === except || v.state === "sunk") continue;
-      if (Math.abs(v.e - e) > 20 || Math.abs(v.n - n) > 20) continue;
-      const [lo, hi] = span(v);
-      if (z >= hi || z + HEIGHT <= lo) continue;
-      if (fromBox(v, e, n).d < RADIUS) return true;
-    }
-    return false;
-  }
-
-  /** Where you can stand getting out at (e, n), from a vehicle whose floor is at z: not a drop, not a wall. */
-  private footing(e: number, n: number, z: number, from: Vehicle): Spot | null {
-    if (!this.world.inData(e, n)) return null;
-    const under = this.world.surfaceUnder(e, n, z, STEP_UP);
-    if (under.z < z - 0.65) return null;
-    const swim = under.kind === "water";
-    const zf = swim ? WATER_Z : under.z;
-    if (this.world.blocked(e, n, RADIUS, zf, HEIGHT) || this.occupied(e, n, zf, from)) return null;
-    return { e, n, z: zf, swim };
-  }
-
-  /** Out of a car: the driver's side if there is room, else the other, the front, the back; the water only if nothing else. */
-  private carExit(v: Vehicle): Spot | null {
-    const s = sizeOf(v.kind);
-    const sy = Math.sin(v.yaw);
-    const cy = Math.cos(v.yaw);
-    let water: Spot | null = null;
-    for (const [side, end] of DOORS) {
-      const off = side * (s.width / 2 + EXIT_SIDE);
-      const fwd = end * (s.length / 2 + EXIT_END);
-      const spot = this.footing(v.e + cy * off + sy * fwd, v.n - sy * off + cy * fwd, v.z, v);
-      if (spot && !spot.swim) return spot;
-      water ??= spot;
-    }
-    return water;
-  }
-
-  /** Off a boat: onto a pier or the shore within 1.5 m, else into the water beside it. */
-  private boatExit(v: Vehicle): Spot | null {
-    const s = sizeOf(v.kind);
-    const sy = Math.sin(v.yaw);
-    const cy = Math.cos(v.yaw);
-    const at = (side: number, end: number, out: number): [number, number] => {
-      const off = side * (s.width / 2 + out);
-      const fwd = end * (s.length / 2 + out);
-      return [v.e + cy * off + sy * fwd, v.n - sy * off + cy * fwd];
-    };
-    for (const [side, end] of DOORS)
-      for (const out of STEP_OFF) {
-        const [e, n] = at(side, end, out);
-        if (!this.world.inData(e, n) || this.world.isWater(e, n)) continue;
-        const land = this.world.surfaceUnder(e, n, WATER_Z, 1.2);
-        if (land.kind === "water") continue;
-        if (this.world.blocked(e, n, RADIUS, land.z, HEIGHT) || this.occupied(e, n, land.z, v))
-          continue;
-        return { e, n, z: land.z, swim: false };
-      }
-    for (const [side, end] of DOORS) {
-      const [e, n] = at(side, end, SWIM_OFF);
-      if (!this.world.inData(e, n) || !this.world.isWater(e, n)) continue;
-      if (this.world.blocked(e, n, RADIUS, WATER_Z, HEIGHT) || this.occupied(e, n, WATER_Z, v))
-        continue;
-      return { e, n, z: WATER_Z, swim: true };
-    }
-    return null;
-  }
-
-  /** What you drive is going under: out you come, swimming beside it. */
-  private swimOut(v: Vehicle): void {
-    const s = sizeOf(v.kind);
-    const off = s.width / 2 + EXIT_SIDE;
-    const e = v.e - Math.cos(v.yaw) * off;
-    const n = v.n + Math.sin(v.yaw) * off;
-    const beside = this.world.inData(e, n) && this.world.isWater(e, n);
-    this.leaveVehicle(v);
-    this.stand({ e: beside ? e : v.e, n: beside ? n : v.n, z: WATER_Z, swim: true }, v.yaw);
-  }
-
   /** Bumped by a car or a boat: pushed out of it, and hurt by how fast it closed on you. */
   private youAndVehicles(): void {
     if (this.yours || this.waiting || this.tunnel) return;
     const p = this.player;
-    for (const v of this.nearby) {
-      if (v.state === "sunk" || v.state === "sinking") continue;
-      if (Math.abs(v.e - p.e) > 20 || Math.abs(v.n - p.n) > 20) continue;
-      const [lo, hi] = span(v);
-      // on its roof, or under it
-      if (p.z >= hi - 0.05 || p.z + HEIGHT <= lo) continue;
-      const b = fromBox(v, p.e, p.n);
-      if (b.d >= RADIUS) continue;
-      const push = RADIUS - b.d + 0.01;
-      [p.e, p.n] = this.world.slide(
-        p.e,
-        p.n,
-        p.e + b.ne * push,
-        p.n + b.nn * push,
-        RADIUS,
-        p.z,
-        HEIGHT,
-      );
-      if (this.wasted || this.hitCool > 0) continue;
-      const body = bodyOf(v);
-      // the speed it closed at along the line between you
-      const closing = (body.ve - this.vel.e) * b.ne + (body.vn - this.vel.n) * b.nn;
-      const hurt = hitDamage(closing);
-      if (!(hurt > 0)) continue;
-      this.hitCool = HIT_COOL;
-      this.hurtYou(hurt);
-      if (p.life > 0 && p.mode === "foot") {
-        p.mode = "down";
-        p.vz = 0;
-        p.airFrom = null;
-        this.downFor = KNOCKED;
-        this.knock = { e: b.ne * closing * THROWN, n: b.nn * closing * THROWN };
-      }
+    const hit = bumped(p, this.nearby, this.world, this.vel);
+    if (!hit || this.wasted || this.hitCool > 0) return;
+    const hurt = hitDamage(hit.closing);
+    if (!(hurt > 0)) return;
+    this.hitCool = HIT_COOL;
+    this.hurtYou(hurt);
+    if (p.life > 0 && p.mode === "foot") {
+      // a hit you survive knocks you over for a moment
+      p.mode = "down";
+      p.vz = 0;
+      p.airFrom = null;
+      this.downFor = KNOCKED;
+      this.knock = { e: hit.ne * hit.closing * THROWN, n: hit.nn * hit.closing * THROWN };
     }
   }
 
@@ -1254,13 +887,14 @@ export class WalkGame {
     const p = this.player;
     const v = this.yours;
     if (v) {
-      const spot = v.boat ? this.boatExit(v) : this.carExit(v);
+      // you lie beside what you drove, which stays where it is
+      const spot = wayOut(v, this.world, this.nearby);
       this.leaveVehicle(v);
       this.stand(spot ?? { e: v.e, n: v.n, z: v.z, swim: false }, v.yaw);
     }
     this.wasted = true;
     this.wastedT = 0;
-    this.downEye = { ...this.eye };
+    this.cams.down();
     this.body = { e: p.e, n: p.n, z: p.mode === "swim" ? WATER_Z : p.z, yaw: p.yaw };
     p.mode = "down";
     p.life = 0;
@@ -1298,7 +932,6 @@ export class WalkGame {
     this.wasted = false;
     this.wastedT = 0;
     this.body = null;
-    this.downEye = null;
     this.vel = { e: 0, n: 0 };
     this.hitCool = 0;
     this.hurtFlash = 0;
@@ -1306,62 +939,43 @@ export class WalkGame {
 
   // ---------- tunnels and the edge ----------
 
-  /**
-   * Into a tunnel's portal (across its roadway, up to 3 m either side of its line): the dark, then
-   * the other portal; a closed one stops you at its barrier.
-   */
+  /** Into a tunnel's portal: the dark, then the other portal; a closed one stops you at its barrier. */
   private portals(h: number): void {
     const p = this.player;
-    if (
-      h <= 0 ||
-      this.yours?.boat ||
-      (p.mode !== "foot" && p.mode !== "drive") ||
-      Math.abs(p.z) > 3
-    )
-      return;
-    // this step's move
-    const de = p.e - this.before.e;
-    const dn = p.n - this.before.n;
-    for (const t of this.ix.tunnels)
-      for (const [end, other] of [
-        [t.a, t.b],
-        [t.b, t.a],
-      ] as const) {
-        if (!end) continue;
-        const ue = Math.sin(end[2]);
-        const un = Math.cos(end[2]);
-        const along = (p.e - end[0]) * ue + (p.n - end[1]) * un;
-        const across = (p.e - end[0]) * un - (p.n - end[1]) * ue;
-        if (Math.abs(along) > PORTAL_REACH || Math.abs(across) > PORTAL_WIDE) continue;
-        if (de * ue + dn * un <= 0) continue;
-        if (!other) {
-          // the barrier: back to where this step began, and stopped
-          const v = this.yours;
-          if (v) {
-            v.e = this.before.e;
-            v.n = this.before.n;
-            v.v = 0;
-            v.vs = 0;
-            v.w = 0;
-          }
-          p.e = this.before.e;
-          p.n = this.before.n;
-          this.vel = { e: 0, n: 0 };
-          this.say("tunnelClosed");
-          return;
-        }
-        const speed = Math.hypot(de, dn) / h;
-        const yaw = other[2] + Math.PI;
-        this.tunnel = {
-          left: Math.min(TUNNEL_MAX, t.length / Math.max(TUNNEL_SPEED, speed)),
-          wait: TUNNEL_WAIT,
-          e: other[0] + Math.sin(yaw) * TUNNEL_OUT,
-          n: other[1] + Math.cos(yaw) * TUNNEL_OUT,
-          yaw,
-          speed,
-        };
-        return;
+    if (this.yours?.boat || (p.mode !== "foot" && p.mode !== "drive") || Math.abs(p.z) > 3) return;
+    const crossed = portalCrossed(
+      this.ix.tunnels,
+      p.e,
+      p.n,
+      p.e - this.before.e,
+      p.n - this.before.n,
+      h,
+    );
+    if (!crossed) return;
+    if (crossed.closed) {
+      // the barrier: back to where this step began, and stopped
+      const v = this.yours;
+      if (v) {
+        v.e = this.before.e;
+        v.n = this.before.n;
+        v.v = 0;
+        v.vs = 0;
+        v.w = 0;
       }
+      p.e = this.before.e;
+      p.n = this.before.n;
+      this.vel = { e: 0, n: 0 };
+      this.say("tunnelClosed");
+      return;
+    }
+    this.tunnel = {
+      left: crossed.seconds,
+      wait: TUNNEL_WAIT,
+      e: crossed.e,
+      n: crossed.n,
+      yaw: crossed.yaw,
+      speed: crossed.speed,
+    };
   }
 
   private tunnelStep(real: number): void {
@@ -1381,7 +995,7 @@ export class WalkGame {
       v.v = tu.speed;
       v.vs = 0;
       v.w = 0;
-      this.camYaw = tu.yaw;
+      this.cams.turnTo(tu.yaw);
     }
     const p = this.player;
     p.e = tu.e;
@@ -1440,99 +1054,21 @@ export class WalkGame {
 
   /** Loose cars, wrecks, what sinks and the boats left about; the moored boats bob. */
   private freeStep(h: number): void {
-    this.free = this.free.filter(
-      (v) => v.state !== "sunk" && (v === this.yours || this.near(v, LOOSE_KEEP)),
+    const me = this.focus();
+    const f = this.fleet;
+    f.free = f.free.filter(
+      (v) => v.state !== "sunk" && (v === this.yours || within(v, me, LOOSE_KEEP)),
     );
-    for (const v of this.free) {
+    for (const v of f.free) {
       if (v === this.yours) continue;
       const ev = v.boat
         ? stepBoat(v, null, this.world, h, this.t, { calm: this.reduced })
         : stepCar(v, null, this.world, h);
       this.events(v, ev);
     }
-    for (const v of this.kept)
+    for (const v of f.kept)
       if (v.boat && v.state === "parked")
         stepBoat(v, null, this.world, h, this.t, { calm: this.reduced });
-  }
-
-  /** The ferries on their routes, there and back; a route whose boat was taken gets another, out of sight. */
-  private ferriesStep(h: number): void {
-    const me = this.focus();
-    for (const f of this.ferries) {
-      const pose = ferryPose(f, this.t);
-      let b = f.boat;
-      if (b && b.state !== "traffic") {
-        f.boat = null;
-        if (b !== this.yours && !this.free.includes(b)) this.free.push(b);
-        b = null;
-      }
-      if (!b) {
-        if (Math.hypot(pose.e - me.e, pose.n - me.n) < FERRY_BACK || this.visible(pose.e, pose.n))
-          continue;
-        b = f.boat = this.ferryBoat(f, pose);
-      }
-      b.e = pose.e;
-      b.n = pose.n;
-      b.yaw = pose.yaw;
-      b.z = WATER_Z;
-      b.v = 0;
-      b.vs = 0;
-      b.w = 0;
-      // still, a boat only rides the swell
-      if (this.near(b, FERRY_NEAR))
-        stepBoat(b, null, this.world, h, this.t, { calm: this.reduced });
-      b.v = pose.speed;
-    }
-  }
-
-  private ferryBoat(f: Ferry, pose: { e: number; n: number; yaw: number }): Vehicle {
-    return newVehicle(
-      nextVehicleId(),
-      "ferry",
-      pose.e,
-      pose.n,
-      pose.yaw,
-      "traffic",
-      f.staten ? 1 : 0,
-    );
-  }
-
-  private routes(life: LifeRoutes): Ferry[] {
-    const out: Ferry[] = [];
-    (life ?? []).forEach((route, i) => {
-      const pts: number[] = [];
-      const cum: number[] = [];
-      for (let k = 0; k + 1 < route.path.length; k += 2) {
-        const [e, n] = lonLatToEN(this.ix.geo, route.path[k], route.path[k + 1]);
-        if (!Number.isFinite(e) || !Number.isFinite(n)) continue;
-        const prev = pts.length;
-        cum.push(prev ? cum[cum.length - 1] + Math.hypot(e - pts[prev - 2], n - pts[prev - 1]) : 0);
-        pts.push(e, n);
-      }
-      const len = cum[cum.length - 1] ?? 0;
-      if (!(len >= FERRY_MIN)) return;
-      out.push({
-        name: route.name,
-        pts,
-        cum,
-        len,
-        speed: FERRY_SPEED,
-        phase: (i * 0.618034) % 1,
-        staten: false,
-        boat: null,
-      });
-    });
-    // the Staten Island route's boat is the long orange one: by its name (St. George is its
-    // terminal), else the longest route
-    const staten =
-      out.find((f) => /staten island|st\.? george/i.test(f.name)) ??
-      out.reduce<Ferry | undefined>((a, b) => (!a || b.len > a.len ? b : a), undefined);
-    if (staten) {
-      staten.staten = true;
-      staten.speed = STATEN_SPEED;
-    }
-    for (const f of out) f.boat = this.ferryBoat(f, ferryPose(f, 0));
-    return out;
   }
 
   private trafficStep(h: number): void {
@@ -1542,101 +1078,36 @@ export class WalkGame {
       blockers.push({ e: p.e, n: p.n, r: RADIUS, z: p.z });
     for (const q of this.crowd.people) blockers.push({ e: q.e, n: q.n, r: 0.3, z: q.z });
     this.traffic.blockers = blockers;
-    this.traffic.visible = this.visible;
+    this.traffic.visible = this.cams.visible;
     this.traffic.step(h, this.t, this.focus(), this.carsAround());
   }
 
-  // ---------- what hits what ----------
+  // ---------- what hits what, and what comes of it ----------
 
-  /** A route's ferry is not pushed by anything: it is on its route. */
-  private onRoute(v: Vehicle): boolean {
-    return v.boat && v.state === "traffic";
-  }
-
-  /** What moves of itself: you, what slides loose, a ferry under way. */
-  private mover(v: Vehicle): boolean {
-    if (v === this.yours) return !this.tunnel;
-    if (this.onRoute(v)) return v.v !== 0;
-    return (v.state === "loose" || v.state === "wrecked") && moving(v);
-  }
-
-  /** Every pair of boxes near you that touch, one of them moving, pushed apart and hurt. */
-  private collide(): void {
+  /** Every pair of vehicles near you that touch, one of them moving: see `crashes.ts`. */
+  private collisions(): void {
+    const me = this.focus();
     const list = this.nearby.filter(
       (v) =>
         v.state !== "sunk" &&
         v.state !== "sinking" &&
         !(v === this.yours && this.tunnel) &&
-        this.near(v, COLLIDE_REACH) &&
+        within(v, me, COLLIDE_REACH) &&
         !(v.state === "traffic" && !v.boat && this.traffic.squeezing(v)),
     );
-    const grid = new Map<number, Vehicle[]>();
-    const cellsOf = (v: Vehicle) => {
-      const s = sizeOf(v.kind);
-      const r = Math.hypot(s.length, s.width) / 2;
-      const out: number[] = [];
-      for (let x = Math.floor((v.e - r) / BUCKET); x <= Math.floor((v.e + r) / BUCKET); x++)
-        for (let y = Math.floor((v.n - r) / BUCKET); y <= Math.floor((v.n + r) / BUCKET); y++)
-          out.push((x + 32768) * 65536 + (y + 32768));
-      return out;
-    };
-    for (const v of list)
-      for (const k of cellsOf(v)) {
-        const bucket = grid.get(k);
-        if (bucket) bucket.push(v);
-        else grid.set(k, [v]);
-      }
-    const done = new Set<string>();
-    for (const a of list) {
-      if (!this.mover(a)) continue;
-      for (const k of cellsOf(a))
-        for (const b of grid.get(k) ?? []) {
-          if (b === a || a.boat !== b.boat) continue;
-          if (this.onRoute(a) && this.onRoute(b)) continue;
-          const key = a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;
-          if (done.has(key)) continue;
-          done.add(key);
-          const [a0, a1] = span(a);
-          const [b0, b1] = span(b);
-          if (a0 >= b1 || b0 >= a1) continue;
-          this.hit(a, b);
-        }
-    }
-  }
-
-  private hit(a: Vehicle, b: Vehicle): void {
-    const ba = bodyOf(a);
-    const bb = bodyOf(b);
-    if (this.onRoute(a)) ba.mass = Infinity;
-    if (this.onRoute(b)) bb.mass = Infinity;
-    const touch = overlap(ba, bb);
-    if (!touch) return;
-    const va = { e: ba.ve, n: ba.vn };
-    const vb = { e: bb.ve, n: bb.vn };
-    const closing = resolve(ba, bb, touch);
-    this.answer(a, ba, va);
-    this.answer(b, bb, vb);
-    if (closing > 0) {
-      // each takes its share by the other's weight
-      applyDamage(a, closing, bb.mass);
-      applyDamage(b, closing, ba.mass);
-    }
-    if (closing > CRUNCH) this.crunch(a, touch.pe, touch.pn, Math.max(a.z, b.z), closing);
-  }
-
-  /** Puts a hit's outcome on a vehicle: traffic stops or goes loose, a parked car goes loose. */
-  private answer(v: Vehicle, body: Body, was: { e: number; n: number }): void {
-    if (this.onRoute(v)) return;
-    if (v.state === "traffic") {
-      const knock = Math.hypot(body.ve - was.e, body.vn - was.n);
-      if (this.traffic.hit(v, knock)) {
-        applyBody(v, body);
-        if (!this.free.includes(v)) this.free.push(v);
-      }
-      return;
-    }
-    if (v.state === "parked") this.loosen(v);
-    applyBody(v, body);
+    collide(list, {
+      traffic: this.traffic,
+      // what moves of itself: you, what slides loose, a ferry under way
+      mover: (v) =>
+        v === this.yours
+          ? !this.tunnel
+          : onRoute(v)
+            ? v.v !== 0
+            : (v.state === "loose" || v.state === "wrecked") && moving(v),
+      loosen: (v) => this.fleet.loosen(v),
+      keep: (v) => this.fleet.keep(v),
+      crunch: (v, e, n, z, speed) => this.crunch(v, e, n, z, speed),
+    });
   }
 
   /** A hit worth hearing: the crunch, the sparks, people running, your camera shaken. */
@@ -1649,8 +1120,7 @@ export class WalkGame {
     if (d < CRASH_HEAR) this.sound.crash(Math.min(1, speed / CRASH_LOUD) * (1 - d / CRASH_HEAR));
     this.particles.sparks(e, n, z, speed);
     this.crowd.scare(e, n, CRASH_SCARE);
-    if (v === this.yours && !this.reduced)
-      this.shake = Math.max(this.shake, Math.min(1.2, speed / 12));
+    if (v === this.yours) this.cams.bump(speed);
   }
 
   /** A stepper's own hits (a wall, a parapet, a quay, a landing): their damage is done already. */
@@ -1658,13 +1128,9 @@ export class WalkGame {
     if (ev.impact > CRUNCH) {
       const hl = sizeOf(v.kind).length / 2;
       const way = v.v < 0 ? -1 : 1;
-      this.crunch(
-        v,
-        v.e + Math.sin(v.yaw) * hl * way,
-        v.n + Math.cos(v.yaw) * hl * way,
-        v.z,
-        ev.impact,
-      );
+      const e = v.e + Math.sin(v.yaw) * hl * way;
+      const n = v.n + Math.cos(v.yaw) * hl * way;
+      this.crunch(v, e, n, v.z, ev.impact);
     }
     if (ev.fell > CRUNCH) this.crunch(v, v.e, v.n, v.z, ev.fell);
   }
@@ -1672,8 +1138,8 @@ export class WalkGame {
   /** What became of everything this step: traffic the game must keep, wrecks catching fire, what goes into the water. */
   private watch(): void {
     for (const v of this.traffic.cars)
-      if (v.state !== "traffic" && v !== this.yours && !this.free.includes(v)) this.free.push(v);
-    const all = this.yours ? [this.yours, ...this.free] : this.free;
+      if (v.state !== "traffic" && v !== this.yours) this.fleet.keep(v);
+    const all = this.yours ? [this.yours, ...this.fleet.free] : this.fleet.free;
     for (const v of all) {
       if (v.state === "wrecked" && !this.burnt.has(v)) {
         this.burnt.add(v);
@@ -1681,8 +1147,7 @@ export class WalkGame {
       }
       if (v.state === "sinking" && !this.sinkingSeen.has(v)) {
         this.sinkingSeen.add(v);
-        const s = sizeOf(v.kind);
-        this.splash(v.e, v.n, Math.max(s.width, 2), 1);
+        this.splash(v.e, v.n, Math.max(sizeOf(v.kind).width, 2), 1);
         if (v === this.yours) this.say("sinking");
       }
     }
@@ -1690,11 +1155,10 @@ export class WalkGame {
 
   /** A car catching fire: the boom, the flames, people knocked over and running, you hurt if near. */
   private wreck(v: Vehicle): void {
-    const s = sizeOf(v.kind);
     const f = this.focus();
     const d = Math.hypot(v.e - f.e, v.n - f.n);
     if (d < BOOM_HEAR) this.sound.boom(1 - d / BOOM_HEAR);
-    this.particles.wreck(v.e, v.n, v.z, s.length);
+    this.particles.wreck(v.e, v.n, v.z, sizeOf(v.kind).length);
     for (const q of this.crowd.people)
       if (
         q.state !== "down" &&
@@ -1722,156 +1186,32 @@ export class WalkGame {
     this.particles.splash(e, n, size);
   }
 
-  /** Smoke from damaged engines, fire on wrecks, bubbles over what sinks, foam behind boats. */
-  private effects(h: number): void {
-    if (h > 0)
-      for (const v of this.nearby) {
-        if (v.state === "sunk" || !this.near(v, SMOKE_REACH) || (v === this.yours && this.tunnel))
-          continue;
-        const s = sizeOf(v.kind);
-        const sy = Math.sin(v.yaw);
-        const cy = Math.cos(v.yaw);
-        if (v.state === "sinking") {
-          if (Math.random() < h * 20) this.particles.bubbles(v.e, v.n, s.width);
-          continue;
-        }
-        if (!v.boat && v.damage >= 0.55) {
-          const fe = v.e + sy * (s.length / 2 - 0.9);
-          const fn = v.n + cy * (s.length / 2 - 0.9);
-          const z = v.z + s.height * 0.65;
-          if (v.fire > 0)
-            for (let k = 0; k < 3; k++)
-              if (Math.random() < h * 30) this.particles.flame(fe, fn, z, s.width);
-          const wrecked = v.state === "wrecked";
-          if (Math.random() < (wrecked ? 10 : (v.damage - 0.5) * 14) * h)
-            this.particles.smoke(fe, fn, z, wrecked);
-        }
-        if (v.boat && Math.abs(v.v) > 2 && Math.random() < h * Math.abs(v.v) * 1.5)
-          this.particles.wake(v.e - sy * (s.length / 2), v.n - cy * (s.length / 2), v.yaw, s.width);
-      }
-    this.particles.step(h);
-  }
-
   private timers(real: number): void {
     this.msgFor = Math.max(0, this.msgFor - real);
     if (this.msgFor === 0) this.msg = null;
     this.hurtFlash = Math.max(0, this.hurtFlash - real / HURT_FADE);
     this.jumpFor = Math.max(0, this.jumpFor - real);
     this.hitCool = Math.max(0, this.hitCool - real);
-    this.lookIdle += real;
-    this.shake *= Math.exp(-6 * real);
+    this.cams.tick(real);
   }
 
-  // ---------- the cameras, the drawing, the signs ----------
+  // ---------- the camera, the colours, the drawing, the signs ----------
 
   private camera(real: number): void {
-    const p = this.player;
-    let eye: Eye;
-    if (this.tunnel) {
-      // in the dark: the camera waits at the far end, so its squares come in
-      const tu = this.tunnel;
-      eye = { e: tu.e, n: tu.n, z: EYE, yaw: tu.yaw, pitch: 0, fov: FOV };
-    } else if (this.wasted && this.body) eye = this.reduced ? this.eye : this.wastedEye();
-    else if (this.yours) eye = this.driverEye(real);
-    else {
-      let z = p.z + EYE;
-      if (p.mode === "swim")
-        z = WATER_Z + SWIM_EYE + (this.reduced ? 0 : Math.sin(this.t * 2.1) * 0.05);
-      else if (p.mode === "down") z = p.z + 0.45;
-      else if (!this.reduced && p.airFrom === null) z += Math.sin(p.bob) * 0.05;
-      eye = { e: p.e, n: p.n, z, yaw: p.yaw, pitch: p.pitch, fov: FOV };
-    }
-    this.eye = eye;
+    const tu = this.tunnel;
+    const eye = tu
+      ? this.cams.waiting(tu.e, tu.n, tu.yaw)
+      : this.wasted && this.body
+        ? this.cams.wasted(this.body, this.wastedT)
+        : this.yours
+          ? this.cams.driving(this.yours, real, this.held("lookBehind"), this.world)
+          : this.cams.onFoot(this.player, this.t);
     this.view.setCamera(eye.e, eye.n, eye.z, eye.yaw, eye.pitch, eye.fov);
-  }
-
-  /** The camera lifting away from you lying in the street, a slow turn as it rises. */
-  private wastedEye(): Eye {
-    const b = this.body!;
-    const k = smooth(wastedAt(this.wastedT, false).lift);
-    const back = 2.5 + 6 * k;
-    const yaw = b.yaw + 0.6 * k;
-    const e = b.e - Math.sin(yaw) * back;
-    const n = b.n - Math.cos(yaw) * back;
-    const z = b.z + 1.6 + 12 * k;
-    const lifted: Eye = {
-      e,
-      n,
-      z,
-      yaw: Math.atan2(b.e - e, b.n - n),
-      pitch: -Math.atan2(z - (b.z + 0.3), back),
-      fov: FOV,
-    };
-    // from where you saw last, over the first half second
-    const from = this.downEye;
-    const m = from ? smooth(Math.min(1, this.wastedT / 0.5)) : 1;
-    if (!from || m >= 1) return lifted;
-    return {
-      e: from.e + (lifted.e - from.e) * m,
-      n: from.n + (lifted.n - from.n) * m,
-      z: from.z + (lifted.z - from.z) * m,
-      yaw: from.yaw + wrap(lifted.yaw - from.yaw) * m,
-      pitch: from.pitch + (lifted.pitch - from.pitch) * m,
-      fov: from.fov + (lifted.fov - from.fov) * m,
-    };
-  }
-
-  /** The chase camera behind what you drive, or your eyes at its wheel. */
-  private driverEye(real: number): Eye {
-    const v = this.yours!;
-    const s = sizeOf(v.kind);
-    if (this.lookIdle > LOOK_RETURN) {
-      this.lookYaw *= Math.exp(-3 * real);
-      this.lookPitch += (LOOK_PITCH - this.lookPitch) * Math.min(1, 3 * real);
-    }
-    this.camYaw += wrap(v.yaw - this.camYaw) * Math.min(1, real * FOLLOW);
-    const speed = Math.abs(v.v);
-    const fov = this.reduced ? FOV : FOV + clamp((speed - 12) * 0.45, 0, 18);
-    this.fov += (fov - this.fov) * Math.min(1, real * 3);
-    const behind = this.held("lookBehind") ? Math.PI : 0;
-    const jig = () =>
-      this.shake > 0.01 && !this.reduced ? (Math.random() - 0.5) * this.shake * 0.6 : 0;
-    if (this.cam === "wheel") {
-      const [eh, ef] = EYES[v.kind];
-      const side = v.boat ? 0 : -0.36;
-      const sy = Math.sin(v.yaw);
-      const cy = Math.cos(v.yaw);
-      return {
-        e: v.e + sy * ef + cy * side + jig(),
-        n: v.n + cy * ef - sy * side,
-        z: v.z + v.heave + eh + jig() * 0.5,
-        yaw: v.yaw + this.lookYaw + behind,
-        pitch: this.lookPitch + 0.1,
-        fov: this.fov,
-      };
-    }
-    const yaw = this.camYaw + this.lookYaw + behind;
-    const dist = 4.5 + s.length * 0.8 + clamp(speed * 0.05, 0, 2);
-    const back = Math.cos(this.lookPitch) * dist;
-    let ce = v.e - Math.sin(yaw) * back;
-    let cn = v.n - Math.cos(yaw) * back;
-    const cz = v.z + Math.max(0.8, 1.2 + s.height * 0.7 - Math.sin(this.lookPitch) * dist * 0.6);
-    // a wall in the way brings it closer
-    for (let k = 0.15; k <= 1.0001; k += 0.15) {
-      const pe = v.e + (ce - v.e) * k;
-      const pn = v.n + (cn - v.n) * k;
-      if (!this.world.blocked(pe, pn, 0.3, cz - 0.4, 0.8)) continue;
-      const f = Math.max(0.1, k - 0.2);
-      ce = v.e + (ce - v.e) * f;
-      cn = v.n + (cn - v.n) * f;
-      break;
-    }
-    const te = v.e + Math.sin(yaw) * 4;
-    const tn = v.n + Math.cos(yaw) * 4;
-    const tz = v.z + 1 + s.height * 0.45;
-    return {
-      e: ce + jig(),
-      n: cn,
-      z: cz + jig(),
-      yaw: Math.atan2(te - ce, tn - cn),
-      pitch: Math.atan2(tz - cz, Math.hypot(te - ce, tn - cn)),
-      fov: this.fov,
-    };
+    // the colours drain while you are down (not under reduced motion: `wastedAt` keeps them)
+    const grey = this.wasted ? wastedAt(this.wastedT, this.reduced).grey : 0;
+    this.view.setGrey(grey);
+    this.models.setGrey(grey);
+    this.particles.setGrey(grey);
   }
 
   /** Whether a vehicle's tail lamps are lit: braking at your wheel, slowing or stopped in traffic. */
@@ -1886,22 +1226,20 @@ export class WalkGame {
 
   private draw(): void {
     const m = this.models;
+    const me = this.focus();
     const far = FOG_FAR + 30;
     m.begin();
     for (const v of this.nearby) {
-      if ((v === this.yours && this.tunnel) || !this.near(v, far)) continue;
+      if ((v === this.yours && this.tunnel) || !within(v, me, far)) continue;
       m.vehicle(v, this.braking(v));
     }
-    for (const v of this.free)
-      if (v !== this.yours && !this.near(v, NEAR) && this.near(v, far)) m.vehicle(v);
-    for (const f of this.ferries)
-      if (
-        f.boat &&
-        f.boat !== this.yours &&
-        !this.near(f.boat, FERRY_NEAR) &&
-        this.near(f.boat, far)
-      )
-        m.vehicle(f.boat);
+    for (const v of this.fleet.free)
+      if (v !== this.yours && !within(v, me, NEAR) && within(v, me, far)) m.vehicle(v);
+    for (const v of this.ferries.boats())
+      if (v !== this.yours && !within(v, me, FERRY_NEAR) && within(v, me, far)) m.vehicle(v);
+    for (const posts of this.posts.values())
+      for (const post of posts)
+        if (within(post, me, SIGNAL_REACH)) m.signal(post, lampLit(this.t, post.phase));
     for (const q of this.crowd.people) m.person(q);
     const b = this.body;
     if (this.wasted && b) m.you(b.e, b.n, b.z, b.yaw, true);
@@ -1911,7 +1249,8 @@ export class WalkGame {
   private snapshot(): WalkState {
     const p = this.player;
     const v = this.yours;
-    const near = !v && !this.wasted && !this.waiting && !this.tunnel ? this.nearest() : null;
+    const near =
+      !v && !this.wasted && !this.waiting && !this.tunnel ? toTake(p, this.nearby) : null;
     return {
       mode: this.wasted ? "down" : v ? (v.boat ? "boat" : "drive") : p.mode,
       life: p.life,
@@ -1928,7 +1267,7 @@ export class WalkGame {
       message: this.msg,
       hurt: this.hurtFlash,
       wasted: this.wasted ? wastedAt(this.wastedT, this.reduced) : null,
-      camera: this.cam,
+      camera: this.cams.mode,
       dark: this.tunnel ? 1 : 0,
     };
   }

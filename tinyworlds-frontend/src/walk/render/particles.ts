@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { FOG_FAR, FOG_NEAR, HORIZON } from "./materials";
+import { sizeOf, type Vehicle } from "../vehicles";
+import { DRAIN, FOG_FAR, FOG_NEAR, HORIZON, greysOf } from "./materials";
 import { HALF, HIGH, LIT, SHADE, type Palette } from "./palette";
 
 /**
@@ -64,13 +65,14 @@ void main() {
 const FRAGMENT = /* glsl */ `
 precision highp float;
 uniform vec3 fogColor; uniform float fogNear, fogFar;
+${DRAIN}
 varying vec3 vColour; varying float vAlpha; varying vec3 vMV;
 const float B[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
 void main() {
   if (length(gl_PointCoord - 0.5) > 0.5) discard;
   ivec2 q = ivec2(mod(gl_FragCoord.xy, 4.0));
   if (vAlpha < (B[q.x + q.y * 4] + 0.5) / 16.0) discard;
-  gl_FragColor = vec4(mix(vColour, fogColor, smoothstep(fogNear, fogFar, length(vMV))), 1.0);
+  gl_FragColor = vec4(drained(mix(vColour, fogColor, smoothstep(fogNear, fogFar, length(vMV)))), 1.0);
 }`;
 
 export class WalkParticles {
@@ -117,6 +119,8 @@ export class WalkParticles {
         fogColor: { value: HORIZON },
         fogNear: { value: FOG_NEAR },
         fogFar: { value: FOG_FAR },
+        grey: { value: 0 },
+        greys: { value: greysOf(palette) },
       },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
@@ -132,6 +136,11 @@ export class WalkParticles {
       this.mat.uniforms.pscale.value = buffer.y / (2 * Math.tan((fov * Math.PI) / 360));
     };
     scene.add(this.points);
+  }
+
+  /** Drains the colours to the palette's greys, 0 (none) to 1 (all): the wasted sequence. */
+  setGrey(amount: number): void {
+    this.mat.uniforms.grey.value = Number.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
   }
 
   /** How many are in the air: for a check. */
@@ -373,6 +382,33 @@ export class WalkParticles {
         true,
       );
     }
+  }
+
+  /**
+   * What a vehicle gives off over `h` seconds: smoke from a damaged engine (from 55%, black from
+   * a wreck), flames while a wreck burns, bubbles over what sinks, foam behind a boat under way.
+   */
+  from(v: Vehicle, h: number): void {
+    if (v.state === "sunk" || !(h > 0)) return;
+    const s = sizeOf(v.kind);
+    const sy = Math.sin(v.yaw);
+    const cy = Math.cos(v.yaw);
+    if (v.state === "sinking") {
+      if (Math.random() < h * 20) this.bubbles(v.e, v.n, s.width);
+      return;
+    }
+    if (!v.boat && v.damage >= 0.55) {
+      const fe = v.e + sy * (s.length / 2 - 0.9);
+      const fn = v.n + cy * (s.length / 2 - 0.9);
+      const z = v.z + s.height * 0.65;
+      if (v.fire > 0)
+        for (let k = 0; k < 3; k++) if (Math.random() < h * 30) this.flame(fe, fn, z, s.width);
+      const wrecked = v.state === "wrecked";
+      if (Math.random() < (wrecked ? 10 : (v.damage - 0.5) * 14) * h)
+        this.smoke(fe, fn, z, wrecked);
+    }
+    if (v.boat && Math.abs(v.v) > 2 && Math.random() < h * Math.abs(v.v) * 1.5)
+      this.wake(v.e - sy * (s.length / 2), v.n - cy * (s.length / 2), v.yaw, s.width);
   }
 
   /** Moves them all on by dt seconds and hands the survivors to the points. */

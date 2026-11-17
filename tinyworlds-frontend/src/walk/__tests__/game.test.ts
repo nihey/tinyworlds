@@ -68,14 +68,17 @@ function seeded(seed: number) {
   };
 }
 
-/** A view that renders nothing: the world and a real scene, the cameras it was given kept. */
-function fakeView(world: WalkWorld): GameView & { cameras: number[][] } {
+/** A view that renders nothing: the world and a real scene, the cameras and greys it was given kept. */
+function fakeView(world: WalkWorld): GameView & { cameras: number[][]; greys: number[] } {
   const cameras: number[][] = [];
+  const greys: number[] = [];
   return {
     world,
     scene: new THREE.Scene(),
     cameras,
+    greys,
     setCamera: (...pose: number[]) => void cameras.push(pose),
+    setGrey: (amount: number) => void greys.push(amount),
     update() {},
     render() {},
   };
@@ -257,6 +260,22 @@ describe("going down", () => {
     expect(Math.min(Math.abs(at.n - 91), Math.abs(at.n - 109))).toBeLessThan(0.01);
     expect(now().life).toBe(100);
     expect(now().mode).toBe("foot");
+  });
+
+  it("drains the city's colours while it runs, and gives them back after", () => {
+    const { view, now, simUntil } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100, z: 20 } });
+    const last = () => view.greys[view.greys.length - 1];
+    expect(simUntil(() => now().wasted !== null, 4)).toBe(true);
+    expect(simUntil(() => (now().wasted?.grey ?? 0) > 0.6, 3)).toBe(true);
+    expect(last()).toBeCloseTo(now().wasted!.grey, 5);
+    expect(simUntil(() => now().wasted === null, 6)).toBe(true);
+    expect(last()).toBe(0);
+
+    // under reduced motion the colours stay
+    const calm = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100, z: 20 }, reduced: true });
+    expect(calm.simUntil(() => calm.now().wasted !== null, 4)).toBe(true);
+    calm.game.sim(2);
+    expect(calm.view.greys.every((g) => g === 0)).toBe(true);
   });
 
   it("slows time while it runs, and a key skips ahead once the word is up", () => {

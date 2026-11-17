@@ -35,9 +35,61 @@ uint mixh(uint a, uint b) {
 uint hash2(int x, int y) { return mixh(uint(x), uint(y) + 0x632be5abu); }
 `;
 
+/** The greys the colours drain to when you go down: every shade of the palette's grey stones. */
+export const GREY_RAMPS = ["greyStone", "darkStone", "concrete"] as const;
+const GREYS = GREY_RAMPS.length * SHADES;
+
+/** Those greys as colours, for a `greys` uniform. */
+export function greysOf(palette: Palette): THREE.Vector3[] {
+  const out: THREE.Vector3[] = [];
+  for (const name of GREY_RAMPS)
+    for (let shade = 0; shade < SHADES; shade++) {
+      const [r, g, b] = palette.rgb(palette.ramp(name), shade);
+      out.push(new THREE.Vector3(r / 255, g / 255, b / 255));
+    }
+  return out;
+}
+
+const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+/** The grey of `greys` nearest a colour's brightness. */
+export function greyOf(greys: THREE.Vector3[], c: THREE.Color): THREE.Color {
+  const l = luma(c.r, c.g, c.b);
+  let best = greys[0];
+  for (const g of greys)
+    if (Math.abs(luma(g.x, g.y, g.z) - l) < Math.abs(luma(best.x, best.y, best.z) - l)) best = g;
+  return new THREE.Color().setRGB(best.x, best.y, best.z, THREE.LinearSRGBColorSpace);
+}
+
+/**
+ * Draining the colours (the wasted sequence): with `grey` from 0 to 1, that share of the pixels,
+ * picked by a 4 × 4 Bayer pattern, take the palette grey nearest their brightness instead. A
+ * pixel is a palette colour or a grey, never a mix of the two.
+ */
+export const DRAIN = /* glsl */ `
+uniform float grey; uniform vec3 greys[${GREYS}];
+vec3 drained(vec3 c) {
+  if (grey <= 0.0) return c;
+  ivec2 q = ivec2(mod(gl_FragCoord.xy, 4.0));
+  int b[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
+  if (grey < (float(b[q.x + q.y * 4]) + 0.5) / 16.0) return c;
+  const vec3 Y = vec3(0.299, 0.587, 0.114);
+  float l = dot(c, Y);
+  vec3 best = greys[0];
+  float d = 9.0;
+  for (int i = 0; i < ${GREYS}; i++) {
+    float e = abs(dot(greys[i], Y) - l);
+    if (e < d) { d = e; best = greys[i]; }
+  }
+  return best;
+}
+`;
+
+/** The fog, the last thing every surface's colour goes through: then the drain. */
 const FOG = /* glsl */ `
 uniform vec3 fogColor; uniform float fogNear, fogFar;
-vec3 fogged(vec3 c, float d) { return mix(c, fogColor, smoothstep(fogNear, fogFar, d)); }
+${DRAIN}
+vec3 fogged(vec3 c, float d) { return drained(mix(c, fogColor, smoothstep(fogNear, fogFar, d))); }
 `;
 
 const PALETTE = /* glsl */ `
@@ -274,8 +326,9 @@ void main() {
 const EDGE_FRAGMENT = /* glsl */ `
 precision highp float;
 uniform vec3 fogColor; uniform vec3 skyColor;
+${DRAIN}
 varying vec3 vW;
-void main() { gl_FragColor = vec4(vW.y < cameraPosition.y ? fogColor : skyColor, 1.0); }`;
+void main() { gl_FragColor = vec4(drained(vW.y < cameraPosition.y ? fogColor : skyColor), 1.0); }`;
 
 export interface WalkMaterials {
   /** Walls of buildings, deck slabs, parapets, columns and the shore's edge. */
@@ -296,6 +349,8 @@ export interface WalkMaterials {
   ground(mask: THREE.Texture | null): { colour: THREE.ShaderMaterial; depth: THREE.ShaderMaterial };
   /** Once a frame: the clock (seconds) and the camera, for the water and the trees. */
   frame(time: number, camera: THREE.Camera): void;
+  /** Drains the colours to the palette's greys, 0 (none) to 1 (all): the wasted sequence. */
+  setGrey(amount: number): void;
   dispose(): void;
 }
 
@@ -364,6 +419,8 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     fogFar: { value: FOG_FAR },
     time: { value: 0 },
     laneColour: { value: palette.ramp("markingWhite") * SHADES + LIT },
+    grey: { value: 0 },
+    greys: { value: greysOf(palette) },
   };
 
   const wall = new THREE.ShaderMaterial({
@@ -410,7 +467,12 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     fragmentShader: WATER_FRAGMENT,
   });
   const edge = new THREE.ShaderMaterial({
-    uniforms: { fogColor: shared.fogColor, skyColor: { value: SKY } },
+    uniforms: {
+      fogColor: shared.fogColor,
+      skyColor: { value: SKY },
+      grey: shared.grey,
+      greys: shared.greys,
+    },
     vertexShader: EDGE_VERTEX,
     fragmentShader: EDGE_FRAGMENT,
     side: THREE.DoubleSide,
@@ -450,6 +512,9 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
         colorWrite: false,
       });
       return { colour, depth };
+    },
+    setGrey(amount) {
+      shared.grey.value = Number.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
     },
     frame(time, camera) {
       shared.time.value = time;
