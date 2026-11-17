@@ -256,7 +256,9 @@ const LOOSE_SPIN = 2.5;
 
 // damage
 const HARMLESS = 3;
-const DAMAGE = 0.022;
+/** Damage a metre a second over `HARMLESS`, before the share and the toughness. Halved from the
+ * spike's 0.022 when the owner asked to "increase the level of damage cars can sustain". */
+export const DAMAGE_PER_MS = 0.011;
 const DAMAGE_SLOWS = 0.45;
 const FIRE = 9;
 
@@ -338,11 +340,13 @@ export function accelFactor(v: Vehicle): number {
 }
 
 /**
- * Damage from a hit at `impact` m/s: (impact − 3) × 0.022 ÷ toughness, times the share the vehicle
- * takes of it. Against another of `otherMass` that share is 2·M / (m + M): once against its own
- * weight, more against a heavier one, less against a lighter one; against what does not give (a
- * wall, the ground: no `otherMass`) it is 2. So a hatchback hitting a wall at 30 m/s is wrecked and
- * a bus is not. Answers whether this hit wrecked it: a car then burns for 9 s, a boat goes down.
+ * Damage from a hit at `impact` m/s: (impact − 3) × 0.011 ÷ toughness, times the share the vehicle
+ * takes of it; every hit and every fall, cars and boats alike, comes through here. Against another
+ * of `otherMass` that share is 2·M / (m + M): once against its own weight, more against a heavier
+ * one, less against a lighter one; against what does not give (a wall, the ground: no
+ * `otherMass`) it is 2. So a hatchback hitting a wall at 30 m/s is left at about 60% (smoking) and
+ * is wrecked from about 48 m/s, and a bus at 30 m/s takes a fifth. Answers whether this hit wrecked
+ * it: a car then burns for 9 s, a boat goes down.
  */
 export function applyDamage(v: Vehicle, impact: number, otherMass?: number): boolean {
   if (v.state === "wrecked" || v.state === "sinking" || v.state === "sunk") return false;
@@ -351,7 +355,7 @@ export function applyDamage(v: Vehicle, impact: number, otherMass?: number): boo
     otherMass === undefined || !Number.isFinite(otherMass)
       ? 2
       : (2 * otherMass) / (size.mass + otherMass);
-  const add = (Math.max(0, impact - HARMLESS) * DAMAGE * share) / size.tough;
+  const add = (Math.max(0, impact - HARMLESS) * DAMAGE_PER_MS * share) / size.tough;
   if (!(add > 0)) return false;
   v.damage = Math.min(1, v.damage + add);
   if (v.damage < 1) return false;

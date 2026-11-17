@@ -395,8 +395,11 @@ apart; an impulse with a little bounce (0.25) spins them by where they touched. 
 stops for 2.5 s, or leaves its lane and slides loose if the knock is hard (over 2.2 m/s); a
 parked car hit becomes loose. Loose cars slide, spin, slow and come to rest where they end up
 (kept while within 700 m), or roll off an edge and fall. Buildings and parapets stop a car,
-which slides along them. **Damage** per hit: (impact speed − 3 m/s) × 0.022, divided by the
-car's toughness; the lighter car takes more; a fall counts as a hit at the landing speed. From
+which slides along them. **Damage** per hit: (impact speed − 3 m/s) × 0.011, divided by the
+car's toughness; the lighter car takes more; a fall counts as a hit at the landing speed; boats
+the same. (It was 0.022 at launch; the owner then asked to "increase the level of damage cars can
+sustain", so every hit does half: a hatchback into a wall at 30 m/s is left smoking, not
+wrecked, and is wrecked from about 48 m/s.) From
 35% the glass cracks, from 55% the engine smokes, at 100% the car catches fire (9 s), turns black
 and smokes black, and will not drive; it is still solid and can be climbed. Damage costs
 acceleration. Sparks, glass and a crunch on hits; a dull boom on a wreck.

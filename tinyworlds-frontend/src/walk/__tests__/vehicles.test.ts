@@ -5,6 +5,7 @@ import {
   applyDamage,
   BOATS,
   CARS,
+  DAMAGE_PER_MS,
   newVehicle,
   pickCar,
   stepBoat,
@@ -287,23 +288,42 @@ describe("walls and damage", () => {
     expect(v.damage).toBe(0);
   });
 
-  it("is wrecked by a 30 m/s wall hit in a hatchback, half wrecked in a bus", () => {
+  it("does half the spike's damage a metre a second (the owner: cars sustain more)", () => {
+    expect(DAMAGE_PER_MS).toBe(0.011);
+    const v = car("sedan", 0, 0, 0);
+    applyDamage(v, 13);
+    expect(v.damage).toBeCloseTo(2 * 10 * 0.011, 12);
+  });
+
+  it("survives a 30 m/s wall hit in a hatchback, smoking; is wrecked from about 48 m/s; a bus takes a third", () => {
     const w = building();
     const hatch = car("hatchback", 60 - CARS.hatchback.length / 2 - 0.5, 100, EAST, 30);
     const h = run(hatch, gas, w, 0.5);
     expect(h.impact).toBeCloseTo(30, 0);
-    expect(h.wrecked).toBe(true);
-    expect(hatch.state).toBe("wrecked");
-    expect(hatch.damage).toBe(1);
-    expect(hatch.fire).toBeGreaterThan(8);
+    expect(h.wrecked).toBe(false);
+    expect(hatch.state).toBe("driven");
+    // (30 − 3) × 0.011 × 2: past the cracked glass (35%) and the smoke (55%), short of a wreck
+    expect(hatch.damage).toBeCloseTo(2 * (h.impact - 3) * 0.011, 6);
+    expect(hatch.damage).toBeGreaterThan(0.55);
+    expect(hatch.damage).toBeLessThan(0.65);
+
+    // a supercar (as tough as a hatchback) into the same wall: 45 m/s leaves it, 52 m/s wrecks it
+    const near = car("supercar", 60 - CARS.supercar.length / 2 - 0.5, 100, EAST, 45);
+    expect(run(near, gas, w, 0.5).wrecked).toBe(false);
+    expect(near.damage).toBeGreaterThan(0.9);
+    const fast = car("supercar", 60 - CARS.supercar.length / 2 - 0.5, 100, EAST, 52);
+    const f = run(fast, gas, w, 0.5);
+    expect(f.wrecked).toBe(true);
+    expect(fast.state).toBe("wrecked");
+    expect(fast.damage).toBe(1);
+    expect(fast.fire).toBeGreaterThan(8);
 
     const bus = car("bus", 60 - CARS.bus.length / 2 - 0.5, 100, EAST, 30);
     const b = run(bus, gas, w, 0.5);
     expect(b.impact).toBeCloseTo(30, 0);
     expect(b.wrecked).toBe(false);
     expect(bus.state).toBe("driven");
-    expect(bus.damage).toBeGreaterThan(0.3);
-    expect(bus.damage).toBeLessThan(0.6);
+    expect(bus.damage).toBeCloseTo((2 * (b.impact - 3) * 0.011) / 3, 6);
   });
 
   it("hurts the lighter of two cars more, and equal ones by the formula", () => {
@@ -314,11 +334,11 @@ describe("walls and damage", () => {
     expect(hatch.damage).toBeGreaterThan(10 * bus.damage);
     const a = car("sedan", 0, 0, 0);
     applyDamage(a, 20, CARS.sedan.mass);
-    expect(a.damage).toBeCloseTo((20 - 3) * 0.022, 9);
+    expect(a.damage).toBeCloseTo((20 - 3) * 0.011, 9);
     // what does not give (a wall, the ground) counts as the heaviest of all
     const b = car("sedan", 0, 0, 0);
     applyDamage(b, 20);
-    expect(b.damage).toBeCloseTo(2 * (20 - 3) * 0.022, 9);
+    expect(b.damage).toBeCloseTo(2 * (20 - 3) * 0.011, 9);
   });
 
   it("says when a car would stand in a wall or outside the data", () => {
@@ -420,7 +440,7 @@ describe("decks", () => {
     expect(v.z).toBe(0);
     const landing = Math.sqrt(2 * 13 * 10);
     expect(r.fell).toBeCloseTo(landing, 0);
-    expect(v.damage).toBeCloseTo(2 * (r.fell - 3) * 0.022, 6);
+    expect(v.damage).toBeCloseTo(2 * (r.fell - 3) * 0.011, 6);
     expect(r.impact).toBe(0);
   });
 
@@ -846,10 +866,20 @@ describe("boats", () => {
     expect(bow(soft)).toBeGreaterThanOrEqual(100 - 1e-6);
     expect(bow(soft)).toBeLessThan(101);
     expect(r.impact).toBeCloseTo(10, 0);
-    expect(soft.damage).toBeCloseTo(2 * (r.impact - 3) * 0.022, 6);
+    expect(soft.damage).toBeCloseTo(2 * (r.impact - 3) * 0.011, 6);
     expect(soft.state).toBe("driven");
 
+    // flat out (28 m/s) a fresh boat takes (28 − 3) × 0.011 × 2 and floats on
+    const full = newVehicle(3, "speedboat", 110, 100, WEST, "driven");
+    full.v = 28;
+    const once = run(full, gas, w(), 2);
+    expect(once.wrecked).toBe(false);
+    expect(full.state).toBe("driven");
+    expect(full.damage).toBeCloseTo(2 * (once.impact - 3) * 0.011, 6);
+
+    // a second hit like it is the end of it
     const hard = newVehicle(2, "speedboat", 110, 100, WEST, "driven");
+    hard.damage = full.damage;
     hard.v = 28;
     const h = run(hard, gas, w(), 7);
     expect(h.wrecked).toBe(true);
