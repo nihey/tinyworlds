@@ -7,6 +7,7 @@ import {
   resolveDataBase,
   setMapView,
   viewDataBase,
+  worldDataUrl,
 } from "../data";
 import { parseManifest } from "../manifest";
 
@@ -65,6 +66,16 @@ describe("dataUrl", () => {
 
   it("uses the active world's folder by default", () => {
     expect(dataUrl("manifest.json")).toBe("/data/tinynyc/manifest.json");
+  });
+
+  it("keeps the world's own folder for the street walk, whichever way the map is turned", () => {
+    try {
+      setMapView("grid");
+      expect(worldDataUrl("walk/walk.json", "w1")).toBe("/data/tinynyc/walk/walk.json?v=w1");
+      expect(worldDataUrl("manifest.json")).toBe("/data/tinynyc/manifest.json");
+    } finally {
+      setMapView("north");
+    }
   });
 
   it("follows the view the map is turned to", () => {

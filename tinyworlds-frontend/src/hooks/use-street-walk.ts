@@ -100,6 +100,8 @@ export function useStreetWalk({
   onOpening,
 }: {
   engine: MapEngine | null;
+  /** the world's own manifest (north up), whichever way the map is turned: it names the walk's
+   * version, and the walk is one for both views */
   manifest: Manifest | null;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   sights: Sight[];
@@ -266,7 +268,7 @@ export function useStreetWalk({
     if (!engine || !canWalk) return;
     const v = engine.getView();
     void putDown(
-      () => dropAtMapPx(version, v.x, v.y),
+      () => dropAtMapPx(engine, version, v.x, v.y),
       (d) => void openWalk(d),
     );
   }, [engine, canWalk, version, putDown, openWalk]);

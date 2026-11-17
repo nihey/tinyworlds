@@ -80,8 +80,9 @@ export interface World {
    */
   turn?: "grid";
   /**
-   * Its data has the street walk (walk/): the little person on the map opens a walk at street
-   * level, on foot, at the wheel or on the water. Without it the viewer never asks for the files.
+   * Its data has the street walk (walk/, in its own folder: one walk whichever way the map is
+   * turned): the little person on the map opens a walk at street level, on foot, at the wheel or
+   * on the water. Without it the viewer never asks for the files.
    */
   walk?: boolean;
   /**

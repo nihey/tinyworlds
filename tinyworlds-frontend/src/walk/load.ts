@@ -1,4 +1,5 @@
-import { dataUrl } from "@/map/data";
+import { worldDataUrl } from "@/map/data";
+import type { Projection } from "@/map/projection";
 import { readCell, type WalkCell } from "./cell";
 import { REACH, snapDrop, yawAlong, type Drop } from "./drop";
 import { decodeCell, inflate, WalkDataError } from "./format";
@@ -7,8 +8,9 @@ import { cellExists, parseWalkIndex, type WalkIndex } from "./walk-index";
 
 /**
  * The walk's files as the viewer reads them: `walk/walk.json` once, and the squares, each
- * `walk/cells/<i>_<j>.bin` with `?v=<manifest.walk>`. The squares read while the person is
- * held over the map are kept, a few of them, so the walk opens on them at once. Reached only
+ * `walk/cells/<i>_<j>.bin` with `?v=<manifest.walk>`, from the world's own data folder whichever
+ * way the map is turned (one walk, in metres, for both views). The squares read while the person
+ * is held over the map are kept, a few of them, so the walk opens on them at once. Reached only
  * by dynamic import, like everything of the walk.
  */
 
@@ -45,6 +47,51 @@ export function fromMapPx(geo: WalkGeo, x: number, y: number, z: number): [numbe
 }
 
 /**
+ * How the map on screen places the walk's points: north up or turned to the street grid, its map
+ * px are its own projection's, not the walk's (`walk.json`'s `geo` is the world's own view).
+ */
+export interface MapFrame {
+  /** map px per metre of the map's projection (its `geo.k`) */
+  k: number;
+  /** (e, n) metres of the walk at height z: map px as the map draws it, raised by z·kz */
+  toMap(e: number, n: number, z: number): { x: number; y: number };
+  /** map px (x, y) as the map draws a point at height z: the walk's (e, n) metres */
+  fromMap(x: number, y: number, z: number): [number, number];
+}
+
+/** The frame of a map drawn with the walk's own projection (`geo`): the world's own view. */
+export function geoFrame(geo: WalkGeo): MapFrame {
+  return {
+    k: geo.k,
+    toMap: (e, n, z) => toMapPx(geo, e, n, z),
+    fromMap: (x, y, z) => fromMapPx(geo, x, y, z),
+  };
+}
+
+/**
+ * The frame of the map being shown (a `MapEngine`: its current projection and manifest), for a
+ * walk whose metres are `walk`'s: through lon/lat, so it holds for either view.
+ */
+export function mapFrame(
+  walk: WalkGeo,
+  map: { projection: Projection; manifest: { geo: { k: number; kz: number } } },
+): MapFrame {
+  const { k, kz } = map.manifest.geo;
+  return {
+    k,
+    toMap(e, n, z) {
+      const [lon, lat] = enToLonLat(walk, e, n);
+      const p = map.projection.toMap(lon, lat);
+      return { x: p.x, y: p.y - z * kz };
+    },
+    fromMap(x, y, z) {
+      const g = map.projection.toGeo(x, y + z * kz);
+      return lonLatToEN(walk, g.lon, g.lat);
+    },
+  };
+}
+
+/**
  * The raised deck the map draws at map px (x, y): bridges and overpasses stand z·kz px above
  * their footprint, so a point on one is far (71 m for a 41 m deck) from the ground under the
  * pointer. Each deck (not the railways) is drawn as the map draws it and hit within its
@@ -53,7 +100,7 @@ export function fromMapPx(geo: WalkGeo, x: number, y: number, z: number): [numbe
  */
 export function pickDeck(
   cells: Iterable<WalkCell>,
-  geo: WalkGeo,
+  frame: MapFrame,
   x: number,
   y: number,
 ): Drop | null {
@@ -63,11 +110,11 @@ export function pickDeck(
     for (const w of cell.elevated) {
       if (w.kind === 2 || seen.has(w.pts)) continue;
       seen.add(w.pts);
-      const reach = (w.width / 2) * geo.k + DECK_SLACK;
+      const reach = (w.width / 2) * frame.k + DECK_SLACK;
       const p = w.pts;
-      let a = toMapPx(geo, p[0], p[1], p[2]);
+      let a = frame.toMap(p[0], p[1], p[2]);
       for (let q = 3; q + 2 < p.length; q += 3) {
-        const b = toMapPx(geo, p[q], p[q + 1], p[q + 2]);
+        const b = frame.toMap(p[q], p[q + 1], p[q + 2]);
         const sx = b.x - a.x;
         const sy = b.y - a.y;
         const len2 = sx * sx + sy * sy;
@@ -82,7 +129,7 @@ export function pickDeck(
         const e = p[q - 3] + de * t;
         const n = p[q - 2] + dn * t;
         const z = p[q - 1] + (p[q + 2] - p[q - 1]) * t;
-        const front = toMapPx(geo, e, n, 0).y;
+        const front = frame.toMap(e, n, 0).y;
         if (best && !(front > best.front + 0.5 || (front > best.front - 0.5 && dist < best.dist)))
           continue;
         best = { drop: { e, n, z, yaw: yawAlong(de / len, dn / len) }, front, dist };
@@ -167,10 +214,10 @@ export class WalkData {
    * The squares that could hold what the map draws at map px (x, y): round the ground point under
    * it, and round the footprints of decks up to `DECK_TOP` high drawn there.
    */
-  private under(x: number, y: number): [number, number][] {
+  private under(frame: MapFrame, x: number, y: number): [number, number][] {
     const out = new Map<string, [number, number]>();
     for (let z = 0; z <= DECK_TOP; z += DECK_STEP) {
-      const [e, n] = fromMapPx(this.ix.geo, x, y, z);
+      const [e, n] = frame.fromMap(x, y, z);
       for (const sq of squaresNear(this.ix, e, n, z === 0 ? REACH : DECK_REACH))
         out.set(`${sq[0]}_${sq[1]}`, sq);
     }
@@ -178,15 +225,15 @@ export class WalkData {
   }
 
   /**
-   * Where a person put down at map px (x, y) stands: on the raised deck the map draws there, or
-   * else by the street or sidewalk nearest the ground point under it (never on a deck the map
-   * draws elsewhere). Null when there is neither.
+   * Where a person put down at map px (x, y) of a map placed by `frame` stands: on the raised deck
+   * the map draws there, or else by the street or sidewalk nearest the ground point under it
+   * (never on a deck the map draws elsewhere). Null when there is neither.
    */
-  async dropAtMap(x: number, y: number): Promise<Drop | null> {
-    const cells = await this.load(this.under(x, y));
-    const deck = pickDeck(cells, this.ix.geo, x, y);
+  async dropAtMap(frame: MapFrame, x: number, y: number): Promise<Drop | null> {
+    const cells = await this.load(this.under(frame, x, y));
+    const deck = pickDeck(cells, frame, x, y);
     if (deck) return deck;
-    const [e, n] = fromMapPx(this.ix.geo, x, y, 0);
+    const [e, n] = frame.fromMap(x, y, 0);
     return snapDrop(cells.map(onTheGround), e, n);
   }
 
@@ -195,18 +242,17 @@ export class WalkData {
    * them: streets and sidewalks within r metres of the ground point, and decks drawn within
    * r metres' worth of px. Only from squares already in: the highlight never waits.
    */
-  waysNearMap(x: number, y: number, r: number): Float32Array[] {
-    const geo = this.ix.geo;
-    const [e, n] = fromMapPx(geo, x, y, 0);
+  waysNearMap(frame: MapFrame, x: number, y: number, r: number): Float32Array[] {
+    const [e, n] = frame.fromMap(x, y, 0);
     const out = this.waysNear(e, n, r, false);
     const seen = new Set<Float32Array>();
-    for (const [i, j] of this.under(x, y)) {
+    for (const [i, j] of this.under(frame, x, y)) {
       const cell = this.ready.get(`${i}_${j}`);
       if (!cell) continue;
       for (const d of cell.elevated) {
         if (d.kind === 2 || seen.has(d.pts)) continue;
         seen.add(d.pts);
-        if (drawnWithin(geo, d.pts, x, y, r * geo.k)) out.push(d.pts);
+        if (drawnWithin(frame, d.pts, x, y, r * frame.k)) out.push(d.pts);
       }
     }
     return out;
@@ -257,10 +303,10 @@ export class WalkData {
 }
 
 /** Whether an (e, n, z) polyline, drawn as the map draws it, passes within r px of map px (x, y). */
-function drawnWithin(geo: WalkGeo, pts: Float32Array, x: number, y: number, r: number): boolean {
-  let a = toMapPx(geo, pts[0], pts[1], pts[2]);
+function drawnWithin(frame: MapFrame, pts: Float32Array, x: number, y: number, r: number): boolean {
+  let a = frame.toMap(pts[0], pts[1], pts[2]);
   for (let q = 3; q + 2 < pts.length; q += 3) {
-    const b = toMapPx(geo, pts[q], pts[q + 1], pts[q + 2]);
+    const b = frame.toMap(pts[q], pts[q + 1], pts[q + 2]);
     const sx = b.x - a.x;
     const sy = b.y - a.y;
     const len2 = sx * sx + sy * sy;
@@ -301,19 +347,19 @@ async function bytesOf(url: string): Promise<Uint8Array> {
 const loading = new Map<string, Promise<WalkData>>();
 
 /**
- * The walk's index and its squares for this data set (`manifest.walk`), read once per page; a
- * failed read is forgotten, so asking again tries again.
+ * The walk's index and its squares (`manifest.walk` of the world's own manifest), read once per
+ * page, whichever way the map is turned; a failed read is forgotten, so asking again tries again.
  */
 export function walkData(version: string | undefined): Promise<WalkData> {
   const key = version ?? "";
   let p = loading.get(key);
   if (!p) {
     p = (async () => {
-      const res = await fetch(dataUrl("walk/walk.json", version));
+      const res = await fetch(worldDataUrl("walk/walk.json", version));
       if (!res.ok) throw new WalkDataError(`walk.json: ${res.status}`);
       const ix = parseWalkIndex(await res.json());
       return new WalkData(ix, async (i, j) => {
-        const raw = await inflate(await bytesOf(dataUrl(`walk/cells/${i}_${j}.bin`, version)));
+        const raw = await inflate(await bytesOf(worldDataUrl(`walk/cells/${i}_${j}.bin`, version)));
         return readCell(decodeCell(raw));
       });
     })();

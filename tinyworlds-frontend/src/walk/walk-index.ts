@@ -12,7 +12,7 @@ export interface WalkIndex {
   /** base64 bitset, bit (i − i0) + (j − j0)·cols, LSB-first: the square's file exists */
   cells: string;
   geo: WalkGeo;
-  /** the street grid's bearing for paving (the city file's betaDeg) */
+  /** the street grid's bearing for paving (the city file's gridDeg, whichever way the map is turned) */
   gridDeg: number;
   sunDeg: number;
   /** RAMP_COUNT × 6 shades × 3 bytes */

@@ -53,6 +53,8 @@ export interface WalkAt {
 }
 
 export interface WalkScreenProps {
+  /** the world's own manifest (north up), whichever way the map beside is turned: the walk's
+   * version, its origin (`geo`), the first view (`start`) and the ferries' version */
   manifest: Manifest;
   start: WalkStart;
   /** a click on the map beside the walk: you are put there (a new `id` each time) */
@@ -194,7 +196,8 @@ export default function WalkScreen({
       try {
         const [data, life] = await Promise.all([
           walkData(manifest.walk),
-          loadLife(manifest.indexes).catch(() => ({ ferries: [] })),
+          // the ferries of the world's own folder: the walk's version, whichever way the map is turned
+          loadLife(manifest.indexes, undefined, { own: true }).catch(() => ({ ferries: [] })),
         ]);
         if (cancelled) return;
         try {

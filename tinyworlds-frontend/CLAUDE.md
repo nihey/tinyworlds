@@ -948,7 +948,8 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
   points every data URL at the other set (`setMapView`, `viewDataBase` in `map/data.ts`) and
   starts the engine again from the address bar, as a shared link would. A game of Guess the
   building ends first. Nothing of one view is mixed with the other's: `dataUrl()` follows the
-  view by default, so the minimap and the quiz follow too.
+  view by default, so the minimap and the quiz follow too. The street walk is the one exception:
+  it is the world's own whichever way the map is turned (`worldDataUrl`, below).
 - **Remembered per world** in the visitor's preferences (`prefs.view`, `"north"` by default), not
   in the shared link: a link always opens north up. The tab reads it once, when it opens (the
   view is in no markup before the map is in, so the page still hydrates as prerendered): turning
@@ -966,6 +967,17 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
 `CLAUDE.md` has the data (`walk/walk.json`, `walk/cells/<i>_<j>.bin`) and the design is
 `docs/superpowers/specs/2026-11-16-street-walk-design.md`.
 
+- **One walk for both views.** The walk is in metres, so it is the world's own (`walk/` of its
+  own folder, never `grid/`): its files come through `worldDataUrl` with the version the
+  world's own manifest names. North up that is the map's manifest; turned to the street grid,
+  whose manifest names no walk, `map-app.tsx` reads the world's own beside it
+  (`loadWorldManifest`, `walkManifest`), and the person stands in the tools once it is in. On
+  the map side everything goes through the engine's current projection: `mapFrame` (in
+  `walk/load.ts`) takes the walk's metres to the map's px through lon/lat, and the drop
+  (`dropAtMap`, `pickDeck`), the lit ways (`waysNearMap`, `dropHighlight`) and the click beside
+  the walk take it; you and your cone are placed with `engine.projection` (`walkerPoint`).
+  Turning the map starts a new engine; the compass is not there while walking, so a walk never
+  outlives its map.
 - **Nothing of it is in the map's first bundle.** `walk-screen.tsx` is the only way in: its
   default export is reached by `import()` from `useStreetWalk` (`hooks/use-street-walk.ts`,
   the walk as the map sees it) when a walk opens, and three.js and every module under
@@ -1117,7 +1129,7 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   `#your-browser`.
 - **The modules** (`src/walk/`, no React): `format.ts` `walk-index.ts` `cell.ts` `geo.ts`
   (the data, in world metres east and north of the projection's origin), `load.ts` (fetching
-  it, `?v=<manifest.walk>`), `world.ts` (surfaces, water, walls), `player.ts` `health.ts`
+  it, `?v=<manifest.walk>`, and `mapFrame`: the walk on the map being shown), `world.ts` (surfaces, water, walls), `player.ts` `health.ts`
   `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
   `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
   `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { MapEngine } from "@/map/engine";
 import { PERSON, PERSON_H, PERSON_W, personColours } from "@/map/person";
 import type { Drop } from "@/walk/drop";
-import type { WalkData } from "@/walk/load";
+import type { MapFrame, WalkData } from "@/walk/load";
 import { WORLD } from "@/worlds";
 
 /**
@@ -30,6 +30,17 @@ const DRAG_START = 6;
 async function walkData(version: string | undefined) {
   const { walkData: load } = await import("@/walk/load");
   return load(version);
+}
+
+/** The walk's data, and how the map on screen places it (its projection, whichever way it is
+ * turned). */
+async function walkOnMap(
+  engine: MapEngine,
+  version: string | undefined,
+): Promise<{ data: WalkData; frame: MapFrame }> {
+  const { walkData: load, mapFrame } = await import("@/walk/load");
+  const data = await load(version);
+  return { data, frame: mapFrame(data.ix.geo, engine) };
 }
 
 /** Where a person put down stands, in the walk's metres (z: on a deck) and on the ground of the map. */
@@ -54,14 +65,15 @@ export async function dropAtLonLat(
   return placed(data, await data.dropAt(lon, lat));
 }
 
-/** The same for a point of the map as it is drawn, in map px: a raised deck where it is drawn. */
+/** The same for a point of the map as it is drawn, in its map px: a raised deck where it is drawn. */
 export async function dropAtMapPx(
+  engine: MapEngine,
   version: string | undefined,
   x: number,
   y: number,
 ): Promise<PlacedDrop | null> {
-  const data = await walkData(version);
-  return placed(data, await data.dropAtMap(x, y));
+  const { data, frame } = await walkOnMap(engine, version);
+  return placed(data, await data.dropAtMap(frame, x, y));
 }
 
 /** The same for a point on the map's canvas, in CSS px from its top left. */
@@ -72,7 +84,7 @@ export async function dropAtScreen(
   y: number,
 ): Promise<PlacedDrop | null> {
   const m = engine.screenToMap(x, y);
-  return dropAtMapPx(version, m.x, m.y);
+  return dropAtMapPx(engine, version, m.x, m.y);
 }
 
 /** The person as pixels: an SVG, `px` CSS px per pixel. */
@@ -174,14 +186,20 @@ export function WalkPerson({
         clear();
         return;
       }
-      const [data, walker] = await Promise.all([walkData(version), import("@/map/walker")]);
+      const [{ data, frame }, walker] = await Promise.all([
+        walkOnMap(engine, version),
+        import("@/map/walker"),
+      ]);
       while (wanted.current && alive.current && carry.current?.moving) {
         const p = wanted.current;
         wanted.current = null;
         const m = engine.screenToMap(p.x, p.y);
-        const drop = await data.dropAtMap(m.x, m.y);
+        const drop = await data.dropAtMap(frame, m.x, m.y);
         if (!carry.current?.moving) break;
-        walker.dropHighlight(engine, data.waysNearMap(m.x, m.y, LIGHT_REACH));
+        walker.dropHighlight(engine, {
+          ways: data.waysNearMap(frame, m.x, m.y, LIGHT_REACH),
+          frame,
+        });
         setVerdict(drop ? "walk" : "none");
       }
     } catch {

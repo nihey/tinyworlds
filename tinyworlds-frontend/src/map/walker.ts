@@ -1,3 +1,4 @@
+import type { MapFrame } from "@/walk/load";
 import { WORLD } from "@/worlds";
 import type { MapEngine } from "./engine";
 import type { Geo } from "./manifest";
@@ -7,7 +8,8 @@ import { PERSON, PERSON_H, PERSON_W, personColours } from "./person";
  * The street walk on the map: where you are while you walk (the little person, and a cone the
  * way you face), and while the person is carried over the map the ways it can be put down on,
  * lit in the accent. Both are scene layers drawn whatever "life on the map" says; they are
- * signs, not life. Reached by dynamic import, with the rest of the walk.
+ * signs, not life. Both go through the engine's own projection (north up or turned to the
+ * street grid: the map's, not the walk's). Reached by dynamic import, with the rest of the walk.
  */
 
 const RAD = Math.PI / 180;
@@ -18,19 +20,14 @@ const CONE = 30;
 const CONE_HALF = 32 * RAD;
 const INK = "#15171a";
 
-/** A ground move of (de, dn) metres as a move in map px (the projection is linear). */
+/** A ground move of (de, dn) metres as a move in map px of a map drawn with `geo` (the
+ * projection is linear). */
 function moveToMap(geo: Geo, de: number, dn: number): { x: number; y: number } {
   const s = Math.sin(geo.betaDeg * RAD);
   const c = Math.cos(geo.betaDeg * RAD);
   const p = de * s + dn * c;
   const q = de * c - dn * s;
   return { x: (p + q) * geo.k, y: ((q - p) * geo.k) / 2 };
-}
-
-/** A point (e, n) metres from the projection's origin, z up, in map px. */
-function pointToMap(geo: Geo, e: number, n: number, z: number): { x: number; y: number } {
-  const m = moveToMap(geo, e, n);
-  return { x: m.x, y: m.y - z * geo.kz };
 }
 
 /** Where you are, for the map: on the ground at (lon, lat), `z` metres up (a deck), facing `heading`° from north. */
@@ -57,6 +54,7 @@ export function walkerPoint(engine: MapEngine, at: WalkerAt): { x: number; y: nu
 export function walkerLayer(engine: MapEngine, get: () => WalkerAt | null): () => void {
   const colours = personColours(WORLD.accent.color);
   const accent = WORLD.accent.color;
+  // the map's own: its projection is the one `walkerPoint` places you with
   const geo = engine.manifest.geo;
   return engine.addSceneLayer(
     (ctx, view) => {
@@ -123,23 +121,28 @@ const highlights = new WeakMap<MapEngine, { ways: Float32Array[]; off: () => voi
 
 /**
  * While the person is carried over the map: the ways it can be put down on near the pointer,
- * (e, n, z) polylines in metres, lit in the accent over a dark edge. Null takes them away.
+ * (e, n, z) polylines in the walk's metres, placed on this map by `frame` (`mapFrame`), lit in
+ * the accent over a dark edge. Null takes them away.
  */
-export function dropHighlight(engine: MapEngine, ways: Float32Array[] | null): void {
+export function dropHighlight(
+  engine: MapEngine,
+  lit: { ways: Float32Array[]; frame: MapFrame } | null,
+): void {
   const had = highlights.get(engine);
-  if (!ways || ways.length === 0) {
+  const ways = lit?.ways;
+  if (!lit || !ways || ways.length === 0) {
     if (had) {
       had.off();
       highlights.delete(engine);
     }
     return;
   }
-  const geo = engine.manifest.geo;
+  const { frame } = lit;
   // into map px once: [x, y, x, y, …] per way
   const lines = ways.map((pts) => {
     const out = new Float32Array((pts.length / 3) * 2);
     for (let q = 0, o = 0; q + 2 < pts.length; q += 3, o += 2) {
-      const m = pointToMap(geo, pts[q], pts[q + 1], pts[q + 2]);
+      const m = frame.toMap(pts[q], pts[q + 1], pts[q + 2]);
       out[o] = m.x;
       out[o + 1] = m.y;
     }

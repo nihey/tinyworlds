@@ -30,6 +30,7 @@ import {
   loadPlaces,
   loadSights,
   loadSightTexts,
+  loadWorldManifest,
   setMapView,
 } from "@/map/data";
 import type { Sight, SightTexts } from "@/map/sights";
@@ -116,11 +117,15 @@ export function MapApp() {
   );
   // what a finger or a mouse does to the map beside the walk
   const coarse = useMediaQuery("(pointer: coarse)");
+  // the world's own manifest, whichever way the map is turned: the street walk is one for both
+  // views, and that manifest names its version (north up it is the map's own; turned to the
+  // street grid it is read beside the map's)
+  const [walkManifest, setWalkManifest] = useState<Manifest | null>(null);
 
   // the street walk: the person put down on the map, the split, and the way back
   const street = useStreetWalk({
     engine,
-    manifest: session?.manifest ?? null,
+    manifest: session ? walkManifest : null,
     canvasRef,
     sights,
     // the map's other signs give way
@@ -143,6 +148,14 @@ export function MapApp() {
     let started: MapEngine | null = null;
     setMapView(view);
 
+    // turned to the street grid, the walk's version is in the world's own manifest: asked at
+    // once, beside the map's (a failure only leaves the walk out of this view)
+    const own =
+      WORLD.walk && view === "grid" && WORLD.turn === "grid"
+        ? loadWorldManifest(abort.signal)
+        : null;
+    own?.catch(() => {});
+
     (async () => {
       try {
         const manifest = await loadManifest(abort.signal);
@@ -159,6 +172,15 @@ export function MapApp() {
         started = live;
         window.tinyworld = live; // a handle for the console: tinyworld.flyTo({ lon, lat })
         setSession({ manifest, engine: live });
+        if (WORLD.walk) {
+          if (!own) setWalkManifest(manifest);
+          else
+            own
+              .then((m) => {
+                if (!abort.signal.aborted) setWalkManifest(m);
+              })
+              .catch(() => {});
+        }
 
         // the map is usable without these; search and lines arrive when they arrive
         loadPlaces(manifest.indexes, abort.signal)
@@ -223,6 +245,7 @@ export function MapApp() {
     setErrorMessage(null);
     setFailed(false);
     setSession(null);
+    setWalkManifest(null);
     setPlaces(null);
     setPlacesFailed(false);
     setHasHoods(false);
@@ -269,6 +292,7 @@ export function MapApp() {
     if (quizOn) quiz.stop();
     writeHash(formatHash({ ...engine.getCentre(), scale: engine.getView().scale }));
     setSession(null);
+    setWalkManifest(null);
     setPlaces(null);
     setPlacesFailed(false);
     setHasHoods(false);
