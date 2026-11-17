@@ -1120,6 +1120,36 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   (`SlowWatch`: a slow street far from the water says nothing of the mirror's cost; a frame
   over 1 s is a gap); the automatic quality's first step lets it go too.
   `view.setReflections(on)` sets it again, `view.reflections` says whether it is on.
+- **Billboards** (`render/billboards.ts` where and what, `billboard-mesh.ts`,
+  `billboard-material.ts`): the owner asked to "put the billboards in times square". A world's
+  `billboards` (areas: lon, lat, a radius in metres) say where; New York's is Times Square,
+  centred where Broadway crosses Seventh Avenue as the walk's streets have it (the bowtie's
+  waist), 215 m round, so West 42nd and West 47th Street are in. A wall there carries screens when
+  it is a straight run of its footprint (edges turning under 12° are one wall) at least 8 m long
+  (taken in pieces of about 36 m), its volume stands on the street (base ≤ 6 m) and is tall (top ≥
+  15 m), and it faces open ground: probes from three points along it, 3 to 15 m out (Manhattan's
+  side streets are 18 m from front to front), meet no volume rising above 6 m, and the middle one
+  ends inside the area. Walls near the centre are taken first and more often, with two or three
+  screens stacked up them (one or two further out, one at the edge), from 6 m up to 2 m under the
+  top (60 m at most), each 60 to 90% of the wall wide (wider near the centre), 1:1 to 3:1, 0.3 m
+  off the wall in a dark housing. Each square's share of an area's 120 screens is the share of the area it
+  holds; New York's has 111. All of it from the data and hashes of each volume's seed and wall,
+  so the screens are the same every visit; a square's are hung (`WalkView.hangBillboards`, one
+  square a frame, about 0.2 to 1.3 ms) once it and every square round it are in, the probes
+  reaching into them, as one instanced mesh of its group: one draw call a square, no measurable
+  frame time at the waist (5.5 ms against 5.2 ms a frame, within the noise, 60 fps both, 1440 ×
+  900 at pixel size 3). What they show (`screenOf`, by hash): a slideshow of big pictograms on a
+  flat field (a new one every 3 s), a ticker band of coloured blocks scrolling under a picture,
+  colour bands sweeping (diagonal, sideways or rings), or a pictogram blinking or pulsing between
+  two palettes; every loop a whole number of seconds. The pictograms are drawn in code, 16 × 16
+  (a star, theatre masks, music, a film clapper, a cup, a sneaker, a heart, a lightning bolt).
+  Pixel art in LED pixels of 0.25 m, every pixel one of the palette's bright colours exactly
+  (`SCHEMES`: taxi yellow, reds, blues, greens, pinks, oranges, white, and the darks), gradients
+  in a 4 × 4 Bayer pattern of the screen's own pixels, a dark frame round each, then the fog and
+  the wasted greying (`fogged`); far away whole blocks of its pixels take one pixel's colour, so
+  nothing shimmers. **No brands, no logos, no letters or digits anywhere** (nothing to
+  translate). Under reduced motion every screen keeps one frame. Not in the minimap, not solid
+  (nothing reaches a wall 6 m up); a palette without their ramps shows none.
 - **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
   than the gaps between its lines), so which deck you are on is told by your history and your
   direction (`surfaceUnder`'s `on` and `going`). You stay on the way you are on while its strip
@@ -1158,7 +1188,8 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,
   `quality.ts`, `minimap.ts`, `game.ts`;
   `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
-  `deck-mesh.ts` `shore.ts`, `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
+  `deck-mesh.ts` `shore.ts`, `billboards.ts` `billboard-mesh.ts` `billboard-material.ts`,
+  `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
   production build has no `window.walk`: development builds put the game there for the
   console (`walk.sim(5)`, `walk.state`).
 

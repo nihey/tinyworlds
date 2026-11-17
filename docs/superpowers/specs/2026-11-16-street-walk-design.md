@@ -78,7 +78,12 @@ whole city, built for real, with its bridges, overpasses and water.
   the whole screen, with a minimap of the streets in its bottom-left corner (Layout, below).
 - **Mouse and keyboard** with pointer lock; **on a touch screen** a thumb stick on the left half
   and drag-to-look on the right half, with buttons for what keys do.
-- **Daytime only.** Signs and billboards are generic: no real brands anywhere.
+- **Daytime only.** Signs and billboards are generic: no real brands anywhere. After launch the
+  owner asked to "put the billboards in times square": the walls round the bowtie face the street
+  with animated pixel-art screens (pictograms, tickers of coloured blocks, sweeping bands, blinking
+  pictures) in the palette's bright colours, wordless (no brands, logos, letters or digits), placed
+  from the data so they are the same every visit; a world lists the areas that have them
+  (`billboards`). The viewer's `CLAUDE.md` has the rules.
 
 ## Calls made after the review (Claude's; the owner may change them)
 
@@ -321,6 +326,7 @@ tick on the rim where north is. No labels, no other marks, nothing of GTA's own 
   side, glints and ripple rings, all on one 5 s loop; the shore a low edge (quay stone along paved land and piers, a bank
   elsewhere);
 - trees as upright pixel billboards;
+- in Times Square, screens on the street-facing walls (the owner's later ask, under Signs above);
 - sky and a fog from 140 m to 560 m; squares within 3 load, beyond 4.5 unload;
 - rendered at a low resolution and scaled up without smoothing: pixel size 3 by default,
   changeable;

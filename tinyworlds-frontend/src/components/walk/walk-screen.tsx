@@ -14,6 +14,7 @@ import { loadBindings, saveBindings, type Bindings } from "@/walk/controls";
 import { WalkGame } from "@/walk/game";
 import { enToLonLat, lonLatToEN } from "@/walk/geo";
 import { walkData } from "@/walk/load";
+import { billboardAreas } from "@/walk/render/billboards";
 import { PIXEL_DEFAULT, PIXEL_MAX, PIXEL_MIN, WalkView } from "@/walk/render/view";
 import { QualityLadder } from "@/walk/quality";
 import { WalkSound } from "@/walk/sound";
@@ -192,7 +193,9 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
         ]);
         if (cancelled) return;
         try {
-          view = new WalkView(canvas, data.ix, (i, j) => data.square(i, j));
+          view = new WalkView(canvas, data.ix, (i, j) => data.square(i, j), {
+            billboards: billboardAreas(data.ix.geo, WORLD.billboards),
+          });
         } catch {
           // a context the browser would not give after all
           toast.error(t.walk.noWebgl);

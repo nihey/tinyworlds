@@ -256,6 +256,11 @@ export class WalkWorld {
     return this.cellMap.has(keyOf(i, j));
   }
 
+  /** Square (i, j), when it is in. */
+  cell(i: number, j: number): WalkCell | undefined {
+    return this.cellMap.get(keyOf(i, j));
+  }
+
   cells(): Iterable<WalkCell> {
     return this.cellMap.values();
   }

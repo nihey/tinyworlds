@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { isMapDeck, type ElevatedWay, type GroundWay, type Volume, type WalkCell } from "../cell";
+import { mix } from "../math";
 import { cellExists, type WalkIndex } from "../walk-index";
 import { deckAt, JOIN_HEIGHT, PARAPET_HEIGHT, WATER_Z, type WalkWorld } from "../world";
 import {
@@ -74,14 +75,6 @@ const EDGE_TOP = 1000;
 const PARAPET_THICK = 0.3;
 /** The roadway sits this far over the way (and is drawn forward in depth), so it shows over the ground where a ramp comes down. */
 const ROADWAY_LIFT = 0.02;
-
-/** The pipeline's `mix` (scene/hash.ts). */
-function mix(a: number, b: number): number {
-  let h = (a ^ Math.imul(b, 0x9e3779b1)) >>> 0;
-  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return (h ^ (h >>> 16)) >>> 0;
-}
 
 /** Vertices, triangles and named attributes, grown as a square is built, then one geometry. */
 class Buf {

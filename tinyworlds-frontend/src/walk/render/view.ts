@@ -2,6 +2,8 @@ import * as THREE from "three";
 import type { WalkCell } from "../cell";
 import { cellExists, type WalkIndex } from "../walk-index";
 import { WalkWorld } from "../world";
+import { billboardMesh } from "./billboard-mesh";
+import { placeBillboards, squareInAreas, type BillboardArea } from "./billboards";
 import {
   buildCellMeshes,
   disposeCellMeshes,
@@ -16,6 +18,10 @@ import { makePalette, type Palette } from "./palette";
  * The walk's view: a three.js renderer drawing at a fraction of the screen's resolution and
  * scaled up without smoothing (big pixels, like the map's), the sky and the fog, the water under
  * everything, and the squares streamed in around the camera. Reached only by dynamic import.
+ *
+ * Where the world says (`billboards`: Times Square), a square's street-facing walls get their
+ * screens once it and every square round it are in (the probes that say a wall faces open ground
+ * reach into them), one square a frame, as a mesh of its own group (`billboards.ts`).
  *
  * The water mirrors what stands by it: before each frame, a second camera under the water's
  * surface draws everything but the sky, the water and the ground (`NOT_MIRRORED`) into a picture
@@ -411,12 +417,18 @@ export class WalkView {
   /** Whether a square has been shown yet: the frame rate counts from then. */
   private shownAny = false;
   private readonly buffer = new THREE.Vector2();
+  /** The areas with billboards, the square each shown group is, and the groups whose billboards are up (or that have none). */
+  private readonly areas: readonly BillboardArea[];
+  private readonly cellOf = new Map<THREE.Group, WalkCell>();
+  private readonly boarded = new Set<THREE.Group>();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     ix: WalkIndex,
     load: (i: number, j: number) => Promise<WalkCell>,
+    options: { billboards?: readonly BillboardArea[] } = {},
   ) {
+    this.areas = options.billboards ?? [];
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
@@ -468,6 +480,8 @@ export class WalkView {
       drop: (g) => {
         this.scene.remove(g);
         this.wet.delete(g);
+        this.cellOf.delete(g);
+        this.boarded.delete(g);
         if (this.shown.delete(g)) this.openAt = null;
         if (g.userData.disposables) disposeCellMeshes(g);
       },
@@ -522,12 +536,15 @@ export class WalkView {
     this.materials.setStill(on);
   }
 
-  /** Streams the squares round the camera and meshes at most one of them. */
+  /** Streams the squares round the camera and meshes at most one of them, or else hangs one square's billboards. */
   update(dt: number): void {
     this.time += Math.max(0, dt);
     this.stream.update(dt, this.at.e, this.at.n);
     const cell = this.stream.next(this.at.e, this.at.n);
-    if (!cell) return;
+    if (!cell) {
+      this.hangBillboards();
+      return;
+    }
     let group: THREE.Group;
     try {
       group = buildCellMeshes(cell, this.ctx);
@@ -541,8 +558,60 @@ export class WalkView {
     this.scene.add(group);
     if (cell.mask.mode !== 0) this.wet.set(group, { i: cell.i, j: cell.j });
     this.shown.set(group, cell.key);
+    this.cellOf.set(group, cell);
     this.openAt = null;
     this.stream.show(cell, group);
+  }
+
+  /**
+   * The billboards of the nearest shown square in an area that has none yet and whose squares
+   * round it are all in (or have no file): the same screens whatever else is loaded.
+   */
+  private hangBillboards(): void {
+    if (this.areas.length === 0) return;
+    const ix = this.world.index;
+    let best: THREE.Group | null = null;
+    let bestD = Infinity;
+    for (const [group, cell] of this.cellOf) {
+      if (this.boarded.has(group)) continue;
+      if (!squareInAreas(cell.i, cell.j, this.areas, ix.cell)) {
+        this.boarded.add(group);
+        continue;
+      }
+      let ready = true;
+      for (let dj = -1; dj <= 1 && ready; dj++)
+        for (let di = -1; di <= 1 && ready; di++)
+          if (cellExists(ix, cell.i + di, cell.j + dj) && !this.world.has(cell.i + di, cell.j + dj))
+            ready = false;
+      if (!ready) continue;
+      const d = Math.hypot(
+        (cell.i + 0.5) * ix.cell - this.at.e,
+        (cell.j + 0.5) * ix.cell - this.at.n,
+      );
+      if (d < bestD) {
+        bestD = d;
+        best = group;
+      }
+    }
+    if (!best) return;
+    const cell = this.cellOf.get(best)!;
+    this.boarded.add(best);
+    const near = [];
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) {
+        const c = this.world.cell(cell.i + di, cell.j + dj);
+        if (c) near.push(...c.volumes);
+      }
+    const mesh = billboardMesh(
+      placeBillboards(cell, near, this.areas, ix.cell),
+      this.palette,
+      this.materials.billboard,
+      cell.i * ix.cell,
+      cell.j * ix.cell,
+    );
+    if (!mesh) return;
+    best.add(mesh);
+    (best.userData.disposables as { dispose(): void }[]).push(mesh.geometry);
   }
 
   render(): void {
