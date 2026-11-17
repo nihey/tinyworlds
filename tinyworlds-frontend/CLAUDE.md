@@ -1040,7 +1040,7 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
   `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
   `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,
-  `game.ts`;
+  `quality.ts`, `game.ts`;
   `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
   `deck-mesh.ts` `shore.ts`, `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
   production build has no `window.walk`: development builds put the game there for the
