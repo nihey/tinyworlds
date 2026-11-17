@@ -147,3 +147,18 @@ export function fileStreets(nodes: RoadNode[], streets: StreetEdge[]): WalkCell[
   }
   return [...cells.values()];
 }
+
+/** These squares and, empty, every square round them that is not among them: so that what stands round a street is all in. */
+export function ringed(cells: WalkCell[]): WalkCell[] {
+  const have = new Set(cells.map((c) => c.key));
+  const out = [...cells];
+  for (const c of cells)
+    for (let di = -1; di <= 1; di++)
+      for (let dj = -1; dj <= 1; dj++) {
+        const key = `${c.i + di}_${c.j + dj}`;
+        if (have.has(key)) continue;
+        have.add(key);
+        out.push(makeCell(c.i + di, c.j + dj));
+      }
+  return out;
+}

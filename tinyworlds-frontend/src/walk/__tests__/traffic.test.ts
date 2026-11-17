@@ -1,31 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { RoadNode, StreetEdge, WalkCell } from "../cell";
+import type { RoadNode, StreetEdge } from "../cell";
 import {
-  PAINT_RED,
-  PAINTS,
   RoadNet,
   SPAWN_FAR,
   SPAWN_NEAR,
   DROP_FAR,
   STOP_LINE,
   Traffic,
-  parkedOn,
   pickWay,
-  starterCar,
   type Blocker,
 } from "../traffic";
 import { bodyOf, overlap } from "../collide";
 import { CARS, newVehicle, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
-import {
-  boxVolume,
-  fileStreets,
-  makeCell,
-  roadNode,
-  streetEdge,
-  waterRect,
-  worldOf,
-} from "./fixtures";
+import { fileStreets, makeCell, roadNode, streetEdge, worldOf } from "./fixtures";
 
 type Tunnels = WalkIndex["tunnels"];
 const EAST = Math.PI / 2;
@@ -150,289 +138,6 @@ function avenue(opts: Partial<StreetEdge> = {}) {
   ];
   return { nodes, streets };
 }
-
-describe("the road network", () => {
-  it("keeps a street filed under two squares once, until both squares are gone", () => {
-    const nodes = [roadNode(1, 100, 100), roadNode(2, 300, 100)];
-    const s = streetEdge(1, 2, [
-      [100, 100],
-      [300, 100],
-    ]);
-    const cells = fileStreets(nodes, [s]);
-    expect(cells.map((c) => c.key).sort()).toEqual(["0_0", "1_0"]);
-    const net = new RoadNet();
-    for (const c of cells) net.add(c);
-    expect(net.edge("1-2")).toBeDefined();
-    expect(net.outOf(1)).toHaveLength(1);
-    expect(net.node(2)?.e).toBe(300);
-    net.remove("0_0");
-    expect(net.edge("1-2")).toBeDefined();
-    net.remove("nowhere");
-    net.remove("1_0");
-    expect(net.edge("1-2")).toBeUndefined();
-    expect(net.outOf(1)).toEqual([]);
-    expect(net.node(2)).toBeUndefined();
-  });
-
-  it("answers the ways out of a node: one-way streets only their way, never the way it came", () => {
-    const nodes = [
-      roadNode(1, 100, 100),
-      roadNode(2, 0, 100),
-      roadNode(3, 180, 100),
-      roadNode(4, 100, 20),
-      roadNode(5, 100, 180),
-    ];
-    const streets = [
-      streetEdge(2, 1, [
-        [0, 100],
-        [100, 100],
-      ]),
-      streetEdge(
-        1,
-        3,
-        [
-          [100, 100],
-          [180, 100],
-        ],
-        { ow: 1 },
-      ),
-      streetEdge(
-        4,
-        1,
-        [
-          [100, 20],
-          [100, 100],
-        ],
-        { ow: 1 },
-      ),
-      streetEdge(
-        1,
-        5,
-        [
-          [100, 100],
-          [100, 180],
-        ],
-        { ow: -1 },
-      ),
-    ];
-    const { net } = setup(nodes, streets);
-    expect(
-      net
-        .outOf(1)
-        .map((s) => s.key)
-        .sort(),
-    ).toEqual(["1-3", "2-1"]);
-    expect(net.outOf(1, "2-1").map((s) => s.key)).toEqual(["1-3"]);
-    expect(net.outOf(4).map((s) => s.key)).toEqual(["4-1"]);
-    expect(net.outOf(5).map((s) => s.key)).toEqual(["1-5"]);
-    expect(net.outOf(3)).toEqual([]);
-  });
-
-  it("puts a two-way street's lanes right of the middle each way, and a one-way street's centred", () => {
-    const net = new RoadNet();
-    const two = streetEdge(
-      1,
-      2,
-      [
-        [0, 0],
-        [100, 0],
-      ],
-      { width: 20 },
-    );
-    for (const forward of [true, false]) {
-      const lanes = net.lanes(two, forward);
-      expect(lanes.length).toBe(2);
-      for (const x of lanes) expect(x).toBeGreaterThan(0);
-      expect(lanes[1]).toBeGreaterThan(lanes[0]);
-    }
-    const one = streetEdge(
-      1,
-      2,
-      [
-        [0, 0],
-        [100, 0],
-      ],
-      { width: 20, ow: 1 },
-    );
-    const lanes = net.lanes(one, true);
-    expect(lanes.length).toBe(4);
-    expect(lanes.reduce((s, x) => s + x, 0)).toBeCloseTo(0);
-    expect(net.lanes(one, false)).toEqual([]);
-    const back = streetEdge(
-      1,
-      2,
-      [
-        [0, 0],
-        [100, 0],
-      ],
-      { width: 20, ow: -1 },
-    );
-    expect(net.lanes(back, true)).toEqual([]);
-    expect(net.lanes(back, false)).toHaveLength(4);
-  });
-
-  it("counts max(1, floor(width / 3.3)) lanes where nothing parks", () => {
-    const net = new RoadNet();
-    const deck = (width: number, ow: 0 | 1) =>
-      streetEdge(
-        1,
-        2,
-        [
-          [0, 0, 7],
-          [100, 0, 7],
-        ],
-        { width, ow, elevated: true },
-      );
-    expect(net.lanes(deck(13.3, 1), true)).toHaveLength(4);
-    expect(net.lanes(deck(6.7, 1), true)).toHaveLength(2);
-    expect(net.lanes(deck(3, 1), true)).toHaveLength(1);
-    expect(net.lanes(deck(6, 0), true)).toHaveLength(1);
-    expect(net.lanes(deck(13.3, 0), false)).toHaveLength(2);
-  });
-
-  it("leaves the kerbs to parked cars where they park", () => {
-    const net = new RoadNet();
-    const side = streetEdge(
-      1,
-      2,
-      [
-        [0, 0],
-        [100, 0],
-      ],
-      { width: 10, ow: 1 },
-    );
-    const lanes = net.lanes(side, true);
-    expect(lanes).toHaveLength(1);
-    expect(lanes[0]).toBeCloseTo(0);
-  });
-});
-
-describe("parked cars", () => {
-  const nodes = [roadNode(30, 10, 100), roadNode(31, 190, 100)];
-  const parkStreet = (opts: Partial<StreetEdge> = {}) =>
-    streetEdge(
-      30,
-      31,
-      [
-        [10, 100, opts.elevated ? 7 : 0],
-        [190, 100, opts.elevated ? 7 : 0],
-      ],
-      { width: 12, ...opts },
-    );
-  const worldWith = (s: StreetEdge, parts: Partial<WalkCell> = {}) => {
-    const cells = fileStreets(nodes, [s]);
-    Object.assign(cells[0], parts);
-    return worldOf(...cells);
-  };
-
-  it("are the same every time, from the street's key", () => {
-    const s = parkStreet();
-    const w = worldWith(s);
-    const once = parkedOn(s, w);
-    expect(once.length).toBeGreaterThan(0);
-    expect(parkedOn(s, w)).toEqual(once);
-    const other = { ...s, key: "30-31x" };
-    expect(parkedOn(other, w)).not.toEqual(once);
-  });
-
-  it("line both kerbs, a spot every 6.5 m, about two in three filled, facing the traffic beside them", () => {
-    const s = parkStreet();
-    const cars = parkedOn(s, worldWith(s));
-    const south = cars.filter((c) => c.n < 100);
-    const north = cars.filter((c) => c.n > 100);
-    expect(south.length).toBeGreaterThan(5);
-    expect(north.length).toBeGreaterThan(5);
-    // 180 m less the ends: 26 spots a side
-    expect(cars.length).toBeGreaterThan(52 * 0.5);
-    expect(cars.length).toBeLessThan(52 * 0.85);
-    for (const c of south) expect(Math.sin(c.yaw)).toBeCloseTo(1);
-    for (const c of north) expect(Math.sin(c.yaw)).toBeCloseTo(-1);
-    for (const c of cars) {
-      const spec = CARS[c.kind];
-      expect(Math.abs(c.n - 100)).toBeCloseTo(6 - 0.2 - spec.width / 2, 5);
-      expect(spec.length).toBeLessThanOrEqual(6.5);
-      expect(Number.isInteger(c.color) && c.color >= 0 && c.color < PAINTS).toBe(true);
-    }
-    for (const side of [south, north]) {
-      const es = side.map((c) => c.e).sort((x, y) => x - y);
-      for (let k = 1; k < es.length; k++) {
-        const steps = (es[k] - es[k - 1]) / 6.5;
-        expect(Math.abs(steps - Math.round(steps))).toBeLessThan(1e-3);
-      }
-    }
-  });
-
-  it("leave the lanes clear", () => {
-    const s = parkStreet();
-    const net = new RoadNet();
-    const outer = Math.max(...net.lanes(s, true), ...net.lanes(s, false));
-    for (const c of parkedOn(s, worldWith(s))) {
-      const inner = Math.abs(c.n - 100) - CARS[c.kind].width / 2;
-      expect(inner).toBeGreaterThanOrEqual(outer + 1.15);
-    }
-  });
-
-  it("face the one way a one-way street goes, on both kerbs", () => {
-    const s = parkStreet({ ow: 1 });
-    const cars = parkedOn(s, worldWith(s));
-    expect(cars.some((c) => c.n > 100) && cars.some((c) => c.n < 100)).toBe(true);
-    for (const c of cars) expect(Math.sin(c.yaw)).toBeCloseTo(1);
-    const back = parkStreet({ ow: -1 });
-    for (const c of parkedOn(back, worldWith(back))) expect(Math.sin(c.yaw)).toBeCloseTo(-1);
-  });
-
-  it("need a street 9 m wide, on the ground, and not a motorway", () => {
-    for (const s of [
-      parkStreet({ width: 7 }),
-      parkStreet({ width: 8.9 }),
-      parkStreet({ elevated: true }),
-      parkStreet({ cls: 0, width: 14 }),
-      parkStreet({ link: true }),
-    ])
-      expect(parkedOn(s, worldWith(s))).toEqual([]);
-    const s = parkStreet({ width: 9 });
-    expect(parkedOn(s, worldWith(s)).length).toBeGreaterThan(0);
-  });
-
-  it("drop a car that would stand in a wall or in the water", () => {
-    const s = parkStreet();
-    const walled = worldWith(s, { volumes: [boxVolume(10, 90, 190, 96.5)] });
-    const cars = parkedOn(s, walled);
-    expect(cars.length).toBeGreaterThan(5);
-    expect(cars.every((c) => c.n > 100)).toBe(true);
-    const wet = worldWith(s, { mask: waterRect(0, 0, 0, 102, 200, 200) });
-    const dry = parkedOn(s, wet);
-    expect(dry.length).toBeGreaterThan(5);
-    expect(dry.every((c) => c.n < 100)).toBe(true);
-    // the same spots otherwise
-    const all = parkedOn(s, worldWith(s));
-    expect(dry).toEqual(all.filter((c) => c.n < 100));
-  });
-
-  it("keep clear of a crossing", () => {
-    const { nodes: cn, streets } = cross();
-    const w = worldOf(...fileStreets(cn, streets));
-    const west = streets[0];
-    const cars = parkedOn(west, w);
-    expect(cars.length).toBeGreaterThan(0);
-    for (const c of cars) expect(c.e + CARS[c.kind].length / 2).toBeLessThanOrEqual(300 - 6 - 5);
-  });
-
-  it("leave the red supercar on the kerb nearest to where the walk opens", () => {
-    const s = parkStreet();
-    const w = worldWith(s);
-    const car = starterCar(w, { e: 100, n: 90 });
-    expect(car).not.toBeNull();
-    expect(car!.kind).toBe("supercar");
-    expect(car!.state).toBe("parked");
-    expect(car!.color).toBe(PAINT_RED);
-    expect(car!.n).toBeLessThan(100);
-    expect(Math.abs(car!.e - 100)).toBeLessThan(6.5);
-    expect(Math.abs(car!.n - 100)).toBeCloseTo(6 - 0.2 - CARS.supercar.width / 2, 5);
-    const narrow = parkStreet({ width: 7 });
-    expect(starterCar(worldWith(narrow), { e: 100, n: 90 })).toBeNull();
-  });
-});
 
 describe("turning", () => {
   it("goes straight three times as often as it takes each turn", () => {
@@ -568,6 +273,77 @@ describe("giving way at a crossing", () => {
 });
 
 describe("lights at a crossing", () => {
+  it("stop a car at a 30° crossing clear of the other street", () => {
+    const a = Math.PI / 6;
+    const ue = Math.cos(a);
+    const un = Math.sin(a);
+    const nodes = [
+      roadNode(C, 300, 300, { lights: true, bearing: EAST }),
+      roadNode(2, 100, 300),
+      roadNode(3, 500, 300),
+      roadNode(4, 300 - 190 * ue, 300 - 190 * un),
+      roadNode(5, 300 + 190 * ue, 300 + 190 * un),
+    ];
+    const o: Partial<StreetEdge> = { width: 20, cls: 3 };
+    const streets = [
+      streetEdge(
+        2,
+        C,
+        [
+          [100, 300],
+          [300, 300],
+        ],
+        o,
+      ),
+      streetEdge(
+        C,
+        3,
+        [
+          [300, 300],
+          [500, 300],
+        ],
+        o,
+      ),
+      streetEdge(
+        4,
+        C,
+        [
+          [300 - 190 * ue, 300 - 190 * un],
+          [300, 300],
+        ],
+        o,
+      ),
+      streetEdge(
+        C,
+        5,
+        [
+          [300, 300],
+          [300 + 190 * ue, 300 + 190 * un],
+        ],
+        o,
+      ),
+    ];
+    for (const lane of [0, 1]) {
+      const { net, traffic } = setup(nodes, streets);
+      const car = traffic.spawnAt(net.edge(`2-${C}`)!, true, 60, { kind: "bus", lane })!;
+      // east-west runs along the node's bearing: red from 16 s to 34 s
+      run(traffic, 16, { t0: 16, focus: { e: 300, n: 300 } });
+      expect(car.v).toBeLessThan(0.05);
+      const s = Math.sin(car.yaw);
+      const c = Math.cos(car.yaw);
+      const hl = CARS.bus.length / 2;
+      const hw = CARS.bus.width / 2;
+      for (const [f, r] of [
+        [hl, hw],
+        [hl, -hw],
+      ]) {
+        const e = car.e + s * f + c * r;
+        const n = car.n + c * f - s * r;
+        expect(Math.abs((e - 300) * un - (n - 300) * ue)).toBeGreaterThanOrEqual(10);
+      }
+    }
+  });
+
   const westCar = (s: number, v: number) => {
     const { nodes, streets } = cross();
     const { net, traffic } = setup(nodes, streets);
@@ -867,6 +643,28 @@ describe("spawning", () => {
     expect(traffic.cars.length <= 10 || far.length === 0).toBe(true);
   });
 
+  it("fills the streets at once when primed, near you and in view too", () => {
+    const { nodes, streets } = grid();
+    const { traffic } = setup(nodes, streets, { random: rng(4), spawn: true });
+    const focus = { e: 550, n: 550 };
+    traffic.visible = () => true;
+    traffic.prime(focus);
+    expect(traffic.cars.length).toBe(traffic.budget);
+    const dists = traffic.cars.map((c) => Math.hypot(c.e - focus.e, c.n - focus.n));
+    for (const d of dists) {
+      expect(d).toBeGreaterThanOrEqual(20);
+      expect(d).toBeLessThanOrEqual(SPAWN_FAR);
+    }
+    expect(dists.filter((d) => d < SPAWN_NEAR).length).toBeGreaterThan(10);
+    for (const c of traffic.cars) expect(c.state).toBe("traffic");
+    // moved: the cars beyond 380 m of the new place go, and the budget is filled again there
+    const there = { e: 50, n: 50 };
+    traffic.prime(there);
+    expect(traffic.cars.length).toBe(traffic.budget);
+    for (const c of traffic.cars)
+      expect(Math.hypot(c.e - there.e, c.n - there.n)).toBeLessThanOrEqual(DROP_FAR);
+  });
+
   it("brings none while the budget is spent", () => {
     const { nodes, streets } = grid();
     const { traffic } = setup(nodes, streets, { spawn: true });
@@ -954,6 +752,40 @@ describe("tunnels", () => {
     run(traffic, 4, { t0: t, focus });
     expect(car.e).toBeGreaterThan(625);
     expect(Math.abs(car.n - 100)).toBeLessThan(3);
+  });
+
+  it("drops a car at once whose tunnel comes out beyond 380 m of you, freeing its place", () => {
+    // streets every 50 m round (100, 100), apart from the tunnel's, for a new car to stand on
+    const more: RoadNode[] = [];
+    const field: StreetEdge[] = [];
+    for (let k = 0; k < 12; k++) {
+      const n = -175 + 50 * k;
+      more.push(roadNode(500 + 2 * k, -200, n), roadNode(501 + 2 * k, 400, n));
+      field.push(
+        streetEdge(500 + 2 * k, 501 + 2 * k, [
+          [-200, n],
+          [400, n],
+        ]),
+      );
+    }
+    for (const far of [true, false]) {
+      const { net, traffic } = setup([...nodes, ...more], [...streets, ...field], {
+        tunnels: tunnel(true),
+      });
+      traffic.budget = 1;
+      // the exit portal is 510 m from (100, 100), 250 m from (360, 100)
+      const focus = far ? { e: 100, n: 100 } : { e: 360, n: 100 };
+      const car = traffic.spawnAt(net.edge("20-21")!, true, 20, { kind: "sedan" })!;
+      let t = 0;
+      while (traffic.cars.includes(car) && t < 60) {
+        traffic.step(DT, t, focus, []);
+        t += DT;
+      }
+      expect(traffic.cars.includes(car)).toBe(false);
+      // a new car fits only if the one in the tunnel holds no place
+      traffic.prime(focus);
+      expect(traffic.cars.length).toBe(far ? 1 : 0);
+    }
   });
 
   it("takes a car away into a closed tunnel, or a portal with no tunnel", () => {

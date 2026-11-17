@@ -266,6 +266,12 @@ const smooth = (t: number) => t * t * (3 - 2 * t);
 /** Read through a call: a step can sink what the type checker saw afloat. */
 const isSunk = (v: Vehicle) => v.state === "sunk";
 
+let lastId = 0;
+/** A vehicle id never given before on this page: the traffic's cars take theirs here, and the game's do too. */
+export function nextVehicleId(): number {
+  return ++lastId;
+}
+
 export function newVehicle(
   id: number,
   kind: CarKind | BoatKind,
