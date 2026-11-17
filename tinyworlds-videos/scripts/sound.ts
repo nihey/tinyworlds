@@ -23,6 +23,22 @@ const BEDS: Record<string, { prompt: string; seconds: number }> = {
       "No vocals, no spoken words, no sound effects.",
     ].join(" "),
   },
+  // the recap film: under a narration, so it leaves the voice room; its middle is the history
+  // of the map, a city a beat or two, so that part drives
+  recap: {
+    seconds: 60,
+    prompt: [
+      "Instrumental, exactly 96 BPM, 4/4, warm, hopeful and miniature, a music-box and toy-workshop",
+      "feel, made to sit under a spoken narration: sparse in the middle frequencies where a voice speaks.",
+      "It starts at once, no fade-in, on a soft plucked kalimba and celesta pattern over a quiet pulse.",
+      "A round bass and soft brushed percussion join after eight bars.",
+      "From about 23 seconds a steady kick on every beat drives it and a bright glockenspiel melody",
+      "with gentle chiptune colour climbs bar by bar; it is fullest and widest from 28 to 40 seconds.",
+      "From about 44 seconds it thins back to the plucked pattern and a warm pad, and from 51 seconds",
+      "it holds one long warm chord that rings out to the end.",
+      "No vocals, no spoken words, no sound effects.",
+    ].join(" "),
+  },
   // the tour of tinywesteros: a place a bar, at 80 BPM
   westeros: {
     seconds: 38,

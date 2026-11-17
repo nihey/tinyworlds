@@ -1,0 +1,45 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+    }
+    /* the camera: inside it everything is in the page's own CSS px; it scales and slides */
+    #hall-cam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1024px;
+      height: 1698px;
+    }
+    #hall-still {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1024px;
+      height: 1698px;
+    }
+  </style>
+  <div id="root" data-composition-id="hall" data-width="1920" data-height="1080">
+    <div id="hall-cam" data-layout-allow-overflow>
+      <!-- the live page, three times its size (npm run recap -- pages) -->
+      <img id="hall-still" src="assets/takes/pages/hall.png" alt="" />
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      // a page rect (CSS px) filling the frame
+      const view = (x, y, w, h) => {
+        const s = Math.min(1920 / w, 1080 / h);
+        return { x: (1920 - w * s) / 2 - x * s, y: (1080 - h * s) / 2 - y * s, scale: s };
+      };
+      // the cities with the names under their plaques; out to the Hall of Fame's title as it is named
+      tl.set("#hall-cam", { transformOrigin: "0 0", ...view(12, 352, 1000, 563) }, 0);
+      tl.to("#hall-cam", { ...view(-57, 88, 1138, 640), duration: 0.8, ease: "power2.inOut" }, 1.75);
+      window.__timelines["hall"] = tl;
+    })();
+  </script>
+</template>
