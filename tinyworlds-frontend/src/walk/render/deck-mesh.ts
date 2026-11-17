@@ -1,9 +1,9 @@
-import type { ElevatedWay } from "../cell";
+import type { ElevatedWay, StreetEdge } from "../cell";
 
 /**
- * What holds up an elevated way where the map has nothing (its `own` stretches: overpasses,
- * bridge approaches over land), and what stands on every one of them: pure geometry in world
- * metres, no three.js. `cell-mesh.ts` turns it into triangles.
+ * The walk's own deck for every elevated way (its slab, parapets and roadway), and the columns
+ * that hold it up where the map has nothing (its `own` stretches: overpasses, bridge approaches
+ * over land): pure geometry in world metres, no three.js. `cell-mesh.ts` turns it into triangles.
  */
 
 /** A stretch of a line on the deck, `z` the deck's surface at either end. */
@@ -19,7 +19,7 @@ export interface DeckSpan {
 }
 
 export interface DeckGeometry {
-  /** Stretches of the middle line under which the walk builds its slab: the way's width, 1 m deep (down to the ground at most). */
+  /** Stretches of the middle line where the way is raised: its slab, the way's width, 1 m deep (down to the ground at most). */
   slab: DeckSpan[];
   /** Runs along both edges, each standing a parapet 1 m high on the deck. */
   parapets: DeckSpan[];
@@ -41,6 +41,8 @@ export const COLUMN_SPACING = 30;
 export const PIECE = 25;
 /** Metres: a vertex higher than this is off the ground (as the pipeline's network has it). */
 const OFF_GROUND = 0.3;
+/** A street under a column, with this much room to spare, metres. */
+const STREET_MARGIN = 0.3;
 /** A deck lower than this stands on its slab alone. */
 const COLUMN_MIN_Z = 2.5;
 /** How far along the way a column may move off its station to find free ground, and in what steps. */
@@ -81,11 +83,12 @@ function chop(
 }
 
 /**
- * The slab under the way's `own` stretches (a segment with either end the walk's: the one
- * that meets the map's deck reaches it), a parapet each side wherever the way is raised (open
- * where `open` says another way joins it, as the walk's walls are), columns every ~30 m under
- * the slab that never stand where `under` (a street or water below) is true, moving along the
- * way, then out to the deck's edges, to find free ground, and the roadway all along.
+ * The slab and a parapet each side wherever the way is raised (the parapets open where `open`
+ * says another way joins it, as the walk's walls are), own or not: the map's deck pieces go in
+ * steps, so the walk lays its own smooth roadway over the river bridges too and leaves them
+ * out. Columns every ~30 m under the way's `own` stretches only (over the water the map's own
+ * piers and towers hold it up), never where `under` (a street or water below) is true, moving
+ * along the way, then out to the deck's edges, to find free ground. The roadway all along.
  *
  * With `within` ([e0, n0, e1, n1]), only what may lie in that box is worked out (a square asks
  * for its own part of a way that crosses many): the stretches whose strip reaches it and the
@@ -132,8 +135,8 @@ export function deckGeometry(
     )
       continue;
     chop(ae, an, az, be, bn, bz, at[k], surface);
-    if (way.own[k] || way.own[k + 1]) chop(ae, an, az, be, bn, bz, at[k], slab);
     if (Math.max(az, bz) <= OFF_GROUND) continue;
+    chop(ae, an, az, be, bn, bz, at[k], slab);
 
     const de = (be - ae) / len;
     const dn = (bn - an) / len;
@@ -242,4 +245,124 @@ export function deckGeometry(
       }
   }
   return { slab, parapets, columns, surface };
+}
+
+/** Whether a point is on a street at ground level (not one raised over it), with a little room. */
+export function streetsBelow(streets: StreetEdge[]) {
+  const low = streets
+    .map((s) => {
+      let e0 = Infinity;
+      let n0 = Infinity;
+      let e1 = -Infinity;
+      let n1 = -Infinity;
+      for (let q = 0; q < s.pts.length; q += 3) {
+        e0 = Math.min(e0, s.pts[q]);
+        e1 = Math.max(e1, s.pts[q]);
+        n0 = Math.min(n0, s.pts[q + 1]);
+        n1 = Math.max(n1, s.pts[q + 1]);
+      }
+      const r = s.width / 2 + STREET_MARGIN;
+      return { s, r, e0: e0 - r, n0: n0 - r, e1: e1 + r, n1: n1 + r };
+    })
+    .filter(({ s }) => {
+      for (let q = 2; q < s.pts.length; q += 3) if (s.pts[q] < 1) return true;
+      return false;
+    });
+  return (e: number, n: number): boolean => {
+    for (const { s, r, e0, n0, e1, n1 } of low) {
+      if (e < e0 || e > e1 || n < n0 || n > n1) continue;
+      const p = s.pts;
+      for (let q = 3; q < p.length; q += 3) {
+        const ae = p[q - 3];
+        const an = p[q - 2];
+        const de = p[q] - ae;
+        const dn = p[q + 1] - an;
+        const len2 = de * de + dn * dn;
+        const t = len2 > 0 ? Math.max(0, Math.min(1, ((e - ae) * de + (n - an) * dn) / len2)) : 0;
+        const z = p[q - 1] + (p[q + 2] - p[q - 1]) * t;
+        if (z < 1 && Math.hypot(e - ae - de * t, n - an - dn * t) <= r) return true;
+      }
+    }
+    return false;
+  };
+}
+
+export type Box = readonly [number, number, number, number];
+const meets = (a: Box, b: Box) => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+
+/** A segment's box [e0, n0, e1, n1], grown by r. */
+function segmentBox(p: Float32Array, k: number, r: number): Box {
+  return [
+    Math.min(p[k * 3], p[k * 3 + 3]) - r,
+    Math.min(p[k * 3 + 1], p[k * 3 + 4]) - r,
+    Math.max(p[k * 3], p[k * 3 + 3]) + r,
+    Math.max(p[k * 3 + 1], p[k * 3 + 4]) + r,
+  ];
+}
+
+/**
+ * The box round every segment of a way whose strip reaches `box` (as `deckGeometry` picks
+ * them with `within`), the strip and a metre included: where its parapets can be asked about.
+ * Null when none does.
+ */
+export function reachOf(way: ElevatedWay, box: Box): Box | null {
+  const r = way.width / 2 + 1;
+  let out: [number, number, number, number] | null = null;
+  for (let k = 0; k + 1 < way.pts.length / 3; k++) {
+    const b = segmentBox(way.pts, k, r);
+    if (!meets(b, box)) continue;
+    if (!out) out = [b[0], b[1], b[2], b[3]];
+    else {
+      out[0] = Math.min(out[0], b[0]);
+      out[1] = Math.min(out[1], b[1]);
+      out[2] = Math.max(out[2], b[2]);
+      out[3] = Math.max(out[3], b[3]);
+    }
+  }
+  return out;
+}
+
+/**
+ * A way cut to the run of its segments from the first to the last whose strip reaches `box`:
+ * its deck's height anywhere in the box is the whole way's (`deckAt` only looks within the
+ * strip). Null when none reaches it.
+ */
+export function cutTo(way: ElevatedWay, box: Box): ElevatedWay | null {
+  const half = way.width / 2;
+  let first = -1;
+  let last = -1;
+  for (let k = 0; k + 1 < way.pts.length / 3; k++)
+    if (meets(segmentBox(way.pts, k, half), box)) {
+      if (first < 0) first = k;
+      last = k;
+    }
+  if (first < 0) return null;
+  return {
+    ...way,
+    pts: way.pts.subarray(first * 3, (last + 2) * 3),
+    own: way.own.subarray(first, last + 2),
+  };
+}
+
+/** The unit direction (e, n) of the way's segment nearest a point. */
+export function directionAt(way: ElevatedWay, e: number, n: number): [number, number] {
+  const p = way.pts;
+  let best = Infinity;
+  let dir: [number, number] = [1, 0];
+  for (let q = 3; q < p.length; q += 3) {
+    const ae = p[q - 3];
+    const an = p[q - 2];
+    const de = p[q] - ae;
+    const dn = p[q + 1] - an;
+    const len2 = de * de + dn * dn;
+    if (len2 < 1e-12) continue;
+    const t = Math.max(0, Math.min(1, ((e - ae) * de + (n - an) * dn) / len2));
+    const d = Math.hypot(e - ae - de * t, n - an - dn * t);
+    if (d < best) {
+      best = d;
+      const len = Math.sqrt(len2);
+      dir = [de / len, dn / len];
+    }
+  }
+  return dir;
 }

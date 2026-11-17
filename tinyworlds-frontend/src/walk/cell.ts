@@ -3,6 +3,14 @@ import { WalkDataError, type CellArrays } from "./format";
 
 /** Everything below is in world metres (east, north, height above the land), unless it says otherwise. */
 
+/**
+ * A volume's roof shape when it is a piece of a bridge's deck as the map draws it (the scene's
+ * `Roof.Deck`). The walk neither draws these nor stands on them or bumps into them: each
+ * elevated way has the walk's own roadway, smooth where the map's deck goes in steps.
+ */
+export const ROOF_DECK = 4;
+export const isMapDeck = (v: Volume): boolean => v.roofShape === ROOF_DECK;
+
 export interface Volume {
   /** [e, n, e, n, …] per ring, outer first, even-odd */
   rings: Float32Array[];

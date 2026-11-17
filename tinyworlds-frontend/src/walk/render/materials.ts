@@ -282,7 +282,7 @@ export interface WalkMaterials {
   wall: THREE.ShaderMaterial;
   /** Roofs, a slab's underside, a parapet's top. */
   roof: THREE.ShaderMaterial;
-  /** The roadway on a deck: drawn over the map's deck where they meet. */
+  /** The roadway on a deck: drawn forward in depth, so it shows over the ground where a ramp comes down. */
   deck: THREE.ShaderMaterial;
   tree: THREE.ShaderMaterial;
   cable: THREE.ShaderMaterial;

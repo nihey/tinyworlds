@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { ROOF_DECK } from "../cell";
+import { newPlayer, SPRINT, stepFoot } from "../player";
+import { newVehicle, stepCar } from "../vehicles";
 import { WalkWorld } from "../world";
 import type { WalkIndex } from "../walk-index";
 import { boxVolume, deckWay, makeCell, waterRect } from "./fixtures";
@@ -170,6 +173,57 @@ describe("walls", () => {
     const w = world(makeCell(0, 0), makeCell(1, 0, { volumes: [boxVolume(190, 50, 230, 80)] }));
     w.remove("1_0");
     expect(w.blocked(195, 60, 0.4, 0, 1.8)).toBe(false);
+  });
+});
+
+describe("the map's bridge decks", () => {
+  /**
+   * A river bridge as the data has it: the walk's way at 30 m, and under it the map's deck in
+   * 10 m pieces, flat steps 0.95 m above and below the way by turns.
+   */
+  const bridge = () =>
+    world(
+      makeCell(0, 0, {
+        mask: { mode: 1, bits: null },
+        elevated: [
+          deckWay([
+            [0, 100, 30],
+            [200, 100, 30],
+          ]),
+        ],
+        volumes: Array.from({ length: 20 }, (_, k) => {
+          const top = 30 + (k % 2 === 0 ? 0.95 : -0.95);
+          const v = boxVolume(k * 10, 93, k * 10 + 10, 107, top - 1.5, top);
+          v.roofShape = ROOF_DECK;
+          v.flags = 5;
+          return v;
+        }),
+      }),
+    );
+
+  it("are no walls: someone on foot crosses on the walk's own roadway", () => {
+    const w = bridge();
+    expect(w.blocked(55, 100, 0.35, 30, 1.8)).toBe(false);
+    const p = newPlayer(5, 100, 30, Math.PI / 2);
+    for (let f = 0; f < 8 * 60; f++) {
+      const e0 = p.e;
+      stepFoot(p, { forward: 1, strafe: 0, turn: 0, sprint: true, jump: false }, w, 1 / 60);
+      expect(p.e - e0).toBeCloseTo(SPRINT / 60, 3);
+      expect(p.z).toBe(30);
+    }
+  });
+
+  it("are no walls: a car drives across without a knock", () => {
+    const w = bridge();
+    const v = newVehicle(1, "sedan", 10, 100, Math.PI / 2, "driven");
+    v.v = 15;
+    v.z = 30;
+    for (let f = 0; f < 6 * 60; f++) {
+      const ev = stepCar(v, { throttle: 0.4, brake: 0, steer: 0, handbrake: false }, w, 1 / 60);
+      expect(ev.impact).toBe(0);
+      expect(v.z).toBe(30);
+    }
+    expect(v.e).toBeGreaterThan(100);
   });
 });
 

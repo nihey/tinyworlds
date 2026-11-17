@@ -1,4 +1,4 @@
-import type { ElevatedWay, Volume, WalkCell } from "./cell";
+import { isMapDeck, type ElevatedWay, type Volume, type WalkCell } from "./cell";
 import { CELL } from "./geo";
 import type { WalkIndex } from "./walk-index";
 
@@ -306,7 +306,7 @@ export class WalkWorld {
     return out;
   }
 
-  /** Rebuilds the 20 m grids of a square and its neighbours: each holds the volumes whose box reaches in. */
+  /** Rebuilds the 20 m grids of a square and its neighbours: each holds the volumes whose box reaches in (the map's deck pieces aside). */
   private regrid(i: number, j: number, skipSelf = false) {
     for (let di = -1; di <= 1; di++)
       for (let dj = -1; dj <= 1; dj++) {
@@ -325,6 +325,8 @@ export class WalkWorld {
         const s = this.cellMap.get(keyOf(c.i + di, c.j + dj));
         if (!s) continue;
         for (const v of s.volumes) {
+          // the map's deck pieces step around the way's own roadway: never a wall
+          if (isMapDeck(v)) continue;
           const [e0, n0, e1, n1] = v.box;
           if (e1 < oe || e0 > oe + CELL || n1 < on || n0 > on + CELL) continue;
           const x0 = Math.max(0, Math.floor((e0 - oe) / BUCKET));

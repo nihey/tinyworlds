@@ -1,10 +1,32 @@
 import * as THREE from "three";
-import type { ElevatedWay, GroundWay, StreetEdge, Volume, WalkCell } from "../cell";
+import { isMapDeck, type ElevatedWay, type GroundWay, type Volume, type WalkCell } from "../cell";
 import { cellExists, type WalkIndex } from "../walk-index";
 import { deckAt, JOIN_HEIGHT, PARAPET_HEIGHT, type WalkWorld } from "../world";
-import { columnSide, deckGeometry, SLAB_DEPTH, type DeckSpan } from "./deck-mesh";
+import {
+  columnSide,
+  cutTo,
+  deckGeometry,
+  directionAt,
+  reachOf,
+  SLAB_DEPTH,
+  streetsBelow,
+  type Box,
+  type DeckSpan,
+} from "./deck-mesh";
 import { TREE_RAMPS, type WalkMaterials } from "./materials";
-import { DEEP, HALF, HIGH, LIT, SHADE, SHADES, type Palette } from "./palette";
+import {
+  DEEP,
+  G,
+  groundPaint,
+  HALF,
+  HIGH,
+  isWaterKind,
+  LIT,
+  SHADE,
+  SHADES,
+  type Palette,
+} from "./palette";
+import { groundKindAt, maskTexture, shoreFace, shoreSegments } from "./shore";
 
 /**
  * One square of the walk as three.js meshes, ported from the spike's `buildCell`: its
@@ -36,125 +58,8 @@ const SHORE_FOOT = WATER_SURFACE - 0.3;
 const EDGE_TOP = 1000;
 /** A parapet's thickness, metres. */
 const PARAPET_THICK = 0.3;
-/** A street under a column, with this much room to spare, metres. */
-const STREET_MARGIN = 0.3;
-/** The deck's roadway sits this far over the deck, so it shows over the map's deck volume. */
+/** The roadway sits this far over the way (and is drawn forward in depth), so it shows over the ground where a ramp comes down. */
 const ROADWAY_LIFT = 0.02;
-
-/** Ground kinds, as the scene numbers them (`scene/kinds.ts`). */
-const G = {
-  Water: 0,
-  Land: 1,
-  Scrub: 10,
-  Wetland: 11,
-  Park: 12,
-  Cemetery: 13,
-  Forest: 14,
-  Lawn: 15,
-  Garden: 16,
-  Sand: 17,
-  Rock: 18,
-  Fairway: 19,
-  GolfGreen: 20,
-  Bunker: 21,
-  Lake: 30,
-  Pier: 32,
-  Path: 33,
-  Rail: 34,
-  Road: 36,
-  Highway: 38,
-  Snow: 41,
-  Meadow: 44,
-  RedRock: 45,
-} as const;
-const isWaterKind = (kind: number) => kind === G.Water || kind === G.Lake;
-/** Land whose edge on the water is a bank, not a quay (the tile renderer's `NATURAL_BANK`). */
-const NATURAL_BANK = new Set<number>([
-  G.Park,
-  G.Forest,
-  G.Lawn,
-  G.Scrub,
-  G.Wetland,
-  G.Garden,
-  G.Cemetery,
-  G.Fairway,
-  G.GolfGreen,
-  G.Rock,
-  G.Snow,
-  G.Meadow,
-  G.RedRock,
-]);
-
-/**
- * Ground kind → paint: [colour ramp, shade, alternate ramp, shade, how often the alternate,
- * pattern (0 speckle, 1 paving grid, 2 mown stripes, 3 a street)], after `render/ground.ts`.
- */
-type Paint = readonly [string, number, string, number, number, number];
-const WATER_PAINT: Paint = ["water", LIT, "water", HIGH, 0.04, 0];
-const ROAD_PAINT: Paint = ["asphalt", LIT, "asphalt", HALF, 0.015, 3];
-const DEFAULT_PAINT: Paint = ["pavement", LIT, "pavement", HALF, 0.02, 0];
-const KIND: Record<number, Paint> = {
-  0: WATER_PAINT,
-  1: DEFAULT_PAINT,
-  2: DEFAULT_PAINT,
-  3: ["concrete", LIT, "concrete", HALF, 0.03, 0],
-  4: ["gravel", LIT, "gravel", HALF, 0.12, 0],
-  5: ["dirt", LIT, "dirt", HALF, 0.06, 0],
-  6: ["concrete", HIGH, "concrete", LIT, 0, 1],
-  7: ["cane", LIT, "caneYoung", LIT, 0, 2],
-  8: ["terraRoxa", LIT, "terraRoxa", HALF, 0.12, 0],
-  9: ["steppe", LIT, "steppeDark", LIT, 0.06, 0],
-  10: ["scrub", LIT, "scrub", HALF, 0.12, 0],
-  11: ["wetland", LIT, "waterShallow", HALF, 0.1, 0],
-  12: ["park", LIT, "lawn", LIT, 0.18, 0],
-  13: ["park", LIT, "greyStone", HIGH, 0.02, 0],
-  14: ["forest", LIT, "forest", HALF, 0.12, 0],
-  15: ["lawn", LIT, "lawn", HIGH, 0.03, 0],
-  16: ["lawn", LIT, "rose", HIGH, 0.06, 0],
-  17: ["sand", LIT, "sand", HIGH, 0.06, 0],
-  18: ["rock", LIT, "rock", HALF, 0.12, 0],
-  19: ["lawn", LIT, "lawn", HIGH, 0, 2],
-  20: ["lawn", HIGH, "lawn", HIGH, 0, 0],
-  21: ["sand", LIT, "sand", HIGH, 0.06, 0],
-  22: ["lawn", LIT, "park", LIT, 0, 2],
-  23: ["lawn", LIT, "dirt", LIT, 0, 2],
-  24: ["court", LIT, "court", LIT, 0, 0],
-  25: ["courtGreen", LIT, "courtGreen", LIT, 0, 0],
-  26: ["track", LIT, "track", LIT, 0, 0],
-  27: ["dirt", HIGH, "carRed", LIT, 0.03, 0],
-  28: ["plaza", LIT, "plaza", HALF, 0, 1],
-  29: ["asphaltLight", LIT, "asphaltLight", HALF, 0.03, 0],
-  30: WATER_PAINT,
-  31: ["pool", LIT, "foam", HIGH, 0.02, 0],
-  32: ["pier", LIT, "pier", HALF, 0, 2],
-  33: ["plaza", HIGH, "plaza", LIT, 0.05, 0],
-  34: ["gravel", HALF, "darkStone", SHADE, 0.25, 0],
-  35: ["asphaltLight", LIT, "asphaltLight", HALF, 0.03, 3],
-  36: ROAD_PAINT,
-  37: ROAD_PAINT,
-  38: ["asphaltDark", LIT, "asphaltDark", HALF, 0.05, 3],
-  39: ["asphaltDark", HALF, "asphaltDark", LIT, 0.02, 3],
-  40: ["asphalt", HALF, "asphalt", SHADE, 0.02, 0],
-  41: ["snow", LIT, "snow", HALF, 0.01, 0],
-  42: ["cobble", LIT, "cobble", HALF, 0.2, 0],
-  43: ["dirtRoad", LIT, "dirtRoad", HALF, 0.1, 0],
-  44: ["park", LIT, "lawn", LIT, 0.2, 0],
-  45: ["redStone", LIT, "redStone", HALF, 0.12, 0],
-};
-
-/** Palette-index paints by ground kind, made once per palette. */
-const paintCache = new WeakMap<Palette, Map<number, number[]>>();
-function paintOf(palette: Palette, kind: number): number[] {
-  let cache = paintCache.get(palette);
-  if (!cache) paintCache.set(palette, (cache = new Map()));
-  let p = cache.get(kind);
-  if (!p) {
-    const [a, as, b, bs, often, pattern] = KIND[kind] ?? DEFAULT_PAINT;
-    p = [palette.ramp(a) * SHADES + as, palette.ramp(b) * SHADES + bs, often, pattern];
-    cache.set(kind, p);
-  }
-  return p;
-}
 
 /** The pipeline's `mix` (scene/hash.ts). */
 function mix(a: number, b: number): number {
@@ -352,8 +257,8 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     buf.quad(v0, v0 + 1, v0 + 2, v0 + 3);
   };
 
-  // ---- buildings
-  for (const v of cell.volumes) buildVolume(v);
+  // ---- buildings (not the map's deck pieces: every elevated way has the walk's own roadway)
+  for (const v of cell.volumes) if (!isMapDeck(v)) buildVolume(v);
 
   function buildVolume(v: Volume) {
     const wallTop = v.roofShape === 1 ? v.top + v.roofH : v.top;
@@ -394,7 +299,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     if ((v.roofShape === 2 || v.roofShape === 3) && v.roofH > 0.5 && outer && outer.length >= 6)
       taperedRoof(v, outer);
     else flat(roofs, v.rings, wallTop, roofPaint);
-    // a deck or anything else standing on nothing has an underside, in its walls' deep shade
+    // anything standing on nothing has an underside, in its walls' deep shade
     if (v.base > 0.3) {
       const under = v.wall * SHADES + DEEP;
       flat(roofs, v.rings, v.base, [under, under, 0, 0]);
@@ -447,11 +352,11 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
   const group = new THREE.Group();
   group.position.set(oe, 0, -on);
   const disposables: { dispose(): void }[] = [];
-  let maskTexture: THREE.DataTexture | null = null;
+  let mask: THREE.DataTexture | null = null;
   if (cell.mask.mode !== 1) {
     if (cell.mask.mode === 2) {
-      maskTexture = maskTextureOf(cell.mask.bits!);
-      disposables.push(maskTexture);
+      mask = maskTexture(cell.mask.bits!);
+      disposables.push(mask);
     }
     flatQuad(
       ground,
@@ -461,7 +366,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
         [oe + side, on + side, 0],
         [oe, on + side, 0],
       ],
-      paintOf(palette, G.Land),
+      groundPaint(palette, G.Land),
     );
     const rank = index.paintRank;
     const items: { rank: number; order: number; draw: () => void }[] = [];
@@ -470,7 +375,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
       items.push({
         rank: rank[g.kind] ?? g.kind,
         order: g.order,
-        draw: () => flat(ground, g.rings, 0, paintOf(palette, g.kind)),
+        draw: () => flat(ground, g.rings, 0, groundPaint(palette, g.kind)),
       });
     }
     for (const w of cell.ways)
@@ -484,7 +389,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
   }
 
   function groundWay(w: GroundWay) {
-    const paint = paintOf(palette, w.kind);
+    const paint = groundPaint(palette, w.kind);
     const p = w.pts;
     let along = 0;
     for (let k = 2; k + 1 < p.length; k += 2) {
@@ -499,26 +404,13 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
 
   function shoreEdge(c: WalkCell, bits: Uint8Array) {
     const kindAt = groundKindAt(c, index.paintRank);
-    const quay = palette.ramp("pavement");
-    const pier = palette.ramp("pier");
-    const bank = palette.ramp("dirt");
-    const sand = palette.ramp("sand");
     for (const [ae, an, be, bn] of shoreSegments(bits, side)) {
       // land lies to the left of each segment, the water to its right
       const L = Math.hypot(be - ae, bn - an);
       const ne = (bn - an) / L;
       const nn = -(be - ae) / L;
       const kind = kindAt(oe + (ae + be) / 2 - ne * 1.5, on + (an + bn) / 2 - nn * 1.5);
-      const tone = toneOf(ne, nn);
-      let ramp = quay;
-      let shade = tone - 1;
-      if (kind === G.Sand || kind === G.Bunker) {
-        ramp = sand;
-        shade = tone;
-      } else if (kind === G.Pier) {
-        ramp = pier;
-        shade = Math.max(DEEP, tone - 2);
-      } else if (NATURAL_BANK.has(kind)) ramp = bank;
+      const { ramp, shade } = shoreFace(palette, kind, toneOf(ne, nn));
       wall(
         oe + ae,
         on + an,
@@ -568,7 +460,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     const g = deckGeometry(way, under, { open, within: square });
     const mid = (s: DeckSpan) => inSquare((s.e0 + s.e1) / 2, (s.n0 + s.n1) / 2);
     const hw = way.width / 2;
-    const roadPaint = paintOf(
+    const roadPaint = groundPaint(
       palette,
       way.kind === 1 ? G.Path : way.kind === 2 ? G.Rail : way.width >= 14 ? G.Highway : G.Road,
     );
@@ -733,7 +625,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
   };
   const groundGeometry = ground.geometry();
   if (groundGeometry) {
-    const { colour, depth } = materials.ground(maskTexture);
+    const { colour, depth } = materials.ground(mask);
     disposables.push(colour, depth);
     add(groundGeometry, colour, ORDER_GROUND);
     const plate = new THREE.PlaneGeometry(side, side);
@@ -766,261 +658,6 @@ function signedArea(r: Float32Array): number {
   const k = r.length / 2;
   for (let i = 0, j = k - 1; i < k; j = i++) a += r[j * 2] * r[i * 2 + 1] - r[i * 2] * r[j * 2 + 1];
   return a / 2;
-}
-
-/** The mask as a 100 × 100 texture, filtered so its edge runs smooth between the 2 m cells. */
-function maskTextureOf(bits: Uint8Array): THREE.DataTexture {
-  const data = new Uint8Array(100 * 100);
-  for (let b = 0; b < data.length; b++) data[b] = (bits[b >> 3] >> (b & 7)) & 1 ? 255 : 0;
-  const t = new THREE.DataTexture(data, 100, 100, THREE.RedFormat, THREE.UnsignedByteType);
-  t.magFilter = THREE.LinearFilter;
-  t.minFilter = THREE.LinearFilter;
-  t.unpackAlignment = 1;
-  t.needsUpdate = true;
-  return t;
-}
-
-/**
- * The shore of a square's mask as segments [e0, n0, e1, n1] in metres from its south-west
- * corner, land on the left: the line where the mask, filtered as its texture is (linear between
- * the 2 m cells' centres, held level beyond the outer centres), is half water. Marching squares
- * over the centres and the square's edges, so the edge stands where the ground is cut.
- */
-export function shoreSegments(bits: Uint8Array, side: number): [number, number, number, number][] {
-  const N = 100;
-  const step = side / N;
-  // sample positions: the square's edge, the 100 centres, the far edge
-  const pos = (i: number) => (i === 0 ? 0 : i === N + 1 ? side : (i - 0.5) * step);
-  const wet = (x: number, y: number) => {
-    const cx = Math.max(0, Math.min(N - 1, x - 1));
-    const cy = Math.max(0, Math.min(N - 1, y - 1));
-    const b = cx + N * cy;
-    return (bits[b >> 3] >> (b & 7)) & 1;
-  };
-  /** The filtered mask at a point: what the ground's shader reads. */
-  const field = (e: number, n: number) => {
-    const fx = Math.max(0, Math.min(N - 1, e / step - 0.5));
-    const fy = Math.max(0, Math.min(N - 1, n / step - 0.5));
-    const x0 = Math.min(N - 2, Math.floor(fx));
-    const y0 = Math.min(N - 2, Math.floor(fy));
-    const tx = fx - x0;
-    const ty = fy - y0;
-    const at = (x: number, y: number) => wet(x + 1, y + 1);
-    return (
-      at(x0, y0) * (1 - tx) * (1 - ty) +
-      at(x0 + 1, y0) * tx * (1 - ty) +
-      at(x0, y0 + 1) * (1 - tx) * ty +
-      at(x0 + 1, y0 + 1) * tx * ty
-    );
-  };
-  const out: [number, number, number, number][] = [];
-  for (let y = 0; y <= N; y++)
-    for (let x = 0; x <= N; x++) {
-      const a = wet(x, y);
-      const b = wet(x + 1, y);
-      const c = wet(x + 1, y + 1);
-      const d = wet(x, y + 1);
-      const sum = a + b + c + d;
-      if (sum === 0 || sum === 4) continue;
-      const x0 = pos(x);
-      const x1 = pos(x + 1);
-      const y0 = pos(y);
-      const y1 = pos(y + 1);
-      const xm = (x0 + x1) / 2;
-      const ym = (y0 + y1) / 2;
-      // crossings on the four sides: bottom, right, top, left
-      const cross: [number, number][] = [];
-      if (a !== b) cross.push([xm, y0]);
-      if (b !== c) cross.push([x1, ym]);
-      if (c !== d) cross.push([xm, y1]);
-      if (d !== a) cross.push([x0, ym]);
-      const pairs: [number, number][][] =
-        cross.length === 4
-          ? // a saddle: the filtered mask is exactly half there, which the shader counts as land,
-            // so the land runs through and each water corner is cut off on its own
-            a === 1
-            ? [
-                [cross[0], cross[3]],
-                [cross[1], cross[2]],
-              ]
-            : [
-                [cross[0], cross[1]],
-                [cross[2], cross[3]],
-              ]
-          : [[cross[0], cross[1]]];
-      for (const [[pe, pn], [qe, qn]] of pairs) {
-        const L = Math.hypot(qe - pe, qn - pn);
-        if (L < 1e-6) continue;
-        // the right of p → q must be the water
-        const me = (pe + qe) / 2 + ((qn - pn) / L) * 0.2;
-        const mn = (pn + qn) / 2 - ((qe - pe) / L) * 0.2;
-        if (field(me, mn) > 0.5) out.push([pe, pn, qe, qn]);
-        else out.push([qe, qn, pe, pn]);
-      }
-    }
-  return out;
-}
-
-/**
- * The ground kind on top at a point (world metres): of the land polygons holding it, the one
- * painted last (highest rank, then latest in the scene); land where none does.
- */
-function groundKindAt(c: WalkCell, paintRank: number[]) {
-  const rankOf = (kind: number) => paintRank[kind] ?? kind;
-  const polys = c.ground
-    .filter((g) => !isWaterKind(g.kind))
-    .sort((a, b) => rankOf(b.kind) - rankOf(a.kind) || b.order - a.order)
-    .map((g) => {
-      let e0 = Infinity;
-      let n0 = Infinity;
-      let e1 = -Infinity;
-      let n1 = -Infinity;
-      for (const r of g.rings)
-        for (let k = 0; k < r.length; k += 2) {
-          e0 = Math.min(e0, r[k]);
-          e1 = Math.max(e1, r[k]);
-          n0 = Math.min(n0, r[k + 1]);
-          n1 = Math.max(n1, r[k + 1]);
-        }
-      return { g, e0, n0, e1, n1 };
-    });
-  return (e: number, n: number): number => {
-    for (const { g, e0, n0, e1, n1 } of polys) {
-      if (e < e0 || e > e1 || n < n0 || n > n1) continue;
-      let inside = false;
-      for (const r of g.rings) {
-        const k = r.length / 2;
-        for (let a = k - 1, b = 0; b < k; a = b++) {
-          const an = r[a * 2 + 1];
-          const bn = r[b * 2 + 1];
-          if (an > n !== bn > n && e < ((r[b * 2] - r[a * 2]) * (n - an)) / (bn - an) + r[a * 2])
-            inside = !inside;
-        }
-      }
-      if (inside) return g.kind;
-    }
-    return G.Land;
-  };
-}
-
-/** Whether a point is on a street at ground level (not one raised over it), with a little room. */
-function streetsBelow(streets: StreetEdge[]) {
-  const low = streets
-    .map((s) => {
-      let e0 = Infinity;
-      let n0 = Infinity;
-      let e1 = -Infinity;
-      let n1 = -Infinity;
-      for (let q = 0; q < s.pts.length; q += 3) {
-        e0 = Math.min(e0, s.pts[q]);
-        e1 = Math.max(e1, s.pts[q]);
-        n0 = Math.min(n0, s.pts[q + 1]);
-        n1 = Math.max(n1, s.pts[q + 1]);
-      }
-      const r = s.width / 2 + STREET_MARGIN;
-      return { s, r, e0: e0 - r, n0: n0 - r, e1: e1 + r, n1: n1 + r };
-    })
-    .filter(({ s }) => {
-      for (let q = 2; q < s.pts.length; q += 3) if (s.pts[q] < 1) return true;
-      return false;
-    });
-  return (e: number, n: number): boolean => {
-    for (const { s, r, e0, n0, e1, n1 } of low) {
-      if (e < e0 || e > e1 || n < n0 || n > n1) continue;
-      const p = s.pts;
-      for (let q = 3; q < p.length; q += 3) {
-        const ae = p[q - 3];
-        const an = p[q - 2];
-        const de = p[q] - ae;
-        const dn = p[q + 1] - an;
-        const len2 = de * de + dn * dn;
-        const t = len2 > 0 ? Math.max(0, Math.min(1, ((e - ae) * de + (n - an) * dn) / len2)) : 0;
-        const z = p[q - 1] + (p[q + 2] - p[q - 1]) * t;
-        if (z < 1 && Math.hypot(e - ae - de * t, n - an - dn * t) <= r) return true;
-      }
-    }
-    return false;
-  };
-}
-
-type Box = readonly [number, number, number, number];
-const meets = (a: Box, b: Box) => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
-
-/** A segment's box [e0, n0, e1, n1], grown by r. */
-function segmentBox(p: Float32Array, k: number, r: number): Box {
-  return [
-    Math.min(p[k * 3], p[k * 3 + 3]) - r,
-    Math.min(p[k * 3 + 1], p[k * 3 + 4]) - r,
-    Math.max(p[k * 3], p[k * 3 + 3]) + r,
-    Math.max(p[k * 3 + 1], p[k * 3 + 4]) + r,
-  ];
-}
-
-/**
- * The box round every segment of a way whose strip reaches `box` (as `deckGeometry` picks
- * them with `within`), the strip and a metre included: where its parapets can be asked about.
- * Null when none does.
- */
-function reachOf(way: ElevatedWay, box: Box): Box | null {
-  const r = way.width / 2 + 1;
-  let out: [number, number, number, number] | null = null;
-  for (let k = 0; k + 1 < way.pts.length / 3; k++) {
-    const b = segmentBox(way.pts, k, r);
-    if (!meets(b, box)) continue;
-    if (!out) out = [b[0], b[1], b[2], b[3]];
-    else {
-      out[0] = Math.min(out[0], b[0]);
-      out[1] = Math.min(out[1], b[1]);
-      out[2] = Math.max(out[2], b[2]);
-      out[3] = Math.max(out[3], b[3]);
-    }
-  }
-  return out;
-}
-
-/**
- * A way cut to the run of its segments from the first to the last whose strip reaches `box`:
- * its deck's height anywhere in the box is the whole way's (`deckAt` only looks within the
- * strip). Null when none reaches it.
- */
-function cutTo(way: ElevatedWay, box: Box): ElevatedWay | null {
-  const half = way.width / 2;
-  let first = -1;
-  let last = -1;
-  for (let k = 0; k + 1 < way.pts.length / 3; k++)
-    if (meets(segmentBox(way.pts, k, half), box)) {
-      if (first < 0) first = k;
-      last = k;
-    }
-  if (first < 0) return null;
-  return {
-    ...way,
-    pts: way.pts.subarray(first * 3, (last + 2) * 3),
-    own: way.own.subarray(first, last + 2),
-  };
-}
-
-/** The unit direction (e, n) of the way's segment nearest a point. */
-function directionAt(way: ElevatedWay, e: number, n: number): [number, number] {
-  const p = way.pts;
-  let best = Infinity;
-  let dir: [number, number] = [1, 0];
-  for (let q = 3; q < p.length; q += 3) {
-    const ae = p[q - 3];
-    const an = p[q - 2];
-    const de = p[q] - ae;
-    const dn = p[q + 1] - an;
-    const len2 = de * de + dn * dn;
-    if (len2 < 1e-12) continue;
-    const t = Math.max(0, Math.min(1, ((e - ae) * de + (n - an) * dn) / len2));
-    const d = Math.hypot(e - ae - de * t, n - an - dn * t);
-    if (d < best) {
-      best = d;
-      const len = Math.sqrt(len2);
-      dir = [de / len, dn / len];
-    }
-  }
-  return dir;
 }
 
 /** Trees as upright billboards, one instanced mesh: each a crown kind from the map's leaf ramps. */

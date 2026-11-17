@@ -116,23 +116,31 @@ describe("deckGeometry", () => {
     expect(right.reduce((s, p) => s + lengthOf(p), 0)).toBeCloseTo(120, 3);
   });
 
-  it("builds no slab, and stands no column, where the map's deck holds the way (`own` 0)", () => {
-    // own from 0 to 40 m, the map's deck from 50 to 80 m, own again from 90 m
+  it("builds the slab and parapets wherever the way is raised, own or not; columns only under its own stretches", () => {
+    // own from 0 to 40 m, the map's deck under it from 50 to 80 m (over the water, where the
+    // map's own piers stand), own again from 90 m
     const own = [1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1];
     const g = deckGeometry(eastWay(120, 7, own), nowhere);
-    expect(g.slab.length).toBeGreaterThan(0);
-    for (const s of g.slab) {
-      const lo = Math.min(s.e0, s.e1);
-      const hi = Math.max(s.e0, s.e1);
-      // nothing over the stretch between the two vertices that are both the map's
-      expect(hi <= 50 + 1e-6 || lo >= 80 - 1e-6).toBe(true);
-    }
-    const covered = (e: number) => g.slab.some((s) => e >= s.e0 - 1e-6 && e <= s.e1 + 1e-6);
-    for (const e of [5, 20, 35, 95, 110]) expect(covered(e)).toBe(true);
+    const covered = (list: DeckSpan[], e: number) =>
+      list.some((s) => e >= s.e0 - 1e-6 && e <= s.e1 + 1e-6);
+    for (const e of [5, 35, 55, 65, 75, 95, 115]) expect(covered(g.slab, e)).toBe(true);
+    expect(g.slab.reduce((sum, s) => sum + lengthOf(s), 0)).toBeCloseTo(120, 3);
     for (const [e] of g.columns) expect(e < 40 + 1e-6 || e > 90 - 1e-6).toBe(true);
-    // parapets do not care who builds the deck
     const left = g.parapets.filter((p) => p.n0 > 0);
     expect(left.reduce((sum, p) => sum + lengthOf(p), 0)).toBeCloseTo(120, 3);
+  });
+
+  it("builds no slab along a stretch that lies on the ground", () => {
+    const g = deckGeometry(
+      deckWay([
+        [0, 0, 0],
+        [20, 0, 0.2],
+        [80, 0, 6],
+      ]),
+      nowhere,
+    );
+    for (const s of [...g.slab, ...g.parapets]) expect(Math.max(s.e0, s.e1)).toBeGreaterThan(20);
+    expect(g.slab.reduce((sum, s) => sum + lengthOf(s), 0)).toBeCloseTo(60, 3);
   });
 
   it("lays the roadway on the deck all along, own or not, with the distance along it", () => {
