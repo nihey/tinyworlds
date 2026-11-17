@@ -8,7 +8,7 @@ export interface Drawn {
   height: number;
 }
 
-/** A link's picture is cut to this, the shape of a share card (1.91 to 1) at twice a card's width. */
+/** A link's picture fits within this box, at twice a card's width. */
 export const PICTURE_SIZE = { width: 480, height: 252 };
 
 /** Smaller than this in either direction is not a picture: a spacer, a tracking pixel. */
@@ -60,8 +60,8 @@ async function draw(
 }
 
 /**
- * A page's picture as the site shows it: cut to a share card's shape around its middle, never
- * enlarged, WebP. Null when the bytes are not a picture or it is too small to be one. The
+ * A page's picture as the site shows it: proportional WebP, never enlarged.
+ * Null when the bytes are not a picture or it is too small to be one. The
  * result holds nothing of the source but its pixels (no metadata, no profile).
  */
 export async function drawPicture(input: Buffer): Promise<Drawn | null> {
@@ -75,7 +75,7 @@ export async function drawPicture(input: Buffer): Promise<Drawn | null> {
   }
   return draw(input, (image) =>
     image
-      .resize({ ...PICTURE_SIZE, fit: 'cover', withoutEnlargement: true })
+      .resize({ ...PICTURE_SIZE, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 76, effort: 5 }),
   );
 }

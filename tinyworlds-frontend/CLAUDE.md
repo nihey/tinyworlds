@@ -268,16 +268,13 @@ src/
     Both stand level with the page's own links and the plaques begin level with the hero, so
     the columns read as part of the page.
   - **Narrower** (`WallStrip`): "Our Benefactors", what the list is and the way to the hall
-    of fame on one line, then one row under the figures, every plaque one height (84 px: a
-    name, the sum and cities on one line, the links on one line; the first picture at the
-    plaque's side). Its room is there from the first paint, with empty plaques while the list
-    is on its way, so the page below does not move; a failed answer leaves the invitation
-    alone. Only one of the two is ever in the page (`useMediaQuery`), so no picture is
-    fetched twice.
-  - **They drift** (`drift.tsx`, `.drift` in `globals.css`) only when there is more than fits:
+    of fame on one line, then a horizontally scrollable row under the figures. Every plaque is
+    116 px high, with compact link previews beneath the name and cities. Empty plaques reserve
+    the row's height during loading. A failed answer leaves the invitation alone.
+  - **The side columns drift** (`drift.tsx`, `.drift` in `globals.css`) when there is more than fits:
     the list is then in the page twice, the second copy `inert` and hidden from screen
-    readers, and the track moves by exactly one copy (16 px a second up a column, 26 along
-    the strip), so the loop has no seam; it comes out of the fog and goes back into it (a
+    readers, and the track moves by exactly one copy (16 px a second), so the loop has
+    no seam. It comes out of the fog and goes back into it (a
     mask). It stands still under the pointer and while anything in it has the focus, and
     never moves under `prefers-reduced-motion`: there it is one list, scrolled by hand. The
     columns are not scroll containers otherwise, so the wheel over them scrolls the page.
@@ -291,8 +288,8 @@ src/
   its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
   the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
   to it, so the still hands over to the film unseen and the film loops unseen.
-  A loop is fetched only when its picture is on screen (`preload="none"`, an
-  `IntersectionObserver`) and is the one being shown (`active`), plays while it stays there,
+  A loop is fetched only once the still or its fallback is ready, at least 40% of its frame
+  is on screen (`IntersectionObserver`), and it is the one being shown (`active`). It plays while it stays there
   and is never fetched under `prefers-reduced-motion` or `Save-Data`; if it is missing or
   cannot play, the still stays. The loops are the front page's own files (`LOOPS_BASE` in
   `site.ts`), unlike the share cards: `deploy/deploy.sh home` is all they need, and a world's
@@ -311,8 +308,9 @@ src/
     world), "Explore" (the link to that world, named "Explore {city}") and, where donations
     are taken, "Fund the next city" (`#ranking`). The buttons share a row from `sm` and stack
     below it: they never wrap.
-  - **It moves on by itself** every `SLIDE_MS` (8 s), the new picture fading in over the old
-    (`FADE_MS`, the `hero-in` keyframes), only while `mayAdvance` (`lib/home.ts`) says so:
+  - **It moves on by itself** after `SLIDE_MS` (8 s), once the next still has decoded or its
+    fallback is ready. The new picture fades in over the old (`FADE_MS`, the `hero-in` keyframes)
+    only while `mayAdvance` (`lib/home.ts`) says so:
     more than one slide, the hero on screen, the page in view, no pointer on it, no keyboard
     focus in it, and never under `prefers-reduced-motion` or `Save-Data` (then it stands
     still and only the stills are fetched). Choosing a slide stops it for good: the hero is the visitor's from then on, which is
@@ -595,8 +593,9 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   `setNameHidden`; it acts at once, since it is reversible, and is loaded apart from the funnel).
 - **A benefactor's links** (`benefactors/benefactor-link.tsx`, `lib/links.ts`): up to three
   pages a named donor points to, each with what the API read of it (title, description, the
-  site's icon, the page's picture). They show under the name in a city's sign (`look="row"`:
-  a small picture in the icon's place) and on the front page's plaques (`look="card"`), never
+  site's icon, the page's picture). The picture fits its frame at its original proportions,
+  and the image, title and host share one link. The home strip and city's sign use small previews.
+  The side columns and Hall of Fame have room for the larger preview card. Links never show
   on an unnamed row (the parsers drop them there, whatever the answer says). A link opens in
   a new tab and is a **dofollow link**, `rel="dofollow noopener"` (`LINK_REL`, in
   `lib/links.ts`): never `nofollow`, `sponsored` or `ugc`, because the benefactors are told

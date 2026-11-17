@@ -1,14 +1,13 @@
 "use client";
 
 import { ArrowUpRight, Heart } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
-import { BenefactorLinks, LinkIcon, LinkPicture } from "@/components/benefactors/benefactor-link";
+import { Fragment } from "react";
+import { BenefactorLinks } from "@/components/benefactors/benefactor-link";
 import { Drift } from "@/components/home/drift";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import type { WallLoad } from "@/hooks/use-wall";
 import { formatUsd } from "@/lib/donate";
-import { LINK_REL, hostOf } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import { citiesShown, wallSides, type WallCity, type WallEntry } from "@/lib/wall";
 import { HALL_URL, SITE_ID } from "@/site";
@@ -19,9 +18,8 @@ import { HALL_URL, SITE_ID } from "@/site";
  */
 const WIDE = "(min-width: 90rem)";
 
-/** How fast the columns drift up and the strip drifts along, in CSS px a second. */
+/** How fast the columns drift up, in CSS px a second. */
 const COLUMN_SPEED = 16;
-const STRIP_SPEED = 26;
 
 interface WallProps {
   load: WallLoad;
@@ -166,7 +164,7 @@ function Column({
       className={cn(
         // beside the page's column (64rem wide, centred), a little into its own margin; as far
         // down as the page's links (2.25rem) and the gap under them, then the plaques
-        "fixed inset-y-0 flex w-[clamp(10.5rem,calc(50%-32rem-0.75rem),15.5rem)] flex-col gap-4 py-6",
+        "home-arrive fixed inset-y-0 flex w-[clamp(10.5rem,calc(50%-32rem-0.75rem),15.5rem)] flex-col gap-4 py-6",
         className,
       )}
     >
@@ -228,62 +226,29 @@ export function WallColumns({ load, onCity, onDonate }: WallProps) {
   );
 }
 
-/** As tall as a plaque with a name, a sum and a line of links: every one in the strip is. */
-const STRIP_HEIGHT = "h-[84px]";
+/** Room for the name, the sum and a row of link previews. */
+const STRIP_HEIGHT = "h-[116px]";
 
-/** A plaque of the strip: one height, its first picture at its side, its links on one line. */
+/** A plaque of the strip: one height, with the donor's links beneath their name. */
 function StripPlaque({ entry, onCity }: { entry: WallEntry; onCity: (slug: string) => void }) {
-  const { t } = useI18n();
-  const pictured = entry.links.find((link) => link.image);
-  let lead: ReactNode = null;
-  if (pictured?.image)
-    lead = (
-      <a
-        href={pictured.url}
-        target="_blank"
-        rel={LINK_REL}
-        tabIndex={-1}
-        aria-hidden
-        className="shrink-0"
-      >
-        <LinkPicture src={pictured.image} className="h-[60px]" />
-      </a>
-    );
   return (
-    <li className={cn("sign flex max-w-[21rem] shrink-0 items-center gap-3 px-3", STRIP_HEIGHT)}>
-      {lead}
-      <div className="min-w-0">
+    <li
+      className={cn(
+        "home-arrive sign flex min-w-24 shrink-0 snap-start flex-col justify-center px-3 py-2.5",
+        STRIP_HEIGHT,
+      )}
+    >
+      <div className="max-w-52">
         <Who entry={entry} onCity={onCity} oneLine />
-        {entry.links.length > 0 && (
-          <p className="flex items-center gap-3 pt-1.5">
-            {entry.links.map((link) => (
-              <a
-                key={link.url}
-                href={link.url}
-                target="_blank"
-                rel={LINK_REL}
-                aria-label={t.benefactors.linkLabel
-                  .replace("{title}", link.title)
-                  .replace("{host}", hostOf(link.url))}
-                className="flex min-w-0 items-center gap-1.5 rounded-sm text-xs font-semibold text-paper outline-none hover:text-taxi focus-visible:text-taxi focus-visible:underline"
-              >
-                <LinkIcon src={link.icon} className="size-4 rounded-[4px]" />
-                {/* one link has the line to itself; three share it as icons with a few letters */}
-                <span className={cn("truncate", entry.links.length > 1 && "max-w-[6.5rem]")}>
-                  {entry.links.length > 1 ? hostOf(link.url) : link.title}
-                </span>
-              </a>
-            ))}
-          </p>
-        )}
       </div>
+      <BenefactorLinks links={entry.links} look="strip" className="pt-2" />
     </li>
   );
 }
 
 /**
  * The same benefactors as a strip in the page, for screens with no room beside it: plaques of
- * one height in a row, drifting along when there are more than fit. Its room is there from the
+ * one height in a row that visitors can swipe or scroll. Its room is there from the
  * first paint (empty plaques while the list is on its way), so the page below does not move,
  * and it is never empty: with nobody to show yet, the invitation stands alone.
  */
@@ -308,12 +273,8 @@ export function WallStrip({ load, onCity, onDonate }: WallProps) {
       {!wide && (
         // room around the row (taken back by the margins), so the plaques' edges and the
         // shadows under them are not cut by the window
-        <Drift
-          axis="x"
-          speed={STRIP_SPEED}
-          className={cn("-mx-2 -mt-2 -mb-8 box-content px-2 pt-2 pb-8", STRIP_HEIGHT)}
-        >
-          <ul className="flex h-full gap-3 pr-3">
+        <div className="-mx-2 -mt-2 -mb-6 snap-x snap-proximity scroll-px-2 overflow-x-auto overscroll-x-contain px-2 pt-2 pb-6 [scrollbar-width:thin]">
+          <ul className="flex w-max gap-3 pr-2">
             {waiting
               ? Array.from({ length: 4 }, (_, i) => (
                   <li
@@ -329,7 +290,7 @@ export function WallStrip({ load, onCity, onDonate }: WallProps) {
                   <StripPlaque key={i} entry={entry} onCity={onCity} />
                 ))}
             {!waiting && onDonate && (
-              <li className="w-56 shrink-0">
+              <li className="home-arrive w-56 shrink-0 snap-start">
                 <Invite
                   onDonate={onDonate}
                   className={cn("flex flex-col justify-center", STRIP_HEIGHT)}
@@ -337,7 +298,7 @@ export function WallStrip({ load, onCity, onDonate }: WallProps) {
               </li>
             )}
           </ul>
-        </Drift>
+        </div>
       )}
     </section>
   );

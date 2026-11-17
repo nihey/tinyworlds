@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, Code, UserRound } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
@@ -91,13 +91,43 @@ function WorldGrid({
     newCities?: { on: boolean; onJoin: () => void; onLeave: () => void };
   };
 }) {
+  const grid = useRef<HTMLUListElement>(null);
+  const hasNext = next !== undefined;
+
+  useEffect(() => {
+    const list = grid.current;
+    if (
+      !list ||
+      typeof IntersectionObserver === "undefined" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const { target, isIntersecting } of entries) {
+          if (!isIntersecting) continue;
+          target.setAttribute("data-entered", "");
+          observer.unobserve(target);
+        }
+      },
+      { rootMargin: "0px 0px 24px" },
+    );
+    for (const card of list.children) {
+      if (!card.hasAttribute("data-entered")) observer.observe(card);
+    }
+    return () => observer.disconnect();
+  }, [hasNext]);
+
   return (
     <section aria-labelledby={id}>
       <SectionHead id={id} title={title} line={line} />
       {/* the same columns for every group, so a card is the same size wherever it is listed */}
       <ul
+        ref={grid}
+        data-columns={Math.min(columns, 3)}
         className={cn(
-          "grid gap-4",
+          "home-world-grid grid gap-4",
           columns > 1 && "sm:grid-cols-2",
           columns > 2 && "lg:grid-cols-3",
         )}

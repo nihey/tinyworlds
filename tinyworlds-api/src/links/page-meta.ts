@@ -111,22 +111,32 @@ export function decodeHtml(body: Buffer, contentType: string | null): string {
 interface Tag {
   name: string;
   attrs: Map<string, string>;
+  inBody: boolean;
   /** For `<title>`: what stands between it and its end. */
   text?: string;
 }
 
 const SPACE = /\s/;
 
+/** YouTube channel pages can put their preview metadata after a large head. */
+export function isYouTubeChannel(url: string): boolean {
+  const { hostname, pathname } = new URL(url);
+  return (
+    ['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(hostname) &&
+    /^\/(?:@[^/]+|(?:channel|c|user)\/[^/]+)\/?$/.test(pathname)
+  );
+}
+
 /**
- * The tags of a page's head, one by one: comments, scripts and styles are stepped over, and
- * the walk ends where the body begins. Not a parser of HTML: enough of one to read `<meta>`,
- * `<link>`, `<title>` and `<base>` whatever stands in their quoted values.
+ * Read metadata tags, skipping comments, scripts, and styles. Only YouTube channel pages
+ * continue scanning into their body.
  */
-function* headTags(html: string): Generator<Tag> {
+function* pageTags(html: string, includeBody: boolean): Generator<Tag> {
   const n = html.length;
   // for finding an end tag whatever its case
   const lowered = html.toLowerCase();
   let i = 0;
+  let inBody = false;
   while (i < n) {
     const open = html.indexOf('<', i);
     if (open === -1) return;
@@ -144,7 +154,10 @@ function* headTags(html: string): Generator<Tag> {
       continue;
     }
     const name = named[1].toLowerCase();
-    if (name === 'body') return;
+    if (name === 'body') {
+      if (!includeBody) return;
+      inBody = true;
+    }
     i = open + named[0].length;
     const attrs = new Map<string, string>();
     while (i < n && html[i] !== '>') {
@@ -179,11 +192,11 @@ function* headTags(html: string): Generator<Tag> {
       const close = lowered.indexOf(`</${name}`, i);
       const end = close === -1 ? n : close;
       if (name === 'title')
-        yield { name, attrs, text: decodeEntities(html.slice(i, end)) };
+        yield { name, attrs, inBody, text: decodeEntities(html.slice(i, end)) };
       i = end;
       continue;
     }
-    yield { name, attrs };
+    yield { name, attrs, inBody };
   }
 }
 
@@ -225,7 +238,9 @@ export function readPageMeta(html: string, pageUrl: string): PageMeta {
   let title: string | null = null;
   let base = pageUrl;
 
-  for (const tag of headTags(html)) {
+  for (const tag of pageTags(html, isYouTubeChannel(pageUrl))) {
+    // YouTube's body may supply Open Graph and Twitter metadata. Other settings come from the head.
+    if (tag.inBody && tag.name !== 'meta') continue;
     if (tag.name === 'title') {
       title ??= tag.text ?? null;
     } else if (tag.name === 'base') {
@@ -238,6 +253,7 @@ export function readPageMeta(html: string, pageUrl: string): PageMeta {
         ''
       ).toLowerCase();
       const content = tag.attrs.get('content');
+      if (tag.inBody && !/^(og|twitter):/.test(key)) continue;
       if (key && content && !meta.has(key)) meta.set(key, content);
     } else if (tag.name === 'link') {
       const rel = (tag.attrs.get('rel') ?? '').toLowerCase().split(/\s+/);

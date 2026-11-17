@@ -337,15 +337,16 @@ pictures, `donors.links_hidden` an admin's switch.
   (`isPublicAddress`: no loopback, private, shared, link-local (the metadata service),
   documentation, multicast or reserved range, nor the IPv6 ranges that carry an IPv4 address),
   so a name cannot be public when checked and private when connected to. No more than it was
-  told is read, counted unpacked (a page is cut at 600 kB, a picture over 5 MB or an icon over
-  500 kB refused), and it gives up at the deadline. Nothing of anyone's goes out: no cookie, a
+  told is read, counted unpacked (600 kB per page, 1.5 MB for YouTube channel pages that can
+  publish Open Graph tags after the head, and a picture over 5 MB or an icon over 500 kB
+  refused). It gives up at the deadline. Nothing of anyone's goes out: no cookie, a
   generic user agent.
-- **Pictures are drawn again here** (`link-images.ts`, sharp): the page's picture cut to a share
-  card's shape (480 × 252, never enlarged; under 120 × 60 is not a picture), the icon within
+- **Pictures are drawn again here** (`link-images.ts`, sharp): the page's picture fits within
+  480 × 252 at its original proportions (never enlarged; under 120 × 60 is not a picture), the icon within
   64 px (an `.ico` through `ico.ts`, which the image library does not read), both WebP with
   nothing of the source but its pixels. A source of more than 25 million pixels is refused
   unread. So what the site shows is never a file a linked page sent, and a visitor's browser
-  never asks a linked site for anything.
+  never asks a linked site for anything. Previously cropped previews need a refresh to get the full image.
 - **`GET /api/link-images/:id`** (public) serves one: `image/webp`, `nosniff`, and
   `Cache-Control: public, max-age=31536000, immutable`, because an id's bytes never change: a
   new reading makes new rows, so new ids (404 for the old ones). GraphQL names an image by

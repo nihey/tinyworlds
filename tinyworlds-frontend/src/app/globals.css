@@ -446,6 +446,55 @@
   animation: hero-in ease both;
 }
 
+/* The first still paints immediately. Its sign and controls settle in over it, and each row
+   of cards staggers as it comes into view. Keep all of the content visible without JS. */
+@keyframes home-arrive {
+  from {
+    opacity: 0.5;
+    transform: translateY(var(--home-rise, 8px));
+  }
+}
+
+@keyframes home-hero-rule {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-arrive,
+  .home-world-grid > [data-entered] {
+    animation: home-arrive 470ms cubic-bezier(0.2, 0.75, 0.25, 1) var(--home-delay, 0ms) backwards;
+  }
+
+  .home-world-grid > li {
+    --home-rise: 16px;
+  }
+
+  .home-hero-rule {
+    transform-origin: left;
+    animation: home-hero-rule 560ms cubic-bezier(0.2, 0.75, 0.25, 1) 100ms backwards;
+  }
+
+  @media (width >= 40rem) {
+    .home-world-grid:not([data-columns="1"]) > :nth-child(even) {
+      --home-delay: 65ms;
+    }
+  }
+
+  @media (width >= 64rem) {
+    .home-world-grid[data-columns="3"] > :nth-child(3n + 1) {
+      --home-delay: 0ms;
+    }
+    .home-world-grid[data-columns="3"] > :nth-child(3n + 2) {
+      --home-delay: 65ms;
+    }
+    .home-world-grid[data-columns="3"] > :nth-child(3n) {
+      --home-delay: 130ms;
+    }
+  }
+}
+
 /* the first arrival: signs go up one after another */
 @keyframes sign-in {
   from {

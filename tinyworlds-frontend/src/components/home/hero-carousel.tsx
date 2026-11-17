@@ -1,7 +1,14 @@
 "use client";
 
 import { ArrowUpRight, ChevronLeft, ChevronRight, Heart } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import { MovingPicture } from "@/components/home/moving-picture";
 import { Wordmark } from "@/components/map/wordmark";
 import { ACTION, ACTION_QUIET } from "@/components/styles";
@@ -16,11 +23,14 @@ import { WORLDS } from "@/worlds";
 /** The worlds the hero goes round: every one of the registry that has a film, in its order. */
 const SLIDES = heroSlides(Object.keys(WORLDS), HERO_FILMS);
 
-/** How long before a slide's turn its still is asked for, so it is there when the turn comes. */
-const AHEAD_MS = 1000;
-
 const ARROW =
   "grid size-10 shrink-0 place-items-center rounded-full text-paper outline-none transition-colors hover:bg-sign-raised focus-visible:shadow-[0_0_0_2px_var(--taxi)]";
+
+interface Slides {
+  current: number;
+  leaving: number | null;
+  pending: number | null;
+}
 
 /**
  * The top of the front page: every world in turn, alive, with the page's sign over its lower
@@ -34,9 +44,8 @@ const ARROW =
  */
 export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   const { t, locale } = useI18n();
-  const [current, setCurrent] = useState(0);
-  // the slide the current one is coming in over; gone once the fade is
-  const [leaving, setLeaving] = useState<number | null>(null);
+  const [slides, setSlides] = useState<Slides>({ current: 0, leaving: null, pending: null });
+  const { current, leaving, pending } = slides;
   // the visitor has chosen a slide: the hero stops moving by itself, and says each choice
   const [chosen, setChosen] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -69,60 +78,68 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   /** The visitor's choice of a slide: from here on the hero waits for them. */
   const choose = (to: number) => {
     setChosen(true);
-    if (to === current) return;
-    setLeaving(calm ? null : current);
-    setCurrent(to);
+    setSlides((was) => ({ ...was, pending: to === was.current ? null : to }));
   };
+  const step = (by: number) => choose(stepSlide(pending ?? current, by, SLIDES.length));
+
+  const showPending = useCallback(() => {
+    setSlides((was) => {
+      if (pending === null || was.pending !== pending) return was;
+      if (!moving && !chosen) return { ...was, pending: null };
+      return { current: pending, leaving: calm ? null : was.current, pending: null };
+    });
+  }, [pending, calm, moving, chosen]);
 
   // what the moment is: a tab behind another (it may have been opened there), the hero off screen
   useEffect(() => {
     const unwatch = watchHidden(documentPage(), setHidden);
     const box = picture.current;
+    if (!box || typeof IntersectionObserver === "undefined") return unwatch;
     const watcher = new IntersectionObserver(
       (entries) => setInView((was) => lastSeen(entries, was)),
       { threshold: 0.4 },
     );
-    if (box) watcher.observe(box);
+    watcher.observe(box);
     return () => {
       unwatch();
       watcher.disconnect();
     };
   }, []);
 
-  // the turn of the next world: its still a moment before, so the picture is there to fade in
+  // At the next world's turn, start its still. The current slide stays until the still is ready.
   useEffect(() => {
-    if (!moving) return;
-    const next = stepSlide(current, 1, SLIDES.length);
-    const ahead = window.setTimeout(() => {
-      new Image().src = worldHero(SLIDES[next]).still;
-    }, SLIDE_MS - AHEAD_MS);
+    if (!moving || pending !== null) return;
     const turn = window.setTimeout(() => {
-      setLeaving(current);
-      setCurrent(next);
+      setSlides((was) =>
+        was.current === current && was.pending === null
+          ? { ...was, pending: stepSlide(current, 1, SLIDES.length) }
+          : was,
+      );
     }, SLIDE_MS);
-    return () => {
-      window.clearTimeout(ahead);
-      window.clearTimeout(turn);
-    };
-  }, [moving, current]);
+    return () => window.clearTimeout(turn);
+  }, [moving, current, pending]);
 
   // the slide left behind stays under the new one until that has faded in
   useEffect(() => {
     if (leaving === null) return;
-    const done = window.setTimeout(() => setLeaving(null), FADE_MS);
+    const done = window.setTimeout(() => {
+      setSlides((was) =>
+        was.current === current && was.leaving === leaving ? { ...was, leaving: null } : was,
+      );
+    }, FADE_MS);
     return () => window.clearTimeout(done);
   }, [leaving, current]);
 
   const onKeys = (event: KeyboardEvent) => {
-    if (event.key === "ArrowLeft") choose(stepSlide(current, -1, SLIDES.length));
-    else if (event.key === "ArrowRight") choose(stepSlide(current, 1, SLIDES.length));
+    if (event.key === "ArrowLeft") step(-1);
+    else if (event.key === "ArrowRight") step(1);
     else return;
     event.preventDefault();
   };
 
   const explore = t.home.explore.replace("{city}", copy.city);
-  const film = worldHero(world.id);
-  const before = leaving === null ? null : worldHero(SLIDES[leaving]);
+  // Keep the same image node as a slide moves from prepared to current to leaving.
+  const layers = [...new Set([leaving, current, pending])].filter((index) => index !== null);
 
   return (
     <header
@@ -145,25 +162,32 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
         ref={picture}
         className="relative aspect-[16/11] w-full overflow-hidden rounded-[10px] bg-sign-raised shadow-[0_0_0_1px_rgb(0_0_0/0.6),0_16px_34px_-14px_rgb(0_0_0/0.65)] sm:aspect-[16/9] lg:aspect-[2/1]"
       >
-        {before && leaving !== null && (
-          <MovingPicture
-            key={SLIDES[leaving]}
-            still={before.still}
-            loop={before.loop}
-            alt=""
-            active={false}
-            className="absolute inset-0 size-full"
-          />
-        )}
-        <MovingPicture
-          key={world.id}
-          still={film.still}
-          loop={film.loop}
-          alt=""
-          eager={current === 0}
-          className={cn("absolute inset-0 size-full", leaving !== null && "hero-in")}
-          style={{ animationDuration: `${FADE_MS}ms` }}
-        />
+        {layers.map((index) => {
+          const city = WORLDS[SLIDES[index]];
+          const film = worldHero(city.id);
+          const shown = index === current;
+          const prepared = index === pending;
+          return (
+            <MovingPicture
+              key={city.id}
+              still={film.still}
+              loop={film.loop}
+              alt=""
+              fallback={
+                <Wordmark suffix={city.wordmark} accent={city.accent.color} className="text-4xl" />
+              }
+              eager={shown && current === 0}
+              active={shown}
+              onStillReady={prepared ? showPending : undefined}
+              className={cn(
+                "absolute inset-0 size-full",
+                prepared && index !== leaving && "invisible",
+                shown && leaving !== null && "hero-in",
+              )}
+              style={shown && leaving !== null ? { animationDuration: `${FADE_MS}ms` } : undefined}
+            />
+          );
+        })}
         {/* the picture leads where the sign's button does: for a pointer only, the button is the link */}
         <a
           href={worldUrl(world.id)}
@@ -173,8 +197,8 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
         />
       </div>
 
-      <div className="sign relative mx-3 -mt-14 overflow-hidden sm:mx-5 sm:-mt-24 sm:max-w-md lg:absolute lg:bottom-5 lg:left-5 lg:m-0 lg:w-full">
-        <div aria-hidden className="h-[3px] bg-taxi" />
+      <div className="home-arrive sign relative mx-3 -mt-14 overflow-hidden sm:mx-5 sm:-mt-24 sm:max-w-md lg:absolute lg:bottom-5 lg:left-5 lg:m-0 lg:w-full">
+        <div aria-hidden className="home-hero-rule h-[3px] bg-taxi" />
         <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6">
           <h1>
             <Wordmark className="text-[clamp(2.75rem,12vw,3.75rem)]" />
@@ -219,11 +243,11 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
           aria-label={t.home.carousel.label}
           onKeyDown={onKeys}
           style={{ "--dot": world.accent.color } as CSSProperties}
-          className="sign absolute top-3 right-3 flex h-11 items-center rounded-full px-0.5 lg:top-auto lg:right-5 lg:bottom-5"
+          className="home-arrive sign absolute top-3 right-3 flex h-11 items-center rounded-full px-0.5 [--home-delay:140ms] lg:top-auto lg:right-5 lg:bottom-5"
         >
           <button
             type="button"
-            onClick={() => choose(stepSlide(current, -1, SLIDES.length))}
+            onClick={() => step(-1)}
             aria-label={t.home.carousel.previous}
             className={ARROW}
           >
@@ -259,7 +283,7 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
           </span>
           <button
             type="button"
-            onClick={() => choose(stepSlide(current, 1, SLIDES.length))}
+            onClick={() => step(1)}
             aria-label={t.home.carousel.next}
             className={ARROW}
           >
