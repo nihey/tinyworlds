@@ -42,6 +42,10 @@ describe("parseWalkIndex", () => {
     expect(() => parseWalkIndex({ ...valid(), tunnels: {} })).toThrow(WalkDataError);
     expect(() => parseWalkIndex(null)).toThrow(WalkDataError);
   });
+
+  it("refuses squares of another size than the walk's code knows", () => {
+    expect(() => parseWalkIndex({ ...valid(), cell: 100 })).toThrow(WalkDataError);
+  });
 });
 
 describe("cellExists", () => {

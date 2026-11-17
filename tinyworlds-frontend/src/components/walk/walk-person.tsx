@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -106,10 +105,12 @@ interface WalkPersonProps {
   /** tapped (with a finger, or clicked with a mouse), waiting for the same on the map */
   armed: "touch" | "mouse" | null;
   onArmedChange: (armed: "touch" | "mouse" | null) => void;
-  /** put down where a walk can open */
-  onDrop: (drop: PlacedDrop) => void;
+  /** let go at (x, y) CSS px of the map's canvas (`useStreetWalk`'s `putDownAtScreen`) */
+  onDropAt: (x: number, y: number) => void;
   /** activated from the keyboard: put down in the middle of the map */
   onCentre: () => void;
+  /** whether the walk can be drawn here (says so when not): asked as the person is picked up */
+  canDraw: () => Promise<boolean>;
 }
 
 interface Carry {
@@ -124,8 +125,9 @@ export function WalkPerson({
   version,
   armed,
   onArmedChange,
-  onDrop,
+  onDropAt,
   onCentre,
+  canDraw,
 }: WalkPersonProps) {
   const { t } = useI18n();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -166,6 +168,12 @@ export function WalkPerson({
     if (busy.current) return;
     busy.current = true;
     try {
+      // nothing of the walk is fetched, and no "Let go" said, where it cannot be drawn
+      if (!(await canDraw())) {
+        carry.current = null;
+        clear();
+        return;
+      }
       const [data, walker] = await Promise.all([walkData(version), import("@/map/walker")]);
       while (wanted.current && alive.current && carry.current?.moving) {
         const p = wanted.current;
@@ -188,16 +196,6 @@ export function WalkPerson({
     setVerdict(null);
     wanted.current = null;
     void import("@/map/walker").then((m) => m.dropHighlight(engine, null));
-  };
-
-  const putDown = async (x: number, y: number) => {
-    try {
-      const drop = await dropAtScreen(engine, version, x, y);
-      if (drop) onDrop(drop);
-      else toast(t.walk.noStreet);
-    } catch {
-      toast.error(t.walk.failed);
-    }
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -241,7 +239,7 @@ export function WalkPerson({
     clear();
     if (e.type === "pointercancel") return;
     const p = onMap(e.clientX, e.clientY);
-    if (p) void putDown(p.x, p.y);
+    if (p) onDropAt(p.x, p.y);
   };
 
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -255,7 +253,12 @@ export function WalkPerson({
       onCentre();
       return;
     }
-    onArmedChange(armed ? null : pointer.current);
+    if (armed) {
+      onArmedChange(null);
+      return;
+    }
+    const how = pointer.current;
+    void canDraw().then((ok) => ok && onArmedChange(how));
   };
 
   return (

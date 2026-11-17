@@ -36,6 +36,8 @@ interface AboutDialogProps {
   onDonate?: () => void;
   /** "Become a benefactor of {city}": opens the donate sign with that city chosen */
   onBecome?: (cityName: string) => void;
+  /** the street walk can open here (the world has one, and so does its data): the W line */
+  canWalk?: boolean;
 }
 
 const QUIET =
@@ -82,6 +84,7 @@ export function AboutDialog({
   hoodLines,
   onDonate,
   onBecome,
+  canWalk = false,
 }: AboutDialogProps) {
   const { t, copy } = useI18n();
   const hoods = copy.hoodLines.inSentence;
@@ -127,7 +130,7 @@ export function AboutDialog({
                   hoods={hoods}
                 />
               </li>
-              {WORLD.walk && (
+              {canWalk && (
                 <li>
                   <Keyed text={t.about.keysWalk} hoods={hoods} />
                 </li>

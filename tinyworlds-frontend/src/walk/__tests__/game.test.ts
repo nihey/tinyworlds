@@ -93,11 +93,13 @@ interface Opts {
   life?: LifeRoutes;
   reduced?: boolean;
   tunnels?: WalkIndex["tunnels"];
+  /** squares the index has that never come in (outside the loaded ones, or failing) */
+  missing?: WalkCell[];
 }
 
 /** The game over these squares, already in, with its latest state kept. */
 function play(cells: WalkCell[], opts: Opts) {
-  const ix = { ...indexOf(cells), tunnels: opts.tunnels ?? [] };
+  const ix = { ...indexOf([...cells, ...(opts.missing ?? [])]), tunnels: opts.tunnels ?? [] };
   const world = new WalkWorld(ix);
   for (const c of cells) world.add(c);
   const view = fakeView(world);
@@ -553,6 +555,70 @@ describe("parked cars", () => {
     expect(parked.length).toBeGreaterThan(10);
     for (const v of parked)
       expect(Math.hypot(v.e - supercar!.e, v.n - supercar!.n)).toBeGreaterThan(3);
+  });
+});
+
+describe("the sound", () => {
+  it("is let go with the game: its audio context closed, so walk after walk does not keep one each", () => {
+    const { game } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100 } });
+    const sound = (game as unknown as { sound: WalkSound }).sound;
+    let closed = 0;
+    const ctx = { state: "running", close: () => ((closed += 1), Promise.resolve()) };
+    (sound as unknown as { ctx: unknown }).ctx = ctx;
+    game.dispose();
+    expect(closed).toBe(1);
+  });
+});
+
+describe("parked cars after an early move", () => {
+  /** One street in square 0_0; the start 3 km away, where no square is (yet) in. */
+  const streetAndFar = () =>
+    area(-1, -1, 1, 1, {
+      "0_0": {
+        nodes: [roadNode(1, 10, 100), roadNode(2, 190, 100)],
+        streets: [
+          streetEdge(
+            1,
+            2,
+            [
+              [10, 100],
+              [190, 100],
+            ],
+            { width: 14 },
+          ),
+        ],
+      },
+    });
+
+  /** The squares round (3000, 3000): in the index, never in (out of reach, or failing). */
+  const farAway = () => area(14, 14, 16, 16);
+
+  it("park all the same when you are put elsewhere before the start's squares are in", () => {
+    const { game } = play(streetAndFar(), {
+      start: { e: 3000, n: 3000 },
+      starter: true,
+      missing: farAway(),
+    });
+    game.sim(0.5);
+    // a click on the map beside, in the first second
+    game.teleport(100, 109);
+    game.sim(3);
+    expect(game.vehicles().filter((v) => v.state === "parked").length).toBeGreaterThan(10);
+  });
+
+  it("park all the same when the start's squares never come in", () => {
+    const { game } = play(streetAndFar(), {
+      start: { e: 3000, n: 3000 },
+      starter: true,
+      missing: farAway(),
+    });
+    // walked over to the street on foot, no teleport: the starter's wait ends by itself
+    const p = (game as unknown as { player: { e: number; n: number } }).player;
+    game.sim(0.5);
+    p.e = 100;
+    p.n = 109;
+    game.sim(25);
+    expect(game.vehicles().filter((v) => v.state === "parked").length).toBeGreaterThan(10);
   });
 });
 

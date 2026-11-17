@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readCell } from "../../../tinyworlds-frontend/src/walk/cell.ts";
 import { decodeCell } from "../../../tinyworlds-frontend/src/walk/format.ts";
 import { cellExists, parseWalkIndex } from "../../../tinyworlds-frontend/src/walk/walk-index.ts";
 import { EARTH_RADIUS, makeGeo } from "../projection.js";
@@ -269,6 +270,13 @@ describe("buildWalk", () => {
     expect(piers.shore).toHaveLength(10000);
     expect(Array.from(piers["moor.kind"]!).every((m) => m === 0 || m === 1)).toBe(true);
     expect(piers["moor.xy"]!.length).toBe(12);
+    // and the viewer reads both as they are written: every array where its counts say
+    const read = readCell(square(out, 1, 0));
+    expect(read.moorings).toHaveLength(6);
+    const main = readCell(square(out, 0, 0));
+    expect(main.elevated).toHaveLength(a["elev.kind"]!.length);
+    expect(main.streets.length).toBe(a["st.a"]!.length);
+    expect(main.nodes.length).toBe(a["node.id"]!.length);
 
     // the tunnel's far portal is off the map: closed there
     const tunnel = index.tunnels.find((t) => t.name === "Tunnel")!;

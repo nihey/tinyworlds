@@ -25,6 +25,12 @@ describe("canDrawWalk", () => {
     expect(lost).toBe(true);
   });
 
+  it("is false where the browser cannot unzip the squares, WebGL 2 or not", () => {
+    const gl = { getExtension: () => null };
+    expect(canDrawWalk(canvas({ webgl2: gl }), {})).toBe(false);
+    expect(canDrawWalk(canvas({ webgl2: gl }), { DecompressionStream: class {} })).toBe(true);
+  });
+
   it("is false, without throwing, when asking throws or there is no canvas", () => {
     expect(
       canDrawWalk(() => ({

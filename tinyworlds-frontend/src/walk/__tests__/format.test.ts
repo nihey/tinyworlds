@@ -31,6 +31,17 @@ describe("decodeCell", () => {
     expect(() => decodeCell(raw)).toThrow(WalkDataError);
   });
 
+  it("takes a type's name only as a name, and any array name as a name", () => {
+    for (const type of ["toString", "constructor", "__proto__"]) {
+      const raw = square({ v: 1, i: 0, j: 0, arrays: [["x", type, 1]] }, [0, 0, 0, 0]);
+      expect(() => decodeCell(raw)).toThrow(WalkDataError);
+    }
+    const raw = square({ v: 1, i: 0, j: 0, arrays: [["__proto__", "u8", 1]] }, [9, 0, 0, 0]);
+    const c = decodeCell(raw);
+    expect(Object.getPrototypeOf(c.arrays)).toBeNull();
+    expect(Array.from((c.arrays as Record<string, Uint8Array>)["__proto__"])).toEqual([9]);
+  });
+
   it("throws on a header that is not JSON", () => {
     const raw = new Uint8Array([4, 0, 0, 0, 1, 2, 3, 4]);
     expect(() => decodeCell(raw)).toThrow(WalkDataError);

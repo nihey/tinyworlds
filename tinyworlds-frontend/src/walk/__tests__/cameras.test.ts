@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Cameras } from "../cameras";
 import { wrap } from "../math";
 import { newVehicle, nextVehicleId } from "../vehicles";
-import { boxVolume, makeCell, strip, worldOf } from "./fixtures";
+import { boxVolume, deckWay, makeCell, strip, worldOf } from "./fixtures";
 
 /** A sedan heading east at (100, 100), on open land. */
 const sedan = () => newVehicle(nextVehicleId(), "sedan", 100, 100, Math.PI / 2, "driven");
@@ -62,6 +62,31 @@ describe("the chase camera", () => {
     expect(v.e - far.e).toBeGreaterThan(8);
     expect(v.e - near.e).toBeLessThan(v.e - far.e);
     expect(near.e).toBeGreaterThan(93.6);
+  });
+
+  it("stays out of a tower the roadway passes through, coming closer instead", () => {
+    // a deck at 20 m through a tower (an opening: no wall to the car); the car just past it
+    const tower = worldOf(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay([
+            [0, 100, 20],
+            [200, 100, 20],
+          ]),
+        ],
+        volumes: [boxVolume(84, 88, 96, 112, 0, 80)],
+      }),
+      ...strip(3).slice(1),
+    );
+    const v = sedan();
+    v.z = 20;
+    expect(tower.blocked(90, 100, 0.3, 20, 1.5)).toBe(false);
+    expect(tower.blocked(90, 100, 0.3, 20, 1.5, true)).toBe(false);
+    expect(tower.blocked(90, 100, 0.3, 20, 1.5, false)).toBe(true);
+    const cams = new Cameras({ e: 100, n: 100, z: 20, yaw: 0 }, false);
+    cams.takeWheel(v);
+    const eye = chase(cams, v, 0.5, false, tower);
+    expect(eye.e).toBeGreaterThan(96);
   });
 
   it("widens with speed, but not under reduced motion", () => {

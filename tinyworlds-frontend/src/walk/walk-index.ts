@@ -1,6 +1,6 @@
 import { bitAt, decodeBitset } from "../map/bitset";
 import { WalkDataError } from "./format";
-import type { WalkGeo } from "./geo";
+import { CELL, type WalkGeo } from "./geo";
 
 export interface WalkIndex {
   v: 1;
@@ -82,9 +82,12 @@ export function parseWalkIndex(json: unknown): WalkIndex {
     };
   });
 
+  // the squares' size is the code's as much as the data's (`CELL`): one that disagrees is refused
+  if (num(json, "cell") !== CELL)
+    throw new WalkDataError(`walk.json: squares of ${json.cell} m, not ${CELL}`);
   return {
     v: 1,
-    cell: num(json, "cell"),
+    cell: CELL,
     i0: num(json, "i0"),
     j0: num(json, "j0"),
     cols: num(json, "cols"),

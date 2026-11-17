@@ -60,10 +60,16 @@ export function decodeCell(raw: Uint8Array): { i: number; j: number; arrays: Par
   }
 
   const copy = new Uint8Array(raw).buffer; // starts at 0, so offsets that are multiples of 4 stay aligned
-  const arrays: Partial<CellArrays> = {};
+  // no prototype: an array named "__proto__" or "toString" is an array like any other
+  const arrays: Partial<CellArrays> = Object.create(null);
   let at = (4 + headerLen + 3) & ~3;
   for (const entry of list) {
-    if (!Array.isArray(entry) || typeof entry[0] !== "string" || !(entry[1] in TYPES)) {
+    if (
+      !Array.isArray(entry) ||
+      typeof entry[0] !== "string" ||
+      typeof entry[1] !== "string" ||
+      !Object.hasOwn(TYPES, entry[1])
+    ) {
       throw new WalkDataError(`square: unknown array type ${String(entry?.[1])}`);
     }
     const [name, type, length] = entry as [string, TypeName, number];

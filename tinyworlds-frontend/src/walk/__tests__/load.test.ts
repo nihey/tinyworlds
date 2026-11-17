@@ -78,6 +78,13 @@ describe("WalkData", () => {
     expect(data.waysNear(200, 700, 100).length).toBe(0);
   });
 
+  it("fails, rather than finding no street, when every square round the point fails", async () => {
+    const data = new WalkData(indexOf(), async () => {
+      throw new Error("offline");
+    });
+    await expect(data.drop(100, 300)).rejects.toThrow("offline");
+  });
+
   it("asks again for a square that failed", async () => {
     let tries = 0;
     const data = new WalkData(indexOf(), async (i, j) => {

@@ -84,6 +84,12 @@ export interface StreetWalk {
   /** back to the map, centred where you are (or where the walk was opening) */
   leave: () => void;
   putDownAtCentre: () => void;
+  /** the person let go at (x, y) CSS px of the map's canvas: the walk opens there, or the map
+   * says there is no street */
+  putDownAtScreen: (x: number, y: number) => void;
+  /** whether this browser can draw the walk (asked once; false says so in a toast): what the
+   * person asks when it is picked up, before any of the walk's data is fetched */
+  canDraw: () => Promise<boolean>;
 }
 
 export function useStreetWalk({
@@ -157,6 +163,23 @@ export function useStreetWalk({
     [],
   );
 
+  // whether the browser can draw the walk: once it can, it is not asked again (the check is a
+  // few lines and a throwaway context; the walk is not)
+  const drawable = useRef(false);
+  const canDraw = useCallback(async (): Promise<boolean> => {
+    if (drawable.current) return true;
+    let ok: boolean;
+    try {
+      ok = (await import("@/walk/webgl")).canDrawWalk();
+    } catch {
+      toast.error(t.walk.failed);
+      return false;
+    }
+    if (!ok) toast.error(t.walk.noWebgl);
+    drawable.current = ok;
+    return ok;
+  }, [t]);
+
   /** Opens the walk where the person was put down; the map beside it follows you there. */
   const openWalk = useCallback(
     async (drop: PlacedDrop, heading?: number) => {
@@ -164,17 +187,7 @@ export function useStreetWalk({
       opening.current = true;
       try {
         // a browser that cannot draw it never downloads it
-        let drawable = false;
-        try {
-          drawable = (await import("@/walk/webgl")).canDrawWalk();
-        } catch {
-          toast.error(t.walk.failed);
-          return;
-        }
-        if (!drawable) {
-          toast.error(t.walk.noWebgl);
-          return;
-        }
+        if (!(await canDraw())) return;
         walkingRef.current = true;
         setArmed(null);
         latest.current.onOpening();
@@ -219,12 +232,14 @@ export function useStreetWalk({
         opening.current = false;
       }
     },
-    [engine, t],
+    [engine, t, canDraw],
   );
 
-  /** Puts the person down where `find` says (then `then`), or says there is no street there. */
+  /** Puts the person down where `find` says (then `then`), or says there is no street there;
+   * nothing of the walk is fetched where it cannot be drawn. */
   const putDown = useCallback(
     async (find: () => Promise<PlacedDrop | null>, then: (drop: PlacedDrop) => void) => {
+      if (!walkingRef.current && !(await canDraw())) return;
       try {
         const drop = await find();
         if (drop) then(drop);
@@ -233,7 +248,18 @@ export function useStreetWalk({
         toast.error(t.walk.failed);
       }
     },
-    [t],
+    [t, canDraw],
+  );
+
+  const putDownAtScreen = useCallback(
+    (x: number, y: number) => {
+      if (!engine || !canWalk) return;
+      void putDown(
+        () => dropAtScreen(engine, version, x, y),
+        (d) => void openWalk(d),
+      );
+    },
+    [engine, canWalk, version, putDown, openWalk],
   );
 
   const putDownAtCentre = useCallback(() => {
@@ -352,7 +378,11 @@ export function useStreetWalk({
   useEffect(() => {
     if (!walking || Screen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat || e.metaKey || typing(e)) return;
+      if (e.defaultPrevented || e.repeat || typing(e)) return;
+      // a chord is the browser's or the page's, not the map key (as the walk's own keys have it)
+      if (e.metaKey) return;
+      if (e.ctrlKey && !e.code.startsWith("Control")) return;
+      if (e.altKey && !e.code.startsWith("Alt")) return;
       if (document.querySelector('[role="dialog"]')) return;
       if (!mapKeys.current.includes(e.code)) return;
       e.preventDefault();
@@ -379,5 +409,7 @@ export function useStreetWalk({
     openWalk: (drop, heading) => void openWalk(drop, heading),
     leave,
     putDownAtCentre,
+    putDownAtScreen,
+    canDraw,
   };
 }

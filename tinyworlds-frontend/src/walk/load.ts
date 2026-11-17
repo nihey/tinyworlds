@@ -140,9 +140,12 @@ export class WalkData {
   /** The squares that are in already, of those round a point: no waiting, nothing asked. */
   private ready = new Map<string, WalkCell>();
 
-  /** These squares, once they are in (those that fail are left out). */
+  /** These squares, once they are in (those that fail are left out; when every one fails, the
+   * first failure: offline, or a browser that cannot unzip them, is not "no street here"). */
   private async load(squares: [number, number][]): Promise<WalkCell[]> {
     const got = await Promise.allSettled(squares.map(([i, j]) => this.square(i, j)));
+    const failed = got.find((g): g is PromiseRejectedResult => g.status === "rejected");
+    if (failed && got.every((g) => g.status === "rejected")) throw failed.reason;
     const cells: WalkCell[] = [];
     for (const g of got)
       if (g.status === "fulfilled") {

@@ -167,12 +167,13 @@ export class Cameras {
     let ce = v.e - Math.sin(yaw) * flat;
     let cn = v.n - Math.cos(yaw) * flat;
     const cz = v.z + Math.max(0.8, 1.2 + s.height * 0.7 - Math.sin(this.lookPitch) * dist * 0.6);
-    // a wall in the way brings it closer
+    // a wall in the way brings it closer; a tower's opening the roadway passes through is a wall
+    // to the camera (inside it, it would see the tower from within: flat grey)
     for (let step = 1; step <= BOOM_STEPS; step++) {
       const k = step / BOOM_STEPS;
       const pe = v.e + (ce - v.e) * k;
       const pn = v.n + (cn - v.n) * k;
-      if (!world.blocked(pe, pn, 0.3, cz - 0.4, 0.8)) continue;
+      if (!world.blocked(pe, pn, 0.3, cz - 0.4, 0.8, false)) continue;
       const f = Math.max(0.1, k - 0.2);
       ce = v.e + (ce - v.e) * f;
       cn = v.n + (cn - v.n) * f;

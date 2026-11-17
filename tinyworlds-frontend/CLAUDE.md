@@ -902,7 +902,9 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   default export is reached by `import()` from `useStreetWalk` (`hooks/use-street-walk.ts`,
   the walk as the map sees it) when a walk opens, and three.js and every module under
   `src/walk/` come with it. First the tiny `walk/webgl.ts` says whether the browser can draw
-  it at all: without WebGL 2 a toast says so and nothing more is downloaded. The map itself
+  it at all (WebGL 2, and a browser that can unzip the squares): otherwise a toast says so and
+  nothing more is downloaded. It is asked as soon as the person is picked up (dragged or
+  tapped), before the drop's squares are fetched or "Let go to walk here" is said. The map itself
   carries only the person's button (`walk-person.tsx`, `map/person.ts`), the hook, the walk
   link's parser (`map/hash.ts`) and the split's CSS; `map/walker.ts` and the drop's data
   (`walk/load.ts`) are imported when the person is picked up or a walk opens.
@@ -926,7 +928,8 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   (the map below) under 800 px or in portrait. The map is the same `MapEngine` on its two
   canvases, moved into the grid's map cell: it follows you (`jumpTo` on every move, the wheel
   zooming about you), draws you and a view cone (`walkerLayer`) at your height (on a bridge,
-  on its deck as the map draws it: the walk tells the map the surface under you), and a click
+  on its deck as the map draws it: the walk tells the map the surface under your feet, from
+  the game's own height, never the camera's), and a click
   or tap on it takes you there (`dropAtScreen`, then the game's `teleport`). Its other signs
   give way (search, banners, quiz, tools, minimap, the building spotlight); "Click (or Tap)
   the map to go there" and the credit stay. M or "Back to the map" leaves with the map centred
@@ -939,8 +942,17 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   the map's own keys stand aside), the mouse through pointer lock (a click on the view asks,
   "Click to look around" until then, Esc lets go), and on a touch screen the touch pad. New
   York's first walk of the visit, opened within 400 m of the manifest's `start`, finds a red
-  supercar parked there (`starter`). Below 40 fps the pixels grow a size at a time (up to 5)
-  until the visitor sets them.
+  supercar parked there (`starter`; put elsewhere before its squares are in, or after 15 s
+  whatever they do, it is given up, so the streets still park). A phone may take the GPU back
+  (`webglcontextlost`): the walk says it stopped, and Try again opens where you were.
+- **Automatic quality** (`walk/quality.ts`, `QualityLadder`): under 30 fps for 3 s (counted a
+  few seconds after the first squares are in, while the page is in view), one step down, then
+  3 s more to see: the water's reflections, then fewer people and cars (150 → 90 → 60 people,
+  70 → 45 → 30 cars: `setCrowd`; the crowd lets the farthest out of sight go), then the pixels a
+  size bigger, up to 5, unless the visitor chose one. It never steps back up in a walk (quality
+  that comes and goes reads as a bug, and a phone slow in one street is slow in the next); the
+  crowd and the pixel size it reached stay for the visit's next walk. The map beside is told of
+  your moves at most 20 times a second (it is redrawn for each).
 - **The signs** (`walk-hud.tsx`, text from `walk/hud-text.ts`): the corner sign with the life
   bar, always (20 pixel cells of 5, green, amber under 50, red under 25, flashing on a hit,
   "Life 64 of 100" for a screen reader), the damage bar beside it at the wheel or "Wrecked",

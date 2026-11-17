@@ -11,10 +11,11 @@ import { loadLife } from "@/map/data";
 import { formatWalkHash, writeHash } from "@/map/hash";
 import type { Manifest } from "@/map/manifest";
 import { loadBindings, saveBindings, type Bindings } from "@/walk/controls";
-import { WalkGame, type GameView } from "@/walk/game";
+import { WalkGame } from "@/walk/game";
 import { enToLonLat, lonLatToEN } from "@/walk/geo";
 import { walkData } from "@/walk/load";
 import { PIXEL_DEFAULT, PIXEL_MAX, PIXEL_MIN, WalkView } from "@/walk/render/view";
+import { QualityLadder } from "@/walk/quality";
 import { WalkSound } from "@/walk/sound";
 import { canDrawWalk } from "@/walk/webgl";
 import { WORLD } from "@/worlds";
@@ -64,14 +65,14 @@ export interface WalkScreenProps {
 
 /** Only the visit's first walk, opened by New York's first view, finds the red supercar there. */
 const STARTER_REACH = 400;
+/** Metres over your feet the map's person looks for the surface you stand on (a jump's height). */
+const FEET = 0.25;
 /** Standing still this long, s, writes the walk link. */
 const SETTLE = 0.6;
-/** The frame rate under which the pixels grow by themselves (until the visitor sets them). */
-const SLOW_FPS = 40;
-const SLOW_FOR = 4;
 /** Ms after the first squares are shown before the frame rate counts. */
 const WARM_UP = 3000;
-const AUTO_PIXEL_MAX = 5;
+/** Ms between two moves told to the map beside (it is redrawn for each: 20 a second is plenty). */
+const MAP_EVERY = 50;
 const UNITS = WORLD.units === "imperial" ? "imperial" : "metric";
 
 // kept for the visit, never stored: what the walk was left with
@@ -79,6 +80,7 @@ let walked = false;
 let keptPixel: number | null = null;
 let pixelChosen = false;
 let keptSound = true;
+let keptCrowd = 0;
 
 const storage = (): Storage | null => {
   try {
@@ -140,15 +142,18 @@ export default function WalkScreen({
     bindingsRef.current = bindings;
   });
   const startRef = useRef(start);
-  // the camera's height, as the game last set it: what tells a deck from the street under it
-  const eyeRef = useRef(0);
+  const pixelRef = useRef(pixel);
+  useEffect(() => {
+    pixelRef.current = pixel;
+  });
 
-  /** Where you are for the map: the game's place and heading, and the surface you are on. */
+  /** Where you are for the map: the game's place and heading, and the surface under your feet
+   * (the deck you are on, never one above you, whatever the camera does). */
   const whereAt = useCallback(
-    (p: { e: number; n: number; yaw: number }, z?: number): WalkAt => {
+    (p: { e: number; n: number; z: number; yaw: number }): WalkAt => {
       const [lon, lat] = enToLonLat(manifest.geo, p.e, p.n);
       const world = viewRef.current?.world;
-      const height = z ?? (world ? world.surfaceUnder(p.e, p.n, eyeRef.current, 0).z : 0);
+      const height = world ? world.surfaceUnder(p.e, p.n, p.z, FEET).z : p.z;
       return { lat, lon, z: Math.max(0, height), heading: degrees(p.yaw) };
     },
     [manifest.geo],
@@ -158,7 +163,7 @@ export default function WalkScreen({
   const exit = useCallback(() => {
     if (document.pointerLockElement) document.exitPointerLock();
     const s = startRef.current;
-    exitRef.current(game ? whereAt(game.position()) : whereAt(s, s.z ?? 0));
+    exitRef.current(game ? whereAt(game.position()) : whereAt({ ...s, z: s.z ?? 0 }));
   }, [game, whereAt]);
 
   // open: the browser, the index and the ferries' routes, then the view and the game
@@ -176,6 +181,15 @@ export default function WalkScreen({
     let cancelled = false;
     let view: WalkView | null = null;
     let made: WalkGame | null = null;
+    let sound: WalkSound | null = null;
+    // a phone may take the GPU back (a tab put in the background): the walk says it stopped,
+    // and Try again draws on a new canvas
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      made?.stop();
+      setPhase("failed");
+    };
+    canvas.addEventListener("webglcontextlost", onLost);
     (async () => {
       try {
         const [data, life] = await Promise.all([
@@ -192,27 +206,13 @@ export default function WalkScreen({
           return;
         }
         view.setPixel(keptPixel ?? PIXEL_DEFAULT);
-        const sound = new WalkSound();
+        sound = new WalkSound();
         sound.enabled = keptSound;
         const [se, sn] = lonLatToEN(data.ix.geo, manifest.start.lon, manifest.start.lat);
         const starter = !walked && Math.hypot(s.e - se, s.n - sn) <= STARTER_REACH;
         walked = true;
-        // the view as the game sees it, the camera's height noted on the way
-        const drawn = view;
-        const seen: GameView = {
-          world: drawn.world,
-          scene: drawn.scene,
-          setCamera(e, n, z, yaw, pitch, fov) {
-            eyeRef.current = z;
-            drawn.setCamera(e, n, z, yaw, pitch, fov);
-          },
-          setGrey: (amount) => drawn.setGrey(amount),
-          update: (dt) => drawn.update(dt),
-          render: () => drawn.render(),
-        };
-        eyeRef.current = (s.z ?? 0) + 2;
         made = new WalkGame({
-          view: seen,
+          view,
           ix: data.ix,
           life: life.ferries,
           start: s,
@@ -222,6 +222,9 @@ export default function WalkScreen({
           units: UNITS,
           starter,
         });
+        // the crowd an earlier walk of the visit had to lower
+        const crowd = new QualityLadder(keptCrowd).crowd;
+        made.setCrowd(crowd.people, crowd.cars);
         viewRef.current = view;
         soundRef.current = sound;
         made.start();
@@ -235,7 +238,10 @@ export default function WalkScreen({
     })();
     return () => {
       cancelled = true;
-      made?.dispose();
+      canvas.removeEventListener("webglcontextlost", onLost);
+      // the game lets its sound go; one that never got a game is let go here
+      if (made) made.dispose();
+      else sound?.dispose();
       view?.dispose();
       if (view) loseContext(canvas);
       viewRef.current = null;
@@ -266,9 +272,13 @@ export default function WalkScreen({
     setPixel(Math.max(PIXEL_MIN, Math.min(PIXEL_MAX, Math.round(n))));
   }, []);
 
-  // a click on the map beside: you are put there
+  // a click on the map beside: you are put there (once: a new game after Try again starts
+  // where the walk was to start, not at the last click)
+  const wentTo = useRef<number | null>(null);
   useEffect(() => {
-    if (game && goTo) game.teleport(goTo.e, goTo.n, goTo.z, goTo.yaw);
+    if (!game || !goTo || wentTo.current === goTo.id) return;
+    wentTo.current = goTo.id;
+    game.teleport(goTo.e, goTo.n, goTo.z, goTo.yaw);
   }, [game, goTo]);
 
   // the tunnel's dark, straight into the DOM
@@ -285,13 +295,14 @@ export default function WalkScreen({
     let raf = 0;
     let last = { e: Number.NaN, n: Number.NaN, yaw: Number.NaN };
     let lastZ = 0;
+    let told = -Infinity;
+    let untold = false;
     let still = 0;
     let written = false;
     let before = performance.now();
-    let frames = 0;
-    let span = 0;
     let shown = false;
     let shownAt = 0;
+    const ladder = new QualityLadder(keptCrowd);
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const dt = (now - before) / 1000;
@@ -311,7 +322,7 @@ export default function WalkScreen({
         lastZ = at.z;
         still = 0;
         written = false;
-        moveRef.current(at);
+        untold = true;
       } else if (dt < 0.25) {
         still += dt;
         if (!written && still >= SETTLE) {
@@ -319,23 +330,31 @@ export default function WalkScreen({
           writeHash(formatWalkHash(at));
         }
       }
-      // too slow: bigger pixels, a step at a time, until the visitor chooses (counted from a few
-      // seconds after the first squares are in: building them is slow for a moment anywhere)
-      if (shown && shownAt === 0) shownAt = now;
-      if (!shown || now - shownAt < WARM_UP) {
-        frames = 0;
-        span = 0;
-      } else if (dt > 0 && dt < 0.25) {
-        frames++;
-        span += dt;
-        if (span >= SLOW_FOR) {
-          const fps = frames / span;
-          frames = 0;
-          span = 0;
-          if (!pixelChosen && fps < SLOW_FPS && document.visibilityState === "visible")
-            setPixel((n) => (n < AUTO_PIXEL_MAX ? n + 1 : n));
-        }
+      // the map beside is redrawn for every move it hears of: not more than 20 a second, and
+      // the last one always
+      if (untold && (now - told >= MAP_EVERY || still > 0)) {
+        untold = false;
+        told = now;
+        moveRef.current(at);
       }
+      // too slow: a step down (`QualityLadder`), counted from a few seconds after the first
+      // squares are in (building them is slow for a moment anywhere), while the page is in view
+      if (shown && shownAt === 0) shownAt = now;
+      const view = viewRef.current;
+      if (!view || !shown || now - shownAt < WARM_UP || document.visibilityState !== "visible") {
+        ladder.reset();
+        return;
+      }
+      const step = ladder.frame(dt, {
+        reflections: view.reflections,
+        pixel: pixelRef.current,
+        pixelChosen,
+      });
+      if (step === "reflections") view.setReflections(false);
+      else if (step === "crowd") {
+        game.setCrowd(ladder.crowd.people, ladder.crowd.cars);
+        keptCrowd = ladder.crowdAt;
+      } else if (step === "pixel") setPixel((n) => Math.min(PIXEL_MAX, n + 1));
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -505,6 +524,8 @@ export default function WalkScreen({
                   </Button>
                   <Button
                     onClick={() => {
+                      // stopped mid-walk (the GPU taken back): on again where you were
+                      if (game) startRef.current = game.position();
                       setPhase("loading");
                       setAttempt((n) => n + 1);
                     }}

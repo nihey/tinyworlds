@@ -99,6 +99,7 @@ export interface WalkGameOptions {
   start: { e: number; n: number; yaw: number; z?: number };
   bindings: Bindings;
   reduced: boolean;
+  /** the game's from then on: `dispose` lets it go */
   sound: WalkSound;
   units: "imperial" | "metric";
   /** New York's first walk: a red supercar waits by the start */
@@ -165,6 +166,9 @@ const SIGNAL_REACH = FOG_FAR + 30;
 const SETTLE_REACH = 2;
 const PRIME_GIVE_UP = 6;
 const STARTER_GIVE_UP = 10;
+/** Seconds after which the starter is given up whatever the squares do (one round the start that
+ * keeps failing, or out of reach): parking waits on it, and must not wait for good. */
+const STARTER_AT_MOST = 15;
 const STARTER_EVERY = 0.5;
 /** Out of a tunnel, the far end's square is waited for this long at most, s. */
 const TUNNEL_WAIT = 10;
@@ -234,6 +238,7 @@ export class WalkGame {
   private primed = false;
   private starterPending: boolean;
   private starterWait = 0;
+  private starterAge = 0;
   private starterIn = 0;
   private starterSpot: KerbSpot | null = null;
   private wasted = false;
@@ -380,18 +385,27 @@ export class WalkGame {
     p.launch = p.z;
     this.placeZ = z === undefined;
     this.waiting = true;
+    // the starter waits by the start: put elsewhere, its squares may never come in (out of
+    // reach), and parking waits on it
+    this.starterPending = false;
     this.primePending = true;
     this.primeWait = 0;
     this.vel = { e: 0, n: 0 };
     this.downFor = 0;
   }
 
-  /** Where you are (in what you drive, where it is) and which way you face. */
-  position(): { e: number; n: number; yaw: number } {
+  /** Where you are (in what you drive, where it is), how high your feet (or its wheels) are, and which way you face. */
+  position(): { e: number; n: number; z: number; yaw: number } {
     const v = this.yours;
     return v
-      ? { e: v.e, n: v.n, yaw: wrap(v.yaw) }
-      : { e: this.player.e, n: this.player.n, yaw: wrap(this.player.yaw) };
+      ? { e: v.e, n: v.n, z: v.z, yaw: wrap(v.yaw) }
+      : { e: this.player.e, n: this.player.n, z: this.player.z, yaw: wrap(this.player.yaw) };
+  }
+
+  /** How many people and cars the streets keep round you (the screen lowers them on a slow machine). */
+  setCrowd(people: number, cars: number): void {
+    this.crowd.budget = people;
+    this.traffic.budget = cars;
   }
 
   /** Skips to the end of the wasted sequence, once the word is up. */
@@ -437,7 +451,9 @@ export class WalkGame {
 
   dispose(): void {
     this.stop();
-    this.sound.horn(false);
+    // the sound is the game's from the start: its audio context goes with it (browsers allow a
+    // page only a few, and a live one keeps a phone's audio awake)
+    this.sound.dispose();
     this.view.setGrey(0);
     this.models.dispose();
     this.particles.dispose();
@@ -673,6 +689,8 @@ export class WalkGame {
         this.crowd.prime(this.focus());
       }
     }
+    if (this.starterPending && (this.starterAge += real) > STARTER_AT_MOST)
+      this.starterPending = false;
     if (this.starterPending && this.settled(this.startAt, SETTLE_REACH)) {
       // every kerb spot round the start is looked at: not every frame
       this.starterWait += real;

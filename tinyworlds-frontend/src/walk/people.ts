@@ -429,7 +429,21 @@ export class Crowd {
       const p = this.spawn(focus, SPAWN_MIN, SPAWN_MAX, visible);
       if (p) this.people.push(p);
     }
+    this.trim(focus, visible);
     return events;
+  }
+
+  /** Over the budget (the game lowered it on a slow machine): the farthest out of sight, beyond
+   * where people come from, goes; one a step, so nobody vanishes in view. */
+  private trim(focus: { e: number; n: number }, visible?: (e: number, n: number) => boolean): void {
+    if (this.people.length <= this.budget) return;
+    let worst = -1;
+    let far = SPAWN_MIN;
+    this.people.forEach((p, i) => {
+      const d = Math.hypot(p.e - focus.e, p.n - focus.n);
+      if (d > far && !visible?.(p.e, p.n)) [worst, far] = [i, d];
+    });
+    if (worst >= 0) this.people.splice(worst, 1);
   }
 
   /** One person's own step; false when they have nowhere to be (left on no street) and go. */

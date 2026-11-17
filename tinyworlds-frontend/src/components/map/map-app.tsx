@@ -553,8 +553,9 @@ export function MapApp() {
                   version={street.version}
                   armed={street.armed}
                   onArmedChange={setArmed}
-                  onDrop={(d) => street.openWalk(d)}
+                  onDropAt={street.putDownAtScreen}
                   onCentre={street.putDownAtCentre}
+                  canDraw={street.canDraw}
                 />
               ) : undefined
             }
@@ -583,6 +584,7 @@ export function MapApp() {
         onOpenChange={setAboutOpen}
         attribution={session?.manifest.attribution ?? []}
         hoodLines={hasHoods}
+        canWalk={street.canWalk}
         onDonate={
           takesDonations
             ? () => {

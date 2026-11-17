@@ -101,6 +101,29 @@ describe("the sidewalks", () => {
     }
   });
 
+  it("lets people go, out of sight and far, when the budget is lowered", () => {
+    // a 400 m sidewalk, the focus at one end
+    const walks = [
+      walkEdge(1, 2, [
+        [0, 20],
+        [400, 20],
+      ]),
+    ];
+    const world = worldOf(...[0, 1].map((i) => makeCell(i, 0, { walks })));
+    const crowd = new Crowd(world, seeded(6));
+    crowd.budget = 60;
+    const focus = { e: 10, n: 20 };
+    crowd.prime(focus);
+    expect(crowd.people.length).toBeGreaterThan(30);
+    const near = () =>
+      crowd.people.filter((p) => Math.hypot(p.e - focus.e, p.n - focus.n) <= 60).length;
+    crowd.budget = 10;
+    for (let k = 0; k < 120; k++) crowd.step(1 / 60, k / 60, focus, [], (e) => e < 40);
+    expect(crowd.people.length).toBeLessThanOrEqual(Math.max(10, near()));
+    // and nobody in view went
+    expect(crowd.people.length).toBeGreaterThanOrEqual(Math.min(10, near()));
+  });
+
   it("walks at their own pace to one side of the line and turns on at the nodes", () => {
     const { world } = blockWorld();
     const crowd = new Crowd(world, seeded(2));

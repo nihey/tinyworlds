@@ -136,12 +136,13 @@ export function sameWay(a: ElevatedWay, b: ElevatedWay): boolean {
   return true;
 }
 
-/** The box [e0, n0, e1, n1] round each elevated way's strip, grown by the opening's margin. */
+/** The box [e0, n0, e1, n1] round each elevated way's strip, grown by the most any question
+ * asks past its edge (an opening's margin, a deck's spare): a first test before the segments. */
 const stripBoxes = new WeakMap<ElevatedWay, [number, number, number, number]>();
 function stripBox(w: ElevatedWay): [number, number, number, number] {
   let box = stripBoxes.get(w);
   if (!box) {
-    const r = w.width / 2 + OPENING_MARGIN;
+    const r = w.width / 2 + Math.max(OPENING_MARGIN, DECK_SPARE);
     box = [Infinity, Infinity, -Infinity, -Infinity];
     for (let q = 0; q < w.pts.length; q += 3) {
       box[0] = Math.min(box[0], w.pts[q] - r);
@@ -235,6 +236,8 @@ export class WalkWorld {
       besideZ.length = 0;
       besideNear.length = 0;
       for (const w of c.elevated) {
+        const b = stripBox(w);
+        if (e < b[0] || e > b[2] || n < b[1] || n > b[3]) continue;
         if (!stripHit(w, e, n, w.width / 2 + DECK_SPARE) || hitZ > limit) continue;
         if (hitCap) {
           if (hitZ > endZ) [end, endZ] = [w, hitZ];
@@ -266,10 +269,19 @@ export class WalkWorld {
     return best;
   }
 
-  /** Whether a body of this radius, feet at zFeet and `height` tall, is in a wall or outside the data. */
-  blocked(e: number, n: number, radius: number, zFeet: number, height: number): boolean {
+  /** Whether a body of this radius, feet at zFeet and `height` tall, is in a wall or outside the
+   * data. `openings` false: a tower's opening over a roadway is solid too (for a camera, which
+   * must never stand inside what is drawn). */
+  blocked(
+    e: number,
+    n: number,
+    radius: number,
+    zFeet: number,
+    height: number,
+    openings = true,
+  ): boolean {
     if (!this.inData(e, n)) return true;
-    return this.nearestWall(e, n, radius, zFeet, height) !== null;
+    return this.nearestWall(e, n, radius, zFeet, height, openings) !== null;
   }
 
   /** The move from (e0, n0) to (e1, n1), with whatever points into a wall taken out of it. */
@@ -498,9 +510,16 @@ export class WalkWorld {
   }
 
   /** The wall nearest to a body, or null when it touches none (or stands in an elevated way's opening). */
-  private nearestWall(e: number, n: number, radius: number, zFeet: number, height: number) {
+  private nearestWall(
+    e: number,
+    n: number,
+    radius: number,
+    zFeet: number,
+    height: number,
+    openings = true,
+  ) {
     let best: { inside: boolean; d: number; px: number; py: number } | null = null;
-    let opening: boolean | undefined;
+    let opening: boolean | undefined = openings ? undefined : false;
     const i0 = Math.floor((e - radius) / CELL);
     const i1 = Math.floor((e + radius) / CELL);
     const j0 = Math.floor((n - radius) / CELL);
