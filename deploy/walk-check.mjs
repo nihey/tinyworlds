@@ -4,7 +4,7 @@
 // the script decides what to do.
 //
 //   node deploy/walk-check.mjs walk <data dir>
-//     the walk there: walk.json present, every square it lists on disk and no other, and the
+//     the walk there: walk.json present, every square it lists on disk by name and no other, and the
 //     manifest naming the walk's version as it is on disk (the pipeline's `walkVersion`, which
 //     the pipeline's tests hold this to)
 //   node deploy/walk-check.mjs manifest <local manifest> <server manifest> <field>
@@ -40,12 +40,20 @@ export function walkVersion(walk) {
   return hash.digest("hex").slice(0, 12);
 }
 
-/** How many squares a walk.json lists (the bits set in its bitset). */
+/** The squares' files a walk.json lists: bit (i − i0) + (j − j0)·cols of its bitset, LSB-first. */
 function listed(index) {
   const bits = Buffer.from(index.cells, "base64");
-  let count = 0;
-  for (const byte of bits) for (let b = byte; b; b &= b - 1) count++;
-  return count;
+  const names = new Set();
+  for (let k = 0; k < bits.length * 8; k++)
+    if ((bits[k >> 3] >> (k & 7)) & 1)
+      names.add(`${index.i0 + (k % index.cols)}_${index.j0 + Math.floor(k / index.cols)}.bin`);
+  return names;
+}
+
+/** Up to three names of a list, and how many more. */
+function some(names) {
+  const shown = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${shown} and ${names.length - 3} more` : shown;
 }
 
 export function walkProblems(data) {
@@ -55,11 +63,20 @@ export function walkProblems(data) {
   if (!fs.existsSync(indexFile)) return ["no walk/walk.json"];
   const index = JSON.parse(fs.readFileSync(indexFile, "utf8"));
   const cells = path.join(walk, "cells");
-  const onDisk = fs.existsSync(cells) ? fs.readdirSync(cells).filter((name) => SQUARE.test(name)).length : 0;
+  const onDisk = new Set(fs.existsSync(cells) ? fs.readdirSync(cells).filter((name) => SQUARE.test(name)) : []);
   const want = listed(index);
-  if (onDisk === 0)
+  // the same squares, not only as many: a walk made with --around elsewhere, or a folder of
+  // another build, can hold as many squares as walk.json lists and still miss some of them
+  const missing = [...want].filter((name) => !onDisk.has(name)).sort();
+  const extra = [...onDisk].filter((name) => !want.has(name)).sort();
+  if (onDisk.size === 0)
     problems.push("walk/cells/ has no squares (the last --delete pass would empty the server's)");
-  else if (onDisk !== want) problems.push(`walk/cells/ has ${onDisk} squares, walk.json lists ${want}`);
+  else if (missing.length || extra.length)
+    problems.push(
+      `walk/cells/ has ${onDisk.size} squares, walk.json lists ${want.size}: ` +
+        `${missing.length ? `${missing.length} missing (${some(missing)})` : "none missing"}, ` +
+        `${extra.length ? `${extra.length} not listed (${some(extra)})` : "none not listed"}`,
+    );
   const manifestFile = path.join(data, "manifest.json");
   if (!fs.existsSync(manifestFile)) problems.push("no manifest.json");
   else {

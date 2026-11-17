@@ -107,7 +107,9 @@ world_problems() {
       echo "no quiz (run 'npm run cli -- --city $world quiz' in tinyworlds-pipeline)"
     fi
   fi
-  if grep -q "walk: true" "$FRONTEND/src/worlds/$world.ts" 2>/dev/null &&
+  # an index upload sends no walk (and deletes none): a checkout without one may still send it
+  if [[ "${INDEX_ONLY:-}" != 1 ]] &&
+    grep -q "walk: true" "$FRONTEND/src/worlds/$world.ts" 2>/dev/null &&
     [[ ! -f "$data/walk/walk.json" ]]; then
     if [[ -n "${SERVER_DATA:-}" ]]; then
       echo "no street walk on the server (send it: 'deploy/deploy.sh $world --walk')"
@@ -683,6 +685,8 @@ if [[ "$MODE" == "--no-data" ]]; then
   SERVER_DATA="$WORK/server-data"
   mirror_server_data "$SERVER_DATA"
 fi
+
+[[ "$MODE" == "--index" ]] && export INDEX_ONLY=1
 
 if [[ "$TARGET" == "all" ]]; then
   check_all

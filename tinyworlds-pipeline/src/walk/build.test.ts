@@ -312,11 +312,15 @@ describe("buildWalk", () => {
     fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify({ ...manifest(out), walk: "old" }));
     expect(check.walkProblems(out).join()).toMatch(/names walk old/);
     stampWalk(out, quiet);
-    // a square missing, then none at all
+    // a square under another name (as many squares, not the same ones), one missing, then none
     const cells = path.join(out, "walk", "cells");
     const files = fs.readdirSync(cells);
-    fs.rmSync(path.join(cells, files[0]));
-    expect(check.walkProblems(out).join()).toMatch(/squares, walk.json lists/);
+    fs.renameSync(path.join(cells, files[0]), path.join(cells, "9999_9999.bin"));
+    expect(check.walkProblems(out).join()).toMatch(
+      new RegExp(`1 missing \\(${files[0].replace(".", "\\.")}\\), 1 not listed \\(9999_9999\\.bin\\)`),
+    );
+    fs.rmSync(path.join(cells, "9999_9999.bin"));
+    expect(check.walkProblems(out).join()).toMatch(/squares, walk.json lists .*1 missing/);
     for (const f of files.slice(1)) fs.rmSync(path.join(cells, f));
     expect(check.walkProblems(out).join()).toMatch(/has no squares/);
     // a manifest that differs from the server's in its walk alone may go; in its render, not

@@ -140,7 +140,7 @@ built**: a failing build leaves the whole site as it was, and its log's end is p
 worlds go up first and the front page last, since its links lead to them. `all` also takes
 `--index` and `--data` (no build: every world's data). A world whose viewer file says
 `walk: true` also needs its street walk (`walk/walk.json`, here or, with `--no-data`, on the
-server): the check lists it as missing otherwise.
+server): the check lists it as missing otherwise, except for `--index`, which sends no walk.
 
 **The street walk's data** (`walk/cells/*.bin`, `walk/walk.json`, about 120 MB for New York) goes
 up with a full `--data`, or on its own with `--walk`: the squares first, then `walk.json`, then
@@ -150,14 +150,16 @@ is replaced in place, so a visitor still on the old version may be given the new
 old `?v=` (unless their cache has it already). The manifest names the walk's version
 (`manifest.walk`, appended as `?v=` to them; the squares are cached as immutable). Before
 anything is sent, `--walk` and a full `--data` check the walk here (`deploy/walk-check.mjs`):
-every square `walk.json` lists is on disk and no other (an empty `cells/` would have the last
-pass empty the server's), and the manifest names the folder's own version (a walk copied back
+every square `walk.json` lists is on disk, by name, and no other (an empty `cells/` would have
+the last pass empty the server's; a folder of another build with as many squares is not the
+same walk), and the manifest names the folder's own version (a walk copied back
 from another machine must be stamped first: `npm run cli -- --city tinynyc walk --stamp`).
 `--walk` and `--index` send the whole manifest, so they refuse unless the server's differs from
 the one here only in the field they are sending (`walk`, `indexes`). It builds and announces
 nothing. `all --walk` sends every world's walk and passes by the worlds that have none. A single
 world (`deploy/deploy.sh tinynyc`, `--data`) is checked as `all` checks each one, so a checkout
-without the world's walk refuses rather than deleting the server's. Send it **before** merging the
+without the world's walk refuses rather than deleting the server's (`--index` sends none, and is
+not refused for it). Send it **before** merging the
 branch whose viewer offers the walk: the push deploys the viewers, and a viewer with
 `walk: true` is refused while the server has no `walk/walk.json`.
 
