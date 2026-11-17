@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ROOF_DECK } from "../cell";
+import { ROOF_DECK, type ElevatedWay } from "../cell";
 import { newPlayer, SPRINT, stepFoot } from "../player";
 import { newVehicle, stepCar } from "../vehicles";
 import { WalkWorld, type Parapet } from "../world";
 import type { WalkIndex } from "../walk-index";
-import { boxVolume, deckWay, makeCell, waterRect } from "./fixtures";
+import { boxVolume, deckWay, makeCell, strip, waterRect, worldOf } from "./fixtures";
 
 const index = {} as WalkIndex;
 
@@ -405,6 +405,161 @@ describe("a bridge's towers", () => {
     for (const e of [8, 12, 20]) expect(w.blocked(e, 104, 0.35, 0, 1.8)).toBe(true);
     // on the deck itself, open all the way up
     for (const e of [12, 20, 60]) expect(w.blocked(e, 104, 0.35, e * 0.08, 1.8)).toBe(false);
+  });
+});
+
+describe("handovers", () => {
+  const EAST = Math.PI / 2;
+  /** A taxi driven east at 10 m/s from (e, n, z), last on `on`: the lowest it got and how hard it landed. */
+  const drive = (w: WalkWorld, e: number, n: number, z: number, on: ElevatedWay) => {
+    const v = newVehicle(1, "taxi", e, n, EAST, "driven");
+    Object.assign(v, { z, v: 10, on });
+    let fell = 0;
+    let low = z;
+    for (let f = 0; f < 20 * 60 && v.e < 230; f++) {
+      const ev = stepCar(
+        v,
+        { throttle: Math.max(0, (10 - v.v) * 0.5), brake: 0, steer: 0, handbrake: false },
+        w,
+        1 / 60,
+      );
+      fell = Math.max(fell, ev.fell);
+      low = Math.min(low, v.z);
+    }
+    return { e: v.e, low, fell };
+  };
+
+  it("keeps a car on a footway at its height through a joint, whatever roadway lies lower", () => {
+    const f1 = deckWay(
+      [
+        [0, 100, 10],
+        [100, 100, 10],
+      ],
+      5,
+      1,
+    );
+    const f2 = deckWay(
+      [
+        [100, 100, 10],
+        [250, 100, 10],
+      ],
+      5,
+      1,
+    );
+    // a roadway 6 m under it, and one 3 m lower alongside whose strip reaches over its line
+    const under = deckWay(
+      [
+        [0, 100, 4],
+        [250, 100, 4],
+      ],
+      14,
+    );
+    const beside = deckWay(
+      [
+        [0, 106, 7],
+        [250, 106, 7],
+      ],
+      14,
+    );
+    for (const low of [under, beside]) {
+      const r = drive(worldOf(...strip(2, { elevated: [f1, f2, low] })), 20, 100, 10, f1);
+      expect(r.e).toBeGreaterThan(200);
+      expect(r).toMatchObject({ low: 10, fell: 0 });
+    }
+  });
+
+  it("keeps a car past a roadway's open rail at its height through a joint", () => {
+    // two 14 m roadway ways meeting at e = 120, and a sidewalk footway beside them at their
+    // height that opens their rail: a hatchback 0.4 m past the rail, on the roadway's spare
+    const r1 = deckWay(
+      [
+        [0, 100, 10],
+        [120, 100, 10],
+      ],
+      14,
+    );
+    const r2 = deckWay(
+      [
+        [120, 100, 10],
+        [300, 100, 10],
+      ],
+      14,
+    );
+    const walk = deckWay(
+      [
+        [0, 108, 10],
+        [300, 108, 10],
+      ],
+      4,
+      1,
+    );
+    const w = worldOf(...strip(2, { elevated: [r1, r2, walk] }));
+    expect(w.surfaceUnder(50, 107.2, 10, 0.5, null, { de: 1, dn: 0, car: true })).toMatchObject({
+      z: 10,
+      kind: "deck",
+    });
+    const v = newVehicle(1, "hatchback", 60, 107.4, EAST, "driven");
+    Object.assign(v, { z: 10, v: 8, on: r1 });
+    let fell = 0;
+    let low = 10;
+    for (let f = 0; f < 14 * 60; f++) {
+      const ev = stepCar(
+        v,
+        { throttle: Math.max(0, (8 - v.v) * 0.5), brake: 0, steer: 0, handbrake: false },
+        w,
+        1 / 60,
+      );
+      fell = Math.max(fell, ev.fell);
+      low = Math.min(low, v.z);
+    }
+    expect(v.e).toBeGreaterThan(150);
+    expect({ low, fell }).toEqual({ low: 10, fell: 0 });
+  });
+
+  it("keeps a walker past the rail at its height through a joint, a deck far below", () => {
+    const cases: [number, number, number][] = [
+      // way width, kind, how far off its line (past the rail, on its spare)
+      [10, 0, 5.25],
+      [4, 1, 2.25],
+    ];
+    for (const [width, kind, off] of cases) {
+      const a = deckWay(
+        [
+          [0, 100, 10],
+          [100, 100, 10],
+        ],
+        width,
+        kind,
+      );
+      const b = deckWay(
+        [
+          [100, 100, 10],
+          [250, 100, 10],
+        ],
+        width,
+        kind,
+      );
+      const low = deckWay(
+        [
+          [0, 100, 4],
+          [250, 100, 4],
+        ],
+        14,
+      );
+      const w = worldOf(...strip(2, { elevated: [a, b, low] }));
+      const p = newPlayer(20, 100 - off, 10, EAST);
+      p.on = a;
+      let hurt = 0;
+      for (let f = 0; f < 40 * 20 && p.e < 200; f++)
+        hurt += stepFoot(
+          p,
+          { forward: 1, strafe: 0, turn: 0, sprint: true, jump: false },
+          w,
+          0.05,
+        ).hurt;
+      expect(p.e).toBeGreaterThan(150);
+      expect({ z: p.z, hurt }).toEqual({ z: 10, hurt: 0 });
+    }
   });
 });
 

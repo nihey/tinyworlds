@@ -226,7 +226,7 @@ export class WalkWorld {
 
   add(cell: WalkCell): void {
     this.cellMap.set(cell.key, cell);
-    this.forgetRails(cell.i, cell.j);
+    this.forgetRails(cell);
     this.regrid(cell.i, cell.j);
   }
 
@@ -235,14 +235,21 @@ export class WalkWorld {
     if (!cell) return;
     this.cellMap.delete(key);
     this.grids.delete(key);
-    this.forgetRails(cell.i, cell.j);
+    this.forgetRails(cell);
     this.regrid(cell.i, cell.j, true);
   }
 
-  /** A square's rails, and its neighbours' (what lies past a rail may be in the next square). */
-  private forgetRails(i: number, j: number): void {
+  /**
+   * A square's rails, and its neighbours' when it holds elevated ways (what lies past a rail may
+   * be a deck in the next square). A square without any is not asked again of its neighbours:
+   * only its ground could open a rail of theirs within 0.8 m of the border at a ramp's foot,
+   * and such a rail stays closed until they are built again.
+   */
+  private forgetRails(cell: WalkCell): void {
+    this.parapetCache.delete(cell.key);
+    if (cell.elevated.length === 0) return;
     for (let di = -1; di <= 1; di++)
-      for (let dj = -1; dj <= 1; dj++) this.parapetCache.delete(keyOf(i + di, j + dj));
+      for (let dj = -1; dj <= 1; dj++) this.parapetCache.delete(keyOf(cell.i + di, cell.j + dj));
   }
 
   has(i: number, j: number): boolean {
@@ -302,7 +309,7 @@ export class WalkWorld {
     going?: Going | null,
   ): Surface {
     const limit = fromZ + reach;
-    const level = going?.car ? ONE_SURFACE_CAR : ONE_SURFACE_FOOT;
+    const levelZ = going?.car ? ONE_SURFACE_CAR : ONE_SURFACE_FOOT;
     let best: Surface = this.isWater(e, n)
       ? { z: WATER_Z, kind: "water" }
       : { z: 0, kind: "ground" };
@@ -311,7 +318,6 @@ export class WalkWorld {
       // the round end nearest your height (the higher of two as near)
       let end: ElevatedWay | null = null;
       let endZ = -Infinity;
-      let roads = false;
       besideWays.length = 0;
       besideZ.length = 0;
       besideNear.length = 0;
@@ -327,7 +333,6 @@ export class WalkWorld {
           if (d < -1e-6 || (d <= 1e-6 && hitZ > endZ)) [end, endZ] = [w, hitZ];
           continue;
         }
-        roads ||= w.kind === 0;
         let off = 0;
         if (going && gl > 1e-9) off += (ALONG * Math.abs(hitDe * going.dn - hitDn * going.de)) / gl;
         if (going?.car && w.kind !== 0) off += FOOTWAY_FOR_CARS;
@@ -345,28 +350,34 @@ export class WalkWorld {
         pick = mine;
         let gain = going?.car ? STAY_NEARER : STAY_NEARER_FOOT;
         for (let x = 0; x < besideWays.length; x++) {
-          if (x === mine || Math.abs(besideZ[x] - besideZ[mine]) > level) continue;
+          if (x === mine || Math.abs(besideZ[x] - besideZ[mine]) > levelZ) continue;
           const g =
             besideOff[mine] - besideOff[x] + NEARER_WHILE_ON * (besideNear[mine] - besideNear[x]);
           if (g > gain) [pick, gain] = [x, g];
         }
       } else if (besideWays.length > 0) {
-        // the deck nearest your height, and those level with it: the one that fits you best (a
-        // car's only among roadways, where there are any; a way that holds you only by its
-        // spare past the rail, only where none holds you inside its rails)
-        const inside = besideNear.some((d) => d <= 1);
-        const skip = (x: number) =>
-          (going?.car === true && roads && besideWays[x].kind !== 0) ||
-          (inside && besideNear[x] > 1);
-        let ref = -1;
+        // the deck nearest your height, over all of them: you stay at your height
+        let ref = 0;
+        for (let x = 1; x < besideWays.length; x++)
+          if (Math.abs(besideZ[x] - fromZ) < Math.abs(besideZ[ref] - fromZ)) ref = x;
+        // among the decks level with it, the one that fits you best: a car's only among
+        // roadways, where there are any, and one that holds you only by its spare past the rail
+        // only where none holds you inside its rails (both waived where they would leave none)
+        const level = (x: number) => Math.abs(besideZ[x] - besideZ[ref]) <= levelZ;
+        let roads = false;
+        let inside = false;
         for (let x = 0; x < besideWays.length; x++)
-          if (
-            !skip(x) &&
-            (ref < 0 || Math.abs(besideZ[x] - fromZ) < Math.abs(besideZ[ref] - fromZ))
-          )
-            ref = x;
-        for (let x = 0; ref >= 0 && x < besideWays.length; x++) {
-          if (skip(x) || Math.abs(besideZ[x] - besideZ[ref]) > level) continue;
+          if (level(x)) {
+            roads ||= besideWays[x].kind === 0;
+            inside ||= besideNear[x] <= 1;
+          }
+        const keep = (x: number) =>
+          !(going?.car === true && roads && besideWays[x].kind !== 0) &&
+          !(inside && besideNear[x] > 1);
+        let kept = false;
+        for (let x = 0; x < besideWays.length; x++) kept ||= level(x) && keep(x);
+        for (let x = 0; x < besideWays.length; x++) {
+          if (!level(x) || (kept && !keep(x))) continue;
           if (
             pick < 0 ||
             fit(x) < fit(pick) - 1e-6 ||
