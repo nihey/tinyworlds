@@ -1072,6 +1072,10 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   takes it from whatever it would clash with; "Reset to defaults"; the pixel size (1 to 6) and
   the sound switch. Defaults are GTA's keyboard plus turning on the arrows and M for the map
   (`walk/controls.ts`).
+- **Motorcycles** share the road-vehicle simulation, traffic and kerb parking (`TRAFFIC_MIX`).
+  Use the vehicle interaction key to mount or dismount. They accelerate quickly, lean in turns,
+  use the rear brake while turning and back up at walking speed. The chase camera shows the
+  rider, and the first-person camera sits over the centre of the bike.
 - **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half (the
   minimap lets touches through), dragging the right half looks, buttons for jump and get in on
   foot, horn, camera, brake and get out at the wheel, in the bottom-right corner over the credit,
@@ -1150,13 +1154,19 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   nothing shimmers. **No brands, no logos, no letters or digits anywhere** (nothing to
   translate). Under reduced motion every screen keeps one frame. Not in the minimap, not solid
   (nothing reaches a wall 6 m up); a palette without their ramps shows none.
+- **Brooklyn Bridge** (`render/brooklyn-bridge.ts`): the mapped stone tower footprints and heights
+  give the street walk its paired Gothic arches, buttresses and stone courses. The raised central
+  promenade is painted with transverse wood boards. Diagonal stays supplement the packed cables.
+  The landmark uses the existing street walk cells and rides on the same road and footway decks.
 - **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
   than the gaps between its lines), so which deck you are on is told by your history and your
   direction (`surfaceUnder`'s `on` and `going`). You stay on the way you are on while its strip
   holds you, whatever rises or falls beside it; another takes over only where the two are one
   surface (within 0.2 m for a car, 0.09 m for a walker: less than either's snap down) and goes
   your way clearly better (a car's direction is where it will point in half a second, so a
-  driver turning onto a branch at a fork gets it). Coming off a way's end or edge, landing or
+  driver turning onto a branch at a fork gets it). On foot, proximity to a footway also counts
+  when both decks are level, so a walker following the Brooklyn Bridge promenade can leave the
+  adjacent roadway before their grades diverge. Coming off a way's end or edge, landing or
   put down, you are on the deck nearest your height that fits best: nearest its line as a share
   of its half-width, its direction nearest yours, of the kind you were on (footway after
   footway); a car goes onto a footway only where no roadway is, and ties go to the deck nearest

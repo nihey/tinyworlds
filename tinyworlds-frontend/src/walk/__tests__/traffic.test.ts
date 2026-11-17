@@ -650,6 +650,7 @@ describe("spawning", () => {
     traffic.visible = () => true;
     traffic.prime(focus);
     expect(traffic.cars.length).toBe(traffic.budget);
+    expect(traffic.cars.some((v) => v.kind === "motorcycle")).toBe(true);
     const dists = traffic.cars.map((c) => Math.hypot(c.e - focus.e, c.n - focus.n));
     for (const d of dists) {
       expect(d).toBeGreaterThanOrEqual(20);

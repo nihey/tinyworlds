@@ -4,7 +4,8 @@ import type { WalkCell, WalkEdge } from "../cell";
 import { defaultBindings } from "../controls";
 import { WalkGame, type GameView, type LifeRoutes, type WalkState } from "../game";
 import { enToLonLat } from "../geo";
-import { MODEL_RAMPS } from "../render/models";
+import { MODEL_RAMPS, WalkModels } from "../render/models";
+import { makePalette } from "../render/palette";
 import { PARTICLE_RAMPS } from "../render/particles";
 import { WalkSound } from "../sound";
 import { PAINT_RED, parkedOn, starterCar } from "../traffic";
@@ -272,6 +273,68 @@ describe("getting into a car", () => {
     expect(far.now().mode).toBe("foot");
     expect(far.now().vehicle).toBeNull();
   });
+});
+
+it("lets you find, ride and dismount a motorcycle parked at the kerb", () => {
+  const road = streetEdge(
+    1,
+    2,
+    [
+      [10, 100],
+      [190, 100],
+    ],
+    { width: 14 },
+  );
+  const cells = area(-1, -1, 1, 1, {
+    "0_0": {
+      nodes: [roadNode(1, 10, 100), roadNode(2, 190, 100)],
+      streets: [road],
+    },
+  });
+  const { game, now, simUntil } = play(cells, { start: { e: 100, n: 109 } });
+  game.setCrowd(0, 0);
+  game.sim(0.5);
+  const bike = game.vehicles().find((v) => v.kind === "motorcycle" && v.state === "parked");
+  expect(bike).toBeDefined();
+  if (!bike) return;
+
+  const right = bike.n > 100 ? 1 : -1;
+  game.teleport(bike.e, bike.n + right, 0, bike.yaw);
+  game.sim(0.1);
+  expect(now().near?.kind).toBe("motorcycle");
+  game.keyDown("KeyF");
+  game.keyUp("KeyF");
+  game.sim(0.1);
+  expect(now()).toMatchObject({ mode: "drive", vehicle: { kind: "motorcycle", boat: false } });
+
+  game.keyDown("KeyW");
+  expect(simUntil(() => (now().vehicle?.speed ?? 0) > 4, 1)).toBe(true);
+  game.keyUp("KeyW");
+  game.keyDown("KeyS");
+  expect(simUntil(() => (now().vehicle?.speed ?? Infinity) < 1, 1)).toBe(true);
+  game.keyUp("KeyS");
+  game.keyDown("KeyF");
+  game.keyUp("KeyF");
+  game.sim(0.1);
+  expect(now().mode).toBe("foot");
+  expect(game.vehicles()).toContain(bike);
+});
+
+it("draws empty motorcycles at the kerb and riders on occupied ones", () => {
+  const ix = indexOf([makeCell(0, 0)]);
+  const palette = makePalette(ix);
+  const models = new WalkModels(new THREE.Scene(), palette, ix);
+  const bike = newVehicle(nextVehicleId(), "motorcycle", 100, 100, 0);
+  models.vehicle(bike);
+  models.end(0);
+  expect(models.counts()).toMatchObject({ motorcycle: 1, motorcyclist: 0 });
+
+  bike.state = "traffic";
+  models.vehicle(bike);
+  models.end(0);
+  expect(models.counts()).toMatchObject({ motorcycle: 1, motorcyclist: 1 });
+  models.dispose();
+  palette.texture.dispose();
 });
 
 describe("getting out of a car", () => {

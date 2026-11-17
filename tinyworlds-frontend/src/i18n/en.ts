@@ -705,9 +705,11 @@ export const en: Strings = {
       swim: "{forward}{left}{back}{right} swim · {sprint} faster · {map} map · {menu} keys",
       drive:
         "{accelerate}{steerLeft}{brake}{steerRight} drive · {handbrake} handbrake · {horn} horn · {camera} camera · {exit} get out · {menu} keys",
+      ride: "{accelerate}{steerLeft}{brake}{steerRight} ride · {handbrake} rear brake · {horn} horn · {camera} camera · {exit} get off · {menu} keys",
       sail: "{accelerate}{steerLeft}{brake}{steerRight} sail · {horn} horn · {camera} camera · {exit} get off · {menu} keys",
     },
     getIn: "{key} get in the {vehicle}",
+    getOnMotorcycle: "{key} get on the {vehicle}",
     vehicles: {
       hatchback: "hatchback",
       sedan: "sedan",
@@ -719,6 +721,7 @@ export const en: Strings = {
       muscle: "muscle car",
       sports: "sports car",
       supercar: "supercar",
+      motorcycle: "motorcycle",
       boxTruck: "box truck",
       bus: "bus",
       speedboat: "speedboat",
@@ -748,6 +751,8 @@ export const en: Strings = {
       jump: "Jump",
       enter: "Get in",
       exit: "Get out",
+      mount: "Get on",
+      dismount: "Get off",
       horn: "Horn",
       camera: "Camera",
       brake: "Brake",

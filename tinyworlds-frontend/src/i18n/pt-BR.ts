@@ -721,9 +721,11 @@ export const ptBR: Strings = {
       swim: "{forward}{left}{back}{right} nadar · {sprint} mais rápido · {map} mapa · {menu} teclas",
       drive:
         "{accelerate}{steerLeft}{brake}{steerRight} dirigir · {handbrake} freio de mão · {horn} buzina · {camera} câmera · {exit} sair · {menu} teclas",
+      ride: "{accelerate}{steerLeft}{brake}{steerRight} pilotar · {handbrake} freio traseiro · {horn} buzina · {camera} câmera · {exit} descer · {menu} teclas",
       sail: "{accelerate}{steerLeft}{brake}{steerRight} navegar · {horn} buzina · {camera} câmera · {exit} descer · {menu} teclas",
     },
     getIn: "{key} para entrar: {vehicle}",
+    getOnMotorcycle: "{key} para subir na {vehicle}",
     vehicles: {
       hatchback: "hatch",
       sedan: "sedã",
@@ -735,6 +737,7 @@ export const ptBR: Strings = {
       muscle: "muscle car",
       sports: "esportivo",
       supercar: "supercarro",
+      motorcycle: "moto",
       boxTruck: "caminhão baú",
       bus: "ônibus",
       speedboat: "lancha rápida",
@@ -764,6 +767,8 @@ export const ptBR: Strings = {
       jump: "Pular",
       enter: "Entrar",
       exit: "Sair",
+      mount: "Subir",
+      dismount: "Descer",
       horn: "Buzina",
       camera: "Câmera",
       brake: "Freio",

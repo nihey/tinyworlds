@@ -142,6 +142,41 @@ describe("surfaces", () => {
     expect(p.z).toBeCloseTo(5, 5);
   });
 
+  it("follows a promenade where it meets and then leaves the edge of a roadway ramp", () => {
+    const road = deckWay(
+      [
+        [20, 100, 0.2],
+        [100, 100, 6.5],
+        [145, 100, 6.5],
+        [160, 95, 7.5],
+      ],
+      13,
+    );
+    const path = deckWay(
+      [
+        [23, 106, 0],
+        [100, 106, 6.5],
+        [115, 106, 6.5],
+        [190, 106, 12.5],
+      ],
+      2.5,
+      1,
+    );
+    const w = world(makeCell(0, 0, { elevated: [road, path] }));
+    const p = newPlayer(15, 106, 0, Math.PI / 2);
+    const input = { forward: 1, strafe: 0, turn: 0, sprint: false, jump: false };
+
+    expect(w.surfaceUnder(105, 106, 6.5, 0.5, road, { de: 1, dn: 0, car: true }).way).toBe(road);
+    for (let frame = 0; frame < 70 && p.e < 30; frame++) stepFoot(p, input, w, 0.05);
+    expect(p.on).toBe(road);
+    for (let frame = 0; frame < 700 && p.e < 175; frame++) stepFoot(p, input, w, 0.05);
+
+    expect(p.e).toBeGreaterThanOrEqual(175);
+    expect(p.on).toBe(path);
+    expect(p.z).toBeCloseTo(6.5 + (p.e - 115) * 0.08);
+    expect(p.life).toBe(100);
+  });
+
   it("puts a car's roof under someone on foot", () => {
     const w = world(makeCell(0, 0));
     w.roofs = (e) => (e === 5 ? 1.5 : null);

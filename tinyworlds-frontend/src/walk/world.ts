@@ -290,7 +290,8 @@ export class WalkWorld {
    *   spare past the rail), whatever rises or falls beside it. Another takes over only where the
    *   two are one surface (`ONE_SURFACE_CAR`, `_FOOT`: less than the body's snap down) and it
    *   goes your way better, by `STAY_NEARER`: a branch you are turning onto at a fork, a lane
-   *   change on the level. Being nearer its line counts for little (`NEARER_WHILE_ON`).
+   *   change on the level. Being nearer its line counts for little (`NEARER_WHILE_ON`), except
+   *   when a walker is following a footway along the edge of a roadway.
    * - Else (you have come off its end or its edge, or you are landing, or put down) you are on
    *   the deck nearest your height, or one level with it, that fits you best: nearest its line
    *   as a share of its half-width, plus how far its direction is from the way you are going
@@ -356,8 +357,14 @@ export class WalkWorld {
         let gain = going?.car ? STAY_NEARER : STAY_NEARER_FOOT;
         for (let x = 0; x < besideWays.length; x++) {
           if (x === mine || Math.abs(besideZ[x] - besideZ[mine]) > levelZ) continue;
+          const closer = besideNear[mine] - besideNear[x];
+          // Give a walker following a footway room to switch before the two ramps separate.
+          const ontoFootway =
+            going && !going.car && besideWays[mine].kind === 0 && besideWays[x].kind === 1;
           const g =
-            besideOff[mine] - besideOff[x] + NEARER_WHILE_ON * (besideNear[mine] - besideNear[x]);
+            besideOff[mine] -
+            besideOff[x] +
+            (ontoFootway ? SAME_KIND + closer : NEARER_WHILE_ON * closer);
           if (g > gain) [pick, gain] = [x, g];
         }
       } else if (besideWays.length > 0) {

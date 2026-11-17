@@ -36,13 +36,15 @@ export function TouchPad({ game }: { game: WalkGame }) {
   const knob = useRef<HTMLDivElement>(null);
   const fingers = useRef(new Map<number, Finger>());
   const [mode, setMode] = useState<WalkState["mode"]>(game.state.mode);
-  const [near, setNear] = useState(game.state.near !== null);
+  const [near, setNear] = useState(game.state.near?.kind);
+  const [riding, setRiding] = useState(game.state.vehicle?.kind === "motorcycle");
 
   useEffect(
     () =>
       game.subscribe((s) => {
         setMode(s.mode);
-        setNear(s.near !== null);
+        setNear(s.near?.kind);
+        setRiding(s.vehicle?.kind === "motorcycle");
       }),
     [game],
   );
@@ -118,6 +120,16 @@ export function TouchPad({ game }: { game: WalkGame }) {
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
 
+  // Mounting and dismounting replace the button before the finger may lift.
+  const tap = (action: "enter" | "exit") => ({
+    onPointerDown: (e: ReactPointerEvent) => {
+      e.stopPropagation();
+      game.press(action, true);
+      game.press(action, false);
+    },
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  });
+
   const driving = mode === "drive" || mode === "boat";
   const button =
     "sign pointer-events-auto flex h-14 min-w-14 items-center justify-center rounded-full px-3 text-xs font-semibold select-none active:bg-sign-raised";
@@ -159,22 +171,24 @@ export function TouchPad({ game }: { game: WalkGame }) {
                 </button>
               )}
               <button
+                key="exit"
                 type="button"
                 className={cn(button, "bg-taxi text-taxi-ink")}
-                {...hold("exit")}
+                {...tap("exit")}
               >
-                {t.walk.touch.exit}
+                {riding ? t.walk.touch.dismount : t.walk.touch.exit}
               </button>
             </>
           ) : (
             <>
               {near && (
                 <button
+                  key="enter"
                   type="button"
                   className={cn(button, "bg-taxi text-taxi-ink")}
-                  {...hold("enter")}
+                  {...tap("enter")}
                 >
-                  {t.walk.touch.enter}
+                  {near === "motorcycle" ? t.walk.touch.mount : t.walk.touch.enter}
                 </button>
               )}
               {mode === "foot" && (

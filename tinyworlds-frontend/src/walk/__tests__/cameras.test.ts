@@ -101,4 +101,15 @@ describe("the chase camera", () => {
       else expect(eye.fov).toBeCloseTo(82.6, 0);
     }
   });
+
+  it("puts the first-person camera above the middle of the motorcycle", () => {
+    const v = newVehicle(nextVehicleId(), "motorcycle", 100, 100, Math.PI / 2, "driven");
+    const cams = new Cameras({ e: 100, n: 100, z: 0, yaw: 0 }, false);
+    cams.takeWheel(v);
+    cams.toggle();
+    const eye = cams.driving(v, 1 / 30, false, open);
+    expect(eye.n).toBeCloseTo(v.n);
+    expect(eye.z - v.z).toBeGreaterThan(1.4);
+    expect(eye.yaw).toBe(v.yaw);
+  });
 });

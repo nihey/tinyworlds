@@ -717,9 +717,11 @@ export const esES: Strings = {
       swim: "{forward}{left}{back}{right} nadar · {sprint} más rápido · {map} mapa · {menu} teclas",
       drive:
         "{accelerate}{steerLeft}{brake}{steerRight} conducir · {handbrake} freno de mano · {horn} claxon · {camera} cámara · {exit} salir · {menu} teclas",
+      ride: "{accelerate}{steerLeft}{brake}{steerRight} conducir · {handbrake} freno trasero · {horn} claxon · {camera} cámara · {exit} bajar · {menu} teclas",
       sail: "{accelerate}{steerLeft}{brake}{steerRight} navegar · {horn} claxon · {camera} cámara · {exit} bajar · {menu} teclas",
     },
     getIn: "{key} para entrar: {vehicle}",
+    getOnMotorcycle: "{key} para subir a la {vehicle}",
     vehicles: {
       hatchback: "utilitario",
       sedan: "berlina",
@@ -731,6 +733,7 @@ export const esES: Strings = {
       muscle: "muscle car",
       sports: "deportivo",
       supercar: "superdeportivo",
+      motorcycle: "moto",
       boxTruck: "camión de caja",
       bus: "autobús",
       speedboat: "lancha rápida",
@@ -760,6 +763,8 @@ export const esES: Strings = {
       jump: "Saltar",
       enter: "Entrar",
       exit: "Salir",
+      mount: "Subir",
+      dismount: "Bajar",
       horn: "Claxon",
       camera: "Cámara",
       brake: "Freno",

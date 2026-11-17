@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import type { BoatKind, CarKind } from "../kinds";
+import { clamp } from "../math";
 import type { Person } from "../people";
+import { GRAVITY } from "../player";
 import type { SignalPost } from "../signals";
 import { sizeOf, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
@@ -39,6 +41,7 @@ const LAMP_RED = 15;
 const LAMP_YELLOW = 16;
 const LAMP_GREEN = 17;
 const HOUSING = 18;
+const METAL = 19;
 // the parts of a person
 const SHIRT = 0;
 const PANTS = 1;
@@ -145,6 +148,7 @@ export const EYES: Record<CarKind | BoatKind, [number, number]> = {
   muscle: [1.08, -0.6],
   sports: [0.95, -0.35],
   supercar: [0.88, -0.45],
+  motorcycle: [1.58, 0.24],
   boxTruck: [2.0, 2.6],
   bus: [2.3, 5.3],
   speedboat: [1.55, 0.3],
@@ -337,8 +341,30 @@ const SEDAN: CarLines = {
   roof: 1.45,
 };
 
-/** Each car, the size `CARS` gives it, in the spike's lines. */
+function motorcycleModel(M: Shape) {
+  for (const z of [-0.76, 0.76]) {
+    // The straight edges and stepped corners make the two tyres read at the walk's pixel scale.
+    M.box(-0.1, 0.1, 0, 0.1, z - 0.22, z + 0.22, TYRE);
+    M.box(-0.1, 0.1, 0.1, 0.51, z - 0.34, z + 0.34, TYRE);
+    M.box(-0.1, 0.1, 0.51, 0.61, z - 0.22, z + 0.22, TYRE);
+    M.pair(0.1, 0.12, 0.18, 0.43, z - 0.15, z + 0.15, METAL);
+  }
+  M.box(-0.22, 0.22, 0.36, 0.68, -0.31, 0.39, TRIM); // frame and engine
+  M.pair(0.13, 0.19, 0.3, 0.42, 0.05, 0.77, METAL); // swingarm
+  M.pair(0.19, 0.26, 0.38, 0.51, 0.37, 0.91, METAL); // exhaust
+  M.prism(-0.16, 0.16, -0.87, -0.7, 0.31, -0.12, 0.12, -0.62, -0.45, 1.02, METAL); // fork
+  M.box(-0.14, 0.14, 0.61, 0.69, -0.99, -0.49, BODY); // front fender
+  M.prism(-0.24, 0.24, -0.6, 0.19, 0.65, -0.17, 0.17, -0.44, 0.03, 1.02, BODY); // tank
+  M.box(-0.19, 0.19, 0.62, 0.81, 0.16, 0.93, BODY); // rear fender
+  M.box(-0.19, 0.19, 0.81, 0.93, 0.08, 0.75, TYRE); // seat
+  M.box(-0.44, 0.44, 1.06, 1.15, -0.57, -0.46, TRIM); // handlebars
+  M.box(-0.16, 0.16, 0.87, 1.06, -0.79, -0.57, { front: HEAD, side: TRIM, top: TRIM });
+  M.box(-0.16, 0.16, 0.71, 0.83, 0.9, 0.97, { back: TAIL, side: TRIM, top: TRIM });
+}
+
+/** Each road vehicle's model, at the size `CARS` gives it. */
 const CAR_MODELS: Record<CarKind, (M: Shape) => void> = {
+  motorcycle: motorcycleModel,
   hatchback: (M) =>
     car(M, {
       len: 3.9,
@@ -592,6 +618,34 @@ function personModel(M: Shape) {
   M.limb = 0;
 }
 
+/** Sitting over the seat with hands on the grips and feet on the pegs. */
+function riderModel(M: Shape) {
+  M.prism(-0.2, 0.2, 0.05, 0.4, 0.91, -0.21, 0.21, -0.28, 0.02, 1.4, SHIRT);
+  M.pair(0.12, 0.26, 0.79, 0.94, -0.18, 0.35, PANTS);
+  M.pair(0.19, 0.29, 0.51, 0.82, -0.16, 0.01, PANTS);
+  M.pair(0.19, 0.3, 0.44, 0.54, -0.2, 0.07, SHOE);
+  for (const side of [-1, 1]) {
+    const grip = side * 0.35;
+    const shoulder = side * 0.22;
+    M.prism(
+      grip - 0.055,
+      grip + 0.055,
+      -0.54,
+      -0.41,
+      1.13,
+      shoulder - 0.075,
+      shoulder + 0.075,
+      -0.24,
+      -0.08,
+      1.38,
+      SHIRT,
+    );
+  }
+  M.box(-0.08, 0.08, 1.39, 1.48, -0.25, -0.08, SKIN);
+  M.box(-0.14, 0.14, 1.46, 1.71, -0.37, -0.07, HAIR); // helmet
+  M.box(-0.12, 0.12, 1.54, 1.63, -0.388, -0.36, SHOE); // visor
+}
+
 /** A traffic signal on its post, 4 m tall, its three lamps (red over yellow over green) facing forward. */
 function signalModel(M: Shape) {
   M.box(-0.07, 0.07, 0, 3.0, -0.07, 0.07, TRIM);
@@ -678,6 +732,7 @@ void main() {
   else if (p == ${LAMP_YELLOW}) c = vLit == 1 ? P(${r("taxi")}, 5) : P(${r("darkStone")}, 1);
   else if (p == ${LAMP_GREEN}) c = vLit == 2 ? P(${r("libertyGreen")}, 5) : P(${r("darkStone")}, 1);
   else if (p == ${HOUSING}) c = P(${r("taxi")}, t - 1);
+  else if (p == ${METAL}) c = P(${r("steel")}, t);
   else c = P(${r("taxi")}, t - 1);
   gl_FragColor = vec4(fogged(c, length(vMV)), 1.0);
 }`;
@@ -859,6 +914,9 @@ export class WalkModels {
     const person = M.arrays();
     this.pools.set("person", new Pool(scene, person, PERSON_ATTRS, this.personMat, 64));
     this.pools.set("you", new Pool(scene, person, PERSON_ATTRS, this.personMat, 1));
+    const rider = new Shape();
+    riderModel(rider);
+    this.pools.set("motorcyclist", new Pool(scene, rider.arrays(), PERSON_ATTRS, this.personMat));
     const post = new Shape();
     signalModel(post);
     this.pools.set("signal", new Pool(scene, post.arrays(), VEHICLE_ATTRS, this.vehicleMat, 64));
@@ -917,7 +975,7 @@ export class WalkModels {
   }
 
   /** A car or a boat where it is, `brake` lighting its tail lamps. A sunk one is not drawn. */
-  vehicle(v: Vehicle, brake = false): void {
+  vehicle(v: Vehicle, brake = false, hideRider = false): void {
     if (v.state === "sunk") return;
     const pool = this.pools.get(v.kind);
     if (!pool) return;
@@ -929,10 +987,26 @@ export class WalkModels {
       const longer = v.size.length / kind.length;
       scale = this.stretch.set(v.size.width / kind.width, longer, longer);
     }
-    const i = this.place(pool, v.e, v.z + v.heave, v.n, v.yaw, 0, -v.roll, scale);
+    const occupied = v.kind === "motorcycle" && (v.state === "traffic" || v.state === "driven");
+    const roll = occupied
+      ? clamp(Math.atan((Math.max(0, v.v) * v.w) / GRAVITY), -0.46, 0.46)
+      : v.roll;
+    const i = this.place(pool, v.e, v.z + v.heave, v.n, v.yaw, 0, -roll, scale);
     pool.attrs.ramp.array[i] = this.paint(v);
     pool.attrs.lit.array[i] = brake ? 1 : 0;
     pool.attrs.dmg.array[i] = v.state === "wrecked" ? 1 : v.damage;
+    if (occupied && !hideRider) this.motorcyclist(v, roll);
+  }
+
+  private motorcyclist(v: Vehicle, roll: number): void {
+    const pool = this.pools.get("motorcyclist")!;
+    const i = this.place(pool, v.e, v.z, v.n, v.yaw, 0, -roll);
+    const cols = pool.attrs.cols.array as Float32Array;
+    const paint = v.color & 7;
+    cols[i * 4] = v.state === "driven" ? this.yours[0] : this.ramp(TOPS[paint]);
+    cols[i * 4 + 1] = v.state === "driven" ? this.yours[1] : this.ramp(BOTTOMS[paint]);
+    cols[i * 4 + 2] = v.state === "driven" ? this.yours[2] : this.ramp(SKINS[paint]);
+    cols[i * 4 + 3] = this.ramp("carWhite");
   }
 
   /** Someone in the street: walking, running, waiting, lying where they fell, or swimming. */

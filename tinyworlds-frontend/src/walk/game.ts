@@ -1310,7 +1310,7 @@ export class WalkGame {
     m.begin();
     for (const v of this.nearby) {
       if ((v === this.yours && this.tunnel) || !within(v, me, far)) continue;
-      m.vehicle(v, this.braking(v));
+      m.vehicle(v, this.braking(v), v === this.yours && this.cams.mode === "wheel");
     }
     for (const v of this.fleet.free)
       if (v !== this.yours && !within(v, me, NEAR) && within(v, me, far)) m.vehicle(v);
