@@ -1,8 +1,7 @@
 /**
  * The street walk's little person, one character per pixel like the badges' maps: drawn in the
- * tool column (an SVG), dangling while it is carried over the map, and standing on the map
- * where you are while you walk (`walker.ts`). Not anyone's figure but ours: a walker in the
- * map's own pixel style, its shirt in the world's accent.
+ * tool column (an SVG) and dangling while it is carried over the map. Not anyone's figure but
+ * ours: a walker in the map's own pixel style, its shirt in the world's accent.
  */
 export const PERSON = [
   "..kkk..",

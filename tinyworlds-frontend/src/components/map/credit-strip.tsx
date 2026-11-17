@@ -10,7 +10,7 @@ import { WORLD } from "@/worlds";
 interface CreditStripProps {
   engine: MapEngine;
   onAbout: () => void;
-  /** where the view is, before the credit (left out beside the street walk, where room is short) */
+  /** where the view is, before the credit (left out over the street walk, where the map is not seen) */
   readout?: boolean;
   className?: string;
   style?: React.CSSProperties;

@@ -136,15 +136,15 @@ src/
 │   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
 │   ├── quiz.ts          # Guess the building's questions (quiz.<locale>.json): parseQuiz
 │   ├── person.ts        # the street walk's little person, one character per pixel
-│   ├── walker.ts        # the walk on the map: you and your view cone, the drop's lit ways
+│   ├── walker.ts        # the walk on the map: the ways lit under the carried person
 │   └── __tests__/
 ├── walk/                # the street walk (below): pure simulation, its data, and render/
 │                        # (three.js); reached only through import()
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
 ├── components/walk/     # the street walk's screen (walk-screen.tsx, by import() only), its
-│                        # signs, wasted screen, controls menu and touch pad; the person in
-│                        # the tool column (walk-person.tsx)
+│                        # signs, minimap, wasted screen, controls menu and touch pad; the
+│                        # person in the tool column (walk-person.tsx)
 ├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
 │                        # "Build the next city" (build-next.tsx), a city's card and its
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
@@ -829,8 +829,10 @@ no depth information: no cars.
 
 Layers are called every frame while life is on; with `prefers-reduced-motion` they are called
 once per redraw with `timeMs = 0`. A layer added with `{ always: true }` is a sign, not life (the
-street walk's person and the drop's lit ways, `map/walker.ts`): it is drawn with life off too,
-whenever the map is redrawn. The live engine is also on `window.tinyworld` for the console.
+ways lit under the street walk's carried person, `map/walker.ts`): it is drawn with life off too,
+whenever the map is redrawn. `setPaused(true)` stops all drawing while something covers the whole
+map (the street walk): the view can still be moved, and `setPaused(false)` draws it again. The
+live engine is also on `window.tinyworld` for the console.
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
@@ -974,10 +976,9 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   (`loadWorldManifest`, `walkManifest`), and the person stands in the tools once it is in. On
   the map side everything goes through the engine's current projection: `mapFrame` (in
   `walk/load.ts`) takes the walk's metres to the map's px through lon/lat, and the drop
-  (`dropAtMap`, `pickDeck`), the lit ways (`waysNearMap`, `dropHighlight`) and the click beside
-  the walk take it; you and your cone are placed with `engine.projection` (`walkerPoint`).
-  Turning the map starts a new engine; the compass is not there while walking, so a walk never
-  outlives its map.
+  (`dropAtMap`, `pickDeck`) and the lit ways (`waysNearMap`, `dropHighlight`) take it; the way
+  back centres the map on you with `engine.projection`. Turning the map starts a new engine; the
+  compass is not there while walking, so a walk never outlives its map.
 - **Nothing of it is in the map's first bundle.** `walk-screen.tsx` is the only way in: its
   default export is reached by `import()` from `useStreetWalk` (`hooks/use-street-walk.ts`,
   the walk as the map sees it) when a walk opens, and three.js and every module under
@@ -986,7 +987,7 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   nothing more is downloaded. It is asked as soon as the person is picked up (dragged or
   tapped), before the drop's squares are fetched or "Let go to walk here" is said. The map itself
   carries only the person's button (`walk-person.tsx`, `map/person.ts`), the hook, the walk
-  link's parser (`map/hash.ts`) and the split's CSS; `map/walker.ts` and the drop's data
+  link's parser (`map/hash.ts`) and the walk's CSS; `map/walker.ts` and the drop's data
   (`walk/load.ts`) are imported when the person is picked up or a walk opens.
 - **Getting in.** The little person stands in the tool column (in the map's pixel style, its
   shirt the accent; not anyone else's figure). Drag it onto the map: the ways near the pointer
@@ -1004,17 +1005,38 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   link carries no height, so on a deck's footprint it opens on the deck), and the walk writes
   one through `writeHash` whenever you stand still. Analytics: `walk_start` through
   `siteEvent` with `world`, Rybbit included, once the walk has opened.
-- **The split** (`.walk-split` in `globals.css`): the walk 7, the map 3, side by side; stacked
-  (the map below) under 800 px or in portrait. The map is the same `MapEngine` on its two
-  canvases, moved into the grid's map cell: it follows you (`jumpTo` on every move, the wheel
-  zooming about you), draws you and a view cone (`walkerLayer`) at your height (on a bridge,
-  on its deck as the map draws it: the walk tells the map the surface under your feet, from
-  the game's own height, never the camera's), and a click
-  or tap on it takes you there (`dropAtScreen`, then the game's `teleport`). Its other signs
-  give way (search, banners, quiz, tools, minimap, the building spotlight); "Click (or Tap)
-  the map to go there" and the credit stay. M or "Back to the map" leaves with the map centred
-  where you are, from the moment the walk is asked for: while its code downloads, while it
-  loads and after it fails.
+- **Full screen** (`.walk-full` in `globals.css`): the owner asked for the map "in the bottom
+  left side with just the streets just like it works on GTA" instead of beside the walk, so the
+  walk takes the whole screen. The map's `MapEngine` stays alive underneath, hidden and paused
+  (`setPaused`, from the hook while walking: nothing drawn, life included, and it does not follow
+  you); its other signs give way (search, banners, quiz, tools, its own minimap, the building
+  spotlight). The credit stays, in the bottom-right corner. M or "Back to the map" leaves with the
+  map centred where you are (on a bridge, its deck as the map draws it, from the game's own
+  height), from the moment the walk is asked for: while its code downloads, while it loads and
+  after it fails. A walk link followed while walking takes you there (`goTo`, the game's
+  `teleport`); the map itself is not a way to move you any more.
+- **The minimap** (`street-minimap.tsx`, drawn by `walk/minimap.ts`): a small square sign in the
+  bottom-left corner (about 176 CSS px, 128 on a phone or a short screen: `--walk-mm` on
+  `.walk-pane`, 16 px from the edges and the notches), just the streets, centred on you and
+  turned with you (the way you face is up; your heading: on foot where you look, at the wheel
+  the car's), zoomed out with your speed (`minimapSpan`: 150 m across standing, on foot or
+  swimming, out to 450 m at 30 m/s and over, eased over about half a second; at once under
+  reduced motion, though it still turns). Pixel art: an odd number of pixels across, each two
+  (or so) CSS px and a whole number of device pixels, shown without smoothing; every pixel one
+  tone. The streets (`StreetEdge`s cut to each square, `squareSegments`) at their real width
+  (at least 1.2 px) in a light paper (`concrete`), the major classes (secondary and up) a touch
+  brighter (`markingWhite`), the elevated ways (bridges, highways) over them in `salmon`; the
+  water the palette's deep water from each square's mask, and past the edge of the data as the
+  walk lays its open water (`offDataWater`); the land, and a 3 px rim, the sign's dark. You are
+  a pixel arrow in the accent at the middle; north a little paper triangle in the rim. No other
+  marks, no labels. A picture for a screen reader named once (`walk.minimap`); no target for a
+  pointer (`pointer-events: none`), so a thumb on it reaches the stick under it; under the wasted
+  screen and the signs. Its cost: each square's segments are made once, the first time it is in reach (six a drawing at
+  most, the nearest first), and dropped when the world lets the square go; a drawing (at most 20
+  a second, none while nothing has moved) runs each segment in reach through the transform and
+  fills the pixel rows it covers (`rasterSegments`: a capsule, one run a row), reads the masks
+  for the pixels no line covers, and puts the picture: about 0.15 to 0.25 ms in a desktop
+  Chrome. No Path2D, no antialiasing to undo, nothing read back from the canvas.
 - **The screen** (`WalkScreen`): checks WebGL 2 again (`canDrawWalk`), reads `walk.json`
   ("couldn't start" with Try again, on a new canvas, and Back), builds
   `WalkView` (the renderer) and `WalkGame` (the game: `game.ts` and the modules it ties
@@ -1031,8 +1053,7 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   70 → 45 → 30 cars: `setCrowd`; the crowd lets the farthest out of sight go), then the pixels a
   size bigger, up to 5, unless the visitor chose one. It never steps back up in a walk (quality
   that comes and goes reads as a bug, and a phone slow in one street is slow in the next); the
-  crowd and the pixel size it reached stay for the visit's next walk. The map beside is told of
-  your moves at most 20 times a second (it is redrawn for each).
+  crowd and the pixel size it reached stay for the visit's next walk.
 - **The signs** (`walk-hud.tsx`, text from `walk/hud-text.ts`): the corner sign with the life
   bar, always (20 pixel cells of 5, green, amber under 50, red under 25, flashing on a hit,
   "Life 64 of 100" for a screen reader), the damage bar beside it at the wheel or "Wrecked",
@@ -1051,9 +1072,11 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   takes it from whatever it would clash with; "Reset to defaults"; the pixel size (1 to 6) and
   the sound switch. Defaults are GTA's keyboard plus turning on the arrows and M for the map
   (`walk/controls.ts`).
-- **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half,
-  dragging the right half looks, buttons for jump and get in on foot, horn, camera, brake and
-  get out at the wheel.
+- **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half (the
+  minimap lets touches through), dragging the right half looks, buttons for jump and get in on
+  foot, horn, camera, brake and get out at the wheel, in the bottom-right corner over the credit,
+  wrapping into rows before they reach the minimap. Off touch, "F get in the taxi" rises over the
+  minimap on a narrow screen.
 - **The water** (the rules and their numbers in `walk/water.ts`, the shader in
   `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
   according to" a write-up of layered pixel-art water, whose ideas are re-made here for a
@@ -1133,7 +1156,7 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
   `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
   `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,
-  `quality.ts`, `game.ts`;
+  `quality.ts`, `minimap.ts`, `game.ts`;
   `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
   `deck-mesh.ts` `shore.ts`, `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
   production build has no `window.walk`: development builds put the game there for the

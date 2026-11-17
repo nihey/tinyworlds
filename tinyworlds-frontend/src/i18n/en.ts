@@ -743,8 +743,7 @@ export const en: Strings = {
     pixel: "Pixel size",
     sound: "Sound",
     clickToLook: "Click to look around",
-    mapGoThere: "Click the map to go there",
-    mapTapThere: "Tap the map to go there",
+    minimap: "Map of the streets around you",
     touch: {
       jump: "Jump",
       enter: "Get in",

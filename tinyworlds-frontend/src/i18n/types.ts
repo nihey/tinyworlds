@@ -826,9 +826,8 @@ export interface Strings {
     sound: string;
     /** before the mouse is captured */
     clickToLook: string;
-    /** the map beside the walk: a click (or, on a touch screen, a tap) on it takes you there */
-    mapGoThere: string;
-    mapTapThere: string;
+    /** the minimap in the corner, for a screen reader */
+    minimap: string;
     /** the touch buttons */
     touch: {
       jump: string;

@@ -759,8 +759,7 @@ export const ptBR: Strings = {
     pixel: "Tamanho do pixel",
     sound: "Som",
     clickToLook: "Clique para olhar ao redor",
-    mapGoThere: "Clique no mapa para ir até lá",
-    mapTapThere: "Toque no mapa para ir até lá",
+    minimap: "Mapa das ruas ao seu redor",
     touch: {
       jump: "Pular",
       enter: "Entrar",

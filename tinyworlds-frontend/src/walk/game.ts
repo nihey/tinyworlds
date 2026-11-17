@@ -180,7 +180,8 @@ const TOTAL = WASTED.wordAt + WASTED.holdFor + WASTED.fadeFor;
 export class WalkGame {
   readonly units: "imperial" | "metric";
   private readonly view: GameView;
-  private readonly world: WalkWorld;
+  /** the squares round you, as the view streams them (the minimap draws their streets) */
+  readonly world: WalkWorld;
   private readonly ix: WalkIndex;
   private readonly sound: WalkSound;
   private readonly reduced: boolean;

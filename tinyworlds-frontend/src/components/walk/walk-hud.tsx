@@ -247,7 +247,7 @@ export function WalkHud({
       </div>
 
       {near && !s.wasted && (
-        <div className="sign absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap">
+        <div className="sign absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap max-sm:bottom-[calc(var(--walk-mm)+2rem)]">
           {near[0]}
           <kbd className="kbd-key">{keyOf("enter")}</kbd>
           {near.slice(1).join("")}

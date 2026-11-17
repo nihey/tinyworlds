@@ -600,7 +600,7 @@ describe("parked cars after an early move", () => {
       missing: farAway(),
     });
     game.sim(0.5);
-    // a click on the map beside, in the first second
+    // a walk link followed while walking, in the first second
     game.teleport(100, 109);
     game.sim(3);
     expect(game.vehicles().filter((v) => v.state === "parked").length).toBeGreaterThan(10);

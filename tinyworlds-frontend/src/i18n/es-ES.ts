@@ -755,8 +755,7 @@ export const esES: Strings = {
     pixel: "Tamaño del píxel",
     sound: "Sonido",
     clickToLook: "Haz clic para mirar alrededor",
-    mapGoThere: "Haz clic en el mapa para ir allí",
-    mapTapThere: "Toca el mapa para ir allí",
+    minimap: "Mapa de las calles a tu alrededor",
     touch: {
       jump: "Saltar",
       enter: "Entrar",

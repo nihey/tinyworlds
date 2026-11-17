@@ -171,6 +171,8 @@ export class MapEngine {
   private maxTiles = 120;
   private reducedMotion: boolean;
   private destroyed = false;
+  /** the street walk covers the map: nothing is drawn (life included) until it is let go */
+  private paused = false;
 
   // frame loop
   private raf = 0;
@@ -238,7 +240,7 @@ export class MapEngine {
   // scene
   private life = true;
   private readonly sceneLayers = new Set<SceneDraw>();
-  /** the layers drawn whatever "life on the map" says (the street walk's person) */
+  /** the layers drawn whatever "life on the map" says (the ways lit under the street walk's person) */
   private readonly alwaysLayers = new Set<SceneDraw>();
 
   private readonly listeners: { [K in keyof EngineEvents]: Set<EngineEvents[K]> } = {
@@ -540,7 +542,7 @@ export class MapEngine {
    * Adds a layer drawn over the tiles in map space; returns its remover. Layers are
    * only called while life is on, every frame unless the visitor prefers reduced motion
    * (then once per redraw, with time standing still). An `always` layer is not life but a sign
-   * (the street walk's person): it is drawn with life off too, and only when the map is redrawn.
+   * (the ways lit under the street walk's person): it is drawn with life off too, and only when the map is redrawn.
    */
   addSceneLayer(draw: SceneDraw, { always = false }: { always?: boolean } = {}): () => void {
     (always ? this.alwaysLayers : this.sceneLayers).add(draw);
@@ -555,7 +557,25 @@ export class MapEngine {
   /** Ask for a redraw. */
   invalidate(): void {
     this.dirty = true;
-    if (!this.raf && !this.destroyed) this.raf = requestAnimationFrame(this.frame);
+    if (!this.raf && !this.destroyed && !this.paused) this.raf = requestAnimationFrame(this.frame);
+  }
+
+  /**
+   * Stops drawing while something covers the whole map (the street walk), and starts again,
+   * redrawn, when it is let go. Meanwhile the view can still be moved (`jumpTo`): the first frame
+   * after shows it there. Motion under way (a glide, a flight) is dropped.
+   */
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    if (paused) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.stopMotion();
+    } else {
+      this.lastFrame = 0;
+      this.invalidate();
+    }
   }
 
   // ---- view ------------------------------------------------------------------------------
@@ -619,7 +639,7 @@ export class MapEngine {
 
   private readonly frame = (now: number): void => {
     this.raf = 0;
-    if (this.destroyed) return;
+    if (this.destroyed || this.paused) return;
     const dt = Math.min(64, this.lastFrame ? now - this.lastFrame : 16);
     this.lastFrame = now;
     this.frameNo++;
