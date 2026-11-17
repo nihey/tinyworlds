@@ -2,6 +2,7 @@ import type { RoadNode, StreetEdge, WalkCell } from "./cell";
 import { CELL } from "./geo";
 import type { CarKind } from "./kinds";
 import { CARS, newVehicle, nextVehicleId, pickCar, vehicleBlocked, type Vehicle } from "./vehicles";
+import { clamp, smooth, wrap } from "./math";
 import { cellExists } from "./walk-index";
 import type { WalkWorld } from "./world";
 
@@ -51,13 +52,7 @@ const FIT = 0.3;
 /** Portals match a tunnel's ends this near, m. */
 export const PORTAL_MATCH = 2;
 
-export const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
-const smooth = (t: number) => t * t * (3 - 2 * t);
-/** An angle in (−π, π]. */
-export const wrap = (a: number) => {
-  const x = (((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  return x === 0 ? Math.PI : x - Math.PI;
-};
+export { clamp, wrap } from "./math";
 
 /** A key for a pair of grid indices (each within ±32768), for maps of buckets. */
 export const packKey = (x: number, y: number) => (x + 32768) * 65536 + (y + 32768);

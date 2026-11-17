@@ -1,6 +1,7 @@
 import type { BoatKind, CarKind } from "./kinds";
 import { GRAVITY } from "./player";
-import { PARAPET_HEIGHT, type Parapet, type WalkWorld } from "./world";
+import { clamp } from "./math";
+import { PARAPET_HEIGHT, WATER_Z, type Parapet, type WalkWorld } from "./world";
 
 /**
  * Cars and boats: their kinds, arcade handling, walls, falls, damage and sinking. No three.js, no
@@ -126,6 +127,8 @@ export interface Vehicle {
   /** a boat on the swell: metres up, and radians of roll (to the right, down) */
   heave: number;
   roll: number;
+  /** its own box, when it is not its kind's (the long Staten Island ferry) */
+  size?: { length: number; width: number };
 }
 
 export interface DriveInput {
@@ -176,8 +179,16 @@ export function sizeOf(kind: CarKind | BoatKind): Size {
   return SIZES[kind];
 }
 
+const own = new WeakMap<{ length: number; width: number }, Size>();
+/** A vehicle's box: its own when it has one, else its kind's. */
+export function sizeFor(v: Vehicle): Size {
+  if (!v.size) return SIZES[v.kind];
+  let s = own.get(v.size);
+  if (!s) own.set(v.size, (s = { ...SIZES[v.kind], length: v.size.length, width: v.size.width }));
+  return s;
+}
+
 /** The water's surface, metres below the land (as the world and the swimmer have it). */
-const WATER_Z = -0.6;
 const MAX_DT = 0.1;
 const SUBSTEP = 0.02;
 /** No step moves any part of a vehicle further than this, so nothing is passed through. */
@@ -260,7 +271,6 @@ const PROBE_HEIGHT = 3;
 const HEAVE = 0.12;
 const ROLL = 0.06;
 
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 const toward0 = (x: number, by: number) => (x > 0 ? Math.max(0, x - by) : Math.min(0, x + by));
 const smooth = (t: number) => t * t * (3 - 2 * t);
 /** Read through a call: a step can sink what the type checker saw afloat. */
@@ -442,13 +452,20 @@ function carShape(world: VehicleWorld, kind: CarKind, z: number, e: number, n: n
   };
 }
 
+const ownProbes = new WeakMap<{ length: number; width: number }, [number, number][]>();
+
 /** A boat: anything that is not open water at its probes stops it (land, piers, a bridge's piers). */
-function boatShape(world: VehicleWorld, kind: BoatKind): Shape {
-  const probes = PROBES[kind];
+function boatShape(world: VehicleWorld, v: Vehicle): Shape {
+  const kind = v.kind as BoatKind;
+  let probes = PROBES[kind];
+  if (v.size) {
+    probes = ownProbes.get(v.size) ?? boatProbes(v.size.length / 2, v.size.width / 2);
+    ownProbes.set(v.size, probes);
+  }
   const dry = (e: number, n: number) =>
     !world.isWater(e, n) || world.blocked(e, n, PROBE_R, WATER_Z, PROBE_HEIGHT);
   return {
-    reach: BOATS[kind].length / 2,
+    reach: sizeFor(v).length / 2,
     blocked(e, n, yaw) {
       const sy = Math.sin(yaw);
       const cy = Math.cos(yaw);
@@ -482,7 +499,9 @@ export function vehicleBlocked(
   z: number,
   world: VehicleWorld,
 ): boolean {
-  const shape = isBoatKind(kind) ? boatShape(world, kind) : carShape(world, kind, z, e, n);
+  const shape = isBoatKind(kind)
+    ? boatShape(world, newVehicle(0, kind, e, n, yaw))
+    : carShape(world, kind, z, e, n);
   return shape.blocked(e, n, yaw);
 }
 
@@ -788,7 +807,7 @@ function swell(v: Vehicle, t: number, calm: boolean) {
     v.roll = 0;
     return;
   }
-  const size = BOATS[v.kind as BoatKind];
+  const size = sizeFor(v);
   const k = Math.min(1, 8 / size.length) * (v.state === "sinking" ? Math.max(0, 1 - v.sink) : 1);
   const ph = v.e * 0.13 + v.n * 0.07;
   v.heave = k * HEAVE * (Math.sin(t * 1.5 + ph) + 0.4 * Math.sin(t * 2.3 + ph * 1.7));
@@ -813,7 +832,7 @@ function boatStep(
   vl *= Math.exp(-STERN * h);
   // a rudder needs way on: no speed, no turn
   const rudder = input ? clamp(input.steer, -1, 1) : 0;
-  const turn = rudder * (RUDDER / s.length) * clamp(vf / WAY, -1, 1);
+  const turn = rudder * (RUDDER / sizeFor(v).length) * clamp(vf / WAY, -1, 1);
   v.w += (turn - v.w) * Math.min(1, BOAT_HELM * h);
   if (!input && Math.abs(vf) < 0.02 && Math.abs(vl) < 0.02 && Math.abs(v.w) < 0.005) {
     vf = 0;
@@ -823,13 +842,7 @@ function boatStep(
   const frame = v.yaw + BOAT_CARRY * v.w * h;
   const sy = Math.sin(frame);
   const cy = Math.cos(frame);
-  const moved = moveAndSlide(
-    v,
-    vf * sy + vl * cy,
-    vf * cy - vl * sy,
-    h,
-    boatShape(world, v.kind as BoatKind),
-  );
+  const moved = moveAndSlide(v, vf * sy + vl * cy, vf * cy - vl * sy, h, boatShape(world, v));
   if (moved.impact > 0) hit(v, moved.impact, out);
   setVelocity(v, moved.ve, moved.vn);
   if (v.state !== "sinking") v.z = WATER_Z;
@@ -854,7 +867,7 @@ export function stepBoat(
   const total = Math.min(Math.max(dt, 0), MAX_DT);
   if (total <= 0) return out;
   if (input || v.state === "sinking" || v.v !== 0 || v.vs !== 0 || v.w !== 0) {
-    const steps = substeps(v, total, BOATS[v.kind as BoatKind].length / 2);
+    const steps = substeps(v, total, sizeFor(v).length / 2);
     const h = total / steps;
     for (let i = 0; i < steps && !isSunk(v); i++) {
       if (v.state === "sinking") sinkStep(v, BOAT_FLOAT, h);

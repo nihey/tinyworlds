@@ -1,4 +1,4 @@
-import { sizeOf, type Vehicle } from "./vehicles";
+import { sizeFor, type Vehicle } from "./vehicles";
 
 /**
  * A car or a boat as a box on the ground, for collisions: centre (east, north), yaw (radians from
@@ -161,7 +161,7 @@ export function resolve(a: Body, b: Body, hit: Hit, restitution = 0.25): number 
 
 /** A vehicle as a box, its speeds along and across its heading turned into east and north. */
 export function bodyOf(v: Vehicle): Body {
-  const size = sizeOf(v.kind);
+  const size = sizeFor(v);
   const s = Math.sin(v.yaw);
   const c = Math.cos(v.yaw);
   return {

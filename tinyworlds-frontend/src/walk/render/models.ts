@@ -2,9 +2,9 @@ import * as THREE from "three";
 import type { BoatKind, CarKind } from "../kinds";
 import type { Person } from "../people";
 import type { SignalPost } from "../signals";
-import type { Vehicle } from "../vehicles";
+import { sizeOf, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
-import { DRAIN, FOG_FAR, FOG_NEAR, GREY_RAMPS, HORIZON, greysOf } from "./materials";
+import { FOG, FOG_FAR, FOG_NEAR, GREY_RAMPS, HORIZON, greysOf } from "./materials";
 import { SHADES, type Palette } from "./palette";
 
 /**
@@ -606,13 +606,6 @@ function signalModel(M: Shape) {
 
 // ---- the shaders
 
-/** The fog, then the drain to greys while you are down (as the city's surfaces have it). */
-const FOG = /* glsl */ `
-uniform vec3 fogColor; uniform float fogNear, fogFar;
-${DRAIN}
-vec3 fogged(vec3 c, float d) { return drained(mix(c, fogColor, smoothstep(fogNear, fogFar, d))); }
-`;
-
 const PALETTE = /* glsl */ `
 uniform sampler2D pal;
 vec3 P(int ramp, int shade) { return texelFetch(pal, ivec2(ramp * ${SHADES} + clamp(shade, 0, 5), 0), 0).rgb; }
@@ -629,7 +622,7 @@ const VEHICLE_VERTEX = /* glsl */ `
 attribute float part; attribute float ramp; attribute float lit; attribute float dmg;
 uniform vec2 sun;
 flat varying int vPart; flat varying int vRamp; flat varying int vLit; flat varying int vTone;
-flat varying float vDmg; varying vec3 vMV;
+flat varying float vDmg; varying vec3 vMV; varying vec3 vLocal;
 void main() {
   mat4 m = modelMatrix * instanceMatrix;
   ${TONE}
@@ -643,6 +636,7 @@ void main() {
     p.z *= 1.0 - h1 * min(dmg, 1.0) * 0.05;
   }
   vPart = int(part + 0.5); vRamp = int(ramp + 0.5); vLit = int(lit + 0.5); vDmg = dmg;
+  vLocal = position;
   vec4 mv = viewMatrix * m * vec4(p, 1.0);
   vMV = mv.xyz;
   gl_Position = projectionMatrix * mv;
@@ -654,7 +648,7 @@ precision highp float; precision highp int;
 uniform float time;
 ${FOG} ${PALETTE}
 flat varying int vPart; flat varying int vRamp; flat varying int vLit; flat varying int vTone;
-flat varying float vDmg; varying vec3 vMV;
+flat varying float vDmg; varying vec3 vMV; varying vec3 vLocal;
 void main() {
   int t = vTone, p = vPart;
   bool wrecked = vDmg >= 1.0;
@@ -662,9 +656,9 @@ void main() {
   vec3 c;
   if (p == ${BODY}) c = wrecked ? P(${r("carBlack")}, t - 1) : P(vRamp, t - (vDmg > 0.6 ? 1 : 0));
   else if (p == ${GLASS}) {
-    // from 35% the glass cracks: a scatter of bright pixels
-    ivec2 q = ivec2(gl_FragCoord.xy);
-    c = vDmg > 0.35 && (q.x + q.y * 2) % 5 == 0 ? P(${r("glassSilver")}, 5) : P(${r("glassDark")}, t - 1);
+    // from 35% the glass cracks: a scatter of bright bits on the glass itself, 11 cm each
+    ivec3 q = ivec3(floor(vLocal * 9.0 + 100.0));
+    c = vDmg > 0.35 && (q.x + q.y * 2 + q.z * 3) % 5 == 0 ? P(${r("glassSilver")}, 5) : P(${r("glassDark")}, t - 1);
   }
   else if (p == ${TYRE}) c = P(${r("asphaltDark")}, t == 5 ? 1 : 0);
   else if (p == ${HEAD}) c = wrecked ? P(${r("darkStone")}, 1) : P(${r("markingWhite")}, 5);
@@ -821,6 +815,7 @@ export class WalkModels {
   private readonly euler = new THREE.Euler(0, 0, 0, "YXZ");
   private readonly at = new THREE.Vector3();
   private readonly one = new THREE.Vector3(1, 1, 1);
+  private readonly stretch = new THREE.Vector3(1, 1, 1);
   private readonly yours: [number, number, number, number];
   private readonly grey = { value: 0 };
 
@@ -888,12 +883,13 @@ export class WalkModels {
     yaw: number,
     pitch: number,
     roll: number,
+    scale: THREE.Vector3 = this.one,
   ): number {
     const i = pool.next();
     this.euler.set(pitch, -yaw, roll, "YXZ");
     this.quat.setFromEuler(this.euler);
     this.at.set(e, z, -n);
-    this.matrix.compose(this.at, this.quat, this.one);
+    this.matrix.compose(this.at, this.quat, scale);
     pool.mesh.setMatrixAt(i, this.matrix);
     return i;
   }
@@ -925,7 +921,15 @@ export class WalkModels {
     if (v.state === "sunk") return;
     const pool = this.pools.get(v.kind);
     if (!pool) return;
-    const i = this.place(pool, v.e, v.z + v.heave, v.n, v.yaw, 0, -v.roll);
+    // a vehicle of its own size (the long ferry) is its kind's model stretched to it: as much
+    // higher as it is wider
+    let scale = this.one;
+    if (v.size) {
+      const kind = sizeOf(v.kind);
+      const across = v.size.width / kind.width;
+      scale = this.stretch.set(across, across, v.size.length / kind.length);
+    }
+    const i = this.place(pool, v.e, v.z + v.heave, v.n, v.yaw, 0, -v.roll, scale);
     pool.attrs.ramp.array[i] = this.paint(v);
     pool.attrs.lit.array[i] = brake ? 1 : 0;
     pool.attrs.dmg.array[i] = v.state === "wrecked" ? 1 : v.damage;

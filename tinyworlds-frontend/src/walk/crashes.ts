@@ -2,7 +2,7 @@ import { applyBody, bodyOf, overlap, resolve, type Body } from "./collide";
 import { onRoute } from "./ferries";
 import { HEIGHT, RADIUS, type Player } from "./player";
 import type { Traffic } from "./traffic";
-import { applyDamage, sizeOf, type Vehicle } from "./vehicles";
+import { applyDamage, sizeFor, type Vehicle } from "./vehicles";
 import type { WalkWorld } from "./world";
 
 /**
@@ -21,7 +21,7 @@ const BUCKET = 16;
  * inside it: how deep), (ne, nn) the unit way from the box out to the point.
  */
 export function fromBox(v: Vehicle, e: number, n: number, grow = 0) {
-  const s = sizeOf(v.kind);
+  const s = sizeFor(v);
   const hl = s.length / 2 + grow;
   const hw = s.width / 2 + grow;
   const sy = Math.sin(v.yaw);
@@ -47,7 +47,7 @@ export function fromBox(v: Vehicle, e: number, n: number, grow = 0) {
 
 /** A vehicle's height from its bottom (a boat's hull reaches under the water) to its roof. */
 export function span(v: Vehicle): [number, number] {
-  const h = sizeOf(v.kind).height * (v.state === "wrecked" ? 0.85 : 1);
+  const h = sizeFor(v).height * (v.state === "wrecked" ? 0.85 : 1);
   return [v.boat ? v.z - 1 : v.z, v.z + h];
 }
 
@@ -66,7 +66,7 @@ export interface CrashHooks {
 }
 
 const cellsOf = (v: Vehicle) => {
-  const s = sizeOf(v.kind);
+  const s = sizeFor(v);
   const r = Math.hypot(s.length, s.width) / 2;
   const out: number[] = [];
   for (let x = Math.floor((v.e - r) / BUCKET); x <= Math.floor((v.e + r) / BUCKET); x++)
@@ -142,8 +142,8 @@ function answer(v: Vehicle, body: Body, was: { e: number; n: number }, hooks: Cr
 
 /**
  * You on foot or swimming, and the vehicles near: pushed out of any you overlap (unless you stand
- * on its roof or are under it). Answers the hardest of them closing on you, by your velocity
- * `vel`, and its way from it to you; null when none touches you.
+ * on its roof or are under it). Answers the hardest of them coming at you (only its own speed
+ * counts, less yours away from it: `vel`), and its way from it to you; null when none touches you.
  */
 export function bumped(
   p: Player,
@@ -162,8 +162,9 @@ export function bumped(
     const push = RADIUS - b.d + 0.01;
     [p.e, p.n] = world.slide(p.e, p.n, p.e + b.ne * push, p.n + b.nn * push, RADIUS, p.z, HEIGHT);
     const body = bodyOf(v);
-    // the speed it closes at along the line between you
-    const closing = (body.ve - vel.e) * b.ne + (body.vn - vel.n) * b.nn;
+    // how fast it comes at you along the line between you, less how fast you were moving away
+    // from it: walking into a car standing still is no hit, and nor is a car pushing you along
+    const closing = body.ve * b.ne + body.vn * b.nn - Math.max(0, vel.e * b.ne + vel.n * b.nn);
     if (!worst || closing > worst.closing) worst = { closing, ne: b.ne, nn: b.nn };
   }
   return worst;

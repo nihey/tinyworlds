@@ -7,8 +7,8 @@ const TOTAL = WASTED.wordAt + WASTED.holdFor + WASTED.fadeFor;
 
 /**
  * What the screen shows `t` seconds in. `timeRate` scales the world's clock, `grey` drains the
- * colours, `lift` raises the camera, `word` is the lettering's opacity. Reduced motion keeps the
- * word and the fade and drops the slow motion, the drain and the lift.
+ * colours, `lift` raises the camera, `word` is the lettering's opacity. Reduced motion drops the
+ * slow motion and the lift, and keeps the drain, the word and the fade.
  */
 export function wastedAt(
   t: number,
@@ -26,7 +26,7 @@ export function wastedAt(
   const hold = WASTED.wordAt + WASTED.holdFor;
   return {
     timeRate: reduced || t >= WASTED.slowFor ? 1 : WASTED.slowRate,
-    grey: reduced ? 0 : Math.min(1, Math.max(0, t / WASTED.slowFor)),
+    grey: Math.min(1, Math.max(0, t / WASTED.slowFor)),
     lift: reduced ? 0 : Math.min(1, Math.max(0, t / hold)),
     word: Math.min(rise, fade),
     skippable: t >= WASTED.wordAt + WORD_RISE && t < TOTAL,

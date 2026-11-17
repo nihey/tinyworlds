@@ -1,7 +1,8 @@
 import type { LifeFile } from "../map/life";
 import { lonLatToEN, type WalkGeo } from "./geo";
+import { clamp, smooth } from "./math";
 import { newVehicle, nextVehicleId, stepBoat, type Vehicle } from "./vehicles";
-import type { WalkWorld } from "./world";
+import { WATER_Z, type WalkWorld } from "./world";
 
 /**
  * The ferries on the `life.json` routes, there and back with a wait at each end. A boat on its
@@ -13,11 +14,16 @@ import type { WalkWorld } from "./world";
 /** The ferries' routes, as `life.json` has them. */
 export type LifeRoutes = LifeFile["ferries"];
 
-const WATER_Z = -0.6;
 const SPEED = 7;
 const STATEN_SPEED = 8;
+/** The Staten Island boat's own box, m: three times a ferry's length, twice its beam. */
+const STATEN_SIZE = { length: 90, width: 20 };
 /** Seconds a ferry waits at each end. */
 const PAUSE = 15;
+/** A ferry faces along its route from this far behind it to this far ahead, m. */
+const LOOK = 15;
+/** Seconds it takes to turn round at an end, in the middle of its wait there. */
+const TURN = 10;
 /** Routes shorter than this, m, have no boat. */
 const SHORTEST = 200;
 
@@ -37,46 +43,75 @@ interface Route {
   boat: Vehicle | null;
 }
 
-/** Where a ferry is on its route at time t: out, a wait at the far end, back, a wait at the start. */
-function poseAt(r: Route, t: number) {
-  const run = r.len / r.speed;
-  const cycle = 2 * (run + PAUSE);
-  const c = (((t + r.phase * cycle) % cycle) + cycle) % cycle;
-  let d: number;
-  let back: boolean;
-  let speed = r.speed;
-  if (c < run) {
-    d = c * r.speed;
-    back = false;
-  } else if (c < run + PAUSE) {
-    d = r.len;
-    back = false;
-    speed = 0;
-  } else if (c < 2 * run + PAUSE) {
-    d = r.len - (c - run - PAUSE) * r.speed;
-    back = true;
-  } else {
-    d = 0;
-    back = true;
-    speed = 0;
-  }
+/** A point `d` metres along a route (clamped to it). */
+function pointAt(r: Route, d: number): { e: number; n: number } {
+  const x = clamp(d, 0, r.len);
   let lo = 0;
   let hi = r.cum.length - 1;
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
-    if (r.cum[mid] <= d) lo = mid;
+    if (r.cum[mid] <= x) lo = mid;
     else hi = mid;
   }
   const seg = r.cum[hi] - r.cum[lo] || 1;
-  const k = Math.max(0, Math.min(1, (d - r.cum[lo]) / seg));
-  const de = r.pts[hi * 2] - r.pts[lo * 2];
-  const dn = r.pts[hi * 2 + 1] - r.pts[lo * 2 + 1];
-  const yaw = Math.atan2(de, dn) + (back ? Math.PI : 0);
-  return { e: r.pts[lo * 2] + de * k, n: r.pts[lo * 2 + 1] + dn * k, yaw, speed };
+  const k = clamp((x - r.cum[lo]) / seg, 0, 1);
+  return {
+    e: r.pts[lo * 2] + (r.pts[hi * 2] - r.pts[lo * 2]) * k,
+    n: r.pts[lo * 2 + 1] + (r.pts[hi * 2 + 1] - r.pts[lo * 2 + 1]) * k,
+  };
 }
 
-const boatOf = (r: Route, pose: { e: number; n: number; yaw: number }) =>
-  newVehicle(nextVehicleId(), "ferry", pose.e, pose.n, pose.yaw, "traffic", r.staten ? 1 : 0);
+/** The way a ferry faces `d` metres along: from a little behind to a little ahead, so it turns a corner over a few seconds. */
+function headingAt(r: Route, d: number, back: boolean): number {
+  const a = pointAt(r, d - LOOK);
+  const b = pointAt(r, d + LOOK);
+  return Math.atan2(b.e - a.e, b.n - a.n) + (back ? Math.PI : 0);
+}
+
+/**
+ * Where a ferry is on its route at time t: out, a wait at the far end (turning round in the
+ * middle of it), back, a wait at the start (turning round again).
+ */
+function poseAt(r: Route, t: number) {
+  const run = r.len / r.speed;
+  const cycle = 2 * (run + PAUSE);
+  const c = (((t + r.phase * cycle) % cycle) + cycle) % cycle;
+  // how far through its turn round, during a wait that began at `from`
+  const turned = (from: number) => smooth(clamp((c - from - (PAUSE - TURN) / 2) / TURN, 0, 1));
+  if (c < run) {
+    const d = c * r.speed;
+    return { ...pointAt(r, d), yaw: headingAt(r, d, false), speed: r.speed };
+  }
+  if (c < run + PAUSE)
+    return {
+      ...pointAt(r, r.len),
+      yaw: headingAt(r, r.len, false) + Math.PI * turned(run),
+      speed: 0,
+    };
+  if (c < 2 * run + PAUSE) {
+    const d = r.len - (c - run - PAUSE) * r.speed;
+    return { ...pointAt(r, d), yaw: headingAt(r, d, true), speed: r.speed };
+  }
+  return {
+    ...pointAt(r, 0),
+    yaw: headingAt(r, 0, true) + Math.PI * turned(2 * run + PAUSE),
+    speed: 0,
+  };
+}
+
+function boatOf(r: Route, pose: { e: number; n: number; yaw: number }): Vehicle {
+  const v = newVehicle(
+    nextVehicleId(),
+    "ferry",
+    pose.e,
+    pose.n,
+    pose.yaw,
+    "traffic",
+    r.staten ? 1 : 0,
+  );
+  if (r.staten) v.size = STATEN_SIZE;
+  return v;
+}
 
 export class Ferries {
   private readonly routes: Route[] = [];

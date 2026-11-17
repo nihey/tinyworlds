@@ -10,6 +10,7 @@ import { Fleet, within } from "./fleet";
 import { CELL } from "./geo";
 import { LIFE_MAX, fireDamage, hitDamage, regen } from "./health";
 import type { BoatKind, CarKind } from "./kinds";
+import { clamp, wrap } from "./math";
 import { Crowd } from "./people";
 import {
   HEIGHT,
@@ -30,7 +31,7 @@ import { comeTo } from "./spawn";
 import { RoadNet, Traffic, starterCar, type Blocker, type KerbSpot } from "./traffic";
 import { portalCrossed } from "./tunnels";
 import {
-  sizeOf,
+  sizeFor,
   stepBoat,
   stepCar,
   type DriveInput,
@@ -39,7 +40,7 @@ import {
 } from "./vehicles";
 import { cellExists, type WalkIndex } from "./walk-index";
 import { WASTED, wastedAt } from "./wasted";
-import type { WalkWorld } from "./world";
+import { WATER_Z, type WalkWorld } from "./world";
 
 export type { LifeRoutes } from "./ferries";
 
@@ -115,7 +116,6 @@ declare global {
 // the clock
 const MAX_DT = 0.1;
 const SIM_STEP = 1 / 30;
-const WATER_Z = -0.6;
 /** Faster than this, m/s, a move was a jump (a tunnel's far end), not a speed. */
 const JUMPED = 120;
 // you, hit
@@ -144,9 +144,17 @@ const GATHER_EVERY = 0.25;
 const PARK_EVERY = 1;
 const LOOSE_KEEP = 700;
 const COLLIDE_REACH = 250;
+/** Within this of you, loose vehicles move (and hit) in steps of at most CLOSE_STEP, with yours. */
+const CLOSE = 30;
+const CLOSE_STEP = 0.02;
+/** What they may hit reaches this much farther (half a bus, and some). */
+const CLOSE_REACH = 15;
 const ROOF_REACH = 15;
-/** A car's roof holds you up this far beyond its body (your radius, nearly). */
-const ROOF_GROW = 0.3;
+/**
+ * A car's roof holds you up (and its side stops you) this far beyond its body: a little more than
+ * your radius, so walking up to a car never puts you inside the reach where it pushes you.
+ */
+const ROOF_GROW = RADIUS + 0.02;
 const SMOKE_REACH = 150;
 const FERRY_NEAR = 800;
 /** A route's boat taken away comes back no nearer to you than this, out of sight. */
@@ -163,11 +171,6 @@ const TUNNEL_WAIT = 10;
 /** Where the edge of the data is looked for, ahead of you, m. */
 const EDGE_LOOK = 1.5;
 
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
-const wrap = (a: number) => {
-  const x = (((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  return x - Math.PI;
-};
 const TOTAL = WASTED.wordAt + WASTED.holdFor + WASTED.fadeFor;
 
 export class WalkGame {
@@ -202,6 +205,8 @@ export class WalkGame {
   private roofCars: Vehicle[] = [];
   private gatherIn = 0;
   private parkIn = 0;
+  /** where you were as this frame's short steps began */
+  private closeAt = { e: 0, n: 0 };
 
   // input
   private keys = new Set<string>();
@@ -439,11 +444,15 @@ export class WalkGame {
     this.listeners.clear();
   }
 
-  /** Runs the game `seconds` ahead in steps of 1/30 s, drawing nothing: for checks and the console. */
-  sim(seconds: number): void {
+  /**
+   * Runs the game `seconds` ahead in frames of `frame` seconds (1/30 unless said; a slow machine's
+   * are longer, up to 0.1), drawing nothing: for checks and the console.
+   */
+  sim(seconds: number, frame = SIM_STEP): void {
     let left = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    const each = Number.isFinite(frame) && frame > 0 ? frame : SIM_STEP;
     while (left > 1e-9) {
-      const dt = Math.min(SIM_STEP, left);
+      const dt = Math.min(each, left);
       this.step(dt);
       left -= dt;
     }
@@ -491,11 +500,14 @@ export class WalkGame {
     this.gather();
     const p = this.player;
     this.before = { e: p.e, n: p.n };
+    const playing = !this.tunnel && !this.wasted && !this.waiting;
     if (this.tunnel) this.tunnelStep(real);
-    else if (!this.wasted && !this.waiting) {
+    else if (playing) {
       this.wants();
-      if (this.yours) this.driveStep(h);
-      else this.footStep(h);
+      if (!this.yours) this.footStep(h);
+    }
+    this.closeSteps(h, playing);
+    if (playing) {
       this.portals(h);
       this.edge();
     }
@@ -525,7 +537,7 @@ export class WalkGame {
       );
     }
     this.gather();
-    this.collisions();
+    this.collisions(COLLIDE_REACH, (v) => !this.isClose(v));
     this.follow();
     this.youAndVehicles();
     if (h > 0 && !this.wasted && !this.tunnel) {
@@ -586,7 +598,7 @@ export class WalkGame {
     let best: number | null = null;
     for (const v of this.roofCars) {
       if (fromBox(v, e, n, ROOF_GROW).d > 0) continue;
-      const top = v.z + sizeOf(v.kind).height * (v.state === "wrecked" ? 0.85 : 1);
+      const top = v.z + sizeFor(v).height * (v.state === "wrecked" ? 0.85 : 1);
       if (best === null || top > best) best = top;
     }
     return best;
@@ -827,6 +839,7 @@ export class WalkGame {
     const v = this.yours!;
     if (Math.hypot(v.v, v.vs) >= EXIT_SPEED) return this.say("slowDown");
     const spot = wayOut(v, this.world, this.nearby);
+    if (spot === "slower") return this.say("slowDown");
     if (!spot) return this.say("noRoom");
     this.leaveVehicle(v);
     this.stand(spot, v.yaw);
@@ -888,9 +901,9 @@ export class WalkGame {
     const v = this.yours;
     if (v) {
       // you lie beside what you drove, which stays where it is
-      const spot = wayOut(v, this.world, this.nearby);
+      const spot = wayOut(v, this.world, this.nearby, true);
       this.leaveVehicle(v);
-      this.stand(spot ?? { e: v.e, n: v.n, z: v.z, swim: false }, v.yaw);
+      this.stand(spot && spot !== "slower" ? spot : { e: v.e, n: v.n, z: v.z, swim: false }, v.yaw);
     }
     this.wasted = true;
     this.wastedT = 0;
@@ -1019,7 +1032,7 @@ export class WalkGame {
       if (way === 0) return;
       de = Math.sin(v.yaw) * way;
       dn = Math.cos(v.yaw) * way;
-      reach = sizeOf(v.kind).length / 2 + EDGE_LOOK;
+      reach = sizeFor(v).length / 2 + EDGE_LOOK;
     } else {
       const i = this.footInput();
       if (Math.hypot(i.forward, i.strafe) < 0.05) return;
@@ -1052,20 +1065,43 @@ export class WalkGame {
     }
   }
 
-  /** Loose cars, wrecks, what sinks and the boats left about; the moored boats bob. */
+  /** The vehicles that move in short steps: what you drive, and what is loose within 30 m. */
+  private isClose(v: Vehicle): boolean {
+    return v === this.yours || within(v, this.closeAt, CLOSE);
+  }
+
+  /**
+   * What you drive, and the loose vehicles near you, moved in steps of 0.02 s at most, each step
+   * answering the hits it brings: so nothing fast passes through anything near you.
+   */
+  private closeSteps(h: number, playing: boolean): void {
+    this.closeAt = this.focus();
+    const subs = Math.max(1, Math.ceil(h / CLOSE_STEP - 1e-9));
+    const hs = h / subs;
+    for (let k = 0; k < subs; k++) {
+      if (playing && this.yours) this.driveStep(hs);
+      for (const v of this.fleet.free)
+        if (v !== this.yours && this.isClose(v)) this.stepFree(v, hs);
+      this.collisions(CLOSE + CLOSE_REACH, (v) => this.isClose(v));
+    }
+  }
+
+  /** A free vehicle with nobody at the wheel: rolling, sliding, sinking, burning. */
+  private stepFree(v: Vehicle, h: number): void {
+    const ev = v.boat
+      ? stepBoat(v, null, this.world, h, this.t, { calm: this.reduced })
+      : stepCar(v, null, this.world, h);
+    this.events(v, ev);
+  }
+
+  /** The loose cars, wrecks, what sinks and the boats left about farther away; the moored boats bob. */
   private freeStep(h: number): void {
     const me = this.focus();
     const f = this.fleet;
     f.free = f.free.filter(
       (v) => v.state !== "sunk" && (v === this.yours || within(v, me, LOOSE_KEEP)),
     );
-    for (const v of f.free) {
-      if (v === this.yours) continue;
-      const ev = v.boat
-        ? stepBoat(v, null, this.world, h, this.t, { calm: this.reduced })
-        : stepCar(v, null, this.world, h);
-      this.events(v, ev);
-    }
+    for (const v of f.free) if (v !== this.yours && !this.isClose(v)) this.stepFree(v, h);
     for (const v of f.kept)
       if (v.boat && v.state === "parked")
         stepBoat(v, null, this.world, h, this.t, { calm: this.reduced });
@@ -1084,26 +1120,30 @@ export class WalkGame {
 
   // ---------- what hits what, and what comes of it ----------
 
-  /** Every pair of vehicles near you that touch, one of them moving: see `crashes.ts`. */
-  private collisions(): void {
+  /**
+   * Every pair of vehicles within `reach` of you that touch, one of them moving and `which` (those
+   * stepped together): see `crashes.ts`.
+   */
+  private collisions(reach: number, which: (v: Vehicle) => boolean): void {
     const me = this.focus();
     const list = this.nearby.filter(
       (v) =>
         v.state !== "sunk" &&
         v.state !== "sinking" &&
         !(v === this.yours && this.tunnel) &&
-        within(v, me, COLLIDE_REACH) &&
+        within(v, me, reach) &&
         !(v.state === "traffic" && !v.boat && this.traffic.squeezing(v)),
     );
     collide(list, {
       traffic: this.traffic,
       // what moves of itself: you, what slides loose, a ferry under way
       mover: (v) =>
-        v === this.yours
+        which(v) &&
+        (v === this.yours
           ? !this.tunnel
           : onRoute(v)
             ? v.v !== 0
-            : (v.state === "loose" || v.state === "wrecked") && moving(v),
+            : (v.state === "loose" || v.state === "wrecked") && moving(v)),
       loosen: (v) => this.fleet.loosen(v),
       keep: (v) => this.fleet.keep(v),
       crunch: (v, e, n, z, speed) => this.crunch(v, e, n, z, speed),
@@ -1126,7 +1166,7 @@ export class WalkGame {
   /** A stepper's own hits (a wall, a parapet, a quay, a landing): their damage is done already. */
   private events(v: Vehicle, ev: VehicleEvents): void {
     if (ev.impact > CRUNCH) {
-      const hl = sizeOf(v.kind).length / 2;
+      const hl = sizeFor(v).length / 2;
       const way = v.v < 0 ? -1 : 1;
       const e = v.e + Math.sin(v.yaw) * hl * way;
       const n = v.n + Math.cos(v.yaw) * hl * way;
@@ -1147,7 +1187,7 @@ export class WalkGame {
       }
       if (v.state === "sinking" && !this.sinkingSeen.has(v)) {
         this.sinkingSeen.add(v);
-        this.splash(v.e, v.n, Math.max(sizeOf(v.kind).width, 2), 1);
+        this.splash(v.e, v.n, Math.max(sizeFor(v).width, 2), 1);
         if (v === this.yours) this.say("sinking");
       }
     }
@@ -1158,7 +1198,7 @@ export class WalkGame {
     const f = this.focus();
     const d = Math.hypot(v.e - f.e, v.n - f.n);
     if (d < BOOM_HEAR) this.sound.boom(1 - d / BOOM_HEAR);
-    this.particles.wreck(v.e, v.n, v.z, sizeOf(v.kind).length);
+    this.particles.wreck(v.e, v.n, v.z, sizeFor(v).length);
     for (const q of this.crowd.people)
       if (
         q.state !== "down" &&
@@ -1207,7 +1247,7 @@ export class WalkGame {
           ? this.cams.driving(this.yours, real, this.held("lookBehind"), this.world)
           : this.cams.onFoot(this.player, this.t);
     this.view.setCamera(eye.e, eye.n, eye.z, eye.yaw, eye.pitch, eye.fov);
-    // the colours drain while you are down (not under reduced motion: `wastedAt` keeps them)
+    // the colours drain while you are down (under reduced motion too: nothing moves in that)
     const grey = this.wasted ? wastedAt(this.wastedT, this.reduced).grey : 0;
     this.view.setGrey(grey);
     this.models.setGrey(grey);
@@ -1235,8 +1275,8 @@ export class WalkGame {
     }
     for (const v of this.fleet.free)
       if (v !== this.yours && !within(v, me, NEAR) && within(v, me, far)) m.vehicle(v);
-    for (const v of this.ferries.boats())
-      if (v !== this.yours && !within(v, me, FERRY_NEAR) && within(v, me, far)) m.vehicle(v);
+    // parked cars and moored boats beyond what can be hit, out to where the fog is thick
+    for (const v of this.fleet.far) if (v.state === "parked") m.vehicle(v);
     for (const posts of this.posts.values())
       for (const post of posts)
         if (within(post, me, SIGNAL_REACH)) m.signal(post, lampLit(this.t, post.phase));
@@ -1272,21 +1312,26 @@ export class WalkGame {
     };
   }
 
-  /** Tells the listeners when what the signs show has changed. */
+  /**
+   * Tells the listeners when what the signs show has changed as far as they show it: life to the
+   * half point (and whenever it comes back whole), speed to half a metre a second, damage to the
+   * percent, the flash and the wasted sequence to a twentieth. Not every frame.
+   */
   private emit(): void {
     const s = this.snapshot();
     const w = s.wasted;
+    const v = s.vehicle;
+    const twentieths = (x: number) => Math.round(x * 20);
     const sig = [
       s.mode,
-      s.life,
-      s.vehicle
-        ? `${s.vehicle.kind}:${s.vehicle.speed.toFixed(1)}:${s.vehicle.damage.toFixed(3)}:${s.vehicle.wrecked}`
-        : "",
+      Math.floor(s.life * 2),
+      s.life >= LIFE_MAX,
+      v ? `${v.kind}:${Math.round(v.speed * 2)}:${Math.round(v.damage * 100)}:${v.wrecked}` : "",
       s.near?.kind ?? "",
       s.message ?? "",
-      s.hurt.toFixed(2),
+      twentieths(s.hurt),
       w
-        ? `${w.word.toFixed(2)}:${w.grey.toFixed(2)}:${w.lift.toFixed(2)}:${w.timeRate}:${w.skippable}`
+        ? `${twentieths(w.word)}:${twentieths(w.grey)}:${twentieths(w.lift)}:${w.timeRate}:${w.skippable}`
         : "",
       s.camera,
       s.dark,

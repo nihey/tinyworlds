@@ -28,11 +28,13 @@ describe("wasted", () => {
     expect(wastedAt(end, false).done).toBe(true);
   });
 
-  it("keeps only the word and the fade under reduced motion", () => {
+  it("drops the slow motion and the lift under reduced motion, and keeps the rest", () => {
     const r = wastedAt(0.5, true);
     expect(r.timeRate).toBe(1);
     expect(r.lift).toBe(0);
-    expect(r.grey).toBe(0);
+    // the colours still drain (nothing moves in that)
+    expect(r.grey).toBe(wastedAt(0.5, false).grey);
+    expect(wastedAt(WASTED.slowFor, true).grey).toBe(1);
     expect(wastedAt(2, true).word).toBe(1);
   });
 });

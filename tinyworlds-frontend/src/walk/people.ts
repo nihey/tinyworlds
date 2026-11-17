@@ -1,7 +1,8 @@
 import type { WalkEdge } from "./cell";
 import { greenLeft, signal } from "./lights";
+import { clamp, wrap } from "./math";
 import { sizeOf, type Vehicle } from "./vehicles";
-import type { WalkWorld } from "./world";
+import { WATER_Z, type WalkWorld } from "./world";
 
 /**
  * The people of the city: pedestrians on the walking edges (sidewalks, crosswalks, elevated
@@ -70,7 +71,6 @@ const STILL = 0.3;
 /** Within this much of a crosswalk's start they have not committed to it yet. */
 const COMMIT = 0.3;
 const SWIM_SPEED = 1.6;
-const WATER_Z = -0.6;
 /** A knocked person is pushed no faster than this (m/s). */
 const KNOCK_MAX = 12;
 const KNOCK_DECAY = 7;
@@ -124,12 +124,6 @@ interface Walker extends Person {
 }
 
 const keyOf = (gi: number, gj: number) => (gi + 65536) * 131072 + (gj + 65536);
-const wrap = (a: number) => {
-  let x = (a + Math.PI) % (2 * Math.PI);
-  if (x < 0) x += 2 * Math.PI;
-  return x - Math.PI;
-};
-const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 
 export class Crowd {
   /** How many people to keep (the game may lower it on a slow machine). */

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { isMapDeck, type ElevatedWay, type GroundWay, type Volume, type WalkCell } from "../cell";
 import { cellExists, type WalkIndex } from "../walk-index";
-import { deckAt, JOIN_HEIGHT, PARAPET_HEIGHT, type WalkWorld } from "../world";
+import { deckAt, JOIN_HEIGHT, PARAPET_HEIGHT, WATER_Z, type WalkWorld } from "../world";
 import {
   columnSide,
   cutTo,
@@ -51,7 +51,7 @@ const ORDER_GROUND_DEPTH = -90;
 const ORDER_TREES = 1;
 
 /** The water's surface, metres under the land (the simulation's too). */
-export const WATER_SURFACE = -0.6;
+export const WATER_SURFACE = WATER_Z;
 /** A shore's edge stands from a little under the water up to the land. */
 const SHORE_FOOT = WATER_SURFACE - 0.3;
 /** How high the data's edge stands: above anything a camera looks at. */

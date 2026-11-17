@@ -1,18 +1,19 @@
 import { fromBox, span } from "./crashes";
 import { HEIGHT, RADIUS, STEP_UP, type Player } from "./player";
-import { sizeOf, type Vehicle } from "./vehicles";
-import type { WalkWorld } from "./world";
+import { sizeFor, type Vehicle } from "./vehicles";
+import { WATER_Z, type WalkWorld } from "./world";
 
 /**
  * Getting in and out: which car or boat you can take from where you stand or swim, and where you
  * stand (or swim) when you leave one. No three.js.
  */
 
-const WATER_Z = -0.6;
 /** You take a car or boat within this of its side, m. */
 const REACH = 2.4;
 /** Faster than this, m/s, you cannot get out. */
 export const EXIT_SPEED = 4;
+/** Out by the front or the back only this slowly, m/s: anything quicker would run you over. */
+const ENDS_SPEED = 1;
 /** Out of a car this far beside it, or ahead of it or behind. */
 const EXIT_SIDE = 0.6;
 const EXIT_END = 0.7;
@@ -72,7 +73,7 @@ function occupied(nearby: Vehicle[], e: number, n: number, z: number, except: Ve
 
 /** The point `out` metres beyond a vehicle's side (`side` ±1) or end (`end` ±1). */
 function beside(v: Vehicle, side: number, end: number, out: number): [number, number] {
-  const s = sizeOf(v.kind);
+  const s = sizeFor(v);
   const sy = Math.sin(v.yaw);
   const cy = Math.cos(v.yaw);
   const off = side * (s.width / 2 + out);
@@ -80,10 +81,14 @@ function beside(v: Vehicle, side: number, end: number, out: number): [number, nu
   return [v.e + cy * off + sy * fwd, v.n - sy * off + cy * fwd];
 }
 
-/** Out of a car: the driver's side if there is room, else the other, the front, the back; the water only if nothing else. */
-function carExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[]): Spot | null {
+/**
+ * Out of a car: the driver's side if there is room, else the other, the front, the back (`ends`:
+ * only when it has all but stopped); the water only if nothing else.
+ */
+function carExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[], ends: boolean): Spot | null {
   let water: Spot | null = null;
   for (const [side, end] of DOORS) {
+    if (end && !ends) continue;
     const [e, n] = beside(v, side, end, side ? EXIT_SIDE : EXIT_END);
     if (!world.inData(e, n)) continue;
     const under = world.surfaceUnder(e, n, v.z, STEP_UP);
@@ -98,10 +103,11 @@ function carExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[]): Spot | null {
   return water;
 }
 
-/** Off a boat: onto a pier or the shore within 1.5 m, else into the water beside it. */
-function boatExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[]): Spot | null {
+/** Off a boat: onto a pier or the shore within 1.5 m (off the bow or stern only when `ends`), else into the water beside it. */
+function boatExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[], ends: boolean): Spot | null {
   for (const [side, end] of DOORS)
     for (const out of STEP_OFF) {
+      if (end && !ends) continue;
       const [e, n] = beside(v, side, end, out);
       if (!world.inData(e, n) || world.isWater(e, n)) continue;
       const land = world.surfaceUnder(e, n, WATER_Z, 1.2);
@@ -111,6 +117,7 @@ function boatExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[]): Spot | null 
       return { e, n, z: land.z, swim: false };
     }
   for (const [side, end] of DOORS) {
+    if (end && !ends) continue;
     const [e, n] = beside(v, side, end, SWIM_OFF);
     if (!world.inData(e, n) || !world.isWater(e, n)) continue;
     if (world.blocked(e, n, RADIUS, WATER_Z, HEIGHT) || occupied(nearby, e, n, WATER_Z, v))
@@ -120,9 +127,22 @@ function boatExit(v: Vehicle, world: WalkWorld, nearby: Vehicle[]): Spot | null 
   return null;
 }
 
-/** Where you stand (or swim) leaving a vehicle, or null when there is no room. */
-export function wayOut(v: Vehicle, world: WalkWorld, nearby: Vehicle[]): Spot | null {
-  return v.boat ? boatExit(v, world, nearby) : carExit(v, world, nearby);
+/**
+ * Where you stand (or swim) leaving a vehicle; "slower" when only its front or back is free and it
+ * is still rolling; null when there is no room. `anyway`: every way out whatever its speed (you
+ * going down in it).
+ */
+export function wayOut(
+  v: Vehicle,
+  world: WalkWorld,
+  nearby: Vehicle[],
+  anyway = false,
+): Spot | "slower" | null {
+  const ends = anyway || Math.hypot(v.v, v.vs) < ENDS_SPEED;
+  const exit = v.boat ? boatExit : carExit;
+  const spot = exit(v, world, nearby, ends);
+  if (spot || ends) return spot;
+  return exit(v, world, nearby, true) ? "slower" : null;
 }
 
 /** Out of what is going under: swimming beside it on the driver's side, else where it is. */

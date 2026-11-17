@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import { sizeOf, type Vehicle } from "../vehicles";
-import { DRAIN, FOG_FAR, FOG_NEAR, HORIZON, greysOf } from "./materials";
+import { sizeFor, type Vehicle } from "../vehicles";
+import { WATER_Z } from "../world";
+import { FOG, FOG_FAR, FOG_NEAR, HORIZON, greysOf } from "./materials";
 import { HALF, HIGH, LIT, SHADE, type Palette } from "./palette";
 
 /**
@@ -25,7 +26,6 @@ export const PARTICLE_RAMPS: readonly string[] = [
   "waterShallow",
 ];
 /** The water's surface, where foam floats and bubbles break. */
-const WATER_Z = -0.6;
 const FOAM_Z = WATER_Z + 0.03;
 
 type Colour = [number, number, number];
@@ -64,15 +64,14 @@ void main() {
 
 const FRAGMENT = /* glsl */ `
 precision highp float;
-uniform vec3 fogColor; uniform float fogNear, fogFar;
-${DRAIN}
+${FOG}
 varying vec3 vColour; varying float vAlpha; varying vec3 vMV;
 const float B[16] = float[16](0., 8., 2., 10., 12., 4., 14., 6., 3., 11., 1., 9., 15., 7., 13., 5.);
 void main() {
   if (length(gl_PointCoord - 0.5) > 0.5) discard;
   ivec2 q = ivec2(mod(gl_FragCoord.xy, 4.0));
   if (vAlpha < (B[q.x + q.y * 4] + 0.5) / 16.0) discard;
-  gl_FragColor = vec4(drained(mix(vColour, fogColor, smoothstep(fogNear, fogFar, length(vMV)))), 1.0);
+  gl_FragColor = vec4(fogged(vColour, length(vMV)), 1.0);
 }`;
 
 export class WalkParticles {
@@ -390,7 +389,7 @@ export class WalkParticles {
    */
   from(v: Vehicle, h: number): void {
     if (v.state === "sunk" || !(h > 0)) return;
-    const s = sizeOf(v.kind);
+    const s = sizeFor(v);
     const sy = Math.sin(v.yaw);
     const cy = Math.cos(v.yaw);
     if (v.state === "sinking") {

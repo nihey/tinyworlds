@@ -1,3 +1,4 @@
+import { clamp } from "./math";
 import type { Surface } from "./world";
 
 export const LIFE_MAX = 100;
@@ -5,8 +6,6 @@ export const LIFE_MAX = 100;
 export const REGEN = 2;
 /** Seconds without being hurt before life comes back. */
 export const REGEN_AFTER = 5;
-
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 
 /** A fall hurts from 4 m and kills at 15 m; water never hurts. */
 export function fallDamage(drop: number, into: Surface["kind"]): number {

@@ -1,9 +1,10 @@
+import { clamp, smooth, wrap } from "./math";
 import { EYE, SWIM_EYE, type Player } from "./player";
 import { FOG_FAR } from "./render/materials";
 import { EYES } from "./render/models";
-import { sizeOf, type Vehicle } from "./vehicles";
+import { sizeFor, sizeOf, type Vehicle } from "./vehicles";
 import { wastedAt } from "./wasted";
-import type { WalkWorld } from "./world";
+import { WATER_Z, type WalkWorld } from "./world";
 
 /**
  * Where the walk is seen from: your eyes on foot (a slight bob) or swimming (bobbing at the
@@ -24,7 +25,6 @@ export interface Eye {
   fov: number;
 }
 
-const WATER_Z = -0.6;
 const FOV = 70;
 /** The chase camera swings back behind this long after you last looked round, s. */
 const LOOK_RETURN = 1.4;
@@ -33,15 +33,10 @@ const LOOK_PITCH = -0.1;
 const FOLLOW = 3.2;
 /** Pointer movement to radians (looking round on foot, and at the wheel). */
 export const MOUSE = 0.0021;
+/** The boom from what you drive to the chase camera is looked along in this many steps, the last at the camera. */
+const BOOM_STEPS = 7;
 /** What counts as in view, either side of where the camera looks (generous: a wide screen, a wide view). */
 const VIEW_HALF = 1.15;
-
-const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
-const wrap = (a: number) => {
-  const x = (((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  return x - Math.PI;
-};
-const smooth = (t: number) => t * t * (3 - 2 * t);
 
 export class Cameras {
   /** At the wheel: chasing behind, or your own eyes. */
@@ -137,7 +132,7 @@ export class Cameras {
 
   /** The chase camera behind what you drive (`behind`: looking back), or your eyes at its wheel. */
   driving(v: Vehicle, real: number, behind: boolean, world: WalkWorld): Eye {
-    const s = sizeOf(v.kind);
+    const s = sizeFor(v);
     if (this.lookIdle > LOOK_RETURN) {
       this.lookYaw *= Math.exp(-3 * real);
       this.lookPitch += (LOOK_PITCH - this.lookPitch) * Math.min(1, 3 * real);
@@ -149,7 +144,10 @@ export class Cameras {
     const back = behind ? Math.PI : 0;
     const jig = () => (this.shake > 0.01 ? (Math.random() - 0.5) * this.shake * 0.6 : 0);
     if (this.mode === "wheel") {
-      const [eh, ef] = EYES[v.kind];
+      // a boat of its own size (the long ferry) has its wheelhouse as far along, and as high
+      const kind = sizeOf(v.kind);
+      const eh = EYES[v.kind][0] * (s.width / kind.width);
+      const ef = EYES[v.kind][1] * (s.length / kind.length);
       const side = v.boat ? 0 : -0.36;
       const sy = Math.sin(v.yaw);
       const cy = Math.cos(v.yaw);
@@ -169,7 +167,8 @@ export class Cameras {
     let cn = v.n - Math.cos(yaw) * flat;
     const cz = v.z + Math.max(0.8, 1.2 + s.height * 0.7 - Math.sin(this.lookPitch) * dist * 0.6);
     // a wall in the way brings it closer
-    for (let k = 0.15; k <= 1.0001; k += 0.15) {
+    for (let step = 1; step <= BOOM_STEPS; step++) {
+      const k = step / BOOM_STEPS;
       const pe = v.e + (ce - v.e) * k;
       const pn = v.n + (cn - v.n) * k;
       if (!world.blocked(pe, pn, 0.3, cz - 0.4, 0.8)) continue;

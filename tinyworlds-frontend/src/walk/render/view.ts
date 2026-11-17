@@ -9,7 +9,7 @@ import {
   WATER_SURFACE,
   type MeshContext,
 } from "./cell-mesh";
-import { greyOf, greysOf, makeMaterials, SKY, type WalkMaterials } from "./materials";
+import { makeMaterials, SKY, type WalkMaterials } from "./materials";
 import { makePalette, type Palette } from "./palette";
 
 /**
@@ -33,6 +33,9 @@ export const RETRY_AFTER = 10;
 export const PIXEL_MIN = 1;
 export const PIXEL_MAX = 6;
 export const PIXEL_DEFAULT = 3;
+/** The sky's dome: inside the camera's far plane, drawn before anything. */
+const SKY_RADIUS = 1000;
+const ORDER_SKY = -1000;
 
 const keyOf = (i: number, j: number) => `${i}_${j}`;
 
@@ -236,9 +239,8 @@ export class WalkView {
   private readonly ctx: MeshContext;
   private readonly water: THREE.Mesh;
   private readonly fogBox: THREE.BufferGeometry;
-  /** The sky, and the grey it drains to. */
-  private readonly sky = SKY.clone();
-  private readonly skyGrey: THREE.Color;
+  /** The sky: a dome that follows the camera, drawn first (it drains to grey as the rest does). */
+  private readonly sky: THREE.Mesh;
   private pixel = PIXEL_DEFAULT;
   private drawn = { w: 0, h: 0, pixel: 0 };
   private time = 0;
@@ -262,8 +264,11 @@ export class WalkView {
 
     this.palette = makePalette(ix);
     this.materials = makeMaterials(this.palette, ix);
-    this.skyGrey = greyOf(greysOf(this.palette), SKY);
-    this.scene.background = this.sky;
+    this.scene.background = SKY;
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 16, 8), this.materials.sky);
+    this.sky.renderOrder = ORDER_SKY;
+    this.sky.frustumCulled = false;
+    this.scene.add(this.sky);
     this.camera.rotation.order = "YXZ";
 
     // the water under everything: it follows the camera, its pattern stays where it is
@@ -323,10 +328,7 @@ export class WalkView {
 
   /** Drains the colours to the palette's greys, 0 (none) to 1 (all): the wasted sequence. */
   setGrey(amount: number): void {
-    const g = Number.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
-    this.materials.setGrey(g);
-    // the sky is one flat colour, not a surface: it eases to its grey
-    this.sky.copy(SKY).lerp(this.skyGrey, g);
+    this.materials.setGrey(amount);
   }
 
   /** Streams the squares round the camera and meshes at most one of them. */
@@ -360,6 +362,7 @@ export class WalkView {
       this.camera.updateProjectionMatrix();
       this.drawn = { w, h, pixel: this.pixel };
     }
+    this.sky.position.copy(this.camera.position);
     this.water.position.x = Math.round(this.camera.position.x / 100) * 100;
     this.water.position.z = Math.round(this.camera.position.z / 100) * 100;
     this.camera.updateMatrixWorld();
@@ -374,7 +377,8 @@ export class WalkView {
 
   dispose(): void {
     this.stream.dispose();
-    this.scene.remove(this.water);
+    this.scene.remove(this.water, this.sky);
+    this.sky.geometry.dispose();
     this.water.geometry.dispose();
     this.fogBox.dispose();
     this.materials.dispose();

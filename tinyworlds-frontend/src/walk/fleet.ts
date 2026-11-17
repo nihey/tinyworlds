@@ -11,10 +11,12 @@ import type { WalkWorld } from "./world";
  */
 
 /** Streets this near you get their parked cars, m; beyond the second they are let go. */
-const PARK_REACH = 320;
-const PARK_DROP = 420;
-/** Parked cars and moored boats this near are the ones gathered for the frame. */
+const PARK_REACH = 500;
+const PARK_DROP = 600;
+/** Parked cars and moored boats this near are the ones gathered for the frame (what can be hit)... */
 const KEPT = 300;
+/** ...and out to this they are drawn, so they do not pop up where the fog is still thin. */
+export const SHOWN = 480;
 
 type Box = [number, number, number, number];
 
@@ -46,6 +48,8 @@ export class Fleet {
   free: Vehicle[] = [];
   /** The parked cars and moored boats within 300 m, as last gathered. */
   kept: Vehicle[] = [];
+  /** Those beyond 300 m and within 480 m: only drawn. */
+  far: Vehicle[] = [];
   private streets = new Map<string, { box: Box; cars: Vehicle[] }>();
   private moored = new Map<string, Vehicle[]>();
   /** where a parked car or a moored boat came from, and the spot it leaves empty when it goes */
@@ -103,16 +107,19 @@ export class Fleet {
       if (!seen.has(key) || boxDistance(st.box, me.e, me.n) > PARK_DROP) this.streets.delete(key);
   }
 
-  /** The parked cars and moored boats within 300 m: a few times a second is often enough. */
+  /** The parked cars and moored boats within 300 m, and those out to 480 m: a few times a second is often enough. */
   gather(me: { e: number; n: number }): void {
-    const out: Vehicle[] = [];
-    for (const st of this.streets.values()) {
-      if (boxDistance(st.box, me.e, me.n) > KEPT) continue;
-      for (const v of st.cars) if (within(v, me, KEPT)) out.push(v);
-    }
-    for (const list of this.moored.values())
-      for (const v of list) if (within(v, me, KEPT)) out.push(v);
-    this.kept = out;
+    const kept: Vehicle[] = [];
+    const far: Vehicle[] = [];
+    const sort = (v: Vehicle) => {
+      if (within(v, me, KEPT)) kept.push(v);
+      else if (within(v, me, SHOWN)) far.push(v);
+    };
+    for (const st of this.streets.values())
+      if (boxDistance(st.box, me.e, me.n) <= SHOWN) for (const v of st.cars) sort(v);
+    for (const list of this.moored.values()) for (const v of list) sort(v);
+    this.kept = kept;
+    this.far = far;
   }
 
   /** Keeps a vehicle among the free ones (once). */

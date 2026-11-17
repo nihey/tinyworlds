@@ -8,7 +8,8 @@ import { MODEL_RAMPS } from "../render/models";
 import { PARTICLE_RAMPS } from "../render/particles";
 import { WalkSound } from "../sound";
 import { PAINT_RED, parkedOn, starterCar } from "../traffic";
-import { newVehicle, nextVehicleId, type Vehicle } from "../vehicles";
+import { fireDamage } from "../health";
+import { applyDamage, newVehicle, nextVehicleId, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
 import { WalkWorld } from "../world";
 import { boxVolume, makeCell, roadNode, streetEdge, waterRect } from "./fixtures";
@@ -112,9 +113,8 @@ function play(cells: WalkCell[], opts: Opts) {
     random: seeded(11),
   });
   for (const v of opts.vehicles ?? []) game.add(v);
-  let state: WalkState | null = null;
-  game.subscribe((s) => (state = s));
-  const now = () => state ?? game.state;
+  // the latest state, whether or not it was worth telling the signs
+  const now = (): WalkState => game.state;
   /** Steps until `until` holds, `limit` seconds at most; answers whether it did. */
   const simUntil = (until: () => boolean, limit: number) => {
     for (let t = 0; t < limit; t += 1 / 30) {
@@ -129,6 +129,45 @@ function play(cells: WalkCell[], opts: Opts) {
 /** A parked sedan at (e, n), facing north unless `yaw` says. */
 const sedan = (e: number, n: number, yaw = 0, state: Vehicle["state"] = "parked") =>
   newVehicle(nextVehicleId(), "sedan", e, n, yaw, state);
+
+describe("bumping into what stands still", () => {
+  it("walking or sprinting into a parked car does not hurt, nor knock you down", () => {
+    for (const sprint of [false, true])
+      for (const e of [98.2, 99.1, 100, 100.7, 101.6, 102.3]) {
+        // a sedan across your way 6 m north (4.7 m long, east–west): you walk into its side
+        const { game, now } = play(area(-1, -1, 1, 1), {
+          start: { e, n: 94 },
+          vehicles: [sedan(100, 100, Math.PI / 2)],
+        });
+        game.sim(0.1);
+        if (sprint) game.keyDown("ShiftLeft");
+        game.keyDown("KeyW");
+        game.sim(3);
+        expect(now().life).toBe(100);
+        expect(now().mode).toBe("foot");
+      }
+  });
+
+  it("swimming hard into a moored boat does not hurt", () => {
+    const water = { mask: { mode: 1 as const, bits: null } };
+    const parts: Record<string, Partial<WalkCell>> = {};
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) parts[`${i}_${j}`] = water;
+    for (const e of [99, 100, 101.5]) {
+      const boat = newVehicle(nextVehicleId(), "speedboat", 100, 100, Math.PI / 2, "parked");
+      const { game, now } = play(area(-1, -1, 1, 1, parts), {
+        start: { e, n: 96 },
+        vehicles: [boat],
+      });
+      game.sim(0.1);
+      expect(now().mode).toBe("swim");
+      game.keyDown("ShiftLeft");
+      game.keyDown("KeyW");
+      game.sim(4);
+      expect(now().life).toBe(100);
+      expect(now().mode).toBe("swim");
+    }
+  });
+});
 
 describe("getting into a car", () => {
   it("works within 2.4 m of a parked car, and not at 3 m", () => {
@@ -271,11 +310,12 @@ describe("going down", () => {
     expect(simUntil(() => now().wasted === null, 6)).toBe(true);
     expect(last()).toBe(0);
 
-    // under reduced motion the colours stay
+    // under reduced motion they drain all the same (only the slow motion and the lift go)
     const calm = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100, z: 20 }, reduced: true });
     expect(calm.simUntil(() => calm.now().wasted !== null, 4)).toBe(true);
     calm.game.sim(2);
-    expect(calm.view.greys.every((g) => g === 0)).toBe(true);
+    expect(calm.view.greys[calm.view.greys.length - 1]).toBe(1);
+    expect(calm.now().wasted!.timeRate).toBe(1);
   });
 
   it("slows time while it runs, and a key skips ahead once the word is up", () => {
@@ -335,6 +375,40 @@ describe("going down", () => {
   });
 });
 
+describe("wrecks", () => {
+  it("catching fire within 5 m of you hurt you once, nearer worse", () => {
+    // a sedan 3 m east of you, its side 2.1 m from you, about to burn
+    const car = sedan(103, 100, 0, "loose");
+    const { game, now } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100 }, vehicles: [car] });
+    game.sim(0.1);
+    applyDamage(car, 100);
+    game.sim(0.1);
+    expect(car.state).toBe("wrecked");
+    expect(now().life).toBeCloseTo(100 - fireDamage(2.1), 1);
+    const after = now().life;
+    game.sim(3);
+    expect(now().life).toBe(after);
+  });
+});
+
+describe("fast cars", () => {
+  it("do not pass through another, however fast", () => {
+    // a supercar at 70 m/s northwards at the side of a parked sedan lying across its way, near you
+    const parked = sedan(100, 130, Math.PI / 2);
+    const fast = newVehicle(nextVehicleId(), "supercar", 100, 110, 0, "loose");
+    fast.v = 70;
+    const { game } = play(area(-1, -1, 1, 1), {
+      start: { e: 90, n: 120 },
+      vehicles: [parked, fast],
+    });
+    // in the longest frames there are (a slow machine's): 7 m a frame
+    game.sim(0.3, 0.1);
+    expect(parked.state).not.toBe("parked");
+    // it hit the sedan and shoved it: it is still behind it
+    expect(fast.n).toBeLessThan(parked.n);
+  });
+});
+
 describe("life", () => {
   it("comes back at 2 a second once nothing has hurt you for 5 s", () => {
     const { game, now, simUntil } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100, z: 8 } });
@@ -348,6 +422,24 @@ describe("life", () => {
     expect(now().life).toBeCloseTo(hurt + 2, 0);
     game.sim(30);
     expect(now().life).toBe(100);
+  });
+});
+
+describe("the signs", () => {
+  it("are told when what they show changes, not every frame, and when life is whole again", () => {
+    const { game } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100, z: 8 } });
+    const told: WalkState[] = [];
+    game.subscribe((s) => told.push(s));
+    game.sim(2);
+    const afterFall = told.length;
+    expect(told[told.length - 1].life).toBeLessThan(100);
+    // nothing changes while life waits to come back: nothing is said
+    game.sim(3);
+    expect(told.length).toBe(afterFall);
+    // it comes back in half points, a few dozen times, not a frame at a time
+    game.sim(30);
+    expect(told.length - afterFall).toBeLessThan(90);
+    expect(told[told.length - 1].life).toBe(100);
   });
 });
 

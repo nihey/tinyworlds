@@ -50,23 +50,12 @@ export function greysOf(palette: Palette): THREE.Vector3[] {
   return out;
 }
 
-const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
-
-/** The grey of `greys` nearest a colour's brightness. */
-export function greyOf(greys: THREE.Vector3[], c: THREE.Color): THREE.Color {
-  const l = luma(c.r, c.g, c.b);
-  let best = greys[0];
-  for (const g of greys)
-    if (Math.abs(luma(g.x, g.y, g.z) - l) < Math.abs(luma(best.x, best.y, best.z) - l)) best = g;
-  return new THREE.Color().setRGB(best.x, best.y, best.z, THREE.LinearSRGBColorSpace);
-}
-
 /**
  * Draining the colours (the wasted sequence): with `grey` from 0 to 1, that share of the pixels,
  * picked by a 4 × 4 Bayer pattern, take the palette grey nearest their brightness instead. A
  * pixel is a palette colour or a grey, never a mix of the two.
  */
-export const DRAIN = /* glsl */ `
+const DRAIN = /* glsl */ `
 uniform float grey; uniform vec3 greys[${GREYS}];
 vec3 drained(vec3 c) {
   if (grey <= 0.0) return c;
@@ -85,8 +74,11 @@ vec3 drained(vec3 c) {
 }
 `;
 
-/** The fog, the last thing every surface's colour goes through: then the drain. */
-const FOG = /* glsl */ `
+/**
+ * The fog, the last thing every colour the walk draws goes through, then the drain: `fogged(c, d)`
+ * at `d` metres from the eye. Its uniforms: fogColor, fogNear, fogFar, grey, greys.
+ */
+export const FOG = /* glsl */ `
 uniform vec3 fogColor; uniform float fogNear, fogFar;
 ${DRAIN}
 vec3 fogged(vec3 c, float d) { return drained(mix(c, fogColor, smoothstep(fogNear, fogFar, d))); }
@@ -330,6 +322,16 @@ ${DRAIN}
 varying vec3 vW;
 void main() { gl_FragColor = vec4(drained(vW.y < cameraPosition.y ? fogColor : skyColor), 1.0); }`;
 
+/** The sky: a dome round the camera in the sky's colour, drained like everything else. */
+const SKY_VERTEX = /* glsl */ `
+void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+const SKY_FRAGMENT = /* glsl */ `
+precision highp float;
+uniform vec3 skyColor;
+${DRAIN}
+void main() { gl_FragColor = vec4(drained(skyColor), 1.0); }`;
+
 export interface WalkMaterials {
   /** Walls of buildings, deck slabs, parapets, columns and the shore's edge. */
   wall: THREE.ShaderMaterial;
@@ -341,6 +343,8 @@ export interface WalkMaterials {
   cable: THREE.ShaderMaterial;
   water: THREE.ShaderMaterial;
   edge: THREE.ShaderMaterial;
+  /** The sky's dome: drawn first, behind everything. */
+  sky: THREE.ShaderMaterial;
   /**
    * A square's own ground materials: its colours (no depth, painted in rank order), then its
    * depth (no colour), both cut out where `mask` (a 100 × 100 water mask, null for all land)
@@ -477,6 +481,14 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     fragmentShader: EDGE_FRAGMENT,
     side: THREE.DoubleSide,
   });
+  const sky = new THREE.ShaderMaterial({
+    uniforms: { skyColor: { value: SKY }, grey: shared.grey, greys: shared.greys },
+    vertexShader: SKY_VERTEX,
+    fragmentShader: SKY_FRAGMENT,
+    side: THREE.BackSide,
+    depthTest: false,
+    depthWrite: false,
+  });
   const land = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat);
   land.needsUpdate = true;
 
@@ -488,6 +500,7 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     cable,
     water,
     edge,
+    sky,
     ground(mask) {
       const uniforms = {
         ...shared,
@@ -523,7 +536,7 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
       camRight.normalize();
     },
     dispose() {
-      for (const m of [wall, roof, deck, tree, cable, water, edge]) m.dispose();
+      for (const m of [wall, roof, deck, tree, cable, water, edge, sky]) m.dispose();
       atlas.dispose();
       land.dispose();
     },

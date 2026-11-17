@@ -1,5 +1,5 @@
 import { fallDamage } from "./health";
-import type { Surface, WalkWorld } from "./world";
+import { WATER_Z, type Surface, type WalkWorld } from "./world";
 
 export const WALK = 4.5;
 export const SPRINT = 11;
@@ -20,7 +20,6 @@ export const SWIM_EYE = 0.25;
 export const TURN = 2.2;
 
 /** The water's surface, where a swimmer's feet are. */
-const WATER_Z = -0.6;
 /** Land this far above the water can be climbed onto from it. */
 const CLIMB = 0.8;
 /** How far ahead of a swimmer the shore is looked at. */

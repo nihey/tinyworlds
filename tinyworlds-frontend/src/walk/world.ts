@@ -2,8 +2,8 @@ import { isMapDeck, type ElevatedWay, type Volume, type WalkCell } from "./cell"
 import { CELL } from "./geo";
 import type { WalkIndex } from "./walk-index";
 
-/** The water's surface, metres below the land. */
-const WATER_Z = -0.6;
+/** The water's surface, metres below the land: where swimmers and boats are, for everything that moves. */
+export const WATER_Z = -0.6;
 /** Walls are found through a grid of this many metres per side, per square. */
 const BUCKET = 20;
 const BUCKETS = CELL / BUCKET;
