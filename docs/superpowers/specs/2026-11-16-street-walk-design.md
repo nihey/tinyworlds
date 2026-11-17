@@ -314,9 +314,9 @@ signs give way while walking.
   changeable;
 - the edge of the data is a wall in the fog.
 
-**On foot.** Walk 4.5 m/s, sprint 11 m/s, mouse look, a slight head bob. **Jumping**: 5.2 m/s
-up, gravity 13 m/s²; in the air you land on a car's roof up to 1.15 m above your feet, so you
-can climb a sedan, then a truck; you can jump a parapet. **Swimming**: step or fall into the
+**On foot.** Walk 4.5 m/s, sprint 11 m/s, mouse look, a slight head bob. **Jumping**: 6.5 m/s
+up, gravity 13 m/s² (the spike's 5.2 suited its lower cars); in the air you land on a car's roof
+up to 1.6 m above your feet, so you can climb a sedan, then a truck; you can jump a parapet. **Swimming**: step or fall into the
 water and you swim, 1.6 m/s (3 m/s sprinting), your eyes just above the surface, bobbing; you
 cannot jump in the water; push against any shore or pier to climb out. **Life** (the owner:
 "add life, so that you [know] how much you still have left"): always on screen, on foot, swimming,
