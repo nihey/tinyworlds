@@ -539,7 +539,9 @@ it does not know, and the site then falls back to its payment link. Details in
 - By hand: map data, which is not in git (`deploy/deploy.sh <world> --data`, or `--index` for
   the indexes, or `--walk` for a world's street walk alone: its squares, `walk.json`, then the
   manifest; a world whose file says `walk: true` is incomplete without `walk/walk.json`, here or
-  on the server); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
+  on the server; a walk that is not whole or not stamped with its own version is refused, and
+  `--walk` and `--index` refuse a manifest that differs from the server's in more than what they
+  send); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
   world's data) to the web server; `deploy/deploy.sh all [--parallel[=N] | --serial]
   [--no-data]` checks and builds every world in the viewer's registry and the front page, and
   uploads only if all of them built. A build from a tree that lacks what the server runs is

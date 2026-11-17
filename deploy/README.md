@@ -145,10 +145,19 @@ server): the check lists it as missing otherwise.
 **The street walk's data** (`walk/cells/*.bin`, `walk/walk.json`, about 120 MB for New York) goes
 up with a full `--data`, or on its own with `--walk`: the squares first, then `walk.json`, then
 the manifest, and last a pass over the squares that `--delete`s those the new walk no longer has
-(so a visitor on the old version does not meet a missing square). The manifest names the walk's version (`manifest.walk`, appended as
-`?v=` to them; the squares are cached as immutable). Like `--index`, it refuses when the server's
-manifest is from another render than the local one. It builds and announces nothing. `all --walk`
-sends every world's walk and passes by the worlds that have none. Send it **before** merging the
+(so a visitor on the old version does not meet a missing square). A square both versions have
+is replaced in place, so a visitor still on the old version may be given the new one under the
+old `?v=` (unless their cache has it already). The manifest names the walk's version
+(`manifest.walk`, appended as `?v=` to them; the squares are cached as immutable). Before
+anything is sent, `--walk` and a full `--data` check the walk here (`deploy/walk-check.mjs`):
+every square `walk.json` lists is on disk and no other (an empty `cells/` would have the last
+pass empty the server's), and the manifest names the folder's own version (a walk copied back
+from another machine must be stamped first: `npm run cli -- --city tinynyc walk --stamp`).
+`--walk` and `--index` send the whole manifest, so they refuse unless the server's differs from
+the one here only in the field they are sending (`walk`, `indexes`). It builds and announces
+nothing. `all --walk` sends every world's walk and passes by the worlds that have none. A single
+world (`deploy/deploy.sh tinynyc`, `--data`) is checked as `all` checks each one, so a checkout
+without the world's walk refuses rather than deleting the server's. Send it **before** merging the
 branch whose viewer offers the walk: the push deploys the viewers, and a viewer with
 `walk: true` is refused while the server has no `walk/walk.json`.
 

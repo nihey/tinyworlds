@@ -301,17 +301,35 @@ build_all() {
 build_of() { { grep -o '"build":"[^"]*"' || true; } | head -n 1 | cut -d '"' -f 4; }
 
 # An index-only (or walk-only) upload sends the manifest too (it names the indexes', or the walk's,
-# version), and a manifest also describes the tiles: it may only replace one from the same render,
-# or it would point the viewer at tiles that are not on the server. Says so and fails otherwise.
-same_render() {
-  local target="$1" data="$2" base_path="$3" here there
-  here="$(build_of <"$data/manifest.json")"
-  there="$(server_cat "site$base_path/data/manifest.json" | build_of)" || true
-  if [[ -z "$here" || "$here" != "$there" ]]; then
-    echo "Not sending $target's indexes: its manifest here is from render ${here:-?}," \
-      "the server's from ${there:-none}. Deploy its data first (without --index or --walk)." >&2
+# version), and a manifest also describes the tiles and the other indexes: it may only replace
+# one that differs from it in <field> alone (`indexes` or `walk`), or it would point the viewer at
+# files that are not on the server (and an immutable cache would keep the wrong ones under the new
+# version). Says what differs and fails otherwise.
+same_manifest() {
+  local target="$1" data="$2" base_path="$3" field="$4" there problems status=0
+  there="$(mktemp)"
+  server_cat "site$base_path/data/manifest.json" >"$there" || status=$?
+  if ((status == 0)); then
+    problems="$(node "$ROOT/deploy/walk-check.mjs" manifest "$data/manifest.json" "$there" "$field")" || status=$?
+  fi
+  rm -f "$there"
+  ((status == 0)) || return "$status"
+  if [[ -n "$problems" ]]; then
+    echo "Not sending $target's ${field}: $problems. Deploy its data first (without --index or --walk)." >&2
     return 1
   fi
+}
+
+# Refuses a street walk that is not whole or not stamped (see deploy/walk-check.mjs): the last
+# --delete pass would empty the server's squares, and a manifest naming an old version would
+# serve new squares under the old ?v=, which visitors' caches keep for a year.
+walk_ready() {
+  local target="$1" data="$2" problems
+  problems="$(node "$ROOT/deploy/walk-check.mjs" walk "$data")" || return
+  [[ -z "$problems" ]] && return 0
+  echo "Not sending $target's street walk:" >&2
+  sed "s/^/  - /; s/<world>/$target/g" <<<"$problems" >&2
+  return 1
 }
 
 # Copies one target to the server: its built site from <out> (unless mode is --data or --walk), and its
@@ -330,8 +348,16 @@ upload() {
     return 1
   fi
   # before anything is sent, so a refusal leaves the site as it was
-  if [[ ( "$mode" == "--index" || "$mode" == "--walk" ) && "$target" != "home" ]]; then
-    same_render "$target" "$data" "$base_path" || return
+  if [[ "$mode" == "--index" && "$target" != "home" ]]; then
+    same_manifest "$target" "$data" "$base_path" indexes || return
+  fi
+  if [[ "$mode" == "--walk" ]]; then
+    walk_ready "$target" "$data" || return
+    same_manifest "$target" "$data" "$base_path" walk || return
+  fi
+  # a full data upload carries the walk with it (and --deletes what the server has beyond it)
+  if [[ ( -z "$mode" || "$mode" == "--data" ) && "$target" != "home" && -d "$data/walk" ]]; then
+    walk_ready "$target" "$data" || return
   fi
   if [[ "$mode" != "--data" && "$mode" != "--walk" ]]; then
     if [[ "$target" == "home" ]]; then
@@ -347,8 +373,9 @@ upload() {
     case "$mode" in
       --no-data) ;;
       --walk)
-        # the new squares first, beside the old (a walk.json of the new version never points at
-        # a square not there, and a visitor still on the old one keeps finding its squares), then
+        # the new squares first (a walk.json of the new version never points at a square not
+        # there; a square both versions have is replaced in place, so a visitor still on the old
+        # version may get the new one under the old ?v=, unless their cache has it), then
         # walk.json, then the manifest, which names the walk's version so visitors ask anew;
         # only then the squares the new walk no longer has are removed
         rsync -a --mkpath "$progress" "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
@@ -673,6 +700,16 @@ else
       echo "No map data for $TARGET: run 'npm run all -- --city $TARGET' in tinyworlds-pipeline first." >&2
     fi
     exit 1
+  fi
+  # one world is checked as `all` checks each: a data upload --deletes what the server has
+  # beyond it, so a checkout without the world's walk would take the server's away
+  if [[ "$TARGET" != "home" ]]; then
+    PROBLEMS="$(world_problems "$TARGET")"
+    if [[ -n "$PROBLEMS" ]]; then
+      echo "Not deploying $TARGET:" >&2
+      sed 's/^/  - /' <<<"$PROBLEMS" >&2
+      exit 1
+    fi
   fi
   TARGETS=("$TARGET")
 fi

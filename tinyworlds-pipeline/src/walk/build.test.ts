@@ -290,6 +290,37 @@ describe("buildWalk", () => {
     expect(two.a[1]).toBeCloseTo(-200, 6);
   });
 
+  it("is what the deploy script's check takes the walk's version and its problems to be", async () => {
+    const out = freshOut("deploy-check");
+    await buildWalk({ out, scene: sceneDir, segments: segments(), log: quiet });
+    const check = (await import("../../../deploy/walk-check.mjs")) as {
+      walkVersion: (walk: string) => string;
+      walkProblems: (data: string) => string[];
+      manifestProblems: (here: string, there: string, field: string) => string[];
+    };
+    expect(check.walkVersion(path.join(out, "walk"))).toBe(manifest(out).walk);
+    expect(check.walkProblems(out)).toEqual([]);
+    // copied back and not stamped
+    fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify({ ...manifest(out), walk: "old" }));
+    expect(check.walkProblems(out).join()).toMatch(/names walk old/);
+    stampWalk(out, quiet);
+    // a square missing, then none at all
+    const cells = path.join(out, "walk", "cells");
+    const files = fs.readdirSync(cells);
+    fs.rmSync(path.join(cells, files[0]));
+    expect(check.walkProblems(out).join()).toMatch(/squares, walk.json lists/);
+    for (const f of files.slice(1)) fs.rmSync(path.join(cells, f));
+    expect(check.walkProblems(out).join()).toMatch(/has no squares/);
+    // a manifest that differs from the server's in its walk alone may go; in its render, not
+    const here = path.join(out, "manifest.json");
+    const there = path.join(out, "server-manifest.json");
+    fs.writeFileSync(there, JSON.stringify({ ...manifest(out), walk: "other" }));
+    expect(check.manifestProblems(here, there, "walk")).toEqual([]);
+    fs.writeFileSync(there, JSON.stringify({ ...manifest(out), build: "another" }));
+    expect(check.manifestProblems(here, there, "walk").join()).toMatch(/more than walk: build/);
+    expect(check.manifestProblems(here, path.join(out, "none.json"), "walk").join()).toMatch(/no manifest/);
+  });
+
   it("stamps the version of the walk folder already there", async () => {
     const out = freshOut("stamp");
     await buildWalk({ out, scene: sceneDir, segments: segments(), log: quiet });
