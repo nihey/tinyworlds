@@ -2,15 +2,20 @@ import * as THREE from "three";
 import type { WalkIndex } from "../walk-index";
 import { WATER_Z } from "../world";
 import {
+  BAYER4,
   DAMP_STEPS,
   darkCutOf,
+  DITHER_PX,
   DEEP_STEPS,
+  DEPTH_NEAR,
   GLINT_CELL,
   GLINT_FOR,
   GLINT_GRAZE,
   GLINT_REACH,
   GLINT_SHARE,
+  GRAZE_DEEP,
   GRAZE_ONE,
+  GRAZE_STEEP,
   GRAZE_TWO,
   LAP_CYCLES,
   LAP_DASH,
@@ -20,12 +25,19 @@ import {
   LAP_TRAVEL,
   FOOT_HEIGHT,
   LIGHT_CUT,
+  LINE_PX,
   LOOP,
   MIRROR_FOG_SHADES,
   QUIET_FAR,
   RIM_STEPS,
   SHADE_LIGHT,
+  SHALLOW_PX,
   SHALLOW_STEPS,
+  SURFACE_ACROSS,
+  SURFACE_CELL,
+  SURFACE_DOWN,
+  SURFACE_SHARE,
+  SURFACE_SHOWN,
   WOBBLE_CYCLES,
   WOBBLE_ONE,
   WOBBLE_STILL,
@@ -133,8 +145,8 @@ vec3 P(int ramp, int shade) { return texelFetch(pal, ivec2(ramp * ${SHADES} + cl
 
 /**
  * The map's texels: (east, north) metres to the street grid's texel coordinates (`gridRot` its
- * cosine and sine, `kz` texels a metre) and back, so the water's and the damp ground's shapes
- * step in the same texels as the ground's patterns.
+ * cosine and sine, `kz` texels a metre) and back, so the damp ground's edge steps in the same
+ * texels as the ground's patterns.
  */
 const GRID = /* glsl */ `
 vec2 toGrid(vec2 en) { return vec2(en.x * gridRot.x - en.y * gridRot.y, en.x * gridRot.y + en.y * gridRot.x) * kz; }
@@ -330,21 +342,26 @@ void main() { gl_FragColor = vec4(fogged(C(vColour), length(vMV)), 1.0); }`;
 
 /**
  * Water: an opaque surface 0.6 m under the land, in layers that each pick one palette tone per
- * pixel, never a blend (`../water.ts` has the rules and their numbers):
- * 1. depth: the square's shore field (`shore.ts`) at the middle of the pixel's map texel: the
- *    shallow teal band at the shore, a light rim, the base, the deep shade;
- * 2. sky: a shade or two lighter where it is seen at a grazing angle;
+ * pixel, never a blend (`../water.ts` has the rules and their numbers); where two tones meet,
+ * the threshold is crossed in a 4 × 4 Bayer pattern over a few pixels, never a hard curve:
+ * 1. depth: the square's shore field (`shore.ts`): the shallow teal rim at the shore (2 m, but
+ *    never more than a few pixels across), a light rim, the base, the deep;
+ * 2. the angle: looking steeply down (or near the eye) the map's own water, at middle angles
+ *    the depth's tones, towards the horizon back to the map's water;
  * 3. reflections: the mirror's picture of what stands by the water (`WalkView`), read at the
- *    pixel's place flipped, in three flat tones (the darker of it and the water wins), its rows
- *    moved sideways by whole pixels by how far under their foot they are, a shade lighter at a
- *    time with the fog along the mirrored path;
- * 4. the shore: where it is lit and near, light dashes lapping along it two or three cells out;
- *    where it is far or in shade (quiet), a dark line where the water meets it instead; a broken
- *    light line at the foot of what stands in the water (piers, piles, boats), never above it;
- * 5. glints: short dashes on the open water, new places every loop.
+ *    pixel's place flipped, in three flat tones one, two and three shades under the water they
+ *    lie on, their rows moved sideways by whole pixels by how far under their foot they are,
+ *    a shade fewer at a time with the fog along the mirrored path;
+ * 4. the shore, in lines a pixel or two wide: where it is lit and near, light dashes lapping
+ *    along it two or three cells out; where it is far or in shade (quiet), a dark line where the
+ *    water meets it instead; a broken light line at the foot of what stands in the water
+ *    (piers, piles, boats), never above it;
+ * 5. the living surface: short horizontal dashes a shade lighter or darker, anchored to a world
+ *    grid whose squares grow with distance, drifting and showing for part of the loop;
+ * 6. glints: short dashes on the open water, new places every loop.
  * Every motion runs a whole number of times in `LOOP`; under reduced motion nothing moves (the
- * lapping stays on its near ring) and there are no glints. The open water under everything has
- * no shore (`known` 0): deep, then the sky and the reflections.
+ * lapping stays on its near ring, the dashes stay put) and there are no glints. The open water
+ * (where no square is shown) has no shore (`known` 0): deep, then the angle and the reflections.
  */
 const WATER_VERTEX = /* glsl */ `
 varying vec3 vW; varying vec3 vMV; varying vec2 vLocal;
@@ -359,26 +376,31 @@ void main() {
 
 const WATER_FRAGMENT = /* glsl */ `
 precision highp float; precision highp int;
-uniform float kz; uniform vec2 gridRot; uniform float side;
-uniform sampler2D shore; uniform sampler2D mask; uniform float known;
+uniform float side;
+uniform sampler2D shore; uniform float known;
 uniform float loopT; uniform float loopN; uniform float still;
 uniform int waterRamp; uniform int shallowRamp; uniform int foamRamp;
 uniform vec2 sun; uniform float waterY; uniform vec2 screen;
 uniform float mirrorOn; uniform sampler2D mirrorColour; uniform sampler2D mirrorDepth;
 uniform mat4 mirrorProjInv; uniform mat4 mirrorWorld; uniform float darkCut;
 uniform mat4 projectionMatrix;
-${HASH} ${FOG} ${PALETTE} ${GRID}
+${HASH} ${FOG} ${PALETTE}
 varying vec3 vW; varying vec3 vMV; varying vec2 vLocal;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 const float TAU = 6.28318530718;
 // a tone: x the ramp (0 water, 1 shallow, 2 foam), y the shade
 
-// steps from the land at a texel's middle (the field's R, in sixteenths)
-float stepsAt(vec2 cell, vec2 base) {
-  return texture(shore, (fromGrid(cell + 0.5) + base) / side).r * ${f(255 / 16)};
+float bayer() {
+  ivec2 q = ivec2(mod(gl_FragCoord.xy, 4.0));
+  int m[16] = int[16](${BAYER4.join(", ")});
+  return (float(m[q.x + q.y * 4]) + 0.5) / 16.0;
 }
-bool landAt(vec2 cell, vec2 base) {
-  return texture(mask, (fromGrid(cell + 0.5) + base) / side).r < 0.5;
+int dithered(float x, float t, float w, float b) {
+  if (!(w > 0.0)) return x > t ? 1 : 0;
+  return clamp((x - t) / w + 0.5, 0.0, 1.0) > b ? 1 : 0;
+}
+float shallowUntil(float perPx) {
+  return 0.5 + min(${f(SHALLOW_STEPS - 0.5)}, ${f(SHALLOW_PX)} * perPx);
 }
 int wobble(float rows, float t, float y) {
   float amp = rows < ${f(WOBBLE_STILL)} ? 0.0 : rows < ${f(WOBBLE_ONE)} ? 1.0 : 2.0;
@@ -419,22 +441,31 @@ Mirrored mirrored(ivec2 p, vec2 size) {
 
 void main() {
   vec2 en = vec2(vW.x, -vW.z);
-  vec2 cell = floor(toGrid(en));
-  vec2 base = vLocal - en;
   float dist = length(vMV);
-  float steps = known > 0.5 ? stepsAt(cell, base) : 99.0;
-
-  // 1. depth
-  ivec2 tone = steps < ${f(SHALLOW_STEPS)} ? ivec2(1, ${LIT})
-    : steps < ${f(RIM_STEPS)} ? ivec2(0, ${LIT})
-    : steps < ${f(DEEP_STEPS)} ? ivec2(0, ${HALF})
-    : ivec2(0, ${SHADE});
-
-  // 2. the sky, at a grazing angle
+  // what changes from pixel to pixel, taken where every pixel takes the same path
+  float smoothSteps = known > 0.5 ? texture(shore, vLocal / side).r * ${f(255 / 16)} : 99.0;
+  float perPx = fwidth(smoothSteps);
   float grazing = 1.0 - abs(normalize(vW - cameraPosition).y);
-  if (tone.x == 0) tone.y = min(${HIGH}, tone.y + (grazing >= ${f(GRAZE_TWO)} ? 2 : grazing >= ${f(GRAZE_ONE)} ? 1 : 0));
+  float grazePx = fwidth(grazing);
+  vec2 acrossPx = dFdx(en), downPx = dFdy(en);
+  float b = bayer();
 
-  // 3. reflections
+  // 1-2. depth as the angle shows it (steeply down and near the eye: the map's water; middle
+  // angles: the depth; towards the horizon: back to the map's), each threshold dithered over a
+  // few pixels
+  float wS = perPx * ${f(DITHER_PX)}, wG = grazePx * ${f(DITHER_PX)};
+  ivec2 tone;
+  if (dithered(smoothSteps, shallowUntil(perPx), wS, b) == 0) tone = ivec2(1, ${LIT});
+  else {
+    int dark = dithered(smoothSteps, ${f(RIM_STEPS)}, wS, b) + dithered(smoothSteps, ${f(DEEP_STEPS)}, wS, b);
+    int shows = (dithered(grazing, ${f(GRAZE_STEEP)}, wG, b) + dithered(grazing, ${f(GRAZE_DEEP)}, wG, b)) *
+                dithered(dist, ${f(DEPTH_NEAR)}, fwidth(dist) * ${f(DITHER_PX)}, b);
+    int lift = dithered(grazing, ${f(GRAZE_ONE)}, wG, b) + dithered(grazing, ${f(GRAZE_TWO)}, wG, b);
+    tone = ivec2(0, ${LIT} - max(0, min(dark, shows) - lift));
+  }
+
+  // 3. reflections: the mirror's three tones, a shade fewer at a time with the fog along the
+  // mirrored path
   bool shown = false;
   bool foot = false;
   if (mirrorOn > 0.5) {
@@ -447,20 +478,21 @@ void main() {
       vec3 c = here.colour;
       bool hit = true;
       if (dx != 0) {
-        float dw = texelFetch(mirrorDepth, pw, 0).r;
-        hit = dw < 1.0;
+        hit = texelFetch(mirrorDepth, pw, 0).r < 1.0;
         c = texelFetch(mirrorColour, pw, 0).rgb;
       }
       if (hit) {
+        // one, two or three shades under the water it lies on, fewer with the fog
         float luma = dot(c, LUMA) * 255.0;
-        int r = luma < darkCut ? ${OUTLINE} : luma < ${f(LIGHT_CUT)} ? ${DEEP} : ${SHADE};
-        // what is far along the mirrored path goes into the fog a whole shade at a time
-        r += int(floor(smoothstep(fogNear, fogFar, here.path) * ${f(MIRROR_FOG_SHADES)}));
-        shown = r < tone.y;
-        tone.y = min(tone.y, r);
+        int under = luma < darkCut ? 3 : luma < ${f(LIGHT_CUT)} ? 2 : 1;
+        under -= int(floor(smoothstep(fogNear, fogFar, here.path) * ${f(MIRROR_FOG_SHADES)}));
+        if (under > 0) {
+          tone.y = max(${OUTLINE}, tone.y - under);
+          shown = true;
+        }
       }
       foot = here.foot && here.rows < 1.0;
-    } else if (steps >= ${f(SHALLOW_STEPS)}) {
+    } else if (smoothSteps >= ${f(SHALLOW_STEPS)}) {
       // beside a foot on the same row, below it or level, never above
       for (int k = -2; k <= 2; k++) {
         if (k == 0 || foot) continue;
@@ -471,41 +503,73 @@ void main() {
       }
     }
   }
-  if (foot && steps >= ${f(SHALLOW_STEPS)}) {
+  if (foot && smoothSteps >= ${f(SHALLOW_STEPS)}) {
     // a broken light line at the waterline of what stands in the water
     float tick = still > 0.5 ? 0.0 : floor(loopT * 2.0);
     if ((hash2(int(floor(gl_FragCoord.x / 2.0)), int(tick)) & 3u) != 0u) tone = ivec2(2, ${LIT});
   }
 
-  // 4. the shore
-  if (known > 0.5 && steps < ${f(LAP_FAR + 1)}) {
-    vec4 sh = texture(shore, (fromGrid(cell + 0.5) + base) / side);
+  // 4. the shore: lines a pixel or two wide on the smooth field, so they keep their width at
+  // any distance
+  if (known > 0.5 && smoothSteps < ${f(LAP_FAR + 1)}) {
+    vec4 sh = texture(shore, vLocal / side);
     vec2 out_ = sh.gb * 2.0 - 1.0;
     float len = length(out_);
     out_ = len > 0.05 ? out_ / len : vec2(0.0);
     bool quiet = dist > ${f(QUIET_FAR)} || dot(out_, sun) < ${f(SHADE_LIGHT)};
-    if (steps < ${f(SHALLOW_STEPS)}) {
+    if (quiet) {
       // where a quiet shore meets the water: a dark line along it
-      if (quiet && (landAt(cell + vec2(1.0, 0.0), base) || landAt(cell - vec2(1.0, 0.0), base) ||
-                    landAt(cell + vec2(0.0, 1.0), base) || landAt(cell - vec2(0.0, 1.0), base)))
-        tone = ivec2(0, ${DEEP});
-    } else if (!quiet) {
-      // lapping: the first texels past the ring, in dashes running along the shore
+      if (smoothSteps < 0.5 + perPx * ${f(LINE_PX)}) tone = ivec2(0, ${DEEP});
+    } else {
+      // lapping: a line two or three cells out, in dashes running along the shore
       float half_ = ${f(LOOP / LAP_CYCLES / 2)};
       float ring = still > 0.5 || mod(loopT, 2.0 * half_) < half_ ? ${f(LAP_NEAR)} : ${f(LAP_FAR)};
-      if (steps >= ring && (stepsAt(cell + vec2(1.0, 0.0), base) < ring || stepsAt(cell - vec2(1.0, 0.0), base) < ring ||
-                            stepsAt(cell + vec2(0.0, 1.0), base) < ring || stepsAt(cell - vec2(0.0, 1.0), base) < ring)) {
+      if (len > 0.05 && abs(smoothSteps - ring) < perPx * ${f(LINE_PX / 2)}) {
         // along the shore, its direction in sixteen steps so a bend keeps its dashes whole
         float a = round(atan(out_.y, out_.x) / (TAU / 16.0)) * (TAU / 16.0);
-        float s = dot(fromGrid(cell + 0.5), vec2(-sin(a), cos(a)));
+        float s = dot(en, vec2(-sin(a), cos(a)));
         if (still < 0.5) s -= ${f((LAP_TRAVEL * LAP_PERIOD) / LOOP)} * loopT;
-        if (len > 0.05 && fract(s / ${f(LAP_PERIOD)}) < ${f(LAP_DASH)}) tone = ivec2(1, ${HIGH});
+        if (fract(s / ${f(LAP_PERIOD)}) < ${f(LAP_DASH)}) tone = ivec2(1, ${HIGH});
       }
     }
   }
 
-  // 5. glints on the open water, not on a reflection
-  if (still < 0.5 && !shown && !foot && tone.x == 0 && steps >= ${f(RIM_STEPS)} && dist < ${f(GLINT_REACH)} && grazing < ${f(GLINT_GRAZE)}) {
+  // 5. the living surface: short dashes a shade lighter or darker, one in some squares of a
+  // world grid whose squares double where they would be too small on screen; a square of one
+  // level and of the next share the pixels where the level changes, by hash
+  // the screen's pixels in the water's metres, inverted: where a point a few metres off lies on
+  // screen, without projecting it
+  mat2 toPx = inverse(mat2(acrossPx, downPx));
+  if (tone.x == 0 && !shown && !foot && abs(determinant(mat2(acrossPx, downPx))) > 1e-12) {
+    float need = max(length(acrossPx) * ${f(SURFACE_ACROSS)}, length(downPx) * ${f(SURFACE_DOWN)});
+    float level = log2(max(need, ${f(SURFACE_CELL)}) / ${f(SURFACE_CELL)});
+    float l0 = floor(level);
+    for (int k = 0; k < 2; k++) {
+      float l = l0 + float(k);
+      float S = ${f(SURFACE_CELL)} * exp2(l);
+      vec2 sq = floor(en / S);
+      uint h = mixh(hash2(int(sq.x), int(sq.y)), uint(l) + 101u);
+      float keep = (k == 0 ? 1.0 - (level - l0) : level - l0) * ${f(SURFACE_SHARE)};
+      if (float(h & 1023u) / 1024.0 >= keep) continue;
+      float phase = float((h >> 10) & 255u) / 256.0;
+      if (still < 0.5 && fract(loopT / ${f(LOOP)} + phase) >= ${f(SURFACE_SHOWN)}) continue;
+      uint g = mixh(h, 7u);
+      float drift = still > 0.5 ? 0.0 : 0.12 * sin(TAU * (loopT / ${f(LOOP)} + phase));
+      vec2 at = (sq + vec2(0.3 + 0.4 * float(g & 255u) / 256.0 + drift, 0.3 + 0.4 * float((g >> 8) & 255u) / 256.0)) * S;
+      // the dash's middle on screen, from this pixel's middle
+      vec2 d = floor(gl_FragCoord.xy) - floor(gl_FragCoord.xy + toPx * (at - en));
+      int span = max(1, min(4, 4 - int(floor(l / 2.0))));
+      int len = 1 + int((g >> 16) % uint(span));
+      int x = int(d.x) + (len - 1) / 2;
+      if (d.y == 0.0 && x >= 0 && x < len) {
+        tone.y = clamp(tone.y + (((g >> 24) & 3u) != 0u ? 1 : -1), ${DEEP}, ${HIGH});
+        break;
+      }
+    }
+  }
+
+  // 6. glints on the open water, not on a reflection
+  if (still < 0.5 && !shown && !foot && tone.x == 0 && smoothSteps >= ${f(RIM_STEPS)} && dist < ${f(GLINT_REACH)} && grazing < ${f(GLINT_GRAZE)}) {
     vec2 sq = floor(en / ${f(GLINT_CELL)});
     uint h = mixh(hash2(int(sq.x), int(sq.y)), uint(loopN));
     if (float(h & 255u) < ${f(GLINT_SHARE * 256)}) {
@@ -570,7 +634,7 @@ export interface WalkMaterials {
   deck: THREE.ShaderMaterial;
   tree: THREE.ShaderMaterial;
   cable: THREE.ShaderMaterial;
-  /** The open water under everything: deep where no square says otherwise; it writes no depth. */
+  /** The open water, where no square is shown: deep, no shore. */
   water: THREE.ShaderMaterial;
   edge: THREE.ShaderMaterial;
   /** The sky's dome: drawn first, behind everything. */
@@ -584,11 +648,8 @@ export interface WalkMaterials {
     mask: THREE.Texture | null,
     shore?: THREE.Texture | null,
   ): { colour: THREE.ShaderMaterial; depth: THREE.ShaderMaterial };
-  /**
-   * A square's own water, shaded by its shore field (`shoreTexture`) and cut along its mask
-   * (null for a square all of water). Dispose of it with the square; the textures are the caller's.
-   */
-  waterOf(mask: THREE.Texture | null, shore: THREE.Texture): THREE.ShaderMaterial;
+  /** A square's own water, shaded by its shore field (`shoreTexture`). Dispose of it with the square; the texture is the caller's. */
+  waterOf(shore: THREE.Texture): THREE.ShaderMaterial;
   /** What the mirror saw this frame, for the water to read; null: no reflections. */
   mirror(m: Mirror | null): void;
   /** Under reduced motion the water stands still: no wobble, no glints, the lapping on its near ring. */
@@ -714,7 +775,6 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
   };
   /** A shore field with no shore: open water, dry land. */
   const open = texel(255, 128, 128, 255);
-  const sea = texel(255, 255, 255, 255);
   const blank = texel(0, 0, 0, 255);
   const lumas: number[] = [];
   for (let c = 0; c < palette.size; c++) {
@@ -742,19 +802,17 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     mirrorWorld: { value: new THREE.Matrix4() },
     darkCut: { value: darkCutOf(lumas) },
   };
-  const waterMaterial = (mask: THREE.Texture, shore: THREE.Texture, known: boolean) =>
+  const waterMaterial = (shore: THREE.Texture, known: boolean) =>
     new THREE.ShaderMaterial({
       uniforms: {
         ...waterShared,
         shore: { value: shore },
-        mask: { value: mask },
         known: { value: known ? 1 : 0 },
       },
       vertexShader: WATER_VERTEX,
       fragmentShader: WATER_FRAGMENT,
     });
-  const water = waterMaterial(sea, open, false);
-  water.depthWrite = false;
+  const water = waterMaterial(open, false);
   const edge = new THREE.ShaderMaterial({
     uniforms: {
       fogColor: shared.fogColor,
@@ -813,8 +871,8 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
       });
       return { colour, depth };
     },
-    waterOf(mask, shore) {
-      return waterMaterial(mask ?? sea, shore, true);
+    waterOf(shore) {
+      return waterMaterial(shore, true);
     },
     mirror(m) {
       waterShared.mirrorOn.value = m ? 1 : 0;
@@ -845,7 +903,7 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
       for (const m of [wall, roof, deck, tree, cable, water, edge, sky]) m.dispose();
       atlas.dispose();
       land.dispose();
-      for (const t of [open, sea, blank]) t.dispose();
+      for (const t of [open, blank]) t.dispose();
     },
   };
 }

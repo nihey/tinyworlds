@@ -1,18 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { DEEP, HALF, HIGH, LIT, OUTLINE, SHADE } from "../render/palette";
 import {
+  BAYER4,
   darkCutOf,
+  DEPTH_NEAR,
+  dashSpan,
   depthTone,
+  dithered,
   glint,
   GLINT_FOR,
+  GRAZE_DEEP,
   GRAZE_ONE,
+  GRAZE_STEEP,
   GRAZE_TWO,
   lapRing,
   LOOP,
   quietShore,
   QUIET_FAR,
   reflectTone,
+  SHALLOW_STEPS,
+  shallowUntil,
   skyTone,
+  surfaceLevel,
+  SURFACE_CELL,
   wobble,
   type WaterTone,
 } from "../water";
@@ -45,41 +55,155 @@ describe("depthTone", () => {
 
 describe("skyTone", () => {
   const deep: WaterTone = { ramp: "water", shade: SHADE };
+  const base: WaterTone = { ramp: "water", shade: HALF };
+  const rim: WaterTone = { ramp: "water", shade: LIT };
 
-  it("leaves the water as it is when you look down into it", () => {
-    expect(skyTone(deep, 0)).toEqual(deep);
-    expect(skyTone(deep, 0.5)).toEqual(deep);
+  it("is the map's own water tone, whatever the depth, when you look steeply down into it", () => {
+    for (const g of [0, 0.2, GRAZE_STEEP - 0.01]) {
+      expect(skyTone(deep, g)).toEqual({ ramp: "water", shade: LIT });
+      expect(skyTone(base, g)).toEqual({ ramp: "water", shade: LIT });
+      expect(skyTone(rim, g)).toEqual(rim);
+    }
   });
 
-  it("lightens it a shade, then two, as you see it at a grazing angle", () => {
-    const grazing = Array.from({ length: 101 }, (_, k) => k / 100);
+  it("goes down into the depth's tones a shade at a time, and keeps them at middle angles", () => {
+    // from steep to middle: at most one shade under the map's water
+    for (const g of [GRAZE_STEEP, (GRAZE_STEEP + GRAZE_DEEP) / 2]) {
+      expect(skyTone(deep, g)).toEqual({ ramp: "water", shade: LIT - 1 });
+      expect(skyTone(base, g)).toEqual(base);
+      expect(skyTone(rim, g)).toEqual(rim);
+    }
+    for (const g of [GRAZE_DEEP, (GRAZE_DEEP + GRAZE_ONE) / 2]) {
+      expect(skyTone(deep, g)).toEqual(deep);
+      expect(skyTone(base, g)).toEqual(base);
+    }
+    expect(GRAZE_STEEP).toBeLessThan(GRAZE_DEEP);
+    expect(GRAZE_DEEP).toBeLessThan(GRAZE_ONE);
+  });
+
+  it("lightens it a shade, then two, towards the horizon", () => {
+    const grazing = Array.from(
+      { length: 101 },
+      (_, k) => GRAZE_DEEP + ((1 - GRAZE_DEEP) * k) / 100,
+    );
     const shades = grazing.map((g) => skyTone(deep, g).shade);
-    expect(shades[shades.length - 1]).toBe(SHADE + 2);
     expect(new Set(shades)).toEqual(new Set([SHADE, SHADE + 1, SHADE + 2]));
     for (let k = 1; k < shades.length; k++) expect(shades[k]).toBeGreaterThanOrEqual(shades[k - 1]);
     expect(skyTone(deep, GRAZE_ONE).shade).toBe(SHADE + 1);
     expect(skyTone(deep, GRAZE_TWO).shade).toBe(SHADE + 2);
   });
 
-  it("never goes past the ramp's highlight", () => {
-    expect(skyTone({ ramp: "water", shade: LIT }, 1)).toEqual({ ramp: "water", shade: HIGH });
+  it("lightens back to the map's water, never past it, so the bands only get lighter outwards", () => {
+    expect(skyTone(rim, 1)).toEqual(rim);
+    expect(skyTone(deep, 1)).toEqual({ ramp: "water", shade: LIT });
+    // along a look outwards (grazing growing), never darker then lighter then darker again
+    for (const tone of [deep, base, rim]) {
+      const shades = Array.from({ length: 101 }, (_, k) => skyTone(tone, k / 100).shade);
+      const lowest = Math.min(...shades);
+      const at = shades.indexOf(lowest);
+      for (let k = 1; k <= at; k++) expect(shades[k]).toBeLessThanOrEqual(shades[k - 1]);
+      for (let k = at + 1; k < shades.length; k++)
+        expect(shades[k]).toBeGreaterThanOrEqual(shades[k - 1]);
+      expect(Math.max(...shades)).toBe(LIT);
+    }
+  });
+
+  it("shows no depth near the eye: the water round a swimmer is the map's", () => {
+    const middle = (GRAZE_DEEP + GRAZE_ONE) / 2;
+    expect(skyTone(deep, middle, DEPTH_NEAR - 1)).toEqual({ ramp: "water", shade: LIT });
+    expect(skyTone(deep, middle, DEPTH_NEAR + 1)).toEqual(deep);
+    expect(skyTone(deep, middle)).toEqual(deep);
   });
 
   it("leaves the shallow band alone", () => {
     const shallow: WaterTone = { ramp: "waterShallow", shade: LIT };
-    expect(skyTone(shallow, 1)).toEqual(shallow);
+    for (const g of [0, 0.6, 1]) expect(skyTone(shallow, g)).toEqual(shallow);
   });
 });
 
 describe("reflectTone", () => {
-  it("splits into three flat tones of the ramp's deep half at darkCut and 110", () => {
+  const map: WaterTone = { ramp: "water", shade: LIT };
+
+  it("splits into three flat tones at darkCut and 110, one, two and three shades under the water", () => {
     const cut = 80;
-    expect(reflectTone(0, cut)).toEqual({ ramp: "water", shade: OUTLINE });
-    expect(reflectTone(79.9, cut)).toEqual({ ramp: "water", shade: OUTLINE });
-    expect(reflectTone(80, cut)).toEqual({ ramp: "water", shade: DEEP });
-    expect(reflectTone(109.9, cut)).toEqual({ ramp: "water", shade: DEEP });
-    expect(reflectTone(110, cut)).toEqual({ ramp: "water", shade: SHADE });
-    expect(reflectTone(255, cut)).toEqual({ ramp: "water", shade: SHADE });
+    expect(reflectTone(0, cut, map)).toEqual({ ramp: "water", shade: DEEP });
+    expect(reflectTone(79.9, cut, map)).toEqual({ ramp: "water", shade: DEEP });
+    expect(reflectTone(80, cut, map)).toEqual({ ramp: "water", shade: SHADE });
+    expect(reflectTone(109.9, cut, map)).toEqual({ ramp: "water", shade: SHADE });
+    expect(reflectTone(110, cut, map)).toEqual({ ramp: "water", shade: HALF });
+    expect(reflectTone(255, cut, map)).toEqual({ ramp: "water", shade: HALF });
+    // on the map's water: the darkest darker than the deep water, the lightest close to the base
+    expect(reflectTone(0, cut, map).shade).toBeLessThan(depthTone(99).shade);
+  });
+
+  it("always shows against the water under it, darker, down to the outline", () => {
+    for (const shade of [OUTLINE + 1, SHADE, HALF, LIT, HIGH])
+      for (const luma of [0, 90, 200]) {
+        const r = reflectTone(luma, 80, { ramp: "water", shade });
+        expect(r.shade).toBeLessThan(shade);
+        expect(r.shade).toBeGreaterThanOrEqual(OUTLINE);
+      }
+  });
+
+  it("keeps the water's ramp: a reflection in the shallow band is teal", () => {
+    expect(reflectTone(200, 80, { ramp: "waterShallow", shade: LIT })).toEqual({
+      ramp: "waterShallow",
+      shade: HALF,
+    });
+  });
+});
+
+describe("dithered", () => {
+  it("steps from 0 to 1 across a threshold, in a Bayer pattern within its width", () => {
+    const cells = BAYER4.map((b) => (b + 0.5) / 16);
+    expect(cells.every((b) => dithered(0, 5, 1, b) === 0)).toBe(true);
+    expect(cells.every((b) => dithered(10, 5, 1, b) === 1)).toBe(true);
+    // at the threshold itself, half the cells
+    expect(cells.filter((b) => dithered(5, 5, 1, b) === 1).length).toBe(8);
+    // a quarter of the way in, a quarter
+    expect(cells.filter((b) => dithered(4.75, 5, 1, b) === 1).length).toBe(4);
+    // no width: a hard step
+    expect(dithered(4.99, 5, 0, 0.5)).toBe(0);
+    expect(dithered(5.01, 5, 0, 0.5)).toBe(1);
+  });
+
+  it("uses each of the 16 thresholds once", () => {
+    expect([...BAYER4].sort((a, b) => a - b)).toEqual(Array.from({ length: 16 }, (_, k) => k));
+  });
+});
+
+describe("shallowUntil", () => {
+  it("is a thin rim: a few pixels where the shore is near and large on screen, up to the 2 m band far off", () => {
+    // steps a pixel: small when near
+    expect(shallowUntil(0.01)).toBeLessThan(0.6);
+    expect(shallowUntil(0.01)).toBeGreaterThan(0.5);
+    expect(shallowUntil(1)).toBe(SHALLOW_STEPS);
+    let last = 0;
+    for (const s of [0.001, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 5]) {
+      expect(shallowUntil(s)).toBeGreaterThanOrEqual(last);
+      expect(shallowUntil(s)).toBeLessThanOrEqual(SHALLOW_STEPS);
+      last = shallowUntil(s);
+    }
+  });
+});
+
+describe("the living surface", () => {
+  it("uses cells twice as big a level up, the finest where a cell is small on screen", () => {
+    expect(surfaceLevel(0)).toBe(0);
+    expect(surfaceLevel(SURFACE_CELL)).toBe(0);
+    expect(surfaceLevel(SURFACE_CELL * 2)).toBeCloseTo(1, 9);
+    expect(surfaceLevel(SURFACE_CELL * 8)).toBeCloseTo(3, 9);
+  });
+
+  it("draws dashes of up to 4 pixels near, finer farther", () => {
+    expect(dashSpan(0)).toBe(4);
+    expect(dashSpan(20)).toBe(1);
+    let last = 4;
+    for (let l = 0; l < 12; l++) {
+      expect(dashSpan(l)).toBeLessThanOrEqual(last);
+      expect(dashSpan(l)).toBeGreaterThanOrEqual(1);
+      last = dashSpan(l);
+    }
   });
 });
 

@@ -5,6 +5,8 @@ import {
   SLOW_SPAN,
   SLOW_SPANS,
   SLOW_WARM_UP,
+  OPEN_REACH,
+  openTiles,
   SlowWatch,
   SquareStream,
 } from "../render/view";
@@ -301,5 +303,26 @@ describe("SlowWatch", () => {
     w.reset();
     expect(w.frame(1 / 25)).toBe(false);
     expect(run(w, 60, 10).slow).toBe(false);
+  });
+});
+
+describe("openTiles", () => {
+  it("covers the squares round the camera that no shown square covers, so the water is drawn once", () => {
+    const shown = new Set(["0_0", "1_0", "-1_2"]);
+    const tiles = openTiles(0, 0, shown);
+    const keys = new Set(tiles.map(([i, j]) => `${i}_${j}`));
+    const side = 2 * OPEN_REACH;
+    expect(tiles.length).toBe(side * side - 3);
+    for (const k of shown) expect(keys.has(k)).toBe(false);
+    expect(keys.has("2_0")).toBe(true);
+    expect(keys.has(`${-OPEN_REACH}_${-OPEN_REACH}`)).toBe(true);
+    expect(keys.has(`${OPEN_REACH}_0`)).toBe(false);
+  });
+
+  it("follows the camera's square", () => {
+    const keys = new Set(openTiles(30, -7, new Set()).map(([i, j]) => `${i}_${j}`));
+    expect(keys.has("30_-7")).toBe(true);
+    expect(keys.has(`${30 - OPEN_REACH}_${-7 - OPEN_REACH}`)).toBe(true);
+    expect(keys.has("0_0")).toBe(false);
   });
 });

@@ -965,31 +965,39 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
 - **The water** (the rules and their numbers in `walk/water.ts`, the shader in
   `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
   according to" a write-up of layered pixel-art water, whose ideas are re-made here for a
-  first-person view. Every layer picks one palette tone per pixel, never a blend. Each square
-  with water has its own surface, shaded by a field made once from the data's `shore`
-  (`shoreField` in `render/shore.ts`: the distance to land, smoothed so the bands follow the
-  bank, which way the land lies, and the land's own distance to the water), read at the middle
-  of each map texel so its shapes step like the ground's. The layers: **depth** (a teal shallow
-  band about 2 m wide at the shore, a light rim, the base, the deep shade beyond about 14 m);
-  **sky** (a shade, then two, lighter where it is seen at a grazing angle); **reflections** (a
-  camera mirrored under the surface draws everything but the sky, the water and the ground
-  into a picture of the drawing's size, half of it on a touch screen; the water reads it in
-  three flat tones from the deep half of its ramp, the darker of it and the water winning, its
-  rows shifted sideways by whole pixels the farther they are under their foot, a shade lighter
-  at a time with the fog along the mirrored path); **the shore** (land within 2 m of the water
-  a shade darker, not on a pier; on a near, lit shore light dashes lapping two or three cells
-  out and travelling along it; on a quiet one, farther than 150 m or facing away from the sun,
-  a dark line where it meets the water instead; a broken light line at the waterline of what
-  stands in the water, bridge piers, piles and boats, whose walls reach down to it); **glints**
-  on the open water, new places every loop; and **ripple rings** round every splash
+  first-person view. Every layer picks one palette tone per pixel, never a blend; where two
+  tones meet, the line is crossed in a 4 × 4 Bayer pattern over a few pixels. Each square with
+  water has its own surface (and the open water lies only where no square is shown, so the
+  water is drawn once, after the ground's depth), shaded by a field made once from the data's
+  `shore` (`shoreField` in `render/shore.ts`: the distance to land, smoothed so the bands
+  follow the bank, which way the land lies, and the land's own distance to the water). The
+  layers: **depth** (a teal shallow rim at the shore, 2 m but never more than a few pixels
+  across, a light rim, the base, the deep beyond about 14 m); **the angle** (looking steeply
+  down, or within 8 m of the eye, the map's own water; at middle angles the depth's tones, a
+  shade at a time; towards the horizon back to the map's water, so along any look outwards the
+  water only darkens, then only lightens); **reflections** (a camera mirrored under the surface
+  draws everything but the sky, the water, the ground and the particles into a picture of the
+  drawing's size, half of it on a touch screen; the water reads it in three flat tones, one,
+  two and three shades under the water they lie on, so they always show, its rows shifted
+  sideways by whole pixels the farther they are under their foot, a shade fewer at a time with
+  the fog along the mirrored path); **the shore** (land within 2 m of the water a shade darker,
+  not on a pier; on a near, lit shore a light lapping line two or three cells out, a pixel or
+  two wide, in dashes travelling along it; on a quiet one, farther than 150 m or facing away
+  from the sun, a dark line where it meets the water instead; a broken light line at the
+  waterline of what stands in the water, bridge piers, piles and boats, whose walls reach down
+  to it); **the living surface** (short horizontal dashes a shade lighter or darker, one in
+  some squares of a world grid whose squares double where they would be too small on screen,
+  so they stay a few pixels apart, drifting and showing for part of the loop); **glints** on
+  the open water, new places every loop; and **ripple rings** round every splash
   (`particles.ts`). Every motion is a whole number of cycles in a 5 s loop. Under reduced
-  motion nothing on the water moves (no wobble, no glints, the lapping on its near ring); the
-  rings, being events, still show. What lies on the water or is the ground goes on the layer
-  `NOT_MIRRORED`; the shore's own faces mark themselves in the mirror's alpha, so they get no
-  light line. The mirror costs about one more drawing of the city: it is skipped when no water
-  is within 500 m, and let go for the rest of the walk when the frame rate stays under 40 fps
-  for 2 s (`SlowWatch`, sooner than the screen grows the pixels); `view.setReflections(on)`
-  sets it again, `view.reflections` says whether it is on.
+  motion nothing on the water moves (no wobble, no glints, the lapping on its near ring, the
+  dashes still); the rings, being events, still show. What lies on the water or is the ground
+  goes on the layer `NOT_MIRRORED`; the shore's own faces mark themselves in the mirror's
+  alpha, so they get no light line. The mirror costs about one more drawing of the city: it is
+  skipped when no water is within 500 m, and let go for the rest of the walk when the frame
+  rate stays under 40 fps for 2 s (`SlowWatch`, sooner than the screen grows the pixels);
+  `view.setReflections(on)` sets it again, `view.reflections` says whether it is on. A person
+  knocked into the water makes no ring yet: the crowd has no splash event to hook.
 - **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
   try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
   one cannot bind a key to two clashing actions). The pixel size and the sound last for the

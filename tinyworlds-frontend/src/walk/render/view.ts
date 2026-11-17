@@ -58,6 +58,22 @@ export const SLOW_WARM_UP = 3;
 
 const keyOf = (i: number, j: number) => `${i}_${j}`;
 
+/** Squares each way from the camera's that the open water reaches (2 km: far beyond the fog). */
+export const OPEN_REACH = 10;
+
+/**
+ * The squares the open water is drawn on: those round the camera's square that no shown square
+ * covers (a shown square has its own water, or is all land under its ground), so the water is
+ * drawn once wherever it is. No three.js.
+ */
+export function openTiles(ci: number, cj: number, shown: ReadonlySet<string>): [number, number][] {
+  const out: [number, number][] = [];
+  for (let j = cj - OPEN_REACH; j < cj + OPEN_REACH; j++)
+    for (let i = ci - OPEN_REACH; i < ci + OPEN_REACH; i++)
+      if (!shown.has(keyOf(i, j))) out.push([i, j]);
+  return out;
+}
+
 interface Slot<T> {
   i: number;
   j: number;
@@ -337,6 +353,9 @@ export class WalkView {
   private meshFailed = false;
   /** The squares shown that have water, by where they are. */
   private readonly wet = new Map<THREE.Group, { i: number; j: number }>();
+  /** Every square shown, by its key; and the camera's square the open water was last laid round (null: lay it again). */
+  private readonly shown = new Map<THREE.Group, string>();
+  private openAt: { i: number; j: number } | null = null;
   /** The mirror: its camera, its picture (made when first wanted), how coarse, and whether it is on. */
   private readonly mirrorCam = new THREE.PerspectiveCamera();
   private target: THREE.WebGLRenderTarget | null = null;
@@ -379,11 +398,8 @@ export class WalkView {
         : false;
     this.mirrorScale = media("(pointer: coarse)") ? MIRROR_COARSE : 1;
 
-    // the water under everything: it follows the camera, its pattern stays where it is
-    const plane = new THREE.PlaneGeometry(4000, 4000);
-    plane.rotateX(-Math.PI / 2);
-    this.water = new THREE.Mesh(plane, this.materials.water);
-    this.water.position.y = WATER_SURFACE;
+    // the open water: where no square is shown, round the camera (`openWater`)
+    this.water = new THREE.Mesh(new THREE.BufferGeometry(), this.materials.water);
     this.water.renderOrder = ORDER_WATER;
     this.water.frustumCulled = false;
     this.water.layers.set(NOT_MIRRORED);
@@ -407,6 +423,7 @@ export class WalkView {
       drop: (g) => {
         this.scene.remove(g);
         this.wet.delete(g);
+        if (this.shown.delete(g)) this.openAt = null;
         if (g.userData.disposables) disposeCellMeshes(g);
       },
     });
@@ -478,6 +495,8 @@ export class WalkView {
     }
     this.scene.add(group);
     if (cell.mask.mode !== 0) this.wet.set(group, { i: cell.i, j: cell.j });
+    this.shown.set(group, cell.key);
+    this.openAt = null;
     this.stream.show(cell, group);
   }
 
@@ -493,14 +512,55 @@ export class WalkView {
       this.drawn = { w, h, pixel: this.pixel };
     }
     this.sky.position.copy(this.camera.position);
-    this.water.position.x = Math.round(this.camera.position.x / 100) * 100;
-    this.water.position.z = Math.round(this.camera.position.z / 100) * 100;
+    this.openWater();
     this.camera.updateMatrixWorld();
     const buffer = this.renderer.getDrawingBufferSize(this.buffer);
     this.materials.frame(this.time, this.camera, buffer.x, buffer.y);
     this.watchFrames();
     this.materials.mirror(this.mirror(buffer));
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Lays the open water again when the shown squares or the camera's square changed. */
+  private openWater(): void {
+    const side = this.stream.world.index.cell;
+    const ci = Math.floor(this.camera.position.x / side);
+    const cj = Math.floor(-this.camera.position.z / side);
+    if (!Number.isFinite(ci) || !Number.isFinite(cj)) return;
+    if (this.openAt && this.openAt.i === ci && this.openAt.j === cj) return;
+    this.openAt = { i: ci, j: cj };
+    const tiles = openTiles(ci, cj, new Set(this.shown.values()));
+    const pos = new Float32Array(tiles.length * 12);
+    const index: number[] = [];
+    tiles.forEach(([i, j], k) => {
+      const x0 = i * side;
+      const x1 = x0 + side;
+      const z0 = -j * side;
+      const z1 = z0 - side;
+      pos.set(
+        [
+          x0,
+          WATER_SURFACE,
+          z0,
+          x1,
+          WATER_SURFACE,
+          z0,
+          x1,
+          WATER_SURFACE,
+          z1,
+          x0,
+          WATER_SURFACE,
+          z1,
+        ],
+        k * 12,
+      );
+      index.push(k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3);
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geometry.setIndex(index);
+    this.water.geometry.dispose();
+    this.water.geometry = geometry;
   }
 
   /** Lets the reflections go when frames stay slow, counting once the first squares are shown. */

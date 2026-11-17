@@ -1,4 +1,4 @@
-import { DEEP, HALF, HIGH, LIT, OUTLINE, SHADE } from "./render/palette";
+import { HALF, LIT, OUTLINE, SHADE } from "./render/palette";
 
 /**
  * The water's rules, layer by layer: each picks one palette tone per pixel, never a blend
@@ -17,12 +17,17 @@ export type WaterTone = { ramp: WaterRamp; shade: number };
 
 /** Under this many steps from the land, the shallow band: the first row of water cells, about 2 m. */
 export const SHALLOW_STEPS = 1.5;
+/** The shallow band is at most this many pixels across, so near the shore it stays a thin rim. */
+export const SHALLOW_PX = 6;
 /** Under this many, the light rim. */
 export const RIM_STEPS = 3;
 /** From this many, the deep shade; the base between. */
 export const DEEP_STEPS = 7;
 
-/** Darker away from the land: a teal band at the shore, a light rim, the base, then the deep. */
+/**
+ * Darker away from the land: a teal band at the shore, a light rim, the base, then the deep (as
+ * middle angles show it: `skyTone`).
+ */
 export function depthTone(shoreSteps: number): WaterTone {
   if (shoreSteps < SHALLOW_STEPS) return { ramp: "waterShallow", shade: LIT };
   if (shoreSteps < RIM_STEPS) return { ramp: "water", shade: LIT };
@@ -31,17 +36,47 @@ export function depthTone(shoreSteps: number): WaterTone {
 }
 
 /**
- * How grazing a look at the water (1 − |the view's slope|) lightens it a shade, then two: far
- * water mirrors the sky, while at your feet you see into it.
+ * How grazing a look at the water is (1 − |the view's slope|) decides how much of its depth
+ * shows: looking steeply down you see into it, the map's own water whatever the depth; then the
+ * depth's tones come in a shade at a time (`GRAZE_STEEP`, about 15° under the horizon, then
+ * `GRAZE_DEEP`, about 12°), so far from the shore it is the deep shade at middle angles; towards
+ * the horizon the sky it mirrors takes the depth back a shade at a time (`GRAZE_ONE`, about 6°,
+ * then `GRAZE_TWO`, about 3°), up to the map's water. Within `DEPTH_NEAR` metres of the eye the
+ * depth does not show at all (round a swimmer the middle angles are at arm's length). So along
+ * any look outwards the water only darkens, then only lightens: no rings.
  */
-export const GRAZE_ONE = 0.75;
-export const GRAZE_TWO = 0.9;
+export const GRAZE_STEEP = 0.74;
+export const GRAZE_DEEP = 0.8;
+export const GRAZE_ONE = 0.9;
+export const GRAZE_TWO = 0.95;
+export const DEPTH_NEAR = 8;
 
-/** Lighter at a grazing angle, up to the ramp's highlight; the shallow band keeps its own tone. */
-export function skyTone(tone: WaterTone, grazing: number): WaterTone {
+/** The depth's tone as the angle (and the distance from the eye, metres) shows it; the shallow band keeps its own tone. */
+export function skyTone(tone: WaterTone, grazing: number, distance = Infinity): WaterTone {
   if (tone.ramp !== "water") return tone;
+  const shows =
+    distance < DEPTH_NEAR ? 0 : (grazing >= GRAZE_STEEP ? 1 : 0) + (grazing >= GRAZE_DEEP ? 1 : 0);
   const lift = grazing >= GRAZE_TWO ? 2 : grazing >= GRAZE_ONE ? 1 : 0;
-  return { ramp: "water", shade: Math.min(HIGH, tone.shade + lift) };
+  const depth = Math.min(Math.max(0, LIT - tone.shade), shows);
+  return { ramp: "water", shade: LIT - Math.max(0, depth - lift) };
+}
+
+/**
+ * Where two tones meet, the shader does not draw a hard line: each threshold is crossed over a
+ * few pixels in a 4 × 4 Bayer pattern (still one palette colour per pixel). The pattern's
+ * thresholds, row by row.
+ */
+export const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5] as const;
+/** Pixels over which a threshold between two tones is dithered. */
+export const DITHER_PX = 3;
+
+/**
+ * Whether `x` is past the threshold `t` at a pixel whose Bayer cell is `b` (0–1): over `w`
+ * (the threshold's width, as much of `x` as `DITHER_PX` pixels hold) a growing share of cells.
+ */
+export function dithered(x: number, t: number, w: number, b: number): 0 | 1 {
+  if (!(w > 0)) return x > t ? 1 : 0;
+  return Math.max(0, Math.min(1, (x - t) / w + 0.5)) > b ? 1 : 0;
 }
 
 /** Brightness (0–255) from which a reflected pixel takes the reflection's lightest tone. */
@@ -50,14 +85,22 @@ export const LIGHT_CUT = 110;
 export const DARK_SHARE = 0.15;
 
 /**
- * What stands by the water drawn again in three flat tones from the deep half of the water's
- * ramp: the darkest below `darkCut`, the middle below `LIGHT_CUT`, the lightest above. Where it
- * shows, the darker of it and the water wins, so a reflection never lights the water up.
+ * What stands by the water drawn again in three flat tones, by its brightness: the darkest
+ * (below `darkCut`) three shades under the water it lies on, the middle (below `LIGHT_CUT`) two,
+ * the lightest one. So a reflection always shows, whatever band of the water it crosses: on the
+ * map's water, the deep, the deep shade (the deep water's own) and a shade under the base.
  */
-export function reflectTone(luma: number, darkCut: number): WaterTone {
-  if (luma < darkCut) return { ramp: "water", shade: OUTLINE };
-  if (luma < LIGHT_CUT) return { ramp: "water", shade: DEEP };
-  return { ramp: "water", shade: SHADE };
+export function reflectTone(luma: number, darkCut: number, water: WaterTone): WaterTone {
+  const under = luma < darkCut ? 3 : luma < LIGHT_CUT ? 2 : 1;
+  return { ramp: water.ramp, shade: Math.max(OUTLINE, water.shade - under) };
+}
+
+/**
+ * Where the shallow band ends, in steps from the land (the shore line is at half a step), given
+ * how many steps a pixel spans there: the 2 m band, but never more than `SHALLOW_PX` pixels.
+ */
+export function shallowUntil(stepsPerPixel: number): number {
+  return 0.5 + Math.min(SHALLOW_STEPS - 0.5, SHALLOW_PX * Math.max(0, stepsPerPixel));
 }
 
 /** Metres over the water within which a reflected thing is at its waterline: where the broken light line goes. */
@@ -90,6 +133,9 @@ export function wobble(rowsFromBase: number, t: number, y: number): number {
   return Math.floor(amp * Math.sin(2 * Math.PI * phase) + 0.5);
 }
 
+/** Pixels across the shore's lines (the lapping, the quiet shore's dark edge), whatever the distance. */
+export const LINE_PX = 2;
+
 /** The lapping line's two rings, in steps from the land, and how often it steps out and back per loop. */
 export const LAP_NEAR = 2;
 export const LAP_FAR = 3;
@@ -103,6 +149,32 @@ export const LAP_TRAVEL = 1;
 export function lapRing(t: number): 2 | 3 {
   const period = LOOP / LAP_CYCLES;
   return mod(t, period) < period / 2 ? LAP_NEAR : LAP_FAR;
+}
+
+/**
+ * The living surface: short horizontal dashes a shade lighter or darker than the water under
+ * them, one in some of the squares of a world grid (so they stay where they are as you move),
+ * each drifting a little and showing for part of the loop. The squares are `SURFACE_CELL`
+ * metres near, twice as big a level up wherever they would be under `SURFACE_ACROSS` pixels
+ * across or `SURFACE_DOWN` pixels down, so the dashes stay a few pixels apart and do not crawl:
+ * denser and finer with distance. A level's squares are shared with the next by hash, so the
+ * levels hand over without a seam.
+ */
+export const SURFACE_CELL = 0.4;
+export const SURFACE_ACROSS = 10;
+export const SURFACE_DOWN = 1.5;
+/** The share of squares with a dash, and of the loop each one shows for. */
+export const SURFACE_SHARE = 0.6;
+export const SURFACE_SHOWN = 0.7;
+
+/** The level of the surface's squares where they must be at least this many metres. */
+export function surfaceLevel(metres: number): number {
+  return Math.log2(Math.max(metres, SURFACE_CELL) / SURFACE_CELL);
+}
+
+/** The longest dash at a level, pixels: up to 4 near, down to 1 far. */
+export function dashSpan(level: number): number {
+  return Math.max(1, Math.min(4, 4 - Math.floor(level / 2)));
 }
 
 /** Land under this many steps from the water (the shore line is at half a step: 2 m) is damp, a shade darker. */

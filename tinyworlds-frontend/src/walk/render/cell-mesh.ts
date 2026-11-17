@@ -51,11 +51,15 @@ export interface MeshContext {
   world: WalkWorld;
 }
 
-/** Draw order: the open water first, then each square's, then the ground (painted, then its depth), then the rest. */
-export const ORDER_WATER = -200;
-const ORDER_SQUARE_WATER = -199;
+/**
+ * Draw order: the ground (painted, then its depth), then the water (each square's, and the open
+ * water where no square is), then the rest. The water comes after the ground's depth so that
+ * under the land its shader need not run.
+ */
 const ORDER_GROUND = -100;
 const ORDER_GROUND_DEPTH = -90;
+const ORDER_SQUARE_WATER = -80;
+export const ORDER_WATER = -79;
 const ORDER_TREES = 1;
 
 /** The water's surface, metres under the land (the simulation's too). */
@@ -661,12 +665,12 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     group.add(mesh);
     return mesh;
   };
-  // the square's water, under its ground; what lies flat on the water or under it is not mirrored
+  // the square's water, under its ground; what lies flat on the water or is the ground is not mirrored
   if (shore) {
     const surface = new THREE.PlaneGeometry(side, side);
     surface.rotateX(-Math.PI / 2);
     surface.translate(side / 2, WATER_SURFACE, -side / 2);
-    const material = materials.waterOf(mask, shore);
+    const material = materials.waterOf(shore);
     disposables.push(material);
     add(surface, material, ORDER_SQUARE_WATER)?.layers.set(NOT_MIRRORED);
   }
