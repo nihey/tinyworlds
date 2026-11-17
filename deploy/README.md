@@ -125,6 +125,7 @@ deploy/deploy.sh tinynyc             # after re-rendering: site + data
 deploy/deploy.sh tinyrao --no-data   # one world's code
 deploy/deploy.sh tinynyc --index     # site + indexes (places, hoods, life, sights and their pictures, quiz) + manifest, not the tiles
 deploy/deploy.sh tinyrao --data      # data only, no build
+deploy/deploy.sh tinynyc --walk      # the street walk's data only (squares, walk.json, manifest), no build
 deploy/deploy.sh home                # the front page
 ```
 
@@ -137,7 +138,18 @@ worlds table, `README.md` and `tinyworlds-frontend/CLAUDE.md`. A world without a
 only gets a note. Then it builds every target, and **uploads only once all of them have
 built**: a failing build leaves the whole site as it was, and its log's end is printed. The
 worlds go up first and the front page last, since its links lead to them. `all` also takes
-`--index` and `--data` (no build: every world's data).
+`--index` and `--data` (no build: every world's data). A world whose viewer file says
+`walk: true` also needs its street walk (`walk/walk.json`, here or, with `--no-data`, on the
+server): the check lists it as missing otherwise.
+
+**The street walk's data** (`walk/cells/*.bin`, `walk/walk.json`, about 120 MB for New York) goes
+up with a full `--data`, or on its own with `--walk`: the squares first (with `--delete`), then
+`walk.json`, then the manifest, which names the walk's version (`manifest.walk`, appended as
+`?v=` to them; the squares are cached as immutable). Like `--index`, it refuses when the server's
+manifest is from another render than the local one. It builds and announces nothing. `all --walk`
+sends every world's walk and passes by the worlds that have none. Send it **before** merging the
+branch whose viewer offers the walk: the push deploys the viewers, and a viewer with
+`walk: true` is refused while the server has no `walk/walk.json`.
 
 Every build runs in a temporary copy of the frontend beside it (`.deploy-work.*`, removed when
 the script ends; `node_modules` is hard-linked, `public/data` left out), so builds can run side

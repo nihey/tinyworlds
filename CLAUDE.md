@@ -199,7 +199,9 @@ Each sub-project has its own `CLAUDE.md`.
    merge to main: the push deploys the API (whose seed marks the city `BUILT`), then every
    viewer, and refuses while a world in the registry has no data on the server. Deploying the
    world also tells its city's donors that it is built (once; it needs `ANNOUNCE_HOST` or
-   `API_SERVICE`).
+   `API_SERVICE`). A world with `walk: true` also needs its street walk (`npm run cli -- --city
+   <id> walk`), sent with `--data` or on its own with `deploy/deploy.sh <id> --walk`; the check
+   and the release refuse a world that has none.
 
 The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
 `NEXT_PUBLIC_WORLD`, the data folder and the URL path.
@@ -534,7 +536,9 @@ it does not know, and the site then falls back to its payment link. Details in
   (or the daily one). Nothing of where it goes is in the workflow: it reads the repository's
   `production` environment secrets.
 - By hand: map data, which is not in git (`deploy/deploy.sh <world> --data`, or `--index` for
-  the indexes); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
+  the indexes, or `--walk` for a world's street walk alone: its squares, `walk.json`, then the
+  manifest; a world whose file says `walk: true` is incomplete without `walk/walk.json`, here or
+  on the server); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
   world's data) to the web server; `deploy/deploy.sh all [--parallel[=N] | --serial]
   [--no-data]` checks and builds every world in the viewer's registry and the front page, and
   uploads only if all of them built. A build from a tree that lacks what the server runs is

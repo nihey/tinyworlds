@@ -98,6 +98,7 @@ Requires Node 22+ and npm. About 1.5 GB of disk per large city for raw data, sce
 cd tinyworlds-pipeline
 npm install
 npm run all -- --city tinynyc     # fetch → scene → render → index, into ../tinyworlds-frontend/public/data/tinynyc
+npm run cli -- --city tinynyc walk   # New York's street walk (the squares to walk and drive; heavy: run it on a build machine)
 
 # 2. look at it
 cd ../tinyworlds-frontend
@@ -201,6 +202,7 @@ is not in git, goes up by hand:
 ```bash
 cp deploy/.env.example deploy/.env    # where your server is; never committed
 deploy/deploy.sh tinynyc --data       # a world's tiles and indexes, after rendering it
+deploy/deploy.sh tinynyc --walk       # its street walk's data alone (New York), no build
 deploy/deploy.sh tinynyc              # build for /tinynyc, rsync the site and the tiles
 deploy/deploy.sh release              # what the workflow runs: main, where the server is behind
 ```
