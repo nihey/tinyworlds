@@ -962,6 +962,34 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
 - **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half,
   dragging the right half looks, buttons for jump and get in on foot, horn, camera, brake and
   get out at the wheel.
+- **The water** (the rules and their numbers in `walk/water.ts`, the shader in
+  `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
+  according to" a write-up of layered pixel-art water, whose ideas are re-made here for a
+  first-person view. Every layer picks one palette tone per pixel, never a blend. Each square
+  with water has its own surface, shaded by a field made once from the data's `shore`
+  (`shoreField` in `render/shore.ts`: the distance to land, smoothed so the bands follow the
+  bank, which way the land lies, and the land's own distance to the water), read at the middle
+  of each map texel so its shapes step like the ground's. The layers: **depth** (a teal shallow
+  band about 2 m wide at the shore, a light rim, the base, the deep shade beyond about 14 m);
+  **sky** (a shade, then two, lighter where it is seen at a grazing angle); **reflections** (a
+  camera mirrored under the surface draws everything but the sky, the water and the ground
+  into a picture of the drawing's size, half of it on a touch screen; the water reads it in
+  three flat tones from the deep half of its ramp, the darker of it and the water winning, its
+  rows shifted sideways by whole pixels the farther they are under their foot, a shade lighter
+  at a time with the fog along the mirrored path); **the shore** (land within 2 m of the water
+  a shade darker, not on a pier; on a near, lit shore light dashes lapping two or three cells
+  out and travelling along it; on a quiet one, farther than 150 m or facing away from the sun,
+  a dark line where it meets the water instead; a broken light line at the waterline of what
+  stands in the water, bridge piers, piles and boats, whose walls reach down to it); **glints**
+  on the open water, new places every loop; and **ripple rings** round every splash
+  (`particles.ts`). Every motion is a whole number of cycles in a 5 s loop. Under reduced
+  motion nothing on the water moves (no wobble, no glints, the lapping on its near ring); the
+  rings, being events, still show. What lies on the water or is the ground goes on the layer
+  `NOT_MIRRORED`; the shore's own faces mark themselves in the mirror's alpha, so they get no
+  light line. The mirror costs about one more drawing of the city: it is skipped when no water
+  is within 500 m, and let go for the rest of the walk when the frame rate stays under 40 fps
+  for 2 s (`SlowWatch`, sooner than the screen grows the pixels); `view.setReflections(on)`
+  sets it again, `view.reflections` says whether it is on.
 - **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
   try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
   one cannot bind a key to two clashing actions). The pixel size and the sound last for the
@@ -972,7 +1000,8 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   it, `?v=<manifest.walk>`), `world.ts` (surfaces, water, walls), `player.ts` `health.ts`
   `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
   `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
-  `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `game.ts`;
+  `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,
+  `game.ts`;
   `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
   `deck-mesh.ts` `shore.ts`, `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
   production build has no `window.walk`: development builds put the game there for the

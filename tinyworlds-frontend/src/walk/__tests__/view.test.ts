@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { WalkCell } from "../cell";
-import { SquareStream } from "../render/view";
+import {
+  MIRROR_MIN_FPS,
+  SLOW_SPAN,
+  SLOW_SPANS,
+  SLOW_WARM_UP,
+  SlowWatch,
+  SquareStream,
+} from "../render/view";
 import type { WalkIndex } from "../walk-index";
 import { makeCell } from "./fixtures";
 
@@ -249,5 +256,50 @@ describe("SquareStream", () => {
     s.dispose();
     expect(s.world.has(0, 0)).toBe(false);
     expect(h.dropped).toContain("meshes 0_0");
+  });
+});
+
+describe("SlowWatch", () => {
+  /** Feeds `seconds` of frames at `fps`; whether it said slow at the end, and when it first did. */
+  function run(watch: SlowWatch, fps: number, seconds: number, from = 0) {
+    let first: number | null = null;
+    let t = from;
+    let slow = false;
+    for (let k = 0; k < Math.round(seconds * fps); k++) {
+      t += 1 / fps;
+      slow = watch.frame(1 / fps);
+      if (slow && first === null) first = t;
+    }
+    return { slow, first, t };
+  }
+
+  it("never calls fast frames slow", () => {
+    expect(run(new SlowWatch(), 60, 30).slow).toBe(false);
+    expect(run(new SlowWatch(), MIRROR_MIN_FPS + 2, 30).slow).toBe(false);
+  });
+
+  it("calls frames slow once they stay under the rate for its spans in a row, after the warm-up", () => {
+    const r = run(new SlowWatch(), 25, 20);
+    expect(r.slow).toBe(true);
+    expect(r.first).not.toBeNull();
+    expect(r.first!).toBeGreaterThanOrEqual(SLOW_WARM_UP + SLOW_SPAN * SLOW_SPANS - 0.1);
+    expect(r.first!).toBeLessThan(SLOW_WARM_UP + SLOW_SPAN * SLOW_SPANS + 0.2);
+  });
+
+  it("does not count a slow moment between fast ones", () => {
+    const w = new SlowWatch();
+    run(w, 60, SLOW_WARM_UP + 1);
+    run(w, 20, SLOW_SPAN);
+    expect(run(w, 60, 10).slow).toBe(false);
+  });
+
+  it("ignores gaps (a hidden tab, a breakpoint), and starts afresh when reset", () => {
+    const w = new SlowWatch();
+    run(w, 60, SLOW_WARM_UP + 1);
+    for (let k = 0; k < 20; k++) expect(w.frame(5)).toBe(false);
+    expect(run(w, 25, 10).slow).toBe(true);
+    w.reset();
+    expect(w.frame(1 / 25)).toBe(false);
+    expect(run(w, 60, 10).slow).toBe(false);
   });
 });

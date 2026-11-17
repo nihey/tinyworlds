@@ -9,13 +9,19 @@ import {
   WATER_SURFACE,
   type MeshContext,
 } from "./cell-mesh";
-import { makeMaterials, SKY, type WalkMaterials } from "./materials";
+import { makeMaterials, NOT_MIRRORED, SKY, type Mirror, type WalkMaterials } from "./materials";
 import { makePalette, type Palette } from "./palette";
 
 /**
  * The walk's view: a three.js renderer drawing at a fraction of the screen's resolution and
  * scaled up without smoothing (big pixels, like the map's), the sky and the fog, the water under
  * everything, and the squares streamed in around the camera. Reached only by dynamic import.
+ *
+ * The water mirrors what stands by it: before each frame, a second camera under the water's
+ * surface draws everything but the sky, the water and the ground (`NOT_MIRRORED`) into a picture
+ * of the drawing's size (half of it on a touch screen), clipped at the surface, and the water's
+ * shader reads it. It costs about one more drawing of the city, so it is skipped when no water
+ * is near, and let go for the walk when frames stay slow (`SlowWatch`); `setReflections` sets it.
  */
 
 /**
@@ -36,6 +42,19 @@ export const PIXEL_DEFAULT = 3;
 /** The sky's dome: inside the camera's far plane, drawn before anything. */
 const SKY_RADIUS = 1000;
 const ORDER_SKY = -1000;
+/** Squares (from the camera's) within which water is near enough to be worth mirroring. */
+const MIRROR_REACH = 2.5;
+/** The mirror's picture on a touch screen: one pixel for this many of the drawing's, each way. */
+const MIRROR_COARSE = 2;
+/**
+ * Under this frame rate, over `SLOW_SPAN` s twice in a row, the reflections are let go: sooner
+ * than the walk's screen makes the pixels bigger (40 fps over 4 s), so they go first.
+ */
+export const MIRROR_MIN_FPS = 40;
+export const SLOW_SPAN = 1;
+export const SLOW_SPANS = 2;
+/** Seconds after the first squares are shown before the frame rate counts (building them is slow anywhere). */
+export const SLOW_WARM_UP = 3;
 
 const keyOf = (i: number, j: number) => `${i}_${j}`;
 
@@ -228,6 +247,75 @@ export class SquareStream<T> {
   }
 }
 
+/**
+ * Whether frames are too slow: fed every frame's length, it answers true once the frame rate
+ * has stayed under `minFps` for `spans` spans of `span` s in a row, counted after `warmUp` s.
+ * A gap over a quarter of a second (a hidden tab, a breakpoint) is not a frame. No three.js.
+ */
+export class SlowWatch {
+  private warm = 0;
+  private frames = 0;
+  private span = 0;
+  private slow = 0;
+
+  constructor(
+    private readonly minFps = MIRROR_MIN_FPS,
+    private readonly spanFor = SLOW_SPAN,
+    private readonly spans = SLOW_SPANS,
+    private readonly warmUp = SLOW_WARM_UP,
+  ) {}
+
+  frame(dt: number): boolean {
+    if (!(dt > 0) || dt > 0.25) return this.slow >= this.spans;
+    if (this.warm < this.warmUp) {
+      this.warm += dt;
+      return false;
+    }
+    this.frames++;
+    this.span += dt;
+    if (this.span >= this.spanFor) {
+      this.slow = this.frames / this.span < this.minFps ? this.slow + 1 : 0;
+      this.frames = 0;
+      this.span = 0;
+    }
+    return this.slow >= this.spans;
+  }
+
+  /** From the start again, warm-up and all. */
+  reset(): void {
+    this.warm = 0;
+    this.frames = 0;
+    this.span = 0;
+    this.slow = 0;
+  }
+}
+
+/**
+ * A camera's projection made to clip at the plane y = `y` (the water), keeping what is above it,
+ * instead of at its near plane: the oblique near plane (E. Lengyel, "Modifying the Projection
+ * Matrix to Perform Oblique Near-Plane Clipping"). Its inverse too.
+ */
+function clipAbove(camera: THREE.PerspectiveCamera, y: number): void {
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y).applyMatrix4(
+    camera.matrixWorldInverse,
+  );
+  const c = new THREE.Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+  const m = camera.projectionMatrix.elements;
+  // the corner of the view opposite the plane, in clip space, taken back to the camera's
+  const q = new THREE.Vector4(
+    (Math.sign(c.x) + m[8]) / m[0],
+    (Math.sign(c.y) + m[9]) / m[5],
+    -1,
+    (1 + m[10]) / m[14],
+  );
+  c.multiplyScalar(2 / c.dot(q));
+  m[2] = c.x;
+  m[6] = c.y;
+  m[10] = c.z + 1;
+  m[14] = c.w;
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+}
+
 export class WalkView {
   readonly scene = new THREE.Scene();
   readonly world: WalkWorld;
@@ -247,6 +335,18 @@ export class WalkView {
   private at = { e: 0, n: 0 };
   /** Whether a square's meshes have failed already (said once in the console). */
   private meshFailed = false;
+  /** The squares shown that have water, by where they are. */
+  private readonly wet = new Map<THREE.Group, { i: number; j: number }>();
+  /** The mirror: its camera, its picture (made when first wanted), how coarse, and whether it is on. */
+  private readonly mirrorCam = new THREE.PerspectiveCamera();
+  private target: THREE.WebGLRenderTarget | null = null;
+  private readonly mirrorScale: number;
+  private reflect = true;
+  private readonly slow = new SlowWatch();
+  private lastFrame = 0;
+  /** Whether a square has been shown yet: the frame rate counts from then. */
+  private shownAny = false;
+  private readonly buffer = new THREE.Vector2();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -268,8 +368,16 @@ export class WalkView {
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 16, 8), this.materials.sky);
     this.sky.renderOrder = ORDER_SKY;
     this.sky.frustumCulled = false;
+    this.sky.layers.set(NOT_MIRRORED);
     this.scene.add(this.sky);
     this.camera.rotation.order = "YXZ";
+    this.camera.layers.enable(NOT_MIRRORED);
+    this.mirrorCam.rotation.order = "YXZ";
+    const media = (q: string) =>
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia(q).matches
+        : false;
+    this.mirrorScale = media("(pointer: coarse)") ? MIRROR_COARSE : 1;
 
     // the water under everything: it follows the camera, its pattern stays where it is
     const plane = new THREE.PlaneGeometry(4000, 4000);
@@ -278,7 +386,9 @@ export class WalkView {
     this.water.position.y = WATER_SURFACE;
     this.water.renderOrder = ORDER_WATER;
     this.water.frustumCulled = false;
+    this.water.layers.set(NOT_MIRRORED);
     this.scene.add(this.water);
+    this.setReducedMotion(media("(prefers-reduced-motion: reduce)"));
 
     // a square that failed to load stands in the fog, like the edge of the data
     this.fogBox = new THREE.BoxGeometry(ix.cell, 1000, ix.cell);
@@ -288,12 +398,15 @@ export class WalkView {
       failed: (i, j) => {
         const g = new THREE.Group();
         g.position.set(i * ix.cell, 0, -j * ix.cell);
-        g.add(new THREE.Mesh(this.fogBox, this.materials.edge));
+        const fog = new THREE.Mesh(this.fogBox, this.materials.edge);
+        fog.layers.set(NOT_MIRRORED);
+        g.add(fog);
         this.scene.add(g);
         return g;
       },
       drop: (g) => {
         this.scene.remove(g);
+        this.wet.delete(g);
         if (g.userData.disposables) disposeCellMeshes(g);
       },
     });
@@ -331,6 +444,22 @@ export class WalkView {
     this.materials.setGrey(amount);
   }
 
+  /** Whether the water mirrors the city: on unless set off, or let go because frames were slow. */
+  get reflections(): boolean {
+    return this.reflect;
+  }
+
+  /** Turns the water's reflections on or off; on again, the frame rate is watched afresh. */
+  setReflections(on: boolean): void {
+    this.reflect = on;
+    if (on) this.slow.reset();
+  }
+
+  /** Under reduced motion the water stands still (read from the browser at first). */
+  setReducedMotion(on: boolean): void {
+    this.materials.setStill(on);
+  }
+
   /** Streams the squares round the camera and meshes at most one of them. */
   update(dt: number): void {
     this.time += Math.max(0, dt);
@@ -348,6 +477,7 @@ export class WalkView {
       return;
     }
     this.scene.add(group);
+    if (cell.mask.mode !== 0) this.wet.set(group, { i: cell.i, j: cell.j });
     this.stream.show(cell, group);
   }
 
@@ -366,8 +496,65 @@ export class WalkView {
     this.water.position.x = Math.round(this.camera.position.x / 100) * 100;
     this.water.position.z = Math.round(this.camera.position.z / 100) * 100;
     this.camera.updateMatrixWorld();
-    this.materials.frame(this.time, this.camera);
+    const buffer = this.renderer.getDrawingBufferSize(this.buffer);
+    this.materials.frame(this.time, this.camera, buffer.x, buffer.y);
+    this.watchFrames();
+    this.materials.mirror(this.mirror(buffer));
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Lets the reflections go when frames stay slow, counting once the first squares are shown. */
+  private watchFrames(): void {
+    const now = performance.now();
+    const dt = this.lastFrame > 0 ? (now - this.lastFrame) / 1000 : 0;
+    this.lastFrame = now;
+    this.shownAny ||= this.stream.counts().ready > 0;
+    if (this.reflect && this.shownAny && this.slow.frame(dt)) this.reflect = false;
+  }
+
+  /** Draws the mirror's picture when the water is near and the reflections are on; what it saw, or null. */
+  private mirror(buffer: THREE.Vector2): Mirror | null {
+    const eye = this.camera.position;
+    if (!this.reflect || eye.y <= WATER_SURFACE) return null;
+    const ci = Math.floor(eye.x / this.stream.world.index.cell);
+    const cj = Math.floor(-eye.z / this.stream.world.index.cell);
+    let near = false;
+    for (const { i, j } of this.wet.values())
+      if (Math.hypot(i - ci, j - cj) <= MIRROR_REACH) {
+        near = true;
+        break;
+      }
+    if (!near) return null;
+
+    const w = Math.max(1, Math.ceil(buffer.x / this.mirrorScale));
+    const h = Math.max(1, Math.ceil(buffer.y / this.mirrorScale));
+    if (!this.target) {
+      this.target = new THREE.WebGLRenderTarget(w, h, {
+        minFilter: THREE.NearestFilter,
+        magFilter: THREE.NearestFilter,
+        generateMipmaps: false,
+        depthTexture: new THREE.DepthTexture(w, h),
+      });
+    } else if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
+
+    // the camera mirrored in the surface: under it, looking up as much as the eye looks down
+    const m = this.mirrorCam;
+    m.copy(this.camera);
+    m.layers.set(0);
+    m.position.y = 2 * WATER_SURFACE - eye.y;
+    m.rotation.set(-this.camera.rotation.x, this.camera.rotation.y, 0);
+    m.updateMatrixWorld();
+    m.updateProjectionMatrix();
+    clipAbove(m, WATER_SURFACE);
+    this.renderer.setRenderTarget(this.target);
+    this.renderer.render(this.scene, m);
+    this.renderer.setRenderTarget(null);
+    return {
+      colour: this.target.texture,
+      depth: this.target.depthTexture!,
+      projectionInverse: m.projectionMatrixInverse,
+      world: m.matrixWorld,
+    };
   }
 
   /** How many squares are in, asked for, and failed: for a sign or a check. */
@@ -381,6 +568,8 @@ export class WalkView {
     this.sky.geometry.dispose();
     this.water.geometry.dispose();
     this.fogBox.dispose();
+    this.target?.depthTexture?.dispose();
+    this.target?.dispose();
     this.materials.dispose();
     this.palette.texture.dispose();
     this.renderer.dispose();

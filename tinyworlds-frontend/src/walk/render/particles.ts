@@ -1,13 +1,14 @@
 import * as THREE from "three";
 import { sizeFor, type Vehicle } from "../vehicles";
 import { WATER_Z } from "../world";
-import { FOG, FOG_FAR, FOG_NEAR, HORIZON, greysOf } from "./materials";
+import { FOG, FOG_FAR, FOG_NEAR, HASH, HORIZON, greysOf, NOT_MIRRORED } from "./materials";
 import { HALF, HIGH, LIT, SHADE, type Palette } from "./palette";
 
 /**
  * Sparks, glass, smoke, fire, bubbles, foam and wakes: round points in the palette's colours
  * that fade by dithering (a 4 × 4 Bayer pattern drops more of their pixels as they go), never by
- * blending, after the spike's `cars.js`. World metres east, north and up, as everywhere.
+ * blending, after the spike's `cars.js`. World metres east, north and up, as everywhere. And the
+ * ripple rings a splash leaves on the water.
  */
 
 const MAX = 1600;
@@ -27,6 +28,52 @@ export const PARTICLE_RAMPS: readonly string[] = [
 ];
 /** The water's surface, where foam floats and bubbles break. */
 const FOAM_Z = WATER_Z + 0.03;
+
+/** Rings on the water at once (the oldest gives way), the frames each goes through and how long each lasts, s. */
+const RINGS = 12;
+export const RING_FRAMES = 5;
+export const RING_FRAME = 0.2;
+/** How much wider each frame of a ring is than the last, metres, over its splash's size. */
+const RING_GROW = 0.7;
+const RING_GROW_PER_SIZE = 0.25;
+
+/**
+ * Ripple rings: each a quad on the water round its splash, in which a ring one pixel wide
+ * (whatever the distance) grows by whole frames, `RING_FRAMES` of `RING_FRAME` s, and breaks up
+ * as it goes: each frame leaves out more of its arcs. Palette colours, the fog and the drain, no
+ * blending. `ring` is the splash's [e, n, when, size].
+ */
+const RING_VERTEX = /* glsl */ `
+attribute vec2 corner; attribute vec4 ring;
+varying vec2 vAt; flat varying vec4 vRing; varying vec3 vMV;
+void main() {
+  vRing = ring;
+  float r = ring.w * 0.5 + ${RING_FRAMES}.0 * (${RING_GROW} + ${RING_GROW_PER_SIZE} * ring.w) + 0.5;
+  vAt = corner * r;
+  vec4 mv = modelViewMatrix * vec4(ring.x + vAt.x, ${FOAM_Z.toFixed(2)}, -(ring.y + vAt.y), 1.0);
+  vMV = mv.xyz;
+  gl_Position = projectionMatrix * mv;
+}`;
+
+const RING_FRAGMENT = /* glsl */ `
+precision highp float;
+uniform float now; uniform vec3 shades[3];
+${HASH} ${FOG}
+varying vec2 vAt; flat varying vec4 vRing; varying vec3 vMV;
+void main() {
+  float age = now - vRing.z;
+  int frame = int(floor(age / ${RING_FRAME}));
+  if (age < 0.0 || frame >= ${RING_FRAMES}) discard;
+  float r = vRing.w * 0.5 + float(frame + 1) * (${RING_GROW} + ${RING_GROW_PER_SIZE} * vRing.w);
+  float d = length(vAt);
+  if (abs(d - r) > max(fwidth(d), 0.02) * 0.6) discard;
+  // breaking up: of 24 arcs, each frame after the first leaves out more
+  float a = atan(vAt.y, vAt.x) / 6.28318530718 + 0.5;
+  uint arc = uint(floor(a * 24.0));
+  uint h = mixh(arc, uint(mod(vRing.z * 997.0, 65536.0)));
+  if (float(h & 255u) < float(frame) / ${RING_FRAMES}.0 * 256.0 * 0.8) discard;
+  gl_FragColor = vec4(fogged(shades[min(2, frame / 2)], length(vMV)), 1.0);
+}`;
 
 type Colour = [number, number, number];
 
@@ -90,6 +137,13 @@ export class WalkParticles {
   private readonly smokeBlack: Colour;
   private readonly foam: Colour[];
   private readonly drop: Colour;
+  private readonly rings = new THREE.BufferGeometry();
+  private readonly ringData = new Float32Array(RINGS * 4 * 4);
+  private readonly ringMat: THREE.ShaderMaterial;
+  private readonly ringMesh: THREE.Mesh;
+  private nextRing = 0;
+  /** The particles' own clock, s: the rings' frames count on it. */
+  private clock = 0;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -127,6 +181,8 @@ export class WalkParticles {
     this.points = new THREE.Points(this.geo, this.mat);
     this.points.frustumCulled = false;
     this.points.renderOrder = 2;
+    // most of them float on the water or hang just over it: not in its mirror
+    this.points.layers.set(NOT_MIRRORED);
     // a point's size in pixels: the drawing's height over the view's (at a metre away)
     const buffer = new THREE.Vector2();
     this.points.onBeforeRender = (renderer, _scene, camera) => {
@@ -135,6 +191,44 @@ export class WalkParticles {
       this.mat.uniforms.pscale.value = buffer.y / (2 * Math.tan((fov * Math.PI) / 360));
     };
     scene.add(this.points);
+
+    // the rings: a quad each, its corners and its splash
+    const corners: number[] = [];
+    const index: number[] = [];
+    for (let k = 0; k < RINGS; k++) {
+      corners.push(-1, -1, 1, -1, 1, 1, -1, 1);
+      index.push(k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3);
+    }
+    // a ring not yet made is long gone
+    for (let v = 0; v < RINGS * 4; v++) this.ringData[v * 4 + 2] = -1e6;
+    this.rings.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(new Float32Array(RINGS * 12), 3),
+    );
+    this.rings.setAttribute("corner", new THREE.Float32BufferAttribute(corners, 2));
+    this.rings.setAttribute("ring", attr(this.ringData, 4));
+    this.rings.setIndex(index);
+    const shade = (ramp: string, s: number) =>
+      new THREE.Vector3(...palette.rgb(palette.ramp(ramp), s).map((v) => v / 255));
+    this.ringMat = new THREE.ShaderMaterial({
+      uniforms: {
+        now: { value: 0 },
+        shades: { value: [shade("foam", HIGH), shade("foam", LIT), shade("waterShallow", HIGH)] },
+        fogColor: { value: HORIZON },
+        fogNear: { value: FOG_NEAR },
+        fogFar: { value: FOG_FAR },
+        grey: this.mat.uniforms.grey,
+        greys: this.mat.uniforms.greys,
+      },
+      vertexShader: RING_VERTEX,
+      fragmentShader: RING_FRAGMENT,
+      depthWrite: false,
+    });
+    this.ringMesh = new THREE.Mesh(this.rings, this.ringMat);
+    this.ringMesh.frustumCulled = false;
+    this.ringMesh.renderOrder = 2;
+    this.ringMesh.layers.set(NOT_MIRRORED);
+    scene.add(this.ringMesh);
   }
 
   /** Drains the colours to the palette's greys, 0 (none) to 1 (all): the wasted sequence. */
@@ -319,8 +413,18 @@ export class WalkParticles {
     );
   }
 
-  /** Something going into the water: a ring of foam `size` m across and a few drops. */
+  /** A ripple ring on the water at (e, n) round a splash `size` m across: an event, so it shows under reduced motion too. */
+  ripple(e: number, n: number, size: number): void {
+    const k = this.nextRing;
+    this.nextRing = (k + 1) % RINGS;
+    for (let v = 0; v < 4; v++)
+      this.ringData.set([e, n, this.clock, Math.max(0.5, size)], (k * 4 + v) * 4);
+    this.rings.attributes.ring.needsUpdate = true;
+  }
+
+  /** Something going into the water: a ring of foam `size` m across, a few drops and a ripple ring. */
   splash(e: number, n: number, size: number): void {
+    this.ripple(e, n, size);
     const ring = Math.round(14 + size * 4);
     for (let i = 0; i < ring; i++) {
       const a = (i / ring) * 2 * Math.PI + Math.random() * 0.2;
@@ -413,6 +517,8 @@ export class WalkParticles {
   /** Moves them all on by dt seconds and hands the survivors to the points. */
   step(dt: number): void {
     const h = Math.max(0, dt);
+    this.clock += h;
+    this.ringMat.uniforms.now.value = this.clock;
     for (let i = this.bits.length - 1; i >= 0; i--) {
       const q = this.bits[i];
       q.life -= h;
@@ -452,9 +558,11 @@ export class WalkParticles {
   }
 
   dispose(): void {
-    this.scene.remove(this.points);
+    this.scene.remove(this.points, this.ringMesh);
     this.geo.dispose();
     this.mat.dispose();
+    this.rings.dispose();
+    this.ringMat.dispose();
     this.bits.length = 0;
   }
 }

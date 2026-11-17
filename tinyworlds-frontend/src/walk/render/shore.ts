@@ -4,8 +4,9 @@ import { DEEP, G, isWaterKind, type Palette } from "./palette";
 
 /**
  * Where a square's land meets its water, from its mask (the simulation's own land and water):
- * the texture that cuts the ground, the line the shore's edge stands on, and what that edge is
- * made of (quay stone along paved land and piers, a bank elsewhere).
+ * the texture that cuts the ground, the line the shore's edge stands on, what that edge is made
+ * of (quay stone along paved land and piers, a bank elsewhere), and the field the water and the
+ * damp ground are shaded by.
  */
 
 /** Land whose edge on the water is a bank, not a quay (the tile renderer's `NATURAL_BANK`). */
@@ -45,6 +46,98 @@ export function maskTexture(bits: Uint8Array): THREE.DataTexture {
   t.magFilter = THREE.LinearFilter;
   t.minFilter = THREE.LinearFilter;
   t.unpackAlignment = 1;
+  t.needsUpdate = true;
+  return t;
+}
+
+/** Cells across a square's mask and shore. */
+const SIDE = 100;
+
+/**
+ * A square's shore as the water's shader reads it: per 2 m cell (as the mask), RGBA bytes:
+ * - R, how far the water is from the land in sixteenths of a step (2 m), up to 255 (15.9
+ *   steps): the data's `shore` smoothed (a 5 × 5 binomial blur, the land kept at 0), so the
+ *   bands follow the bank's shape rather than every rounded step and notch of it;
+ * - G, B, which way the land lies: the smoothed distance's slope as a unit vector (east, north),
+ *   0 to 255 for −1 to 1, pointing from the land into the water;
+ * - A, how far the land is from the water in sixty-fourths of a step, up to 255 (just under 4
+ *   steps), 0 in the water: the damp ground.
+ * `bits` null is a square all of water. Filtered linearly by the shaders: a distance between
+ * cells, never a colour.
+ */
+export function shoreField(shore: Uint8Array, bits: Uint8Array | null): Uint8Array {
+  const N = SIDE;
+  const wet = (k: number) => (bits ? (bits[k >> 3] >> (k & 7)) & 1 : 1);
+  const at = (x: number) => Math.max(0, Math.min(N - 1, x));
+  const W = [1, 4, 6, 4, 1];
+
+  // the water's distance, blurred across then along, the square's edges held
+  const across = new Float32Array(N * N);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      let sum = 0;
+      for (let d = -2; d <= 2; d++) sum += W[d + 2] * shore[at(x + d) + N * y];
+      across[x + N * y] = sum / 16;
+    }
+  const dist = new Float32Array(N * N);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const k = x + N * y;
+      if (!wet(k)) continue;
+      let sum = 0;
+      for (let d = -2; d <= 2; d++) sum += W[d + 2] * across[x + N * at(y + d)];
+      dist[k] = sum / 16;
+    }
+
+  // the land's distance to the water: a chamfer (1, √2) both ways
+  const land = new Float32Array(N * N);
+  if (bits) {
+    const far = 1e6;
+    for (let k = 0; k < N * N; k++) land[k] = wet(k) ? 0 : far;
+    const relax = (x: number, y: number, dx: number, dy: number, cost: number) => {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) return;
+      const k = x + N * y;
+      land[k] = Math.min(land[k], land[nx + N * ny] + cost);
+    };
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        relax(x, y, -1, 0, 1);
+        relax(x, y, 0, -1, 1);
+        relax(x, y, -1, -1, Math.SQRT2);
+        relax(x, y, 1, -1, Math.SQRT2);
+      }
+    for (let y = N - 1; y >= 0; y--)
+      for (let x = N - 1; x >= 0; x--) {
+        relax(x, y, 1, 0, 1);
+        relax(x, y, 0, 1, 1);
+        relax(x, y, 1, 1, Math.SQRT2);
+        relax(x, y, -1, 1, Math.SQRT2);
+      }
+  }
+
+  const out = new Uint8Array(N * N * 4);
+  const byte = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const k = x + N * y;
+      const gx = dist[at(x + 1) + N * y] - dist[at(x - 1) + N * y];
+      const gy = dist[x + N * at(y + 1)] - dist[x + N * at(y - 1)];
+      const g = Math.hypot(gx, gy);
+      out[k * 4] = byte(dist[k] * 16);
+      out[k * 4 + 1] = g > 1e-6 ? byte((gx / g) * 127.5 + 127.5) : 128;
+      out[k * 4 + 2] = g > 1e-6 ? byte((gy / g) * 127.5 + 127.5) : 128;
+      out[k * 4 + 3] = byte(land[k] * 64);
+    }
+  return out;
+}
+
+/** `shoreField` as a texture, filtered linearly. */
+export function shoreTexture(field: Uint8Array): THREE.DataTexture {
+  const t = new THREE.DataTexture(field, SIDE, SIDE, THREE.RGBAFormat);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
   t.needsUpdate = true;
   return t;
 }

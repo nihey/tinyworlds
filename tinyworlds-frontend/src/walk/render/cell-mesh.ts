@@ -13,7 +13,7 @@ import {
   type Box,
   type DeckSpan,
 } from "./deck-mesh";
-import { TREE_RAMPS, type WalkMaterials } from "./materials";
+import { NOT_MIRRORED, SHORE_FACE, TREE_RAMPS, type WalkMaterials } from "./materials";
 import {
   DEEP,
   G,
@@ -26,7 +26,14 @@ import {
   SHADES,
   type Palette,
 } from "./palette";
-import { groundKindAt, maskTexture, shoreFace, shoreSegments } from "./shore";
+import {
+  groundKindAt,
+  maskTexture,
+  shoreFace,
+  shoreField,
+  shoreSegments,
+  shoreTexture,
+} from "./shore";
 
 /**
  * One square of the walk as three.js meshes, ported from the spike's `buildCell`: its
@@ -44,8 +51,9 @@ export interface MeshContext {
   world: WalkWorld;
 }
 
-/** Draw order: the water first, then the ground (painted, then its depth), then the rest. */
+/** Draw order: the open water first, then each square's, then the ground (painted, then its depth), then the rest. */
 export const ORDER_WATER = -200;
+const ORDER_SQUARE_WATER = -199;
 const ORDER_GROUND = -100;
 const ORDER_GROUND_DEPTH = -90;
 const ORDER_TREES = 1;
@@ -262,6 +270,10 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
 
   function buildVolume(v: Volume) {
     const wallTop = v.roofShape === 1 ? v.top + v.roofH : v.top;
+    // what stands on the ground stands in the water where its walls are over it (a bridge's
+    // pier, a pile): a plain skirt of its wall from the land's level down to the shore's foot,
+    // so it meets the water (its windows keep their places)
+    const grounded = v.base <= 0.05;
     v.rings.forEach((r, ri) => {
       const k = r.length / 2;
       if (k < 3) return;
@@ -277,6 +289,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
         // the outward normal of a counter-clockwise ring is (dn, −de)
         const ne = (orient * (bn - an)) / L;
         const nn = (orient * -(be - ae)) / L;
+        const tone = toneOf(ne, nn);
         wall(
           ae,
           an,
@@ -290,8 +303,24 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
           v.glass,
           v.pattern,
           v.seed,
-          toneOf(ne, nn),
+          tone,
         );
+        if (grounded && world.isWater((ae + be) / 2, (an + bn) / 2))
+          wall(
+            ae,
+            an,
+            SHORE_FOOT,
+            v.base,
+            be,
+            bn,
+            SHORE_FOOT,
+            v.base,
+            v.wall,
+            v.glass,
+            0,
+            v.seed,
+            tone,
+          );
       }
     });
     const roofPaint = [v.roof * SHADES + LIT, v.roof * SHADES + HALF, 0.06, 0];
@@ -353,11 +382,17 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
   group.position.set(oe, 0, -on);
   const disposables: { dispose(): void }[] = [];
   let mask: THREE.DataTexture | null = null;
+  if (cell.mask.mode === 2) {
+    mask = maskTexture(cell.mask.bits!);
+    disposables.push(mask);
+  }
+  // the water's shore field, also the damp ground's
+  let shore: THREE.DataTexture | null = null;
+  if (cell.mask.mode !== 0 && cell.shore) {
+    shore = shoreTexture(shoreField(cell.shore, cell.mask.mode === 2 ? cell.mask.bits : null));
+    disposables.push(shore);
+  }
   if (cell.mask.mode !== 1) {
-    if (cell.mask.mode === 2) {
-      mask = maskTexture(cell.mask.bits!);
-      disposables.push(mask);
-    }
     flatQuad(
       ground,
       [
@@ -422,7 +457,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
         0,
         ramp,
         ramp,
-        0,
+        SHORE_FACE,
         0,
         shade,
       );
@@ -626,29 +661,38 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     group.add(mesh);
     return mesh;
   };
+  // the square's water, under its ground; what lies flat on the water or under it is not mirrored
+  if (shore) {
+    const surface = new THREE.PlaneGeometry(side, side);
+    surface.rotateX(-Math.PI / 2);
+    surface.translate(side / 2, WATER_SURFACE, -side / 2);
+    const material = materials.waterOf(mask, shore);
+    disposables.push(material);
+    add(surface, material, ORDER_SQUARE_WATER)?.layers.set(NOT_MIRRORED);
+  }
   const groundGeometry = ground.geometry();
   if (groundGeometry) {
-    const { colour, depth } = materials.ground(mask);
+    const { colour, depth } = materials.ground(mask, shore);
     disposables.push(colour, depth);
-    add(groundGeometry, colour, ORDER_GROUND);
+    add(groundGeometry, colour, ORDER_GROUND)?.layers.set(NOT_MIRRORED);
     const plate = new THREE.PlaneGeometry(side, side);
     plate.rotateX(-Math.PI / 2);
     plate.translate(side / 2, 0, -side / 2);
     for (const [name, size] of FLAT_ATTRS)
       plate.setAttribute(name, new THREE.Float32BufferAttribute(new Float32Array(4 * size), size));
-    add(plate, depth, ORDER_GROUND_DEPTH);
+    add(plate, depth, ORDER_GROUND_DEPTH)?.layers.set(NOT_MIRRORED);
   }
   add(walls.geometry(), materials.wall);
   add(roofs.geometry(), materials.roof);
   add(decks.geometry(), materials.deck);
-  add(edges.geometry(), materials.edge);
+  add(edges.geometry(), materials.edge)?.layers.set(NOT_MIRRORED);
   addTrees(cell, ctx, group, disposables);
   addCables(cell, ctx, group, disposables);
   group.userData.disposables = disposables;
   return group;
 }
 
-/** Frees what `buildCellMeshes` made: its geometries, its own materials and its mask. */
+/** Frees what `buildCellMeshes` made: its geometries, its own materials, its mask and shore field. */
 export function disposeCellMeshes(group: THREE.Group): void {
   const list = group.userData.disposables as { dispose(): void }[] | undefined;
   if (list) for (const d of list) d.dispose();
