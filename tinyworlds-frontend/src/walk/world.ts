@@ -58,10 +58,19 @@ function probe(v: Volume, e: number, n: number) {
   return { inside, d: best, px, py };
 }
 
-/** The deck's height at a point inside its strip (nearest segment), else null. */
-export function deckAt(w: ElevatedWay, e: number, n: number): number | null {
+/**
+ * Where an elevated way passes through a tower, an anchorage or a building the map stands across
+ * it (the Brooklyn Bridge's arches): within its strip and this much to spare, for feet from a
+ * little under its deck to well over it, no volume is a wall.
+ */
+const OPENING_MARGIN = 0.3;
+const OPENING_BELOW = 0.5;
+const OPENING_ABOVE = 5;
+
+/** The deck's height at a point inside its strip (nearest segment), else null; `margin` widens the strip each side. */
+export function deckAt(w: ElevatedWay, e: number, n: number, margin = 0): number | null {
   const p = w.pts;
-  const half = w.width / 2;
+  const half = w.width / 2 + margin;
   let best = Infinity;
   let z = 0;
   for (let q = 3; q < p.length; q += 3) {
@@ -78,6 +87,24 @@ export function deckAt(w: ElevatedWay, e: number, n: number): number | null {
     }
   }
   return best === Infinity ? null : z;
+}
+
+/** The box [e0, n0, e1, n1] round each elevated way's strip, grown by the opening's margin. */
+const stripBoxes = new WeakMap<ElevatedWay, [number, number, number, number]>();
+function stripBox(w: ElevatedWay): [number, number, number, number] {
+  let box = stripBoxes.get(w);
+  if (!box) {
+    const r = w.width / 2 + OPENING_MARGIN;
+    box = [Infinity, Infinity, -Infinity, -Infinity];
+    for (let q = 0; q < w.pts.length; q += 3) {
+      box[0] = Math.min(box[0], w.pts[q] - r);
+      box[1] = Math.min(box[1], w.pts[q + 1] - r);
+      box[2] = Math.max(box[2], w.pts[q] + r);
+      box[3] = Math.max(box[3], w.pts[q + 1] + r);
+    }
+    stripBoxes.set(w, box);
+  }
+  return box;
 }
 
 /** The squares and the questions every moving thing asks of them. No three.js, no DOM. */
@@ -340,9 +367,10 @@ export class WalkWorld {
     return grid;
   }
 
-  /** The wall nearest to a body, or null when it touches none. */
+  /** The wall nearest to a body, or null when it touches none (or stands in an elevated way's opening). */
   private nearestWall(e: number, n: number, radius: number, zFeet: number, height: number) {
     let best: { inside: boolean; d: number; px: number; py: number } | null = null;
+    let opening: boolean | undefined;
     const i0 = Math.floor((e - radius) / CELL);
     const i1 = Math.floor((e + radius) / CELL);
     const j0 = Math.floor((n - radius) / CELL);
@@ -366,9 +394,25 @@ export class WalkWorld {
                 continue;
               const h = probe(v, e, n);
               if (!h.inside && h.d >= radius) continue;
+              // asked once, and only when something is there: on a roadway, nothing is a wall
+              opening ??= this.inOpening(e, n, zFeet);
+              if (opening) return null;
               if (!best || (h.inside ? 0 : h.d) < (best.inside ? 0 : best.d)) best = h;
             }
       }
     return best;
+  }
+
+  /** Whether a body with its feet at zFeet stands in an elevated way's opening (see `OPENING_MARGIN`). */
+  private inOpening(e: number, n: number, zFeet: number): boolean {
+    const c = this.cellMap.get(keyOf(Math.floor(e / CELL), Math.floor(n / CELL)));
+    if (!c) return false;
+    for (const w of c.elevated) {
+      const b = stripBox(w);
+      if (e < b[0] || e > b[2] || n < b[1] || n > b[3]) continue;
+      const z = deckAt(w, e, n, OPENING_MARGIN);
+      if (z !== null && zFeet >= z - OPENING_BELOW && zFeet <= z + OPENING_ABOVE) return true;
+    }
+    return false;
   }
 }

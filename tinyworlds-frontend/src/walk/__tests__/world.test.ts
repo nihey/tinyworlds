@@ -227,6 +227,61 @@ describe("the map's bridge decks", () => {
   });
 });
 
+describe("a bridge's towers", () => {
+  /** A deck 10 m wide at 30 m along n = 100, and a tower standing across it from the ground to 80 m. */
+  const tower = () =>
+    world(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay([
+            [0, 100, 30],
+            [200, 100, 30],
+          ]),
+        ],
+        volumes: [boxVolume(95, 88, 105, 112, 0, 80)],
+      }),
+    );
+
+  it("opens where the roadway passes through: someone on foot walks on", () => {
+    const w = tower();
+    const p = newPlayer(80, 100, 30, Math.PI / 2);
+    for (let f = 0; f < 6 * 60; f++) {
+      const e0 = p.e;
+      stepFoot(p, { forward: 1, strafe: 0, turn: 0, sprint: false, jump: false }, w, 1 / 60);
+      expect(p.e).toBeGreaterThan(e0);
+      expect(p.z).toBe(30);
+    }
+    expect(p.e).toBeGreaterThan(105);
+  });
+
+  it("opens where the roadway passes through: a car drives on without a knock", () => {
+    const w = tower();
+    const v = newVehicle(1, "sedan", 70, 100, Math.PI / 2, "driven");
+    v.v = 12;
+    v.z = 30;
+    for (let f = 0; f < 4 * 60; f++) {
+      const ev = stepCar(v, { throttle: 0.3, brake: 0, steer: 0, handbrake: false }, w, 1 / 60);
+      expect(ev.impact).toBe(0);
+    }
+    expect(v.e).toBeGreaterThan(110);
+  });
+
+  it("is a wall everywhere else: under the deck, beside it, and well above it", () => {
+    const w = tower();
+    // on the ground under the deck, and beside the bridge
+    expect(w.blocked(100, 100, 0.35, 0, 1.8)).toBe(true);
+    expect(w.blocked(100, 109, 0.35, 0, 1.8)).toBe(true);
+    // at the deck's height but out past its edge (5 m, and 0.3 m to spare)
+    expect(w.blocked(100, 106, 0.35, 30, 1.8)).toBe(true);
+    // on the deck, and up to 5 m over it, it is open; higher, the tower is there again
+    expect(w.blocked(100, 105.2, 0.35, 30, 1.8)).toBe(false);
+    expect(w.blocked(100, 100, 0.35, 29.6, 1.8)).toBe(false);
+    expect(w.blocked(100, 100, 0.35, 34.9, 1.8)).toBe(false);
+    expect(w.blocked(100, 100, 0.35, 35.2, 1.8)).toBe(true);
+    expect(w.blocked(100, 100, 0.35, 29.4, 1.8)).toBe(true);
+  });
+});
+
 describe("parapets", () => {
   it("gives both edges of a deck, 1 m high at the deck's height", () => {
     const w = world(
