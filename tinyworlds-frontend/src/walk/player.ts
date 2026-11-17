@@ -1,4 +1,5 @@
 import { fallDamage } from "./health";
+import type { ElevatedWay } from "./cell";
 import { WATER_Z, type Surface, type WalkWorld } from "./world";
 
 export const WALK = 4.5;
@@ -51,6 +52,8 @@ export interface Player {
   /** the height of the surface last stood on: what a jump's reach counts from */
   launch: number;
   bob: number;
+  /** the elevated way stood on, kept so a walker follows their own where ways overlap */
+  on?: ElevatedWay;
 }
 
 export interface FootInput {
@@ -146,18 +149,21 @@ function footStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
     if (!air) p.bob += h * speed * 1.7;
   }
 
-  let surf = w.surfaceUnder(p.e, p.n, base, reach);
+  let surf = w.surfaceUnder(p.e, p.n, base, reach, air ? undefined : p.on);
   if (!air) {
     if (p.z - surf.z > SNAP) {
       p.airFrom = p.z;
       p.vz = 0;
+      p.on = undefined;
     } else {
       p.z = surf.z;
       p.launch = surf.z;
       p.vz = 0;
+      p.on = surf.way;
       if (input.jump) {
         p.vz = JUMP;
         p.airFrom = p.z;
+        p.on = undefined;
       }
     }
   }
@@ -183,6 +189,7 @@ function footStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
     out.landed = surf.kind;
     p.z = surf.z;
     p.vz = 0;
+    p.on = surf.way;
     p.airFrom = null;
     p.launch = surf.z;
     if (surf.kind === "water") {
@@ -228,6 +235,7 @@ function swimStep(p: Player, input: FootInput, w: FootWorld, h: number, out: Foo
   p.n = n;
   p.z = land.z;
   p.launch = land.z;
+  p.on = land.way;
   p.mode = "foot";
   out.landed = null;
 }

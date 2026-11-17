@@ -998,6 +998,19 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   rate stays under 40 fps for 2 s (`SlowWatch`, sooner than the screen grows the pixels);
   `view.setReflections(on)` sets it again, `view.reflections` says whether it is on. A person
   knocked into the water makes no ring yet: the crowd has no splash event to hook.
+- **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
+  than the gaps between its lines). Where they do, you are on the way whose line you are
+  nearest, as a share of its half-width, among those about as high as the highest within reach,
+  and you stay on yours while about as near (`surfaceUnder`'s `on`): at a fork you take the
+  branch you steer along, never the one rising beside it. A way's round end counts only where
+  no way holds the point beside its line, or where it stands well above them (the outside of a
+  bend), so where one way ends and the next goes on down there is no ledge. A deck holds you
+  0.5 m past its rails. A rail opens where another way's deck is within 3 m of it (`JOIN_HEIGHT`:
+  a car and a rail, so no rail of one roadway stands in another's lanes on a steep hump), is
+  closed round the outside of a bend, and each square gives the pieces along its own stretch,
+  so none is missing where a way crosses into the next square. In a way's strip, from 1.5 m
+  under its deck (a car's nose on a steep ramp) to 5 m over it, no volume is a wall: the
+  towers' openings, the Queensboro's columns under its upper deck.
 - **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
   try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
   one cannot bind a key to two clashing actions). The pixel size and the sound last for the

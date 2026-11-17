@@ -762,11 +762,12 @@ export class WalkGame {
           p.z,
           HEIGHT,
         );
-        const under = this.world.surfaceUnder(e, n, p.z, STEP_UP);
+        const under = this.world.surfaceUnder(e, n, p.z, STEP_UP, p.on);
         if (under.kind !== "water" && Math.abs(under.z - p.z) <= STEP_UP) {
           p.e = e;
           p.n = n;
           p.z = under.z;
+          p.on = under.way;
         }
       }
       if (this.downFor <= 0) {

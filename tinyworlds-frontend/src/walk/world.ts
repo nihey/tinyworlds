@@ -9,12 +9,29 @@ const BUCKET = 20;
 const BUCKETS = CELL / BUCKET;
 /** How tall a parapet stands above its deck, metres. */
 export const PARAPET_HEIGHT = 1;
-/** A parapet is open where it runs inside another elevated way that is this near in height. */
-export const JOIN_HEIGHT = 1.5;
+/**
+ * A parapet is open where it runs inside another elevated way that is this near in height: at
+ * least a car's height and a parapet, so where two roadways overlap on a steep hump (and their
+ * edges disagree by more than their middles) no rail of one stands in the other's lanes.
+ */
+export const JOIN_HEIGHT = 3;
+/** A way's round end, past its last vertex, gives way to a deck beside another way's line unless
+ * it stands this much higher (then it is what covers the outside of a bend over a lower deck). */
+const CAP_OVER = 3;
+/** Metres a deck holds you up past the rails along its edges: so a foot or a wheel that finds a
+ * gap between two rails (round the outside of a joint) is still on the deck, not over the drop. */
+const DECK_SPARE = 0.5;
+/** Overlapping ways this near the highest one under you are all ones you might be on. */
+const SAME_LEVEL = 1;
+/** The way you are on is kept while you are this near its line, as a share of its half-width,
+ * as you are to the nearest other's: so you do not change ways at every step along the midline. */
+const STAY_NEARER = 0.1;
 
 export interface Surface {
   z: number;
   kind: "ground" | "water" | "deck" | "roof";
+  /** On a deck: the elevated way it is (the same way filed in another square compares by `sameWay`). */
+  way?: ElevatedWay;
 }
 
 export interface Parapet {
@@ -60,33 +77,63 @@ function probe(v: Volume, e: number, n: number) {
 
 /**
  * Where an elevated way passes through a tower, an anchorage or a building the map stands across
- * it (the Brooklyn Bridge's arches): within its strip and this much to spare, for feet from a
- * little under its deck to well over it, no volume is a wall.
+ * it (the Brooklyn Bridge's arches, the Queensboro's columns under its upper deck): within its
+ * strip and this much to spare, for feet from a little under its deck to well over it, no volume
+ * is a wall. "A little under" is a car's nose on the map's steepest ramps (45%), ahead of its feet.
  */
 const OPENING_MARGIN = 0.3;
-const OPENING_BELOW = 0.5;
+const OPENING_BELOW = 1.5;
 const OPENING_ABOVE = 5;
 
-/** The deck's height at a point inside its strip (nearest segment), else null; `margin` widens the strip each side. */
-export function deckAt(w: ElevatedWay, e: number, n: number, margin = 0): number | null {
+/** What `stripHit` found: the deck's height, the distance from the way's line, and whether the
+ * point is past one of the way's ends (in the round cap its strip ends in) rather than beside it. */
+let hitZ = 0;
+let hitD = 0;
+let hitCap = false;
+
+/** Whether the point is inside a way's strip (nearest segment, `half` either side of its line);
+ * the height and the cap are left in `hitZ` and `hitCap`. */
+function stripHit(w: ElevatedWay, e: number, n: number, half: number): boolean {
   const p = w.pts;
-  const half = w.width / 2 + margin;
   let best = Infinity;
-  let z = 0;
   for (let q = 3; q < p.length; q += 3) {
     const ae = p[q - 3];
     const an = p[q - 2];
     const de = p[q] - ae;
     const dn = p[q + 1] - an;
     const len2 = de * de + dn * dn;
-    const t = len2 > 0 ? Math.max(0, Math.min(1, ((e - ae) * de + (n - an) * dn) / len2)) : 0;
+    const raw = len2 > 0 ? ((e - ae) * de + (n - an) * dn) / len2 : 0;
+    const t = Math.max(0, Math.min(1, raw));
     const d = Math.hypot(e - (ae + de * t), n - (an + dn * t));
     if (d <= half && d < best) {
       best = d;
-      z = p[q - 1] + (p[q + 2] - p[q - 1]) * t;
+      hitZ = p[q - 1] + (p[q + 2] - p[q - 1]) * t;
+      hitCap = (q === 3 && raw < 0) || (q === p.length - 3 && raw > 1);
     }
   }
-  return best === Infinity ? null : z;
+  hitD = best;
+  return best !== Infinity;
+}
+
+/** The decks found beside their ways' lines at one point, reused from call to call. */
+const besideWays: ElevatedWay[] = [];
+const besideZ: number[] = [];
+const besideNear: number[] = [];
+
+/** The deck's height at a point inside its strip (nearest segment), else null; `margin` widens the strip each side. */
+export function deckAt(w: ElevatedWay, e: number, n: number, margin = 0): number | null {
+  return stripHit(w, e, n, w.width / 2 + margin) ? hitZ : null;
+}
+
+/** Whether two elevated ways are the same one (a way is filed whole under every square it
+ * touches, so its copies are equal point for point; two roadways sharing their ends are not). */
+export function sameWay(a: ElevatedWay, b: ElevatedWay): boolean {
+  if (a === b) return true;
+  const p = a.pts;
+  const q = b.pts;
+  if (a.kind !== b.kind || a.width !== b.width || p.length !== q.length) return false;
+  for (let x = 0; x < p.length; x++) if (p[x] !== q[x]) return false;
+  return true;
 }
 
 /** The box [e0, n0, e1, n1] round each elevated way's strip, grown by the opening's margin. */
@@ -157,18 +204,62 @@ export class WalkWorld {
     return ((c.mask.bits![idx >> 3] >> (idx & 7)) & 1) === 1;
   }
 
-  /** The highest of the land (or water), an elevated way's deck, or a car's roof that is at most `fromZ + reach`. */
-  surfaceUnder(e: number, n: number, fromZ: number, reach: number): Surface {
+  /**
+   * The highest of the land (or water), an elevated way's deck, or a car's roof that is at most
+   * `fromZ + reach`. Overlapping ways are common (the data's widths are wider than the gaps
+   * between its lines), and the deck you are on is the way whose line you are nearest, as a share
+   * of its half-width, among those about as high as the highest within reach: at a fork it is
+   * the branch you steer along, never the other one rising or falling beside it. `on`, the way
+   * you were on, is kept while you are about as near its line. A way's round end counts only
+   * where no way holds the point beside its line, or where it stands well above them (the
+   * outside of a bend between two ways): where one way ends and the next goes on down, the
+   * next one is what you are on, not the end's flat cap, which would be a ledge.
+   */
+  surfaceUnder(
+    e: number,
+    n: number,
+    fromZ: number,
+    reach: number,
+    on?: ElevatedWay | null,
+  ): Surface {
     const limit = fromZ + reach;
     let best: Surface = this.isWater(e, n)
       ? { z: WATER_Z, kind: "water" }
       : { z: 0, kind: "ground" };
     const c = this.cellMap.get(keyOf(Math.floor(e / CELL), Math.floor(n / CELL)));
     if (c) {
+      let end: ElevatedWay | null = null;
+      let endZ = -Infinity;
+      let top = -Infinity;
+      besideWays.length = 0;
+      besideZ.length = 0;
+      besideNear.length = 0;
       for (const w of c.elevated) {
-        const z = deckAt(w, e, n);
-        if (z !== null && z <= limit && z > best.z) best = { z, kind: "deck" };
+        if (!stripHit(w, e, n, w.width / 2 + DECK_SPARE) || hitZ > limit) continue;
+        if (hitCap) {
+          if (hitZ > endZ) [end, endZ] = [w, hitZ];
+          continue;
+        }
+        besideWays.push(w);
+        besideZ.push(hitZ);
+        besideNear.push(hitD / (w.width / 2));
+        top = Math.max(top, hitZ);
       }
+      let deck: ElevatedWay | null = null;
+      let deckZ = -Infinity;
+      let near = Infinity;
+      let mine = -1;
+      for (let x = 0; x < besideWays.length; x++) {
+        if (besideZ[x] < top - SAME_LEVEL) continue;
+        if (on && mine < 0 && sameWay(besideWays[x], on)) mine = x;
+        if (besideNear[x] < near || (besideNear[x] === near && besideZ[x] > deckZ)) {
+          [deck, deckZ, near] = [besideWays[x], besideZ[x], besideNear[x]];
+        }
+      }
+      if (mine >= 0 && besideNear[mine] <= near + STAY_NEARER)
+        [deck, deckZ] = [besideWays[mine], besideZ[mine]];
+      if (end && (!deck || endZ > deckZ + CAP_OVER)) [deck, deckZ] = [end, endZ];
+      if (deck && deckZ > best.z) best = { z: deckZ, kind: "deck", way: deck };
     }
     const roof = this.roofs?.(e, n);
     if (roof != null && roof <= limit && roof > best.z) best = { z: roof, kind: "roof" };
@@ -275,7 +366,12 @@ export class WalkWorld {
     return out;
   }
 
-  /** Parapet pieces whose middle lies in this square, so a way filed under several squares gives each piece once. */
+  /**
+   * Parapet pieces along this square's stretch of each way, so a way filed under several squares
+   * gives each piece once. A run of closed pieces never crosses into the next square: each square
+   * asks whether a piece is open only of its own ways, which are every way that reaches it, so
+   * two squares agree where they meet and leave no gap in a rail there.
+   */
   private cellParapets(c: WalkCell): Parapet[] {
     const cached = this.parapetCache.get(c.key);
     if (cached) return cached;
@@ -305,13 +401,18 @@ export class WalkWorld {
             const e1 = p[q - 3] + de * t1 + oe;
             const n1 = p[q - 2] + dn * t1 + on;
             const z = p[q - 1] + (p[q + 2] - p[q - 1]) * ((t0 + t1) / 2);
-            if (inCell((e0 + e1) / 2, (n0 + n1) / 2)) out.push({ e0, n0, e1, n1, z });
+            out.push({ e0, n0, e1, n1, z });
             from = -1;
           };
           for (let s = 0; s < steps; s++) {
             const t = (s + 0.5) / steps;
             const me = p[q - 3] + de * t + oe;
             const mn = p[q - 2] + dn * t + on;
+            // another square's piece: that square's to give
+            if (!inCell(me, mn)) {
+              flush(s);
+              continue;
+            }
             const z = p[q - 1] + (p[q + 2] - p[q - 1]) * t;
             const open = c.elevated.some((o, oi) => {
               if (oi === wi) return false;
@@ -327,6 +428,35 @@ export class WalkWorld {
           }
           flush(steps);
         }
+      }
+      // round the outside of each bend, where one segment's rail ends and the next one's starts
+      // apart, a piece between the two (a car would pass through the gap, off the strip)
+      for (let q = 3; q + 3 < p.length; q += 3) {
+        const ae = p[q] - p[q - 3];
+        const an = p[q + 1] - p[q - 2];
+        const be = p[q + 3] - p[q];
+        const bn = p[q + 4] - p[q + 1];
+        const la = Math.hypot(ae, an);
+        const lb = Math.hypot(be, bn);
+        if (la < 1e-6 || lb < 1e-6) continue;
+        const turn = ae * bn - an * be;
+        if (Math.abs(turn) < 1e-9 * la * lb) continue;
+        // a left turn's outside is its right
+        const side = turn > 0 ? -1 : 1;
+        const e0 = p[q] + (-an / la) * half * side;
+        const n0 = p[q + 1] + (ae / la) * half * side;
+        const e1 = p[q] + (-bn / lb) * half * side;
+        const n1 = p[q + 1] + (be / lb) * half * side;
+        const me = (e0 + e1) / 2;
+        const mn = (n0 + n1) / 2;
+        if (Math.hypot(e1 - e0, n1 - n0) < 0.05 || !inCell(me, mn)) continue;
+        const z = p[q + 2];
+        const open = c.elevated.some((o, oi) => {
+          if (oi === wi) return false;
+          const oz = deckAt(o, me, mn);
+          return oz !== null && Math.abs(oz - z) <= JOIN_HEIGHT;
+        });
+        if (!open) out.push({ e0, n0, e1, n1, z });
       }
     });
     this.parapetCache.set(c.key, out);

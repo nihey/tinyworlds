@@ -467,6 +467,95 @@ describe("decks", () => {
     expect(r.fell).toBeCloseTo(Math.sqrt(2 * 13 * 4), 0);
   });
 
+  it("drives on down across the joint where one way ends and the next goes on, without a drop", () => {
+    // two 13 m ways meeting end to end at e = 100, both falling 8%
+    const w = worldOf(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay(
+            [
+              [0, 50, 10],
+              [100, 50, 2],
+            ],
+            13,
+          ),
+          deckWay(
+            [
+              [100, 50, 2],
+              [125, 50, 0],
+            ],
+            13,
+          ),
+        ],
+      }),
+    );
+    const v = car("taxi", 60, 50, EAST, 30, 10 - 0.08 * 60);
+    const r = run(v, { ...gas, throttle: 0.5 }, w, 1.5, () => {
+      if (v.e < 124) expect(Math.abs(v.z - Math.max(0, 10 - 0.08 * v.e))).toBeLessThan(0.05);
+    });
+    expect(r.fell).toBe(0);
+    expect(v.damage).toBe(0);
+  });
+
+  it("keeps to its own way where a narrower one overlaps it and climbs away", () => {
+    // a 13 m roadway at 5 m, and down its middle a 2.5 m footway that rises at 8%
+    const w = worldOf(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay(
+            [
+              [0, 50, 5],
+              [190, 50, 5],
+            ],
+            13,
+          ),
+          deckWay(
+            [
+              [12, 50, 5],
+              [112, 50, 13],
+            ],
+            2.5,
+            1,
+          ),
+        ],
+      }),
+    );
+    const v = car("taxi", 10, 50, EAST, 15, 5);
+    run(v, { ...gas, throttle: 0.2 }, w, 80 / 15);
+    expect(v.e).toBeGreaterThan(85);
+    expect(v.z).toBeCloseTo(5, 2);
+  });
+
+  it("still steps onto a way it drives into from the side, once nearer its line than its own's", () => {
+    const w = worldOf(
+      makeCell(0, 0, {
+        elevated: [
+          deckWay(
+            [
+              [0, 50, 5],
+              [200, 50, 5],
+            ],
+            10,
+          ),
+          deckWay(
+            [
+              [0, 57, 5.3],
+              [200, 57, 5.3],
+            ],
+            10,
+          ),
+        ],
+      }),
+    );
+    const v = car("taxi", 100, 47, NORTH, 3, 5);
+    run(v, { ...gas, throttle: 0.1 }, w, 4, () => {
+      // the overlap is 52 to 55: its own until past the middle of it
+      if (v.n < 53.5) expect(v.z).toBe(5);
+    });
+    expect(v.n).toBeGreaterThan(58);
+    expect(v.z).toBeCloseTo(5.3, 5);
+  });
+
   it("does not sink on a bridge over the water", () => {
     const w = worldOf(
       ...strip(3, {

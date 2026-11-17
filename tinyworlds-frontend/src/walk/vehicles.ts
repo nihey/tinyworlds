@@ -1,3 +1,4 @@
+import type { ElevatedWay } from "./cell";
 import type { BoatKind, CarKind } from "./kinds";
 import { GRAVITY } from "./player";
 import { clamp, smooth } from "./math";
@@ -129,6 +130,8 @@ export interface Vehicle {
   roll: number;
   /** its own box, when it is not its kind's (the long Staten Island ferry) */
   size?: { length: number; width: number };
+  /** the elevated way it stands on, kept so it follows its own where ways overlap */
+  on?: ElevatedWay;
 }
 
 export interface DriveInput {
@@ -706,16 +709,18 @@ function coast(v: Vehicle, vf: number, vl: number, h: number) {
 
 /** Gravity, stepping up onto surfaces, following ramps, landing, and going into the water. */
 function ground(v: Vehicle, world: VehicleWorld, h: number, out: VehicleEvents) {
-  const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP);
+  const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP, v.on);
   // on its surface (a falling car is not, however near the ground: it lands)
   if (v.vz === 0 && v.z - surf.z <= SNAP) {
     if (surf.kind === "water") startSinking(v, out);
     else {
       v.z = surf.z;
       v.vz = 0;
+      v.on = surf.way;
     }
     return;
   }
+  v.on = undefined;
   const prevZ = v.z;
   v.vz -= GRAVITY * h;
   v.z += v.vz * h;
@@ -728,6 +733,7 @@ function ground(v: Vehicle, world: VehicleWorld, h: number, out: VehicleEvents) 
     }
     fell = -v.vz;
     v.z = land.z;
+    v.on = land.way;
   } else if (
     // coming down with its middle onto a building's top: the building holds it up (a deck's rail,
     // or a building it only overhangs, does not: it falls on past them)
@@ -801,7 +807,7 @@ export function stepCar(
   const driver = v.state === "wrecked" || v.state === "sinking" ? null : input;
   if (!driver && v.state !== "sinking" && v.v === 0 && v.vs === 0 && v.w === 0 && v.vz === 0) {
     // at rest: nothing to do while the ground stays where it was
-    const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP);
+    const surf = world.surfaceUnder(v.e, v.n, v.z, STEP_UP, v.on);
     if (surf.kind !== "water" && surf.z === v.z) return out;
   }
   const steps = substeps(v, total, CARS[v.kind as CarKind].length / 2);
