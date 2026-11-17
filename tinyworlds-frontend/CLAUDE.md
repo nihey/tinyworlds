@@ -177,7 +177,8 @@ src/
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
-│                        # useAdminSession, useLists, useJoinReturn, …
+│                        # useAdminSession, useLists, useJoinReturn, useStreetWalk (the
+│                        # walk as the map sees it), …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
@@ -470,7 +471,8 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   every one to Tag Manager's `dataLayer`, where the container sends it on to Google Analytics.
   Rybbit hears the clicks from declarative hooks on the buttons (`data-rybbit-event` with
   `data-rybbit-prop-world`, `-city`, `-amount`), so `siteEvent(…, { rybbit: true })` is only for
-  the two returns from the checkout, which no click marks. What the donor chose rides to the
+  what no click marks: the two returns from the checkout, and `walk_start` (said once the walk
+  has opened: the person's button is pressed for drags, taps and drops that find no street). What the donor chose rides to the
   checkout and back in session storage (`tinyworlds.checkout`); only an API checkout returns
   here, so a payment-link donation is not a `donate_complete` (the API still knows it from
   Stripe). Every message carries all its keys, `undefined` when absent, because the data layer
@@ -897,32 +899,41 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
 `docs/superpowers/specs/2026-11-16-street-walk-design.md`.
 
 - **Nothing of it is in the map's first bundle.** `walk-screen.tsx` is the only way in: its
-  default export is reached by `import()` from `map-app.tsx` when a walk opens, and three.js
-  and every module under `src/walk/` come with it. The map itself carries only the person's
-  button (`walk-person.tsx`, `map/person.ts`), the walk link's parser (`map/hash.ts`) and the
-  split's CSS; `map/walker.ts` and the drop's data (`walk/load.ts`) are imported when the
-  person is picked up or a walk opens.
+  default export is reached by `import()` from `useStreetWalk` (`hooks/use-street-walk.ts`,
+  the walk as the map sees it) when a walk opens, and three.js and every module under
+  `src/walk/` come with it. First the tiny `walk/webgl.ts` says whether the browser can draw
+  it at all: without WebGL 2 a toast says so and nothing more is downloaded. The map itself
+  carries only the person's button (`walk-person.tsx`, `map/person.ts`), the hook, the walk
+  link's parser (`map/hash.ts`) and the split's CSS; `map/walker.ts` and the drop's data
+  (`walk/load.ts`) are imported when the person is picked up or a walk opens.
 - **Getting in.** The little person stands in the tool column (in the map's pixel style, its
   shirt the accent; not anyone else's figure). Drag it onto the map: the ways near the pointer
   it can stand on light up (`dropHighlight`, from the squares under the pointer, read as it
-  moves) and it dangles over the spot with "Let go to walk here" or "No street here". Let go
-  and `snapDrop` puts it on the nearest sidewalk or street within 150 m (on a bridge's deck if
-  dropped on one), facing along it; nothing near is the "No street here" toast and no walk. A
-  tap on the person then a tap on the map does the same (`armed`, the map's own tap taken by
-  `MapApp`; Esc lets go). **W** (free among the map's keys), or the button from the keyboard,
-  puts it down in the middle of the map. A link `#walk=lat,lon,heading` opens the walk there
-  (`parseWalkHash`, also on `hashchange`), and the walk writes one through `writeHash` whenever
-  you stand still. Analytics: `walk_start` through `siteEvent` with `world`, and
-  `data-rybbit-event="walk_start"` on the person.
+  moves) and it dangles over the spot with "Let go to walk here" or "No street here". A point
+  of the map is taken as the map draws it (`WalkData.dropAtMap`): bridges and overpasses are
+  drawn raised by z·kz, so a deck is hit where it is drawn (`pickDeck`, in map px, within its
+  half-width) and not at its footprint (71 m away for the Brooklyn Bridge's 41 m span); off
+  any deck, `snapDrop` puts it on the nearest sidewalk or street to the ground point within
+  150 m, facing along it; nothing near is the "No street here" toast and no walk. A tap on the
+  person then a tap on the map does the same (`armed`, the map's own tap taken by the hook;
+  its sign says tap or click after what pressed the person; Esc lets go). **W** (free among
+  the map's keys), or the button from the keyboard, puts it down in the middle of the map. A
+  link `#walk=lat,lon,heading` opens the walk there (`parseWalkHash`, also on `hashchange`; a
+  link carries no height, so on a deck's footprint it opens on the deck), and the walk writes
+  one through `writeHash` whenever you stand still. Analytics: `walk_start` through
+  `siteEvent` with `world`, Rybbit included, once the walk has opened.
 - **The split** (`.walk-split` in `globals.css`): the walk 7, the map 3, side by side; stacked
   (the map below) under 800 px or in portrait. The map is the same `MapEngine` on its two
   canvases, moved into the grid's map cell: it follows you (`jumpTo` on every move, the wheel
-  zooming about you), draws you and a view cone (`walkerLayer`), and a click or tap on it takes
-  you there (`dropAtScreen`, then the game's `teleport`). Its other signs give way (search,
-  banners, quiz, tools, minimap, the building spotlight); "Click the map to go there" and the
-  credit stay. M or "Back to the map" leaves with the map centred where you are.
-- **The screen** (`WalkScreen`): checks WebGL 2 first (`canDrawWalk`; without it a toast says
-  so and the map stays), reads `walk.json` ("couldn't start" with Try again and Back), builds
+  zooming about you), draws you and a view cone (`walkerLayer`) at your height (on a bridge,
+  on its deck as the map draws it: the walk tells the map the surface under you), and a click
+  or tap on it takes you there (`dropAtScreen`, then the game's `teleport`). Its other signs
+  give way (search, banners, quiz, tools, minimap, the building spotlight); "Click (or Tap)
+  the map to go there" and the credit stay. M or "Back to the map" leaves with the map centred
+  where you are, from the moment the walk is asked for: while its code downloads, while it
+  loads and after it fails.
+- **The screen** (`WalkScreen`): checks WebGL 2 again (`canDrawWalk`), reads `walk.json`
+  ("couldn't start" with Try again, on a new canvas, and Back), builds
   `WalkView` (the renderer) and `WalkGame` (the game: `game.ts` and the modules it ties
   together), and takes the keys while it is open (not while typing or while a dialog is open:
   the map's own keys stand aside), the mouse through pointer lock (a click on the view asks,

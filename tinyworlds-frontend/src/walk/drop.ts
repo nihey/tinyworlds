@@ -57,7 +57,7 @@ function nearest(pts: Float32Array, e: number, n: number): Hit | null {
 }
 
 /** Facing along the way, whichever way is nearer north, so the first view is predictable. */
-function yawAlong(de: number, dn: number): number {
+export function yawAlong(de: number, dn: number): number {
   return dn < 0 || (dn === 0 && de < 0) ? Math.atan2(-de, -dn) : Math.atan2(de, dn);
 }
 

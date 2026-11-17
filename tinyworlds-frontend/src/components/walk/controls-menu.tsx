@@ -162,7 +162,7 @@ export function ControlsMenu({
               </label>
               <Slider
                 id={`${ids}-pixel`}
-                aria-label={w.pixel}
+                thumbLabel={w.pixel}
                 min={PIXEL_MIN}
                 max={PIXEL_MAX}
                 step={1}

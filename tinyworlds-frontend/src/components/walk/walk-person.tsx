@@ -9,17 +9,18 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import type { MapEngine } from "@/map/engine";
 import { PERSON, PERSON_H, PERSON_W, personColours } from "@/map/person";
-import { SITE_ID } from "@/site";
 import type { Drop } from "@/walk/drop";
+import type { WalkData } from "@/walk/load";
 import { WORLD } from "@/worlds";
 
 /**
  * The little person in the tool column, and the three ways to put it down: drag it onto the
  * map (the ways it can stand on light up near the pointer, and it dangles over the spot), tap
- * it and then tap the map (`armed`: the map's own tap is taken by `MapApp`), or the keyboard
- * (activating the button, like the W key, puts it down in the middle of the map). Nothing of
- * the walk is downloaded until the person is picked up: the squares, the drop and the
- * highlight come through `import()`.
+ * it and then tap the map (`armed`: the map's own tap is taken by `useStreetWalk`), or the
+ * keyboard (activating the button, like the W key, puts it down in the middle of the map).
+ * Nothing of the walk is downloaded until the person is picked up: the squares, the drop and
+ * the highlight come through `import()`. A point on the map is a point as the map draws it:
+ * a bridge's deck is drawn raised, so it is hit where it is drawn, not at its footprint.
  */
 
 /** The ways within this many metres of the pointer light up while the person is carried. */
@@ -32,20 +33,36 @@ async function walkData(version: string | undefined) {
   return load(version);
 }
 
-/** Where a person put down stands, in the walk's metres and on the map. */
+/** Where a person put down stands, in the walk's metres (z: on a deck) and on the ground of the map. */
 export type PlacedDrop = Drop & { lon: number; lat: number };
 
-/** Where a person put down at (lon, lat) stands, or null when there is no street within reach. Throws when the walk's data cannot be read. */
+const placed = (data: WalkData, drop: Drop | null): PlacedDrop | null => {
+  if (!drop) return null;
+  const [lon, lat] = data.toLonLat(drop.e, drop.n);
+  return { ...drop, lon, lat };
+};
+
+/**
+ * Where a person put down at (lon, lat) on the ground stands (a walk link's spot), or null when
+ * there is no street within reach. Throws when the walk's data cannot be read.
+ */
 export async function dropAtLonLat(
   version: string | undefined,
   lon: number,
   lat: number,
 ): Promise<PlacedDrop | null> {
   const data = await walkData(version);
-  const drop = await data.dropAt(lon, lat);
-  if (!drop) return null;
-  const [dlon, dlat] = data.toLonLat(drop.e, drop.n);
-  return { ...drop, lon: dlon, lat: dlat };
+  return placed(data, await data.dropAt(lon, lat));
+}
+
+/** The same for a point of the map as it is drawn, in map px: a raised deck where it is drawn. */
+export async function dropAtMapPx(
+  version: string | undefined,
+  x: number,
+  y: number,
+): Promise<PlacedDrop | null> {
+  const data = await walkData(version);
+  return placed(data, await data.dropAtMap(x, y));
 }
 
 /** The same for a point on the map's canvas, in CSS px from its top left. */
@@ -56,8 +73,7 @@ export async function dropAtScreen(
   y: number,
 ): Promise<PlacedDrop | null> {
   const m = engine.screenToMap(x, y);
-  const g = engine.projection.toGeo(m.x, m.y);
-  return dropAtLonLat(version, g.lon, g.lat);
+  return dropAtMapPx(version, m.x, m.y);
 }
 
 /** The person as pixels: an SVG, `px` CSS px per pixel. */
@@ -87,9 +103,9 @@ interface WalkPersonProps {
   engine: MapEngine;
   /** the walk's files' version: `manifest.walk` */
   version: string | undefined;
-  /** tapped, waiting for a tap on the map */
-  armed: boolean;
-  onArmedChange: (armed: boolean) => void;
+  /** tapped (with a finger, or clicked with a mouse), waiting for the same on the map */
+  armed: "touch" | "mouse" | null;
+  onArmedChange: (armed: "touch" | "mouse" | null) => void;
   /** put down where a walk can open */
   onDrop: (drop: PlacedDrop) => void;
   /** activated from the keyboard: put down in the middle of the map */
@@ -126,6 +142,8 @@ export function WalkPerson({
   const wanted = useRef<{ x: number; y: number } | null>(null);
   const busy = useRef(false);
   const alive = useRef(true);
+  // what pressed the person last: the armed sign says tap or click after it
+  const pointer = useRef<"touch" | "mouse">("mouse");
 
   useEffect(() => {
     alive.current = true;
@@ -153,11 +171,9 @@ export function WalkPerson({
         const p = wanted.current;
         wanted.current = null;
         const m = engine.screenToMap(p.x, p.y);
-        const g = engine.projection.toGeo(m.x, m.y);
-        const [e, n] = data.toEN(g.lon, g.lat);
-        const drop = await data.drop(e, n);
+        const drop = await data.dropAtMap(m.x, m.y);
         if (!carry.current?.moving) break;
-        walker.dropHighlight(engine, data.waysNear(e, n, LIGHT_REACH));
+        walker.dropHighlight(engine, data.waysNearMap(m.x, m.y, LIGHT_REACH));
         setVerdict(drop ? "walk" : "none");
       }
     } catch {
@@ -193,6 +209,7 @@ export function WalkPerson({
     }
     carry.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, moving: false };
     dragged.current = false;
+    pointer.current = e.pointerType === "mouse" ? "mouse" : "touch";
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -202,7 +219,7 @@ export function WalkPerson({
       if (Math.hypot(e.clientX - c.x0, e.clientY - c.y0) < DRAG_START) return;
       c.moving = true;
       dragged.current = true;
-      onArmedChange(false);
+      onArmedChange(null);
       setCarried({ x: e.clientX, y: e.clientY });
     }
     if (dangle.current)
@@ -234,11 +251,11 @@ export function WalkPerson({
     }
     // Enter or Space: no pointer, so no spot either; the middle of the map, as W does
     if (e.detail === 0) {
-      onArmedChange(false);
+      onArmedChange(null);
       onCentre();
       return;
     }
-    onArmedChange(!armed);
+    onArmedChange(armed ? null : pointer.current);
   };
 
   return (
@@ -248,15 +265,13 @@ export function WalkPerson({
           <button
             type="button"
             aria-label={t.walk.person}
-            aria-pressed={armed}
+            aria-pressed={armed !== null}
             className="bullet touch-none select-none"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             onClick={onClick}
-            data-rybbit-event="walk_start"
-            data-rybbit-prop-world={SITE_ID}
           >
             <PersonFigure px={2} className={cn(carrying && "opacity-30")} />
           </button>
@@ -302,7 +317,7 @@ export function WalkPerson({
             className="sign sign-in fixed bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+7.5rem)] left-1/2 z-40 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full px-3.5 py-2 text-center text-sm font-semibold"
             style={{ "--sign-from": "8px" } as React.CSSProperties}
           >
-            {t.walk.tapMap}
+            {armed === "touch" ? t.walk.tapMap : t.walk.clickMap}
           </div>,
           document.body,
         )}

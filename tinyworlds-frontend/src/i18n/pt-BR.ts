@@ -650,6 +650,7 @@ export const ptBR: Strings = {
     personHint: "Arraste-me até uma rua",
     dropHere: "Solte para andar aqui",
     tapMap: "Agora toque no mapa, onde quer andar",
+    clickMap: "Agora clique no mapa, onde quer andar",
     noStreet: "Não há rua aqui",
     loading: "Carregando as ruas…",
     failed: "Não foi possível começar a caminhada. O mapa continua funcionando.",
@@ -751,6 +752,7 @@ export const ptBR: Strings = {
     sound: "Som",
     clickToLook: "Clique para olhar ao redor",
     mapGoThere: "Clique no mapa para ir até lá",
+    mapTapThere: "Toque no mapa para ir até lá",
     touch: {
       jump: "Pular",
       enter: "Entrar",

@@ -647,6 +647,7 @@ export const esES: Strings = {
     personHint: "Arrástrame hasta una calle",
     dropHere: "Suelta para pasear aquí",
     tapMap: "Ahora toca el mapa donde quieras pasear",
+    clickMap: "Ahora haz clic en el mapa donde quieras pasear",
     noStreet: "Aquí no hay calle",
     loading: "Cargando las calles…",
     failed: "No se ha podido empezar el paseo. El mapa sigue funcionando.",
@@ -747,6 +748,7 @@ export const esES: Strings = {
     sound: "Sonido",
     clickToLook: "Haz clic para mirar alrededor",
     mapGoThere: "Haz clic en el mapa para ir allí",
+    mapTapThere: "Toca el mapa para ir allí",
     touch: {
       jump: "Saltar",
       enter: "Entrar",

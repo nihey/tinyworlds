@@ -33,16 +33,28 @@ function pointToMap(geo: Geo, e: number, n: number, z: number): { x: number; y: 
   return { x: m.x, y: m.y - z * geo.kz };
 }
 
+/** Where you are, for the map: on the ground at (lon, lat), `z` metres up (a deck), facing `heading`° from north. */
+export interface WalkerAt {
+  lat: number;
+  lon: number;
+  heading: number;
+  z: number;
+}
+
+/** Map px of where you stand: the ground point raised by your height, as the map draws decks. */
+export function walkerPoint(engine: MapEngine, at: WalkerAt): { x: number; y: number } {
+  const p = engine.projection.toMap(at.lon, at.lat);
+  return { x: p.x, y: p.y - Math.max(0, at.z) * engine.manifest.geo.kz };
+}
+
 /**
- * You on the map: a cone on the ground the way you face, and the person standing at your feet,
- * the same size on screen at every zoom. `get` answers where you are now (null: draw nothing).
- * Returns the layer's remover. The engine redraws it whenever the map is redrawn: whoever moves
- * you calls `engine.invalidate()` (or moves the view).
+ * You on the map: a cone on the ground (or the deck) the way you face, and the person standing
+ * at your feet, the same size on screen at every zoom; on a bridge, on its deck as the map draws
+ * it. `get` answers where you are now (null: draw nothing). Returns the layer's remover. The
+ * engine redraws it whenever the map is redrawn: whoever moves you calls `engine.invalidate()`
+ * (or moves the view).
  */
-export function walkerLayer(
-  engine: MapEngine,
-  get: () => { lat: number; lon: number; heading: number } | null,
-): () => void {
+export function walkerLayer(engine: MapEngine, get: () => WalkerAt | null): () => void {
   const colours = personColours(WORLD.accent.color);
   const accent = WORLD.accent.color;
   const geo = engine.manifest.geo;
@@ -50,7 +62,7 @@ export function walkerLayer(
     (ctx, view) => {
       const at = get();
       if (!at) return;
-      const p = engine.projection.toMap(at.lon, at.lat);
+      const p = walkerPoint(engine, at);
       const margin = 60 / view.scale;
       if (
         p.x < view.left - margin ||

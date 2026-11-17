@@ -11,7 +11,7 @@ import { loadLife } from "@/map/data";
 import { formatWalkHash, writeHash } from "@/map/hash";
 import type { Manifest } from "@/map/manifest";
 import { loadBindings, saveBindings, type Bindings } from "@/walk/controls";
-import { WalkGame } from "@/walk/game";
+import { WalkGame, type GameView } from "@/walk/game";
 import { enToLonLat, lonLatToEN } from "@/walk/geo";
 import { walkData } from "@/walk/load";
 import { PIXEL_DEFAULT, PIXEL_MAX, PIXEL_MIN, WalkView } from "@/walk/render/view";
@@ -29,8 +29,9 @@ import { WastedOverlay } from "./wasted-overlay";
  * It checks that the browser can draw it, reads the walk's index, builds the view and the game,
  * and takes the keys (not while typing or while a dialog is open; the controls menu takes the
  * next key itself when a key is being changed), the mouse through pointer lock (a click on the
- * view asks for it, Esc lets it go), and the touch pad on a touch screen. It tells the map where
- * you are as you move, and writes a walk link into the address once you stand still.
+ * view asks for it, Esc lets it go), and the touch pad on a touch screen. The map's key (M) works
+ * from the moment it mounts, before the walk is in and after it fails. It tells the map where you
+ * are as you move (on a bridge, how high), and writes a walk link once you stand still.
  */
 
 export interface WalkStart {
@@ -42,13 +43,23 @@ export interface WalkStart {
   z?: number;
 }
 
+/** Where you are, for the map: the ground point, how high (a deck: the map draws it raised), and which way you face (degrees). */
+export interface WalkAt {
+  lat: number;
+  lon: number;
+  z: number;
+  heading: number;
+}
+
 export interface WalkScreenProps {
   manifest: Manifest;
   start: WalkStart;
   /** a click on the map beside the walk: you are put there (a new `id` each time) */
   goTo?: (WalkStart & { id: number }) | null;
-  onExit: (at: { lat: number; lon: number }) => void;
-  onMove: (at: { lat: number; lon: number; heading: number }) => void;
+  /** the walk is open: its game runs (said once per walk, for the page analytics) */
+  onOpen?: () => void;
+  onExit: (at: WalkAt) => void;
+  onMove: (at: WalkAt) => void;
 }
 
 /** Only the visit's first walk, opened by New York's first view, finds the red supercar there. */
@@ -61,6 +72,7 @@ const SLOW_FOR = 4;
 /** Ms after the first squares are shown before the frame rate counts. */
 const WARM_UP = 3000;
 const AUTO_PIXEL_MAX = 5;
+const UNITS = WORLD.units === "imperial" ? "imperial" : "metric";
 
 // kept for the visit, never stored: what the walk was left with
 let walked = false;
@@ -88,11 +100,17 @@ function loseContext(canvas: HTMLCanvasElement): void {
   }
 }
 
-export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: WalkScreenProps) {
+export default function WalkScreen({
+  manifest,
+  start,
+  goTo,
+  onOpen,
+  onExit,
+  onMove,
+}: WalkScreenProps) {
   const { t } = useI18n();
   const touch = useMediaQuery("(pointer: coarse)");
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-  const units = WORLD.units === "imperial" ? "imperial" : "metric";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const darkRef = useRef<HTMLDivElement>(null);
   const [attempt, setAttempt] = useState(0);
@@ -110,22 +128,38 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
   // the first squares are in: until then the streets are still on their way
   const [streets, setStreets] = useState(false);
 
-  // the latest callbacks, for the loops that outlive a render
+  // the latest callbacks and keys, for the loops that outlive a render
   const exitRef = useRef(onExit);
   const moveRef = useRef(onMove);
+  const openRef = useRef(onOpen);
+  const bindingsRef = useRef(bindings);
   useEffect(() => {
     exitRef.current = onExit;
     moveRef.current = onMove;
+    openRef.current = onOpen;
+    bindingsRef.current = bindings;
   });
   const startRef = useRef(start);
+  // the camera's height, as the game last set it: what tells a deck from the street under it
+  const eyeRef = useRef(0);
+
+  /** Where you are for the map: the game's place and heading, and the surface you are on. */
+  const whereAt = useCallback(
+    (p: { e: number; n: number; yaw: number }, z?: number): WalkAt => {
+      const [lon, lat] = enToLonLat(manifest.geo, p.e, p.n);
+      const world = viewRef.current?.world;
+      const height = z ?? (world ? world.surfaceUnder(p.e, p.n, eyeRef.current, 0).z : 0);
+      return { lat, lon, z: Math.max(0, height), heading: degrees(p.yaw) };
+    },
+    [manifest.geo],
+  );
 
   /** Leaves the walk, with the map where you are (where the walk was to start, before it has). */
   const exit = useCallback(() => {
-    const at = game?.position() ?? startRef.current;
-    const [lon, lat] = enToLonLat(manifest.geo, at.e, at.n);
     if (document.pointerLockElement) document.exitPointerLock();
-    exitRef.current({ lat, lon });
-  }, [game, manifest.geo]);
+    const s = startRef.current;
+    exitRef.current(game ? whereAt(game.position()) : whereAt(s, s.z ?? 0));
+  }, [game, whereAt]);
 
   // open: the browser, the index and the ferries' routes, then the view and the game
   useEffect(() => {
@@ -133,9 +167,10 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
     if (!canvas) return;
     const s = startRef.current;
     const [lon, lat] = enToLonLat(manifest.geo, s.e, s.n);
+    const there = { lat, lon, z: Math.max(0, s.z ?? 0), heading: degrees(s.yaw) };
     if (!canDrawWalk()) {
       toast.error(t.walk.noWebgl);
-      exitRef.current({ lat, lon });
+      exitRef.current(there);
       return;
     }
     let cancelled = false;
@@ -153,7 +188,7 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
         } catch {
           // a context the browser would not give after all
           toast.error(t.walk.noWebgl);
-          exitRef.current({ lat, lon });
+          exitRef.current(there);
           return;
         }
         view.setPixel(keptPixel ?? PIXEL_DEFAULT);
@@ -162,15 +197,29 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
         const [se, sn] = lonLatToEN(data.ix.geo, manifest.start.lon, manifest.start.lat);
         const starter = !walked && Math.hypot(s.e - se, s.n - sn) <= STARTER_REACH;
         walked = true;
+        // the view as the game sees it, the camera's height noted on the way
+        const drawn = view;
+        const seen: GameView = {
+          world: drawn.world,
+          scene: drawn.scene,
+          setCamera(e, n, z, yaw, pitch, fov) {
+            eyeRef.current = z;
+            drawn.setCamera(e, n, z, yaw, pitch, fov);
+          },
+          setGrey: (amount) => drawn.setGrey(amount),
+          update: (dt) => drawn.update(dt),
+          render: () => drawn.render(),
+        };
+        eyeRef.current = (s.z ?? 0) + 2;
         made = new WalkGame({
-          view,
+          view: seen,
           ix: data.ix,
           life: life.ferries,
           start: s,
-          bindings: loadBindings(storage()),
+          bindings: bindingsRef.current,
           reduced: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           sound,
-          units: WORLD.units === "imperial" ? "imperial" : "metric",
+          units: UNITS,
           starter,
         });
         viewRef.current = view;
@@ -178,6 +227,7 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
         made.start();
         setGame(made);
         setPhase("ready");
+        openRef.current?.();
         canvas.focus({ preventScroll: true });
       } catch {
         if (!cancelled) setPhase("failed");
@@ -234,6 +284,7 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
     if (!game) return;
     let raf = 0;
     let last = { e: Number.NaN, n: Number.NaN, yaw: Number.NaN };
+    let lastZ = 0;
     let still = 0;
     let written = false;
     let before = performance.now();
@@ -250,18 +301,22 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
         setStreets(true);
       }
       const p = game.position();
-      const [lon, lat] = enToLonLat(manifest.geo, p.e, p.n);
-      const heading = degrees(p.yaw);
-      if (Math.hypot(p.e - last.e, p.n - last.n) > 0.05 || !(Math.abs(p.yaw - last.yaw) < 0.005)) {
+      const at = whereAt(p);
+      if (
+        Math.hypot(p.e - last.e, p.n - last.n) > 0.05 ||
+        !(Math.abs(p.yaw - last.yaw) < 0.005) ||
+        Math.abs(at.z - lastZ) > 0.05
+      ) {
         last = p;
+        lastZ = at.z;
         still = 0;
         written = false;
-        moveRef.current({ lat, lon, heading });
+        moveRef.current(at);
       } else if (dt < 0.25) {
         still += dt;
         if (!written && still >= SETTLE) {
           written = true;
-          writeHash(formatWalkHash({ lat, lon, heading }));
+          writeHash(formatWalkHash(at));
         }
       }
       // too slow: bigger pixels, a step at a time, until the visitor chooses (counted from a few
@@ -284,11 +339,11 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [game, manifest.geo]);
+  }, [game, whereAt]);
 
-  // the keys, while the walk is open
+  // the keys, while the walk is open: the map's own from the start (loading, failed), all of
+  // them once the game runs
   useEffect(() => {
-    if (!game) return;
     const ignored = (e: KeyboardEvent) => {
       if (e.metaKey) return true;
       if (e.ctrlKey && !e.code.startsWith("Control")) return true;
@@ -301,6 +356,12 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented || ignored(e)) return;
+      if (!game) {
+        if (e.repeat || !bindings.map.includes(e.code)) return;
+        e.preventDefault();
+        exit();
+        return;
+      }
       const acts = game.keyDown(e.code);
       if (acts.length === 0) return;
       e.preventDefault();
@@ -315,8 +376,8 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
         else if (a === "pixelUp") choosePixel(pixel + 1);
       }
     };
-    const onKeyUp = (e: KeyboardEvent) => game.keyUp(e.code);
-    const onBlur = () => game.releaseKeys();
+    const onKeyUp = (e: KeyboardEvent) => game?.keyUp(e.code);
+    const onBlur = () => game?.releaseKeys();
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
@@ -325,7 +386,7 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [game, exit, pixel, choosePixel]);
+  }, [game, exit, pixel, choosePixel, bindings]);
 
   // the mouse: captured by a click on the view, let go by Esc (the browser's)
   useEffect(() => {
@@ -363,7 +424,9 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
 
   return (
     <div className="walk-pane relative h-full w-full overflow-hidden bg-sign">
+      {/* a new canvas for each attempt: one whose context was lost cannot give another */}
       <canvas
+        key={attempt}
         ref={canvasRef}
         tabIndex={0}
         aria-label={t.walk.viewLabel}
@@ -385,7 +448,7 @@ export default function WalkScreen({ manifest, start, goTo, onExit, onMove }: Wa
           <WalkHud
             game={game}
             bindings={bindings}
-            units={units}
+            units={UNITS}
             touch={touch}
             reducedMotion={reducedMotion}
             showLook={!touch && !locked && !menuOpen}

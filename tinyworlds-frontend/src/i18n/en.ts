@@ -635,6 +635,7 @@ export const en: Strings = {
     personHint: "Drag me onto a street",
     dropHere: "Let go to walk here",
     tapMap: "Now tap the map where you want to walk",
+    clickMap: "Now click the map where you want to walk",
     noStreet: "No street here",
     loading: "Loading the streets…",
     failed: "The street walk couldn't start. The map still works.",
@@ -735,6 +736,7 @@ export const en: Strings = {
     sound: "Sound",
     clickToLook: "Click to look around",
     mapGoThere: "Click the map to go there",
+    mapTapThere: "Tap the map to go there",
     touch: {
       jump: "Jump",
       enter: "Get in",

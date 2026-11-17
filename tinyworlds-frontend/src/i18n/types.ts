@@ -742,8 +742,9 @@ export interface Strings {
     personHint: string;
     /** while the person is held over the map */
     dropHere: string;
-    /** after tapping the person on a touch screen */
+    /** after tapping the person with a finger, or clicking it with a mouse */
     tapMap: string;
+    clickMap: string;
     /** the sign when nothing walkable is near where it was dropped */
     noStreet: string;
     loading: string;
@@ -813,8 +814,9 @@ export interface Strings {
     sound: string;
     /** before the mouse is captured */
     clickToLook: string;
-    /** the map beside the walk: a click on it takes you there */
+    /** the map beside the walk: a click (or, on a touch screen, a tap) on it takes you there */
     mapGoThere: string;
+    mapTapThere: string;
     /** the touch buttons */
     touch: {
       jump: string;

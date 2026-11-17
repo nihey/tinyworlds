@@ -3,7 +3,8 @@
  * (`components/analytics.tsx` loads them). Every event goes to Google Tag Manager's data layer, where the container turns
  * it into a Google Analytics event. Rybbit hears the clicks from the declarative hooks on the
  * buttons themselves (`data-rybbit-event`), so it is told from here only about what no click
- * marks: coming back from the checkout, paid or not.
+ * marks: coming back from the checkout, paid or not, and a street walk that has opened (the
+ * person is dragged, tapped twice or put down by a key, and a drop may find no street).
  *
  *   donate_open       the donate sign opened             world, city (the one it opened with)
  *   donate_checkout   a checkout was asked for           world, city, amount (US$, if chosen here)
