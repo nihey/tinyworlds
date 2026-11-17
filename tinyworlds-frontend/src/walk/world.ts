@@ -10,7 +10,7 @@ const BUCKETS = CELL / BUCKET;
 /** How tall a parapet stands above its deck, metres. */
 export const PARAPET_HEIGHT = 1;
 /** A parapet is open where it runs inside another elevated way that is this near in height. */
-const JOIN_HEIGHT = 1.5;
+export const JOIN_HEIGHT = 1.5;
 
 export interface Surface {
   z: number;
@@ -59,7 +59,7 @@ function probe(v: Volume, e: number, n: number) {
 }
 
 /** The deck's height at a point inside its strip (nearest segment), else null. */
-function deckAt(w: ElevatedWay, e: number, n: number): number | null {
+export function deckAt(w: ElevatedWay, e: number, n: number): number | null {
   const p = w.pts;
   const half = w.width / 2;
   let best = Infinity;
