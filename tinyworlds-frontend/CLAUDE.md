@@ -982,34 +982,40 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   water has its own surface (and the open water lies only where no square is shown, so the
   water is drawn once, after the ground's depth), shaded by a field made once from the data's
   `shore` (`shoreField` in `render/shore.ts`: the distance to land, smoothed so the bands
-  follow the bank, which way the land lies, and the land's own distance to the water). The
-  layers: **depth** (a teal shallow rim at the shore, 2 m but never more than a few pixels
-  across, a light rim, the base, the deep beyond about 14 m); **the angle** (looking steeply
-  down, or within 8 m of the eye, the map's own water; at middle angles the depth's tones, a
-  shade at a time; towards the horizon back to the map's water, so along any look outwards the
-  water only darkens, then only lightens); **reflections** (a camera mirrored under the surface
+  follow the bank, which way the land lies, and the land's own distance to the water; a wet
+  square whose data lacks `shore` is drawn as the open water is, never a hole). Past the edge of
+  the data the open water lies only where no shown square beside it is all land, so where the
+  data ends inland the city ends in the fog's wall. The layers: **depth** (a teal shallow rim at
+  the shore, 2 m but never more than a few pixels across, a light rim, the base, the deep beyond
+  about 14 m), as the shore says at any angle, darker away from the land from a bridge as from
+  the water (an angle band once drew a dark ring round anyone looking down from a bridge);
+  **the horizon** (towards it the sky takes the depth back a shade at a time, up to the map's
+  water, so along any look outwards the water changes with the shore, then only lightens);
+  **reflections** (a camera mirrored under the surface
   draws everything but the sky, the water, the ground and the particles into a picture of the
   drawing's size, half of it on a touch screen; the water reads it in three flat tones, one,
   two and three shades under the water they lie on, so they always show, its rows shifted
-  sideways by whole pixels the farther they are under their foot, a shade fewer at a time with
-  the fog along the mirrored path); **the shore** (land within 2 m of the water a shade darker,
-  not on a pier; on a near, lit shore a light lapping line two or three cells out, a pixel or
+  sideways by whole pixels the farther they are under their foot (a pixel whose own texel is
+  sky takes a neighbour's that sways onto it, `mirrorSource`, so a cable is not dotted), a
+  shade fewer at a time with the fog along the mirrored path); **the shore** (the first metre
+  of land a shade darker, not on a pier; on a near, lit shore a light lapping line two or three cells out, a pixel or
   two wide, in dashes travelling along it; on a quiet one, farther than 150 m or facing away
   from the sun, a dark line where it meets the water instead; a broken light line at the
   waterline of what stands in the water, bridge piers, piles and boats, whose walls reach down
   to it); **the living surface** (short horizontal dashes a shade lighter or darker, one in
   some squares of a world grid whose squares double where they would be too small on screen,
   so they stay a few pixels apart, drifting and showing for part of the loop); **glints** on
-  the open water, new places every loop; and **ripple rings** round every splash
-  (`particles.ts`). Every motion is a whole number of cycles in a 5 s loop. Under reduced
+  the open water, new places every loop; and **ripple rings** round every splash, a person
+  knocked off a quay too (`particles.ts`; the crowd says who went in, `CrowdEvents.splashes`). Every motion is a whole number of cycles in a 5 s loop. Under reduced
   motion nothing on the water moves (no wobble, no glints, the lapping on its near ring, the
   dashes still); the rings, being events, still show. What lies on the water or is the ground
   goes on the layer `NOT_MIRRORED`; the shore's own faces mark themselves in the mirror's
   alpha, so they get no light line. The mirror costs about one more drawing of the city: it is
-  skipped when no water is within 500 m, and let go for the rest of the walk when the frame
-  rate stays under 40 fps for 2 s (`SlowWatch`, sooner than the screen grows the pixels);
-  `view.setReflections(on)` sets it again, `view.reflections` says whether it is on. A person
-  knocked into the water makes no ring yet: the crowd has no splash event to hook.
+  drawn only when a square's water within 500 m is in the camera's view (`waterInView`), and
+  let go for the rest of the walk when the frames that drew it stay under 40 fps for 2 s
+  (`SlowWatch`: a slow street far from the water says nothing of the mirror's cost; a frame
+  over 1 s is a gap); the automatic quality's first step lets it go too.
+  `view.setReflections(on)` sets it again, `view.reflections` says whether it is on.
 - **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
   than the gaps between its lines). Where they do, you are on the way whose line you are
   nearest, as a share of its half-width, among those about as high as the highest within reach,

@@ -7,15 +7,12 @@ import {
   darkCutOf,
   DITHER_PX,
   DEEP_STEPS,
-  DEPTH_NEAR,
   GLINT_CELL,
   GLINT_FOR,
   GLINT_GRAZE,
   GLINT_REACH,
   GLINT_SHARE,
-  GRAZE_DEEP,
   GRAZE_ONE,
-  GRAZE_STEEP,
   GRAZE_TWO,
   LAP_CYCLES,
   LAP_DASH,
@@ -241,7 +238,7 @@ void main() {
  * middle of one over 9 m), the texels on the street grid. `paint` is [colour, alternate, how
  * often, pattern] as palette indices; `lane` is [across −1…1, width], `along` metres.
  * With GROUND, a square's ground: nothing outside the square, nothing where its mask is water,
- * and one shade darker within 2 m of the water (damp), but not on a pier's deck.
+ * and one shade darker on its first metre by the water (damp), but not on a pier's deck.
  */
 const FLAT_VERTEX = /* glsl */ `
 attribute vec4 paint; attribute vec2 lane; attribute float along;
@@ -345,13 +342,13 @@ void main() { gl_FragColor = vec4(fogged(C(vColour), length(vMV)), 1.0); }`;
  * pixel, never a blend (`../water.ts` has the rules and their numbers); where two tones meet,
  * the threshold is crossed in a 4 × 4 Bayer pattern over a few pixels, never a hard curve:
  * 1. depth: the square's shore field (`shore.ts`): the shallow teal rim at the shore (2 m, but
- *    never more than a few pixels across), a light rim, the base, the deep;
- * 2. the angle: looking steeply down (or near the eye) the map's own water, at middle angles
- *    the depth's tones, towards the horizon back to the map's water;
+ *    never more than a few pixels across), a light rim, the base, the deep, at any angle;
+ * 2. the horizon: towards it the sky takes the depth back a shade at a time, to the map's water;
  * 3. reflections: the mirror's picture of what stands by the water (`WalkView`), read at the
  *    pixel's place flipped, in three flat tones one, two and three shades under the water they
- *    lie on, their rows moved sideways by whole pixels by how far under their foot they are,
- *    a shade fewer at a time with the fog along the mirrored path;
+ *    lie on, their rows moved sideways by whole pixels by how far under their foot they are
+ *    (`mirrorSource`: a pixel over sky takes a neighbour's that sways onto it), a shade fewer
+ *    at a time with the fog along the mirrored path;
  * 4. the shore, in lines a pixel or two wide: where it is lit and near, light dashes lapping
  *    along it two or three cells out; where it is far or in shade (quiet), a dark line where the
  *    water meets it instead; a broken light line at the foot of what stands in the water
@@ -361,7 +358,7 @@ void main() { gl_FragColor = vec4(fogged(C(vColour), length(vMV)), 1.0); }`;
  * 6. glints: short dashes on the open water, new places every loop.
  * Every motion runs a whole number of times in `LOOP`; under reduced motion nothing moves (the
  * lapping stays on its near ring, the dashes stay put) and there are no glints. The open water
- * (where no square is shown) has no shore (`known` 0): deep, then the angle and the reflections.
+ * (where no square is shown) has no shore (`known` 0): deep, then the horizon and the reflections.
  */
 const WATER_VERTEX = /* glsl */ `
 varying vec3 vW; varying vec3 vMV; varying vec2 vLocal;
@@ -442,26 +439,25 @@ Mirrored mirrored(ivec2 p, vec2 size) {
 void main() {
   vec2 en = vec2(vW.x, -vW.z);
   float dist = length(vMV);
-  // what changes from pixel to pixel, taken where every pixel takes the same path
-  float smoothSteps = known > 0.5 ? texture(shore, vLocal / side).r * ${f(255 / 16)} : 99.0;
+  // what changes from pixel to pixel, taken where every pixel takes the same path (derivatives
+  // before any branch); the shore field read once
+  vec4 sh = texture(shore, vLocal / side);
+  float smoothSteps = known > 0.5 ? sh.r * ${f(255 / 16)} : 99.0;
   float perPx = fwidth(smoothSteps);
   float grazing = 1.0 - abs(normalize(vW - cameraPosition).y);
   float grazePx = fwidth(grazing);
   vec2 acrossPx = dFdx(en), downPx = dFdy(en);
   float b = bayer();
 
-  // 1-2. depth as the angle shows it (steeply down and near the eye: the map's water; middle
-  // angles: the depth; towards the horizon: back to the map's), each threshold dithered over a
-  // few pixels
+  // 1-2. depth as the shore says, at any angle (from a bridge too: no ring round the eye), the
+  // sky taking it back towards the horizon; each threshold dithered over a few pixels
   float wS = perPx * ${f(DITHER_PX)}, wG = grazePx * ${f(DITHER_PX)};
   ivec2 tone;
   if (dithered(smoothSteps, shallowUntil(perPx), wS, b) == 0) tone = ivec2(1, ${LIT});
   else {
     int dark = dithered(smoothSteps, ${f(RIM_STEPS)}, wS, b) + dithered(smoothSteps, ${f(DEEP_STEPS)}, wS, b);
-    int shows = (dithered(grazing, ${f(GRAZE_STEEP)}, wG, b) + dithered(grazing, ${f(GRAZE_DEEP)}, wG, b)) *
-                dithered(dist, ${f(DEPTH_NEAR)}, fwidth(dist) * ${f(DITHER_PX)}, b);
     int lift = dithered(grazing, ${f(GRAZE_ONE)}, wG, b) + dithered(grazing, ${f(GRAZE_TWO)}, wG, b);
-    tone = ivec2(0, ${LIT} - max(0, min(dark, shows) - lift));
+    tone = ivec2(0, ${LIT} - max(0, dark - lift));
   }
 
   // 3. reflections: the mirror's three tones, a shade fewer at a time with the fog along the
@@ -472,27 +468,46 @@ void main() {
     vec2 size = vec2(textureSize(mirrorDepth, 0));
     ivec2 p = ivec2(floor(vec2(gl_FragCoord.x / screen.x, 1.0 - gl_FragCoord.y / screen.y) * size));
     Mirrored here = mirrored(p, size);
+    // what this pixel shows of the mirror: its own texel moved by its wobble, or, where its own
+    // is sky, a neighbour's whose wobble lands here (so a thin column or a cable is not dotted)
+    vec3 c = vec3(0.0);
+    float path = 0.0;
+    bool hit = false;
     if (here.hit) {
       int dx = still > 0.5 ? 0 : wobble(here.rows, loopT, float(p.y));
       ivec2 pw = ivec2(clamp(p.x + dx, 0, int(size.x) - 1), p.y);
-      vec3 c = here.colour;
-      bool hit = true;
+      c = here.colour;
+      path = here.path;
+      hit = true;
       if (dx != 0) {
         hit = texelFetch(mirrorDepth, pw, 0).r < 1.0;
         c = texelFetch(mirrorColour, pw, 0).rgb;
       }
-      if (hit) {
-        // one, two or three shades under the water it lies on, fewer with the fog
-        float luma = dot(c, LUMA) * 255.0;
-        int under = luma < darkCut ? 3 : luma < ${f(LIGHT_CUT)} ? 2 : 1;
-        under -= int(floor(smoothstep(fogNear, fogFar, here.path) * ${f(MIRROR_FOG_SHADES)}));
-        if (under > 0) {
-          tone.y = max(${OUTLINE}, tone.y - under);
-          shown = true;
-        }
-      }
       foot = here.foot && here.rows < 1.0;
-    } else if (smoothSteps >= ${f(SHALLOW_STEPS)}) {
+    } else if (still < 0.5) {
+      for (int a = 1; a <= 2 && !hit; a++)
+        for (int s = -1; s <= 1 && !hit; s += 2) {
+          int k = a * s;
+          ivec2 q = ivec2(clamp(p.x + k, 0, int(size.x) - 1), p.y);
+          if (q.x != p.x + k || texelFetch(mirrorDepth, q, 0).r >= 1.0) continue;
+          Mirrored m = mirrored(q, size);
+          if (wobble(m.rows, loopT, float(p.y)) != k) continue;
+          c = m.colour;
+          path = m.path;
+          hit = true;
+        }
+    }
+    if (hit) {
+      // one, two or three shades under the water it lies on, fewer with the fog
+      float luma = dot(c, LUMA) * 255.0;
+      int under = luma < darkCut ? 3 : luma < ${f(LIGHT_CUT)} ? 2 : 1;
+      under -= int(floor(smoothstep(fogNear, fogFar, path) * ${f(MIRROR_FOG_SHADES)}));
+      if (under > 0) {
+        tone.y = max(${OUTLINE}, tone.y - under);
+        shown = true;
+      }
+    }
+    if (!here.hit && smoothSteps >= ${f(SHALLOW_STEPS)}) {
       // beside a foot on the same row, below it or level, never above
       for (int k = -2; k <= 2; k++) {
         if (k == 0 || foot) continue;
@@ -512,7 +527,6 @@ void main() {
   // 4. the shore: lines a pixel or two wide on the smooth field, so they keep their width at
   // any distance
   if (known > 0.5 && smoothSteps < ${f(LAP_FAR + 1)}) {
-    vec4 sh = texture(shore, vLocal / side);
     vec2 out_ = sh.gb * 2.0 - 1.0;
     float len = length(out_);
     out_ = len > 0.05 ? out_ / len : vec2(0.0);

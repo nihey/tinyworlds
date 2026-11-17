@@ -25,8 +25,8 @@ export const RIM_STEPS = 3;
 export const DEEP_STEPS = 7;
 
 /**
- * Darker away from the land: a teal band at the shore, a light rim, the base, then the deep (as
- * middle angles show it: `skyTone`).
+ * Darker away from the land: a teal band at the shore, a light rim, the base, then the deep
+ * (lightened towards the horizon: `skyTone`).
  */
 export function depthTone(shoreSteps: number): WaterTone {
   if (shoreSteps < SHALLOW_STEPS) return { ramp: "waterShallow", shade: LIT };
@@ -36,28 +36,21 @@ export function depthTone(shoreSteps: number): WaterTone {
 }
 
 /**
- * How grazing a look at the water is (1 − |the view's slope|) decides how much of its depth
- * shows: looking steeply down you see into it, the map's own water whatever the depth; then the
- * depth's tones come in a shade at a time (`GRAZE_STEEP`, about 15° under the horizon, then
- * `GRAZE_DEEP`, about 12°), so far from the shore it is the deep shade at middle angles; towards
- * the horizon the sky it mirrors takes the depth back a shade at a time (`GRAZE_ONE`, about 6°,
- * then `GRAZE_TWO`, about 3°), up to the map's water. Within `DEPTH_NEAR` metres of the eye the
- * depth does not show at all (round a swimmer the middle angles are at arm's length). So along
- * any look outwards the water only darkens, then only lightens: no rings.
+ * The depth shows as the shore says, at any angle: darker away from the land, from a bridge as
+ * from the water (an angle that let it show only at middle angles drew a dark ring round anyone
+ * looking down from a bridge). Only towards the horizon, how grazing the look is (1 − |the
+ * view's slope|) lets the sky it mirrors take the depth back a shade at a time (`GRAZE_ONE`,
+ * about 6° under the horizon, then `GRAZE_TWO`, about 3°), up to the map's water. So along any
+ * look outwards the water's tone changes with the shore, then only lightens.
  */
-export const GRAZE_STEEP = 0.74;
-export const GRAZE_DEEP = 0.8;
 export const GRAZE_ONE = 0.9;
 export const GRAZE_TWO = 0.95;
-export const DEPTH_NEAR = 8;
 
-/** The depth's tone as the angle (and the distance from the eye, metres) shows it; the shallow band keeps its own tone. */
-export function skyTone(tone: WaterTone, grazing: number, distance = Infinity): WaterTone {
+/** The depth's tone as the angle shows it; the shallow band keeps its own tone. */
+export function skyTone(tone: WaterTone, grazing: number): WaterTone {
   if (tone.ramp !== "water") return tone;
-  const shows =
-    distance < DEPTH_NEAR ? 0 : (grazing >= GRAZE_STEEP ? 1 : 0) + (grazing >= GRAZE_DEEP ? 1 : 0);
   const lift = grazing >= GRAZE_TWO ? 2 : grazing >= GRAZE_ONE ? 1 : 0;
-  const depth = Math.min(Math.max(0, LIT - tone.shade), shows);
+  const depth = Math.max(0, LIT - tone.shade);
   return { ramp: "water", shade: LIT - Math.max(0, depth - lift) };
 }
 
@@ -133,6 +126,30 @@ export function wobble(rowsFromBase: number, t: number, y: number): number {
   return Math.floor(amp * Math.sin(2 * Math.PI * phase) + 0.5);
 }
 
+/**
+ * Which texel of a mirror row the pixel at x shows (the shader's rule): its own moved by its own
+ * wobble; where its own texel is sky, the nearest neighbour within two whose wobble lands on x,
+ * so a reflection a texel or two wide (a thin column, a cable) keeps its pixels as it sways;
+ * null for sky. `rowsAt` is a texel's rows under its foot, null where it is sky.
+ */
+export function mirrorSource(
+  x: number,
+  rowsAt: (x: number) => number | null,
+  t: number,
+  y: number,
+): number | null {
+  const own = rowsAt(x);
+  if (own !== null) {
+    const at = x + wobble(own, t, y);
+    return rowsAt(at) === null ? null : at;
+  }
+  for (const k of [-1, 1, -2, 2]) {
+    const rows = rowsAt(x + k);
+    if (rows !== null && wobble(rows, t, y) === k) return x + k;
+  }
+  return null;
+}
+
 /** Pixels across the shore's lines (the lapping, the quiet shore's dark edge), whatever the distance. */
 export const LINE_PX = 2;
 
@@ -177,8 +194,9 @@ export function dashSpan(level: number): number {
   return Math.max(1, Math.min(4, 4 - Math.floor(level / 2)));
 }
 
-/** Land under this many steps from the water (the shore line is at half a step: 2 m) is damp, a shade darker. */
-export const DAMP_STEPS = 1.5;
+/** Land under this many steps from the water is damp, a shade darker: the shore line is at half
+ * a step, so the first metre of land (a 2 m band read heavy along piers, which are all edge). */
+export const DAMP_STEPS = 1;
 
 /**
  * Glints: each square of `GLINT_CELL` metres of open water may glint once a loop (this share

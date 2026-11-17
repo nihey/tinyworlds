@@ -36,6 +36,8 @@ export interface Person {
 export interface CrowdEvents {
   /** each person a vehicle knocked down this step: where, and how fast the vehicle was going */
   knocks: { e: number; n: number; speed: number }[];
+  /** each person who went into the water this step (knocked off a quay): where, for its ring */
+  splashes: { e: number; n: number }[];
 }
 
 /** Metres from the focus: people are spawned between SPAWN_MIN and SPAWN_MAX, dropped beyond DROP. */
@@ -397,7 +399,7 @@ export class Crowd {
     visible?: (e: number, n: number) => boolean,
   ): CrowdEvents {
     this.refresh();
-    const events: CrowdEvents = { knocks: [] };
+    const events: CrowdEvents = { knocks: [], splashes: [] };
 
     // vehicles that can hurt: moving ones
     const movers: { v: Vehicle; ve: number; vn: number; speed: number }[] = [];
@@ -417,7 +419,7 @@ export class Crowd {
         this.people.splice(i, 1);
         continue;
       }
-      if (!this.live(w, dt, t)) {
+      if (!this.live(w, dt, t, events)) {
         this.people.splice(i, 1);
         continue;
       }
@@ -447,10 +449,10 @@ export class Crowd {
   }
 
   /** One person's own step; false when they have nowhere to be (left on no street) and go. */
-  private live(w: Walker, dt: number, t: number): boolean {
+  private live(w: Walker, dt: number, t: number, events: CrowdEvents): boolean {
     if (w.cool > 0) w.cool -= dt;
     if (w.state === "swimming") return this.swim(w, dt);
-    if (w.state === "down") return this.lie(w, dt);
+    if (w.state === "down") return this.lie(w, dt, events);
     if (w.runFor > 0) {
       w.runFor -= dt;
       if (w.runFor <= 0) {
@@ -578,9 +580,10 @@ export class Crowd {
   }
 
   /** Lying where a knock left them; then up, running scared, back to a line. */
-  private lie(w: Walker, dt: number): boolean {
+  private lie(w: Walker, dt: number, events: CrowdEvents): boolean {
     this.drift(w, dt, KNOCK_DECAY, true);
     if (this.world.isWater(w.e, w.n) && w.z <= 0.5) {
+      events.splashes.push({ e: w.e, n: w.n });
       w.state = "swimming";
       w.swimTo = null;
       w.downFor = 0;

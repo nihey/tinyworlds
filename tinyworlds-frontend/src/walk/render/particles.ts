@@ -61,12 +61,14 @@ uniform float now; uniform vec3 shades[3];
 ${HASH} ${FOG}
 varying vec2 vAt; flat varying vec4 vRing; varying vec3 vMV;
 void main() {
+  // the derivative first, where every pixel of the quad takes the same path
+  float d = length(vAt);
+  float px = max(fwidth(d), 0.02);
   float age = now - vRing.z;
   int frame = int(floor(age / ${RING_FRAME}));
   if (age < 0.0 || frame >= ${RING_FRAMES}) discard;
   float r = vRing.w * 0.5 + float(frame + 1) * (${RING_GROW} + ${RING_GROW_PER_SIZE} * vRing.w);
-  float d = length(vAt);
-  if (abs(d - r) > max(fwidth(d), 0.02) * 0.6) discard;
+  if (abs(d - r) > px * 0.6) discard;
   // breaking up: of 24 arcs, each frame after the first leaves out more
   float a = atan(vAt.y, vAt.x) / 6.28318530718 + 0.5;
   uint arc = uint(floor(a * 24.0));

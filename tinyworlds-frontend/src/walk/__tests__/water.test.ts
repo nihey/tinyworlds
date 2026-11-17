@@ -3,17 +3,15 @@ import { DEEP, HALF, HIGH, LIT, OUTLINE, SHADE } from "../render/palette";
 import {
   BAYER4,
   darkCutOf,
-  DEPTH_NEAR,
   dashSpan,
   depthTone,
   dithered,
   glint,
   GLINT_FOR,
-  GRAZE_DEEP,
   GRAZE_ONE,
-  GRAZE_STEEP,
   GRAZE_TWO,
   lapRing,
+  mirrorSource,
   LOOP,
   quietShore,
   QUIET_FAR,
@@ -58,34 +56,17 @@ describe("skyTone", () => {
   const base: WaterTone = { ramp: "water", shade: HALF };
   const rim: WaterTone = { ramp: "water", shade: LIT };
 
-  it("is the map's own water tone, whatever the depth, when you look steeply down into it", () => {
-    for (const g of [0, 0.2, GRAZE_STEEP - 0.01]) {
-      expect(skyTone(deep, g)).toEqual({ ramp: "water", shade: LIT });
-      expect(skyTone(base, g)).toEqual({ ramp: "water", shade: LIT });
-      expect(skyTone(rim, g)).toEqual(rim);
-    }
-  });
-
-  it("goes down into the depth's tones a shade at a time, and keeps them at middle angles", () => {
-    // from steep to middle: at most one shade under the map's water
-    for (const g of [GRAZE_STEEP, (GRAZE_STEEP + GRAZE_DEEP) / 2]) {
-      expect(skyTone(deep, g)).toEqual({ ramp: "water", shade: LIT - 1 });
-      expect(skyTone(base, g)).toEqual(base);
-      expect(skyTone(rim, g)).toEqual(rim);
-    }
-    for (const g of [GRAZE_DEEP, (GRAZE_DEEP + GRAZE_ONE) / 2]) {
+  it("shows the depth as the shore says at every angle short of the horizon: from a bridge too, no ring", () => {
+    // straight down from a bridge, at its middle angles, and level from the water
+    for (const g of [0, 0.2, 0.5, 0.74, 0.8, GRAZE_ONE - 0.01]) {
       expect(skyTone(deep, g)).toEqual(deep);
       expect(skyTone(base, g)).toEqual(base);
+      expect(skyTone(rim, g)).toEqual(rim);
     }
-    expect(GRAZE_STEEP).toBeLessThan(GRAZE_DEEP);
-    expect(GRAZE_DEEP).toBeLessThan(GRAZE_ONE);
   });
 
   it("lightens it a shade, then two, towards the horizon", () => {
-    const grazing = Array.from(
-      { length: 101 },
-      (_, k) => GRAZE_DEEP + ((1 - GRAZE_DEEP) * k) / 100,
-    );
+    const grazing = Array.from({ length: 101 }, (_, k) => 0.8 + (0.2 * k) / 100);
     const shades = grazing.map((g) => skyTone(deep, g).shade);
     expect(new Set(shades)).toEqual(new Set([SHADE, SHADE + 1, SHADE + 2]));
     for (let k = 1; k < shades.length; k++) expect(shades[k]).toBeGreaterThanOrEqual(shades[k - 1]);
@@ -93,31 +74,43 @@ describe("skyTone", () => {
     expect(skyTone(deep, GRAZE_TWO).shade).toBe(SHADE + 2);
   });
 
-  it("lightens back to the map's water, never past it, so the bands only get lighter outwards", () => {
+  it("lightens back to the map's water, never past it, and only lightens along a look outwards", () => {
     expect(skyTone(rim, 1)).toEqual(rim);
     expect(skyTone(deep, 1)).toEqual({ ramp: "water", shade: LIT });
-    // along a look outwards (grazing growing), never darker then lighter then darker again
     for (const tone of [deep, base, rim]) {
       const shades = Array.from({ length: 101 }, (_, k) => skyTone(tone, k / 100).shade);
-      const lowest = Math.min(...shades);
-      const at = shades.indexOf(lowest);
-      for (let k = 1; k <= at; k++) expect(shades[k]).toBeLessThanOrEqual(shades[k - 1]);
-      for (let k = at + 1; k < shades.length; k++)
+      for (let k = 1; k < shades.length; k++)
         expect(shades[k]).toBeGreaterThanOrEqual(shades[k - 1]);
       expect(Math.max(...shades)).toBe(LIT);
     }
   });
 
-  it("shows no depth near the eye: the water round a swimmer is the map's", () => {
-    const middle = (GRAZE_DEEP + GRAZE_ONE) / 2;
-    expect(skyTone(deep, middle, DEPTH_NEAR - 1)).toEqual({ ramp: "water", shade: LIT });
-    expect(skyTone(deep, middle, DEPTH_NEAR + 1)).toEqual(deep);
-    expect(skyTone(deep, middle)).toEqual(deep);
-  });
-
   it("leaves the shallow band alone", () => {
     const shallow: WaterTone = { ramp: "waterShallow", shade: LIT };
     for (const g of [0, 0.6, 1]) expect(skyTone(shallow, g)).toEqual(shallow);
+  });
+});
+
+describe("mirrorSource", () => {
+  it("keeps a reflection a texel wide whole as it sways: every frame, some pixel shows it", () => {
+    // a cable's reflection in texel 50 of its row, 20 rows under its foot (it sways one pixel)
+    const rowsAt = (x: number) => (x === 50 ? 20 : null);
+    let swayed = 0;
+    for (let t = 0; t < LOOP; t += 0.05) {
+      const shows = [47, 48, 49, 50, 51, 52, 53].filter(
+        (x) => mirrorSource(x, rowsAt, t, 7) === 50,
+      );
+      expect(shows.length).toBeGreaterThan(0);
+      if (!shows.includes(50)) swayed++;
+    }
+    // and it does sway: off its own pixel part of the loop
+    expect(swayed).toBeGreaterThan(0);
+  });
+
+  it("is sky where neither the pixel's texel nor a neighbour's sway brings anything", () => {
+    expect(mirrorSource(10, () => null, 1, 3)).toBeNull();
+    // still rows (at the foot) do not sway onto their neighbours
+    expect(mirrorSource(10, (x) => (x === 11 ? 1 : null), 1, 3)).toBeNull();
   });
 });
 

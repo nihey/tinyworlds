@@ -55,6 +55,8 @@ export const SLOW_SPAN = 1;
 export const SLOW_SPANS = 2;
 /** Seconds after the first squares are shown before the frame rate counts (building them is slow anywhere). */
 export const SLOW_WARM_UP = 3;
+/** A frame longer than this, s, is a gap, not a slow frame. */
+export const SLOW_GAP = 1;
 
 const keyOf = (i: number, j: number) => `${i}_${j}`;
 
@@ -64,13 +66,27 @@ export const OPEN_REACH = 10;
 /**
  * The squares the open water is drawn on: those round the camera's square that no shown square
  * covers (a shown square has its own water, or is all land under its ground), so the water is
- * drawn once wherever it is. No three.js.
+ * drawn once wherever it is. Past the edge of the data (a square with no file, `exists` false)
+ * it is drawn only where no shown square beside it is all land (`dry`): where the data ends on
+ * land (the inland fade into Nassau, New Jersey) the city ends in the fog's wall, not in a sea.
+ * No three.js.
  */
-export function openTiles(ci: number, cj: number, shown: ReadonlySet<string>): [number, number][] {
+export function openTiles(
+  ci: number,
+  cj: number,
+  shown: ReadonlySet<string>,
+  dry: ReadonlySet<string> = new Set(),
+  exists: (i: number, j: number) => boolean = () => true,
+): [number, number][] {
   const out: [number, number][] = [];
+  const byLand = (i: number, j: number) => {
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) if (dry.has(keyOf(i + di, j + dj))) return true;
+    return false;
+  };
   for (let j = cj - OPEN_REACH; j < cj + OPEN_REACH; j++)
     for (let i = ci - OPEN_REACH; i < ci + OPEN_REACH; i++)
-      if (!shown.has(keyOf(i, j))) out.push([i, j]);
+      if (!shown.has(keyOf(i, j)) && (exists(i, j) || !byLand(i, j))) out.push([i, j]);
   return out;
 }
 
@@ -282,7 +298,8 @@ export class SlowWatch {
   ) {}
 
   frame(dt: number): boolean {
-    if (!(dt > 0) || dt > 0.25) return this.slow >= this.spans;
+    // a gap (the tab hidden, a breakpoint) is no frame; a slow phone's quarter second is one
+    if (!(dt > 0) || dt > SLOW_GAP) return this.slow >= this.spans;
     if (this.warm < this.warmUp) {
       this.warm += dt;
       return false;
@@ -304,6 +321,34 @@ export class SlowWatch {
     this.span = 0;
     this.slow = 0;
   }
+}
+
+const viewBox = new THREE.Box3();
+const viewFrustum = new THREE.Frustum();
+const viewMatrix = new THREE.Matrix4();
+
+/**
+ * Whether the water of a square with water near the camera (within `MIRROR_REACH` squares of
+ * its own) is in its view: only then is the mirror worth drawing. The camera's world matrix must
+ * be up to date. No WebGL.
+ */
+export function waterInView(
+  wet: Iterable<{ i: number; j: number }>,
+  camera: THREE.Camera,
+  side: number,
+): boolean {
+  const ci = Math.floor(camera.position.x / side);
+  const cj = Math.floor(-camera.position.z / side);
+  viewFrustum.setFromProjectionMatrix(
+    viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
+  );
+  for (const { i, j } of wet) {
+    if (Math.hypot(i - ci, j - cj) > MIRROR_REACH) continue;
+    viewBox.min.set(i * side, WATER_SURFACE - 1, -(j + 1) * side);
+    viewBox.max.set((i + 1) * side, WATER_SURFACE + 1, -j * side);
+    if (viewFrustum.intersectsBox(viewBox)) return true;
+  }
+  return false;
 }
 
 /**
@@ -516,8 +561,9 @@ export class WalkView {
     this.camera.updateMatrixWorld();
     const buffer = this.renderer.getDrawingBufferSize(this.buffer);
     this.materials.frame(this.time, this.camera, buffer.x, buffer.y);
-    this.watchFrames();
-    this.materials.mirror(this.mirror(buffer));
+    const mirrored = this.mirror(buffer);
+    this.watchFrames(mirrored !== null);
+    this.materials.mirror(mirrored);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -529,7 +575,11 @@ export class WalkView {
     if (!Number.isFinite(ci) || !Number.isFinite(cj)) return;
     if (this.openAt && this.openAt.i === ci && this.openAt.j === cj) return;
     this.openAt = { i: ci, j: cj };
-    const tiles = openTiles(ci, cj, new Set(this.shown.values()));
+    const shown = new Set(this.shown.values());
+    const wet = new Set([...this.wet.values()].map(({ i, j }) => keyOf(i, j)));
+    const dry = new Set([...shown].filter((k) => !wet.has(k)));
+    const ix = this.stream.world.index;
+    const tiles = openTiles(ci, cj, shown, dry, (i, j) => cellExists(ix, i, j));
     const pos = new Float32Array(tiles.length * 12);
     const index: number[] = [];
     tiles.forEach(([i, j], k) => {
@@ -563,28 +613,21 @@ export class WalkView {
     this.water.geometry = geometry;
   }
 
-  /** Lets the reflections go when frames stay slow, counting once the first squares are shown. */
-  private watchFrames(): void {
+  /** Lets the reflections go when frames that drew them stay slow (counting once the first
+   * squares are shown): a slow street far from the water says nothing of what the mirror costs. */
+  private watchFrames(drewMirror: boolean): void {
     const now = performance.now();
     const dt = this.lastFrame > 0 ? (now - this.lastFrame) / 1000 : 0;
     this.lastFrame = now;
     this.shownAny ||= this.stream.counts().ready > 0;
-    if (this.reflect && this.shownAny && this.slow.frame(dt)) this.reflect = false;
+    if (drewMirror && this.reflect && this.shownAny && this.slow.frame(dt)) this.reflect = false;
   }
 
   /** Draws the mirror's picture when the water is near and the reflections are on; what it saw, or null. */
   private mirror(buffer: THREE.Vector2): Mirror | null {
     const eye = this.camera.position;
     if (!this.reflect || eye.y <= WATER_SURFACE) return null;
-    const ci = Math.floor(eye.x / this.stream.world.index.cell);
-    const cj = Math.floor(-eye.z / this.stream.world.index.cell);
-    let near = false;
-    for (const { i, j } of this.wet.values())
-      if (Math.hypot(i - ci, j - cj) <= MIRROR_REACH) {
-        near = true;
-        break;
-      }
-    if (!near) return null;
+    if (!waterInView(this.wet.values(), this.camera, this.stream.world.index.cell)) return null;
 
     const w = Math.max(1, Math.ceil(buffer.x / this.mirrorScale));
     const h = Math.max(1, Math.ceil(buffer.y / this.mirrorScale));

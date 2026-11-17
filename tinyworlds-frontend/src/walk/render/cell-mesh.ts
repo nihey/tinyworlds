@@ -665,13 +665,15 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     group.add(mesh);
     return mesh;
   };
-  // the square's water, under its ground; what lies flat on the water or is the ground is not mirrored
-  if (shore) {
+  // the square's water, under its ground; what lies flat on the water or is the ground is not
+  // mirrored. A wet square whose data lacks its shore field has water all the same, as the open
+  // water has it (deep, no shore lines; that material is shared, not the square's), never a hole
+  if (cell.mask.mode !== 0) {
     const surface = new THREE.PlaneGeometry(side, side);
     surface.rotateX(-Math.PI / 2);
     surface.translate(side / 2, WATER_SURFACE, -side / 2);
-    const material = materials.waterOf(shore);
-    disposables.push(material);
+    const material = shore ? materials.waterOf(shore) : materials.water;
+    if (shore) disposables.push(material);
     add(surface, material, ORDER_SQUARE_WATER)?.layers.set(NOT_MIRRORED);
   }
   const groundGeometry = ground.geometry();

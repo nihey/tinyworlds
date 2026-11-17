@@ -545,13 +545,15 @@ export class WalkGame {
     // the streets fill all at once when the squares round you are in, not piecemeal before
     if (this.primed) {
       this.trafficStep(h);
-      this.crowd.step(
+      const crowd = this.crowd.step(
         h,
         this.t,
         me,
         this.nearby.filter((v) => !v.boat),
         this.cams.visible,
       );
+      // someone knocked into the water: a ring where they went in, as for you
+      for (const s of crowd.splashes) this.splash(s.e, s.n, 1.2, 0.5);
     }
     this.gather();
     // the rest: what moved once this frame, against anything it may reach

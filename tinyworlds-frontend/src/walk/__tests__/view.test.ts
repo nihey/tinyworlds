@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { WalkCell } from "../cell";
 import {
@@ -9,6 +10,7 @@ import {
   openTiles,
   SlowWatch,
   SquareStream,
+  waterInView,
 } from "../render/view";
 import type { WalkIndex } from "../walk-index";
 import { makeCell } from "./fixtures";
@@ -295,6 +297,10 @@ describe("SlowWatch", () => {
     expect(run(w, 60, 10).slow).toBe(false);
   });
 
+  it("counts a slow phone's third-of-a-second frames as frames", () => {
+    expect(run(new SlowWatch(), 3, 20).slow).toBe(true);
+  });
+
   it("ignores gaps (a hidden tab, a breakpoint), and starts afresh when reset", () => {
     const w = new SlowWatch();
     run(w, 60, SLOW_WARM_UP + 1);
@@ -303,6 +309,27 @@ describe("SlowWatch", () => {
     w.reset();
     expect(w.frame(1 / 25)).toBe(false);
     expect(run(w, 60, 10).slow).toBe(false);
+  });
+});
+
+describe("waterInView", () => {
+  /** A camera 30 m up at the origin's square, looking along `yaw` (0 north) and a little down. */
+  const camera = (yaw: number) => {
+    const c = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 600);
+    c.position.set(100, 30, -100);
+    c.rotation.set(-0.3, -yaw, 0, "YXZ");
+    c.updateMatrixWorld();
+    return c;
+  };
+
+  it("draws the mirror only when a square's water near the camera is in its view", () => {
+    // water two squares north
+    const wet = [{ i: 0, j: 2 }];
+    expect(waterInView(wet, camera(0), 200)).toBe(true);
+    // looking south, away from it
+    expect(waterInView(wet, camera(Math.PI), 200)).toBe(false);
+    // too far to be worth it, whichever way
+    expect(waterInView([{ i: 0, j: 5 }], camera(0), 200)).toBe(false);
   });
 });
 
@@ -317,6 +344,24 @@ describe("openTiles", () => {
     expect(keys.has("2_0")).toBe(true);
     expect(keys.has(`${-OPEN_REACH}_${-OPEN_REACH}`)).toBe(true);
     expect(keys.has(`${OPEN_REACH}_0`)).toBe(false);
+  });
+
+  it("ends the city in the fog where the data ends on land, not in a sea", () => {
+    // squares 0_0 and 1_0 are shown: 0_0 all land, 1_0 with water; files only for i ≤ 1
+    const shown = new Set(["0_0", "1_0"]);
+    const dry = new Set(["0_0"]);
+    const exists = (i: number) => i <= 1;
+    const keys = new Set(openTiles(0, 0, shown, dry, exists).map(([i, j]) => `${i}_${j}`));
+    // past the data beside the land: none; beside only water, and far from the land: water
+    expect(keys.has("-1_0")).toBe(true); // a square with a file, not shown yet
+    expect(keys.has("2_1")).toBe(true);
+    expect(keys.has("2_0")).toBe(true);
+    const inland = new Set(
+      openTiles(0, 0, new Set(["1_0"]), new Set(["1_0"]), exists).map(([i, j]) => `${i}_${j}`),
+    );
+    expect(inland.has("2_0")).toBe(false);
+    expect(inland.has("2_1")).toBe(false);
+    expect(inland.has("3_0")).toBe(true);
   });
 
   it("follows the camera's square", () => {

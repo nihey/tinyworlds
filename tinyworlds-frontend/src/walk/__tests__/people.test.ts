@@ -338,14 +338,18 @@ describe("the water", () => {
     const p = crowd.addAt("1-2", 60)!;
     crowd.knock(p, { ve: 0, vn: 12 });
     let swam = false;
+    const splashes: { e: number; n: number }[] = [];
     let t = 0;
     while (t < 40) {
-      crowd.step(0.05, t, { e: 80, n: 100 }, []);
+      splashes.push(...crowd.step(0.05, t, { e: 80, n: 100 }, []).splashes);
       if (p.state === "swimming") swam = true;
       t += 0.05;
     }
     expect(swam).toBe(true);
     expect(world.isWater(p.e, p.n)).toBe(false);
+    // going in made a splash (its ring on the water), once, where they went in
+    expect(splashes).toHaveLength(1);
+    expect(world.isWater(splashes[0].e, splashes[0].n)).toBe(true);
   });
 });
 
