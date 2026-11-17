@@ -43,6 +43,7 @@ export const esES: Strings = {
     keysSearch: "{/} busca calles, barrios y lugares de interés. {0} muestra toda la ciudad.",
     keysToggles: "{B} dibuja {hoods}. {D} activa o desactiva el efecto maqueta; {M}, el minimapa.",
     keysTogglesNoHoods: "{D} activa o desactiva el efecto maqueta; {M}, el minimapa.",
+    keysWalk: "{W} coge el muñequito y lo deja en el centro del mapa, para pasear por las calles.",
     link: "El botón del enlace copia una dirección que abre el mapa justo donde estás.",
     mapData: "Datos del mapa",
     descriptions:
@@ -651,11 +652,15 @@ export const esES: Strings = {
     failed: "No se ha podido empezar el paseo. El mapa sigue funcionando.",
     noWebgl: "Este navegador no puede dibujar el paseo (sin WebGL). El mapa sigue funcionando.",
     back: "Volver al mapa",
+    viewLabel: "El paseo por las calles",
     controls: "Controles",
-    resetControls: "Restablecer los valores",
+    resetControls: "Valores por defecto",
     pressKey: "Pulsa una tecla…",
     unbound: "Ninguna",
     closeMenu: "Cerrar los controles",
+    controlsHelp:
+      "Elige una tecla y pulsa la nueva. Esc cancela. Tus teclas se guardan en este navegador.",
+    keySlot: "{action}: {key}",
     groups: { foot: "A pie", drive: "Conduciendo y navegando", any: "En cualquier sitio" },
     actions: {
       forward: "Andar hacia delante",
@@ -727,6 +732,7 @@ export const esES: Strings = {
     life: "Vida",
     lifeLabel: "Vida: {n} de {max}",
     damage: "Daños",
+    damageLabel: "Daños: {n}%",
     wrecked: "Destrozado",
     messages: {
       slowDown: "Reduce la velocidad para salir",
@@ -736,7 +742,7 @@ export const esES: Strings = {
       edge: "Este es el límite del mapa",
     },
     wasted: "ACABADO",
-    wastedSaid: "Estás acabado. En un momento despertarás cerca de aquí.",
+    wastedSaid: "Se acabó. Vuelves en ti cerca de aquí.",
     pixel: "Tamaño del píxel",
     sound: "Sonido",
     clickToLook: "Haz clic para mirar alrededor",

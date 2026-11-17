@@ -127,6 +127,11 @@ export function AboutDialog({
                   hoods={hoods}
                 />
               </li>
+              {WORLD.walk && (
+                <li>
+                  <Keyed text={t.about.keysWalk} hoods={hoods} />
+                </li>
+              )}
               <li>{t.about.link}</li>
             </ul>
           </section>

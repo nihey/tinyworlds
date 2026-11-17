@@ -138,4 +138,11 @@ describe("parseManifest", () => {
     expect(parseManifest({ ...valid, build: "t1", indexes: "" }).indexes).toBe("t1");
     expect(parseManifest({ ...valid, build: "t1", indexes: 7 }).indexes).toBe("t1");
   });
+
+  it("names the street walk's version only when the data has one", () => {
+    expect(parseManifest({ ...valid, walk: "dd51cc933381" }).walk).toBe("dd51cc933381");
+    expect(parseManifest(valid).walk).toBeUndefined();
+    expect(parseManifest({ ...valid, walk: "" }).walk).toBeUndefined();
+    expect(parseManifest({ ...valid, walk: 3 }).walk).toBeUndefined();
+  });
 });

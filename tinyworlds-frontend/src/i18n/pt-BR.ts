@@ -44,6 +44,7 @@ export const ptBR: Strings = {
     keysToggles:
       "{B} desenha {hoods}. {D} liga e desliga o desfoque de miniatura; {M}, o minimapa.",
     keysTogglesNoHoods: "{D} liga e desliga o desfoque de miniatura; {M}, o minimapa.",
+    keysWalk: "{W} pega o bonequinho e o põe no meio do mapa, para andar pelas ruas.",
     link: "O botão de link copia um endereço que abre o mapa exatamente onde você está.",
     mapData: "Dados do mapa",
     descriptions:
@@ -655,11 +656,15 @@ export const ptBR: Strings = {
     noWebgl:
       "Este navegador não consegue desenhar a caminhada (sem WebGL). O mapa continua funcionando.",
     back: "Voltar ao mapa",
+    viewLabel: "A caminhada pelas ruas",
     controls: "Controles",
     resetControls: "Restaurar o padrão",
     pressKey: "Aperte uma tecla…",
     unbound: "Nenhuma",
     closeMenu: "Fechar os controles",
+    controlsHelp:
+      "Escolha uma tecla e aperte a nova. Esc cancela. Suas teclas ficam guardadas neste navegador.",
+    keySlot: "{action}: {key}",
     groups: { foot: "A pé", drive: "Dirigindo e navegando", any: "Em qualquer lugar" },
     actions: {
       forward: "Andar para a frente",
@@ -731,6 +736,7 @@ export const ptBR: Strings = {
     life: "Vida",
     lifeLabel: "Vida: {n} de {max}",
     damage: "Danos",
+    damageLabel: "Danos: {n}%",
     wrecked: "Destruído",
     messages: {
       slowDown: "Reduza a velocidade para sair",
@@ -740,7 +746,7 @@ export const ptBR: Strings = {
       edge: "Este é o limite do mapa",
     },
     wasted: "DETONADO",
-    wastedSaid: "Você foi detonado. Em instantes você acorda por perto.",
+    wastedSaid: "Fim da linha. Você volta a si por perto.",
     pixel: "Tamanho do pixel",
     sound: "Som",
     clickToLook: "Clique para olhar ao redor",

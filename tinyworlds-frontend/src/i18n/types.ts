@@ -79,6 +79,8 @@ export interface Strings {
     keysToggles: string;
     /** the same line for a city with no neighbourhood lines */
     keysTogglesNoHoods: string;
+    /** in a world with the street walk: "{W}" is the key that picks up the little person */
+    keysWalk: string;
     link: string;
     mapData: string;
     /** the credit for the buildings' descriptions, with the licence's URL (made a link) */
@@ -749,12 +751,18 @@ export interface Strings {
     noWebgl: string;
     /** leaves the walk for the map */
     back: string;
+    /** the walk's view, for a screen reader */
+    viewLabel: string;
     /** the controls menu: its title, its reset, the wait for a key, an empty slot, its close button */
     controls: string;
     resetControls: string;
     pressKey: string;
     unbound: string;
     closeMenu: string;
+    /** under the controls menu's title: how a key is changed, and where they are kept */
+    controlsHelp: string;
+    /** a key's button in the menu, for a screen reader: "{action}" its name, "{key}" what it shows */
+    keySlot: string;
     groups: { foot: string; drive: string; any: string };
     actions: Record<ActionId, string>;
     /** the names of keys that are not a letter or a digit */
@@ -786,6 +794,8 @@ export interface Strings {
     life: string;
     lifeLabel: string;
     damage: string;
+    /** "Damage {n}%", for screen readers */
+    damageLabel: string;
     wrecked: string;
     /** brief messages */
     messages: {

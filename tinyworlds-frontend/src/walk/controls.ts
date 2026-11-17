@@ -119,19 +119,29 @@ export function actionsOf(b: Bindings, code: string, group: "foot" | "drive"): A
   ).map((a) => a.id);
 }
 
-/** What was kept, or the defaults: storage may be blocked, empty or edited by hand. */
+/**
+ * What was kept, or the defaults: storage may be blocked, empty or edited by hand. What was kept
+ * is given out again key by key through `rebind`, in the menu's order, so a store edited by hand
+ * cannot leave one key on two actions that are live together: the later one keeps it.
+ */
 export function loadBindings(storage: Pick<Storage, "getItem"> | null): Bindings {
-  const out = defaultBindings();
+  const kept = defaultBindings();
   try {
     const raw = storage?.getItem(STORAGE_KEY);
-    if (!raw) return out;
+    if (!raw) return kept;
     const saved: unknown = JSON.parse(raw);
-    if (typeof saved !== "object" || saved === null || Array.isArray(saved)) return out;
+    if (typeof saved !== "object" || saved === null || Array.isArray(saved)) return kept;
     const slotOf = (v: unknown) => (typeof v === "string" && v ? v : null);
     for (const { id } of ACTIONS) {
       const pair = (saved as Record<string, unknown>)[id];
-      if (Array.isArray(pair)) out[id] = [slotOf(pair[0]), slotOf(pair[1])];
+      if (Array.isArray(pair)) kept[id] = [slotOf(pair[0]), slotOf(pair[1])];
     }
+    let out = Object.fromEntries(ACTIONS.map((a) => [a.id, [null, null]])) as Bindings;
+    for (const { id } of ACTIONS)
+      for (const slot of [0, 1] as const) {
+        const code = kept[id][slot];
+        if (code && !(slot === 1 && code === kept[id][0])) out = rebind(out, id, slot, code);
+      }
     return out;
   } catch {
     return defaultBindings();

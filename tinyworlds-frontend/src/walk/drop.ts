@@ -1,7 +1,7 @@
 import type { WalkCell } from "./cell";
 
 /** How far from the dropped point a way may be and still take the person. */
-const REACH = 150;
+export const REACH = 150;
 
 /** Metres past a street's edge where the person stands: on the kerb, out of the traffic. */
 const KERB = 1;

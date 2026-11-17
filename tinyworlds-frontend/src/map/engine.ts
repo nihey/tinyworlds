@@ -238,6 +238,8 @@ export class MapEngine {
   // scene
   private life = true;
   private readonly sceneLayers = new Set<SceneDraw>();
+  /** the layers drawn whatever "life on the map" says (the street walk's person) */
+  private readonly alwaysLayers = new Set<SceneDraw>();
 
   private readonly listeners: { [K in keyof EngineEvents]: Set<EngineEvents[K]> } = {
     view: new Set(),
@@ -326,6 +328,7 @@ export class MapEngine {
     this.tiles.clear();
     for (const set of Object.values(this.listeners)) set.clear();
     this.sceneLayers.clear();
+    this.alwaysLayers.clear();
   }
 
   // ---- public API ------------------------------------------------------------------------
@@ -536,13 +539,15 @@ export class MapEngine {
   /**
    * Adds a layer drawn over the tiles in map space; returns its remover. Layers are
    * only called while life is on, every frame unless the visitor prefers reduced motion
-   * (then once per redraw, with time standing still).
+   * (then once per redraw, with time standing still). An `always` layer is not life but a sign
+   * (the street walk's person): it is drawn with life off too, and only when the map is redrawn.
    */
-  addSceneLayer(draw: SceneDraw): () => void {
-    this.sceneLayers.add(draw);
+  addSceneLayer(draw: SceneDraw, { always = false }: { always?: boolean } = {}): () => void {
+    (always ? this.alwaysLayers : this.sceneLayers).add(draw);
     this.invalidate();
     return () => {
       this.sceneLayers.delete(draw);
+      this.alwaysLayers.delete(draw);
       this.invalidate();
     };
   }
@@ -1006,14 +1011,16 @@ export class MapEngine {
   // ---- scene (sprites, in map space) -----------------------------------------------------
 
   private drawScene(now: number): void {
-    if (!this.life || this.sceneLayers.size === 0) return;
+    const life = this.life && this.sceneLayers.size > 0;
+    if (!life && this.alwaysLayers.size === 0) return;
     const { ctx, view: v } = this;
     const s = v.scale * v.dpr;
     ctx.save();
     ctx.setTransform(s, 0, 0, s, Math.round(-v.left * s), Math.round(-v.top * s));
     ctx.imageSmoothingEnabled = false;
     const time = this.reducedMotion ? 0 : now;
-    for (const draw of this.sceneLayers) draw(ctx, v, time);
+    if (life) for (const draw of this.sceneLayers) draw(ctx, v, time);
+    for (const draw of this.alwaysLayers) draw(ctx, v, time);
     ctx.restore();
   }
 

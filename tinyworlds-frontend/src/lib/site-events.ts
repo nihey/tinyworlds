@@ -1,6 +1,6 @@
 /**
- * What the page analytics hear about donating, besides page views (`components/analytics.tsx`
- * loads them). Every event goes to Google Tag Manager's data layer, where the container turns
+ * What the page analytics hear about donating and a few other things, besides page views
+ * (`components/analytics.tsx` loads them). Every event goes to Google Tag Manager's data layer, where the container turns
  * it into a Google Analytics event. Rybbit hears the clicks from the declarative hooks on the
  * buttons themselves (`data-rybbit-event`), so it is told from here only about what no click
  * marks: coming back from the checkout, paid or not.
@@ -10,6 +10,8 @@
  *   donate_cancelled  back from the checkout, unpaid     world, city, amount
  *   donate_complete   back from the checkout, paid       world, city, amount, value, currency
  *   explore_more      the way to the other places        world
+ *   quiz_start        Guess the building opened          world
+ *   walk_start        a street walk opened               world
  *
  * The checkout is another site, so what was chosen is kept in the tab's session storage on the
  * way out and read back on return (`rememberCheckout`, `takeCheckout`). Only a checkout opened
@@ -22,7 +24,8 @@ export type SiteEventName =
   | "donate_cancelled"
   | "donate_complete"
   | "explore_more"
-  | "quiz_start";
+  | "quiz_start"
+  | "walk_start";
 
 export interface SiteEventProps {
   world: string;

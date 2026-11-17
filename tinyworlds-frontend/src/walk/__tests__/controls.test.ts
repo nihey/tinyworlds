@@ -91,6 +91,31 @@ describe("loadBindings", () => {
     const b = loadBindings({ getItem: () => JSON.stringify({ jump: [3, "KeyJ"] }) });
     expect(b.jump).toEqual([null, "KeyJ"]);
   });
+
+  it("never binds one key to two actions that are live together, whatever the store says", () => {
+    // edited by hand: J for walking and for jumping, M for the map and for steering
+    const b = loadBindings({
+      getItem: () =>
+        JSON.stringify({
+          forward: ["KeyJ", "ArrowUp"],
+          jump: ["KeyJ", "KeyJ"],
+          steerLeft: ["KeyM", "ArrowLeft"],
+          sprint: ["ShiftLeft", "ShiftLeft"],
+        }),
+    });
+    for (const group of ["foot", "drive"] as const)
+      for (const code of ["KeyJ", "KeyM", "ShiftLeft", "KeyW", "Space"])
+        expect(actionsOf(b, code, group).length, `${code} ${group}`).toBeLessThanOrEqual(1);
+    // a key never sits in both slots of one action
+    for (const [first, second] of Object.values(b)) if (first) expect(second).not.toBe(first);
+    expect(b.sprint).toEqual(["ShiftLeft", null]);
+  });
+
+  it("keeps the defaults as they are", () => {
+    expect(loadBindings({ getItem: () => JSON.stringify(defaultBindings()) })).toEqual(
+      defaultBindings(),
+    );
+  });
 });
 
 describe("saveBindings", () => {

@@ -43,6 +43,8 @@ export const en: Strings = {
     keysSearch: "{/} searches streets, neighbourhoods and landmarks. {0} shows the whole city.",
     keysToggles: "{B} draws {hoods}, {D} switches the miniature blur, {M} the minimap.",
     keysTogglesNoHoods: "{D} switches the miniature blur, {M} the minimap.",
+    keysWalk:
+      "{W} picks up the little person and puts it down in the middle of the map, to walk the streets.",
     link: "The link button copies a link to exactly what you are looking at.",
     mapData: "Map data",
     descriptions:
@@ -638,11 +640,15 @@ export const en: Strings = {
     failed: "The street walk couldn't start. The map still works.",
     noWebgl: "This browser can't draw the street walk (no WebGL). The map still works.",
     back: "Back to the map",
+    viewLabel: "The street walk",
     controls: "Controls",
     resetControls: "Reset to defaults",
     pressKey: "Press a key…",
     unbound: "None",
     closeMenu: "Close the controls",
+    controlsHelp:
+      "Choose a key, then press the new one. Esc cancels. Your keys are kept in this browser.",
+    keySlot: "{action}: {key}",
     groups: { foot: "On foot", drive: "Driving and sailing", any: "Anywhere" },
     actions: {
       forward: "Walk forward",
@@ -714,6 +720,7 @@ export const en: Strings = {
     life: "Life",
     lifeLabel: "Life {n} of {max}",
     damage: "Damage",
+    damageLabel: "Damage {n}%",
     wrecked: "Wrecked",
     messages: {
       slowDown: "Slow down to get out",

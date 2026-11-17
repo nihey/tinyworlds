@@ -133,9 +133,16 @@ src/
 │   ├── life.ts          # ferries and flights
 │   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
 │   ├── quiz.ts          # Guess the building's questions (quiz.<locale>.json): parseQuiz
+│   ├── person.ts        # the street walk's little person, one character per pixel
+│   ├── walker.ts        # the walk on the map: you and your view cone, the drop's lit ways
 │   └── __tests__/
+├── walk/                # the street walk (below): pure simulation, its data, and render/
+│                        # (three.js); reached only through import()
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
+├── components/walk/     # the street walk's screen (walk-screen.tsx, by import() only), its
+│                        # signs, wasted screen, controls menu and touch pad; the person in
+│                        # the tool column (walk-person.tsx)
 ├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
 │                        # "Build the next city" (build-next.tsx), a city's card and its
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
@@ -458,7 +465,8 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   same sign.
 - **What the page analytics hear** (`lib/site-events.ts`): `donate_open`, `donate_checkout`,
   `donate_cancelled`, `donate_complete` (the conversion, with `value` in US$ and `currency`),
-  `explore_more` and `quiz_start`, each with `world` (and `city`, `amount` when there are). `siteEvent()` pushes
+  `explore_more`, `quiz_start` and `walk_start` (a street walk opened), each with `world` (and
+  `city`, `amount` when there are). `siteEvent()` pushes
   every one to Tag Manager's `dataLayer`, where the container sends it on to Google Analytics.
   Rybbit hears the clicks from declarative hooks on the buttons (`data-rybbit-event` with
   `data-rybbit-prop-world`, `-city`, `-amount`), so `siteEvent(…, { rybbit: true })` is only for
@@ -775,7 +783,9 @@ runway. It only animates things that are never hidden behind a building, because
 no depth information: no cars.
 
 Layers are called every frame while life is on; with `prefers-reduced-motion` they are called
-once per redraw with `timeMs = 0`. The live engine is also on `window.tinyworld` for the console.
+once per redraw with `timeMs = 0`. A layer added with `{ always: true }` is a sign, not life (the
+street walk's person and the drop's lit ways, `map/walker.ts`): it is drawn with life off too,
+whenever the map is redrawn. The live engine is also on `window.tinyworld` for the console.
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
@@ -879,6 +889,84 @@ end it with the map where it was.
   (`peopleNote`: an admin's browser is not counted). A polite live region tells a screen
   reader the verdict, then the score (`liveLine`).
 
+## The street walk (`src/walk/`, `components/walk/`)
+
+In a world with `walk: true` (New York) whose manifest names `walk` (the data has `walk/`), the
+city can be walked at street level, in 3D: on foot, at the wheel and on the water. The root
+`CLAUDE.md` has the data (`walk/walk.json`, `walk/cells/<i>_<j>.bin`) and the design is
+`docs/superpowers/specs/2026-11-16-street-walk-design.md`.
+
+- **Nothing of it is in the map's first bundle.** `walk-screen.tsx` is the only way in: its
+  default export is reached by `import()` from `map-app.tsx` when a walk opens, and three.js
+  and every module under `src/walk/` come with it. The map itself carries only the person's
+  button (`walk-person.tsx`, `map/person.ts`), the walk link's parser (`map/hash.ts`) and the
+  split's CSS; `map/walker.ts` and the drop's data (`walk/load.ts`) are imported when the
+  person is picked up or a walk opens.
+- **Getting in.** The little person stands in the tool column (in the map's pixel style, its
+  shirt the accent; not anyone else's figure). Drag it onto the map: the ways near the pointer
+  it can stand on light up (`dropHighlight`, from the squares under the pointer, read as it
+  moves) and it dangles over the spot with "Let go to walk here" or "No street here". Let go
+  and `snapDrop` puts it on the nearest sidewalk or street within 150 m (on a bridge's deck if
+  dropped on one), facing along it; nothing near is the "No street here" toast and no walk. A
+  tap on the person then a tap on the map does the same (`armed`, the map's own tap taken by
+  `MapApp`; Esc lets go). **W** (free among the map's keys), or the button from the keyboard,
+  puts it down in the middle of the map. A link `#walk=lat,lon,heading` opens the walk there
+  (`parseWalkHash`, also on `hashchange`), and the walk writes one through `writeHash` whenever
+  you stand still. Analytics: `walk_start` through `siteEvent` with `world`, and
+  `data-rybbit-event="walk_start"` on the person.
+- **The split** (`.walk-split` in `globals.css`): the walk 7, the map 3, side by side; stacked
+  (the map below) under 800 px or in portrait. The map is the same `MapEngine` on its two
+  canvases, moved into the grid's map cell: it follows you (`jumpTo` on every move, the wheel
+  zooming about you), draws you and a view cone (`walkerLayer`), and a click or tap on it takes
+  you there (`dropAtScreen`, then the game's `teleport`). Its other signs give way (search,
+  banners, quiz, tools, minimap, the building spotlight); "Click the map to go there" and the
+  credit stay. M or "Back to the map" leaves with the map centred where you are.
+- **The screen** (`WalkScreen`): checks WebGL 2 first (`canDrawWalk`; without it a toast says
+  so and the map stays), reads `walk.json` ("couldn't start" with Try again and Back), builds
+  `WalkView` (the renderer) and `WalkGame` (the game: `game.ts` and the modules it ties
+  together), and takes the keys while it is open (not while typing or while a dialog is open:
+  the map's own keys stand aside), the mouse through pointer lock (a click on the view asks,
+  "Click to look around" until then, Esc lets go), and on a touch screen the touch pad. New
+  York's first walk of the visit, opened within 400 m of the manifest's `start`, finds a red
+  supercar parked there (`starter`). Below 40 fps the pixels grow a size at a time (up to 5)
+  until the visitor sets them.
+- **The signs** (`walk-hud.tsx`, text from `walk/hud-text.ts`): the corner sign with the life
+  bar, always (20 pixel cells of 5, green, amber under 50, red under 25, flashing on a hit,
+  "Life 64 of 100" for a screen reader), the damage bar beside it at the wheel or "Wrecked",
+  the speed in the world's units (`units: "imperial"` is mph, else km/h) and the vehicle's
+  name, the line of keys built from the current bindings (not on touch), "F get in the taxi",
+  the messages, and the buttons (controls, back to the map: above even the wasted screen). A
+  hit reddens the view's edges (a plain red frame under reduced motion). React hears the game
+  only when what the signs say changes; what fades every frame goes to the DOM through refs.
+- **The wasted screen** (`wasted-overlay.tsx`): the word ("WASTED", "DETONADO", "ACABADO") in
+  Tiny5, paper white outlined one of its own pixels wide, over a vignette dithered in whole
+  pixels (a Bayer matrix on a small canvas), faded as `wastedAt` says; said once in a polite
+  live region (`wastedSaid`); a key or a tap skips once it is up. The greying, the slow motion
+  and the lifting camera are the game's and the view's.
+- **The controls** (`controls-menu.tsx`, a shadcn `Dialog`, P or its button): every action by
+  group with two keys; a key button waits for the next key (Esc stops waiting) and `rebind`
+  takes it from whatever it would clash with; "Reset to defaults"; the pixel size (1 to 6) and
+  the sound switch. Defaults are GTA's keyboard plus turning on the arrows and M for the map
+  (`walk/controls.ts`).
+- **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half,
+  dragging the right half looks, buttons for jump and get in on foot, horn, camera, brake and
+  get out at the wheel.
+- **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
+  try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
+  one cannot bind a key to two clashing actions). The pixel size and the sound last for the
+  visit, in memory. It sends nothing (no API): the privacy policy lists the keys under
+  `#your-browser`.
+- **The modules** (`src/walk/`, no React): `format.ts` `walk-index.ts` `cell.ts` `geo.ts`
+  (the data, in world metres east and north of the projection's origin), `load.ts` (fetching
+  it, `?v=<manifest.walk>`), `world.ts` (surfaces, water, walls), `player.ts` `health.ts`
+  `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
+  `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
+  `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `game.ts`;
+  `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
+  `deck-mesh.ts` `shore.ts`, `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
+  production build has no `window.walk`: development builds put the game there for the
+  console (`walk.sim(5)`, `walk.state`).
+
 ## Design
 
 Every panel is a black enamel "sign" (`sign` utility) with paper-white lettering and the world's
@@ -905,4 +993,5 @@ exposed to Tailwind as `bg-sign`, `text-paper-dim`, `bg-taxi`, etc.
 - A Radix tooltip and popover on the same button both set `data-state`; style open buttons with
   `aria-expanded` / `aria-pressed` instead.
 - Keyboard shortcuts are in `map-app.tsx` and are ignored while typing or while a dialog or the
-  settings panel is open.
+  settings panel is open; while a street walk is open they stand aside and the walk's own
+  (`walk-screen.tsx`, by `KeyboardEvent.code`, rebindable) take over.
