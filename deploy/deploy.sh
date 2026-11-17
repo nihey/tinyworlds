@@ -7,9 +7,11 @@
 #   deploy/deploy.sh tinyrao --no-data   skip the tiles (code-only change)
 #   deploy/deploy.sh tinynyc --index     site + the small JSON indexes, not the tiles
 #   deploy/deploy.sh tinyrao --data      the data only, no build (after a re-render)
+#   deploy/deploy.sh tinynyc --walk      the street walk's data only (squares, walk.json, manifest),
+#                                        no build, not the tiles
 #   deploy/deploy.sh home                the front page that lists the worlds
 #
-#   deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data | --index | --data]
+#   deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data | --index | --data | --walk]
 #                                        every world in the viewer's registry, then the front
 #                                        page; builds and uploads 3 at a time (--parallel=N:
 #                                        N), or one at a time with --serial
@@ -54,8 +56,8 @@ REGISTRY="$FRONTEND/src/worlds/index.ts"
 
 usage() {
   cat >&2 <<'EOF'
-usage: deploy/deploy.sh <world | home> [--no-data | --index | --data]
-       deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data | --index | --data]
+usage: deploy/deploy.sh <world | home> [--no-data | --index | --data | --walk]
+       deploy/deploy.sh all [--parallel[=N] | --serial] [--no-data | --index | --data | --walk]
        deploy/deploy.sh check
        deploy/deploy.sh release [--everything] [--fresh-home]
 EOF
@@ -72,7 +74,8 @@ registry_worlds() {
 }
 
 # Where a world's map data is looked for: the generated folder here or, with SERVER_DATA set (a
-# deploy without data), the server's manifests and quizzes copied there by mirror_server_data.
+# deploy without data), the server's manifests, quizzes and street-walk indexes copied there by
+# mirror_server_data.
 data_of() {
   if [[ -n "${SERVER_DATA:-}" ]]; then echo "$SERVER_DATA/$1/data"; else echo "$FRONTEND/public/data/$1"; fi
 }
@@ -112,6 +115,16 @@ world_problems() {
       echo "no quiz on the server (send it: 'deploy/deploy.sh $world --index')"
     else
       echo "no quiz (run 'npm run cli -- --city $world quiz' in tinyworlds-pipeline)"
+    fi
+  fi
+  # an index upload sends no walk (and deletes none): a checkout without one may still send it
+  if [[ "${INDEX_ONLY:-}" != 1 ]] &&
+    grep -q "walk: true" "$FRONTEND/src/worlds/$world.ts" 2>/dev/null &&
+    [[ ! -f "$data/walk/walk.json" ]]; then
+    if [[ -n "${SERVER_DATA:-}" ]]; then
+      echo "no street walk on the server (send it: 'deploy/deploy.sh $world --walk')"
+    else
+      echo "no street walk (run 'npm run cli -- --city $world walk' in tinyworlds-pipeline)"
     fi
   fi
 }
@@ -168,12 +181,14 @@ server_cat() {
   ((status != -1))
 }
 
-# Copies every world's manifest and quiz, and its street-grid view's manifest, from the server
-# into <dir>/<world>/data/: what a deploy without data counts on finding there.
+# Copies every world's manifest, quiz and street walk's index, and its street-grid view's
+# manifest, from the server into <dir>/<world>/data/: what a deploy without data counts on
+# finding there.
 mirror_server_data() {
   mkdir -p "$1"
   rsync -r --prune-empty-dirs --include='/*/' --include='/*/data/' \
     --include='/*/data/manifest.json' --include='/*/data/quiz.en-US.json' \
+    --include='/*/data/walk/' --include='/*/data/walk/walk.json' \
     --include='/*/data/grid/' --include='/*/data/grid/manifest.json' --exclude='*' \
     "$DEPLOY_HOST:$DEPLOY_DIR/site/" "$1/"
 }
@@ -299,23 +314,37 @@ build_all() {
 # The `build` a manifest names (read from stdin): which render it describes.
 build_of() { { grep -o '"build":"[^"]*"' || true; } | head -n 1 | cut -d '"' -f 4; }
 
-# An index-only upload sends the manifest too (it names the indexes' version), and a manifest
-# also describes the tiles: it may only replace one from the same render, or it would point the
-# viewer at tiles that are not on the server. Says so and fails otherwise.
-same_render() {
-  local target="$1" data="$2" base_path="$3" here there
-  here="$(build_of <"$data/manifest.json")"
-  # a view inside a world's data folder (grid/) is addressed by its own folder on the server
-  if [[ "${4:-}" == "grid" ]]; then
-    there="$(server_cat "site$base_path/manifest.json" | build_of)" || true
-  else
-    there="$(server_cat "site$base_path/data/manifest.json" | build_of)" || true
+# An index-only (or walk-only) upload sends the manifest too (it names the indexes', or the walk's,
+# version), and a manifest also describes the tiles and the other indexes: it may only replace
+# one that differs from it in <field> alone (`indexes` or `walk`), or it would point the viewer at
+# files that are not on the server (and an immutable cache would keep the wrong ones under the new
+# version). <server manifest> is its path under the deploy folder: a view inside a world's data
+# folder (grid/) is checked against its own. Says what differs and fails otherwise.
+same_manifest() {
+  local target="$1" here="$2" remote="$3" field="$4" there problems status=0
+  there="$(mktemp)"
+  server_cat "$remote" >"$there" || status=$?
+  if ((status == 0)); then
+    problems="$(node "$ROOT/deploy/walk-check.mjs" manifest "$here" "$there" "$field")" || status=$?
   fi
-  if [[ -z "$here" || "$here" != "$there" ]]; then
-    echo "Not sending $target's indexes: its manifest here is from render ${here:-?}," \
-      "the server's from ${there:-none}. Deploy its data first (without --index)." >&2
+  rm -f "$there"
+  ((status == 0)) || return "$status"
+  if [[ -n "$problems" ]]; then
+    echo "Not sending $target's ${field}: $problems. Deploy its data first (without --index or --walk)." >&2
     return 1
   fi
+}
+
+# Refuses a street walk that is not whole or not stamped (see deploy/walk-check.mjs): the last
+# --delete pass would empty the server's squares, and a manifest naming an old version would
+# serve new squares under the old ?v=, which visitors' caches keep for a year.
+walk_ready() {
+  local target="$1" data="$2" problems
+  problems="$(node "$ROOT/deploy/walk-check.mjs" walk "$data")" || return
+  [[ -z "$problems" ]] && return 0
+  echo "Not sending $target's street walk:" >&2
+  sed "s/^/  - /; s/<world>/$target/g" <<<"$problems" >&2
+  return 1
 }
 
 # Sends one view's indexes (a world's data folder, or the grid/ inside it) to <remote dir>: the
@@ -333,7 +362,7 @@ upload_indexes() {
   rsync -a "$data/manifest.json" "$DEPLOY_HOST:$remote/" || return
 }
 
-# Copies one target to the server: its built site from <out> (unless mode is --data), and its
+# Copies one target to the server: its built site from <out> (unless mode is --data or --walk), and its
 # map data as the mode says. Every step is checked: uploads side by side run inside an `if`,
 # where `set -e` does not reach. --mkpath makes the folders a new world needs.
 upload() {
@@ -342,16 +371,24 @@ upload() {
   site="$DEPLOY_DIR/site$base_path"
   data="$FRONTEND/public/data/$target"
   [[ -t 1 ]] && progress="--info=progress2"
+  if [[ "$mode" == "--walk" && ! -f "$data/walk/walk.json" ]]; then
+    # `all --walk` passes by the worlds that have no walk; named alone, a world must have one
+    if [[ "$target" == "home" || "${WALK_OPTIONAL:-}" == 1 ]]; then return 0; fi
+    echo "No street walk for $target: run 'npm run cli -- --city $target walk' in tinyworlds-pipeline first." >&2
+    return 1
+  fi
   # before anything is sent, so a refusal leaves the site as it was
   if [[ "$mode" == "--index" && "$target" != "home" ]]; then
-    same_render "$target" "$data" "$base_path" || return
+    same_manifest "$target" "$data/manifest.json" "site$base_path/data/manifest.json" indexes || return
     if [[ -f "$data/grid/manifest.json" ]]; then
-      same_render "$target (street grid)" "$data/grid" "$base_path/data/grid" "grid" || return
+      same_manifest "$target (street grid)" "$data/grid/manifest.json" \
+        "site$base_path/data/grid/manifest.json" indexes || return
     fi
   fi
   # a world drawn both ways sends its street-grid view with its data: without it here, --delete
-  # would empty the server's grid/ and leave its manifest pointing at tiles that are gone
-  if [[ "$target" != "home" && "$mode" != "--no-data" && "$mode" != "--index" ]] &&
+  # would empty the server's grid/ and leave its manifest pointing at tiles that are gone (a walk
+  # alone sends nothing of grid/: the walk is the world's own, whichever way the map is turned)
+  if [[ "$target" != "home" && "$mode" != "--no-data" && "$mode" != "--index" && "$mode" != "--walk" ]] &&
     grep -q 'turn: "grid"' "$FRONTEND/src/worlds/$target.ts" 2>/dev/null &&
     [[ ! -f "$data/grid/manifest.json" ]]; then
     echo "Not sending $target's data: it is drawn both ways, and its street-grid view is not" \
@@ -359,7 +396,15 @@ upload() {
       "in tinyworlds-pipeline." >&2
     return 1
   fi
-  if [[ "$mode" != "--data" ]]; then
+  if [[ "$mode" == "--walk" ]]; then
+    walk_ready "$target" "$data" || return
+    same_manifest "$target" "$data/manifest.json" "site$base_path/data/manifest.json" walk || return
+  fi
+  # a full data upload carries the walk with it (and --deletes what the server has beyond it)
+  if [[ ( -z "$mode" || "$mode" == "--data" ) && "$target" != "home" && -d "$data/walk" ]]; then
+    walk_ready "$target" "$data" || return
+  fi
+  if [[ "$mode" != "--data" && "$mode" != "--walk" ]]; then
     if [[ "$target" == "home" ]]; then
       # the worlds live in folders beside the front page: replace its own files, delete nothing else
       rsync -az --mkpath --delete "$out/_next/" "$DEPLOY_HOST:$site/_next/" || return
@@ -372,6 +417,17 @@ upload() {
   if [[ "$target" != "home" ]]; then
     case "$mode" in
       --no-data) ;;
+      --walk)
+        # the new squares first (a walk.json of the new version never points at a square not
+        # there; a square both versions have is replaced in place, so a visitor still on the old
+        # version may get the new one under the old ?v=, unless their cache has it), then
+        # walk.json, then the manifest, which names the walk's version so visitors ask anew;
+        # only then the squares the new walk no longer has are removed
+        rsync -a --mkpath "$progress" "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
+        rsync -a --mkpath "$data/walk/walk.json" "$DEPLOY_HOST:$site/data/walk/" || return
+        rsync -a "$data/manifest.json" "$DEPLOY_HOST:$site/data/" || return
+        rsync -a --delete "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
+        ;;
       --index)
         if [[ -f "$data/grid/manifest.json" ]]; then
           upload_indexes "$data/grid" "$site/data/grid" || return
@@ -646,10 +702,14 @@ for arg in "$@"; do
     --parallel) JOBS=3 ;;
     --parallel=*) JOBS="${arg#--parallel=}" ;;
     --serial) JOBS=1 ;;
-    --no-data | --index | --data) MODE="$arg" ;;
+    --no-data | --index | --data | --walk) MODE="$arg" ;;
     *) usage ;;
   esac
 done
+if [[ "$TARGET" == "home" && "$MODE" == "--walk" ]]; then
+  echo "--walk is a world's street walk: the front page has none." >&2
+  exit 2
+fi
 if [[ "$TARGET" != "all" && -n "$JOBS" ]]; then
   echo "--parallel and --serial are for 'all': one target is one build." >&2
   exit 2
@@ -667,12 +727,16 @@ if [[ "$MODE" == "--no-data" ]]; then
   mirror_server_data "$SERVER_DATA"
 fi
 
+[[ "$MODE" == "--index" ]] && export INDEX_ONLY=1
+
 if [[ "$TARGET" == "all" ]]; then
   check_all
   # shellcheck disable=SC2207
   WORLDS=($(registry_worlds))
   TARGETS=("${WORLDS[@]}")
-  [[ "$MODE" != "--data" ]] && TARGETS+=(home)
+  [[ "$MODE" != "--data" && "$MODE" != "--walk" ]] && TARGETS+=(home)
+  # worlds with no walk are passed by, not refused
+  [[ "$MODE" == "--walk" ]] && export WALK_OPTIONAL=1
 else
   if [[ "$TARGET" != "home" && ! -f "$(data_of "$TARGET")/manifest.json" ]]; then
     if [[ -n "${SERVER_DATA:-}" ]]; then
@@ -682,10 +746,20 @@ else
     fi
     exit 1
   fi
+  # one world is checked as `all` checks each: a data upload --deletes what the server has
+  # beyond it, so a checkout without the world's walk would take the server's away
+  if [[ "$TARGET" != "home" ]]; then
+    PROBLEMS="$(world_problems "$TARGET")"
+    if [[ -n "$PROBLEMS" ]]; then
+      echo "Not deploying $TARGET:" >&2
+      sed 's/^/  - /' <<<"$PROBLEMS" >&2
+      exit 1
+    fi
+  fi
   TARGETS=("$TARGET")
 fi
 
-if [[ "$MODE" != "--data" ]]; then
+if [[ "$MODE" != "--data" && "$MODE" != "--walk" ]]; then
   guard_tree
   # what goes up is not main's: until a release puts main back, the server does not know what
   # its viewers come from (and the next release rebuilds them all)
@@ -704,7 +778,7 @@ if [[ "$TARGET" == "all" ]]; then
 else
   upload "$TARGET" "$WORK/$TARGET/out" "$MODE"
 fi
-if [[ "$MODE" != "--data" ]]; then
+if [[ "$MODE" != "--data" && "$MODE" != "--walk" ]]; then
   sync_nginx
   # every viewer, from a commit of main: that is what the site now runs
   if [[ "$TARGET" == "all" ]] && tree_is_main; then
@@ -712,8 +786,11 @@ if [[ "$MODE" != "--data" ]]; then
   fi
 fi
 
-# the worlds are up: the donors of a city that has just been built hear of it
-if [[ "$TARGET" == "all" ]]; then
+# the worlds are up: the donors of a city that has just been built hear of it (a walk's data
+# changes nothing about that)
+if [[ "$MODE" == "--walk" ]]; then
+  :
+elif [[ "$TARGET" == "all" ]]; then
   announce_built "${WORLDS[@]}"
 elif [[ "$TARGET" != "home" ]]; then
   announce_built "$TARGET"

@@ -54,6 +54,20 @@ Each sub-project has its own `CLAUDE.md`.
 
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
+- **New York can be walked.** The street walk is the city at street level, in 3D: on foot, at
+  the wheel and in the water. It is static too: the pipeline's `walk` step (for a world whose
+  file says `walk: true`) cuts the map's own scene and Overture's streets into squares of 200 m
+  (`walk/`, below): the buildings, ground and trees the map draws, its bridges on the map's
+  decks (a bridge of level 2 or more no lower than its level, where the map's hump comes down to
+  the shore) and overpasses ramped to theirs, the network traffic and people follow
+  (lights, one-way streets, crosswalks, tunnels; a tunnel whose far end is where the map fades,
+  as the Holland and Lincoln tunnels' New Jersey ends are, is closed there), land and water,
+  and boats tied at the piers. Only squares on the map are written. In the viewer, a little
+  person in the map's tools is dropped onto a street (or W puts it down mid-map, or a
+  `#walk=lat,lon,heading` link opens it): the walk fills most of the screen with the map beside
+  it following you, loads the squares round you as you go, and nothing of it loads until one
+  opens. It sends nothing anywhere (the page analytics hear `walk_start`) and keeps only the
+  keys a visitor chose, in the browser.
 - **The API exists for donations** (and keeps the answers of "Guess the building", below). Each proposed city is built when donations for it reach
   its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
@@ -194,7 +208,9 @@ Each sub-project has its own `CLAUDE.md`.
    merge to main: the push deploys the API (whose seed marks the city `BUILT`), then every
    viewer, and refuses while a world in the registry has no data on the server. Deploying the
    world also tells its city's donors that it is built (once; it needs `ANNOUNCE_HOST` or
-   `API_SERVICE`).
+   `API_SERVICE`). A world with `walk: true` also needs its street walk (`npm run cli -- --city
+   <id> walk`), sent with `--data` or on its own with `deploy/deploy.sh <id> --walk`; the check
+   and the release refuse a world that has none.
 
 The id is `tiny` + a short city code; it is the pipeline's `--city`, the viewer's
 `NEXT_PUBLIC_WORLD`, the data folder and the URL path.
@@ -216,15 +232,17 @@ data/<world>/
 ├── sights/<hash>.webp       # each of them drawn on its own, nothing in front of it
 ├── sights.<locale>.json     # their Wikipedia openings: en-US, pt-BR, es-ES
 ├── quiz.<locale>.json       # Guess the building's questions (worlds with sights)
-└── grid/                    # a world drawn both ways: all of the above again, turned to its
-                             # street grid (the map as it was first drawn)
+├── walk/                    # the street walk: walk.json and cells/<i>_<j>.bin, 200 m squares (worlds with a walk)
+└── grid/                    # a world drawn both ways: all of the above again but walk/, turned to
+                             # its street grid (the map as it was first drawn)
 ```
 
 **Two views.** A real city is drawn north up (its folder) and turned to its street grid
 (`grid/`, a full data set of its own: the pipeline's `--view grid`). The viewer's compass turns
 the map from one to the other (`World.turn`), starting again on the other set where the map
 was. The files that are in lon/lat (places, hoods, life, the texts, the quiz) are the same in
-both; the tiles, the minimap and the sights' outlines and pictures are not.
+both; the tiles, the minimap and the sights' outlines and pictures are not. The street walk is
+one, in the world's own folder whichever way the map is turned: it is in metres, not map px.
 
 ### Map space and projection
 
@@ -251,6 +269,7 @@ Y = (q − p) · k/2 − h · kz          // h = metres above ground
 interface Manifest {
   name: string;                 // the world id: "tinynyc"
   build: string;                // the render's cache-busting id: append as ?v= to tiles, overview
+  walk?: string;                // the walk's version: append as ?v= to walk/ files
   indexes?: string;             // the indexes' (places, hoods, life, sights, their texts and
                                 // pictures): append as ?v= to those; absent: use `build`. A hash
                                 // of their contents, written by the pipeline's index and wiki
@@ -373,6 +392,85 @@ thing everywhere).
 
 Optional for the viewer: a world without it has no game.
 
+### walk/walk.json, `walk/cells/<i>_<j>.bin`
+
+The street walk (`tinyworlds-pipeline`'s `walk` step; the viewer's `src/walk/`): the city cut
+into 200 m squares, each one gzipped binary file, and an index. Only for a world that has them
+(`manifest.walk` set); without it the viewer offers no walk.
+
+World space is metres east (`e`) and north (`n`) of the projection origin `geo.lon0/lat0`
+(`e = (lon − lon0)·π/180·R·cos(lat0)`, `n = (lat − lat0)·π/180·R`), heights `z` in metres
+above the land (0). Square `(i, j)` covers `e ∈ [200i, 200i+200)`, `n ∈ [200j, 200j+200)`. Map px
+at ground become (e, n) by `p+q = X/k`, `q−p = 2Y/k`, `e = p·sinβ + q·cosβ`,
+`n = p·cosβ − q·sinβ`; px heights ÷ `kz`. `geo` is the scene's, of the world's own view (New
+York's β is 45: north up), not the street grid's `gridDeg`. There is one walk per world, in its
+own folder, never in `grid/`: in the other view the viewer still reads `walk/` with the
+version the world's own `manifest.json` names, and goes between the walk's metres and the map
+it shows through lon/lat and that map's own projection.
+
+```ts
+// walk.json
+interface WalkIndex {
+  v: 1;
+  cell: number;                       // 200
+  i0: number; j0: number; cols: number; rows: number;
+  cells: string;                      // base64 bitset, bit (i−i0) + (j−j0)·cols, LSB-first: the file exists
+  geo: { lon0: number; lat0: number; betaDeg: number; k: number; kz: number };   // the scene's
+  gridDeg: number;                    // the street grid's bearing for paving (the city file's gridDeg)
+  sunDeg: number;                     // where the sun is, degrees
+  palette: { names: string[]; rgb: number[] };   // names × 6 shades × 3 bytes
+  paintRank: number[];                // paint order, per ground kind
+  tunnels: { name: string; a: [number, number, number]; b: [number, number, number] | null; length: number }[];
+                                      // portals [e, n, heading into the tunnel (rad, from north, clockwise)];
+                                      // b null: the other end is off the map (closed by a barrier)
+}
+```
+
+A square's payload (before gzip): `u32` header length, the header as UTF-8 JSON
+`{ v: 1, i, j, arrays: [[name, type, length], …] }` (type `u8 i8 u16 i16 u32 i32 f32`), zero
+padding to a multiple of 4, then each array in header order, each starting at a multiple of 4,
+little-endian. An absent array is empty. **Local dm**: `i16` decimetres from the square's
+south-west corner. **World dm**: `i32` decimetres from the origin.
+
+| Array | Type | One per | Meaning |
+|---|---|---|---|
+| `vol.rings` | u16 | volume | rings (outer first) |
+| `vol.verts` | u16 | ring | vertices |
+| `vol.xy` | i16 | vertex ×2 | local dm (a volume is filed under its centre's square) |
+| `vol.base` `vol.top` `vol.roofH` | u16 | volume | dm |
+| `vol.roofShape` `vol.wall` `vol.roof` `vol.glass` `vol.pattern` `vol.flags` | u8 | volume | as the scene |
+| `vol.seed` | u32 | volume | as the scene |
+| `cab.verts` `cab.kind` | u16, u8 | cable | filed under its middle vertex's square |
+| `cab.xyz` | i32 | vertex ×3 | world dm |
+| `gnd.kind` | u8 | polygon | ground kind |
+| `gnd.order` | u32 | polygon | the scene's index (ties in paint rank paint in this order) |
+| `gnd.rings` `gnd.verts` `gnd.xy` | u16, u16, i16 | | clipped to the square, local dm |
+| `way.kind` `way.width` `way.order` `way.verts` | u8, u16 dm, u32, u16 | way | the scene's ground lines without the bridge flag |
+| `way.xy` | i16 | vertex ×2 | clipped to the square grown by 30 m, local dm |
+| `tree.xy` `tree.kind` | i16 ×2, u8 | tree | |
+| `mask` | u8 | 1 or 1251 | `[0]`: 0 all land, 1 all water, 2 mixed, then 1250 bytes: 100 × 100 cells of 2 m from the south-west, bit `x + 100y` LSB-first, 1 = water |
+| `shore` | u8 | 0 or 10000 | for a square with any water: per 2 m cell (as the mask), the distance to the nearest land in 2 m steps, 0 on land, capped at 255, measured over the whole city (across squares; a square with no file counts as land, the map's edge); absent for an all-land square |
+| `node.id` | u32 | node | city-wide; every node an edge of this square ends at |
+| `node.xyz` | i32 | ×3 | world dm |
+| `node.flags` | u8 | | bit0 lights, bit1 tunnel portal |
+| `node.bearing` | u8 | | its widest street's bearing, 0–255 → 0–π (the lights' "along" phase) |
+| `st.a` `st.b` | u32 | street edge | node ids |
+| `st.cls` | u8 | | 0 motorway, 1 trunk, 2 primary, 3 secondary, 4 tertiary, 5 residential, 6 unclassified |
+| `st.flags` | u8 | | bit0 link, bit1 one-way a→b, bit2 one-way b→a, bit3 elevated somewhere |
+| `st.width` `st.verts` | u16 dm, u16 | | |
+| `st.xyz` | i32 | ×3 | world dm |
+| `wk.a` `wk.b` `wk.flags` `wk.verts` `wk.xyz` | u32, u32, u8, u16, i32 ×3 | walking edge | flags: bit0 crosswalk, bit1 crosses with the "along" phase, bit2 with "across", bit3 elevated |
+| `elev.kind` `elev.width` `elev.verts` | u8, u16 dm, u16 | elevated way | kind 0 road, 1 footway, 2 rail |
+| `elev.xyz` | i32 | ×3 | the deck's surface, world dm |
+| `elev.own` | u8 | vertex | 1: the walk builds the deck here (slab, parapets, columns); 0: the map's deck volume is there |
+| `moor.xy` `moor.heading` `moor.kind` | i32 ×2, u8, u8 | boat | heading 0–255 → 0–2π; kind 0 speedboat, 1 motorboat |
+
+Streets, walks and elevated ways are filed under **every** square they touch (with the nodes they
+end at), so a node's ways are all known once its own square is in. `manifest.walk` is a hash (12
+hex) of `walk.json` and every square, appended as `?v=` to them. The viewer reads a square with
+`src/walk/format.ts` (`inflate`, `decodeCell`), the pipeline writes it with
+`src/walk/format.ts` (`encodeCell`).
+
 ## API contract (viewer ↔ API)
 
 GraphQL at `/api/graphql` (same origin in production):
@@ -464,7 +562,11 @@ it does not know, and the site then falls back to its payment link. Details in
   (or the daily one). Nothing of where it goes is in the workflow: it reads the repository's
   `production` environment secrets.
 - By hand: map data, which is not in git (`deploy/deploy.sh <world> --data`, or `--index` for
-  the indexes); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
+  the indexes, or `--walk` for a world's street walk alone: its squares, `walk.json`, then the
+  manifest; a world whose file says `walk: true` is incomplete without `walk/walk.json`, here or
+  on the server; a walk that is not whole or not stamped with its own version is refused, and
+  `--walk` and `--index` refuse a manifest that differs from the server's in more than what they
+  send); `deploy/deploy.sh <world | home>` builds a viewer and rsyncs it (and the
   world's data) to the web server; `deploy/deploy.sh all [--parallel[=N] | --serial]
   [--no-data]` checks and builds every world in the viewer's registry and the front page, and
   uploads only if all of them built. A build from a tree that lacks what the server runs is

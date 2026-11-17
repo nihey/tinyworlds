@@ -236,6 +236,125 @@
   }
 }
 
+/* ---- the street walk (components/walk) ---------------------------------------------------- */
+
+/* the walk large and the map beside it, 7 to 3; stacked, the map below, on a narrow screen or
+   in portrait. The map's two canvases leave the whole screen for their pane; its other signs
+   are not drawn meanwhile */
+.walk-split {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "walk map";
+  background: var(--sign);
+}
+@media (max-width: 799.98px), (orientation: portrait) {
+  .walk-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+    grid-template-areas: "walk" "map";
+  }
+  .walk-split > .walk-area {
+    box-shadow: 0 1px 0 rgb(0 0 0 / 0.6);
+  }
+}
+.walk-split > .map-tiles,
+.walk-split > .map-marks,
+.walk-split > .dusk-wash {
+  position: relative;
+  grid-area: map;
+}
+.walk-split > .map-tiles {
+  /* a click takes you there */
+  cursor: pointer;
+}
+.walk-split > .tilt-band {
+  display: none;
+}
+.walk-area {
+  grid-area: walk;
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  min-height: 0;
+  /* the map's pane is on its right, or below it */
+  box-shadow: 1px 0 0 rgb(0 0 0 / 0.6);
+}
+.walk-map-signs {
+  grid-area: map;
+  position: relative;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* the person carried over the map: held by the head, swinging a little */
+@keyframes walk-dangle {
+  0%,
+  100% {
+    rotate: -7deg;
+  }
+  50% {
+    rotate: 7deg;
+  }
+}
+.walk-dangle {
+  transform-origin: 50% 0;
+  animation: walk-dangle 900ms ease-in-out infinite;
+}
+
+/* a hit: the edges of the view redden, and the life bar flashes */
+.walk-hurt {
+  box-shadow: inset 0 0 70px 18px rgb(200 71 60 / 0.75);
+}
+@keyframes walk-flash {
+  50% {
+    opacity: 0.35;
+  }
+}
+.walk-flash {
+  animation: walk-flash 160ms steps(1, end) infinite;
+}
+
+/* the wasted screen's word: Tiny5 in paper white, outlined one of its own pixels wide (an em is
+   eight of them) in the signs' ink, at sizes where its pixels are whole screen pixels */
+.walk-wasted {
+  --px: 0.125em;
+  font-size: 56px;
+  line-height: 1;
+  /* room between the letters' outlines: the word stands on the vignette, not on a band */
+  letter-spacing: 0.22em;
+  margin-right: -0.22em;
+  color: var(--paper);
+  text-shadow:
+    var(--px) 0 0 #15171a,
+    calc(-1 * var(--px)) 0 0 #15171a,
+    0 var(--px) 0 #15171a,
+    0 calc(-1 * var(--px)) 0 #15171a,
+    var(--px) var(--px) 0 #15171a,
+    calc(-1 * var(--px)) var(--px) 0 #15171a,
+    var(--px) calc(-1 * var(--px)) 0 #15171a,
+    calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #15171a;
+}
+@media (min-width: 640px) {
+  .walk-wasted {
+    font-size: 96px;
+  }
+}
+@media (min-width: 1100px) {
+  .walk-wasted {
+    font-size: 136px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-dangle,
+  .walk-flash {
+    animation: none;
+  }
+}
+
 /* ---- signs -------------------------------------------------------------------------------- */
 
 @utility sign {

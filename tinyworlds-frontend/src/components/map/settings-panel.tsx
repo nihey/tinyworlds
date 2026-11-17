@@ -92,7 +92,7 @@ export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps
             </label>
             <Slider
               id={strengthId}
-              aria-label={t.settings.tiltStrengthLabel}
+              thumbLabel={t.settings.tiltStrengthLabel}
               min={0}
               max={100}
               step={5}

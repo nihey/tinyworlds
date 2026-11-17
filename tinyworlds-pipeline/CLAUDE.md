@@ -5,29 +5,29 @@ viewer: a pyramid of isometric pixel-art tiles plus search and overlay indexes. 
 queue; run it by hand when the data or the drawing rules change. One process draws one city,
 chosen with `--city` (default `tinynyc`).
 
-| City               | Full run (20 cores) | Output               |
-| ------------------ | ------------------- | -------------------- |
-| `tinynyc`          | ≈ 5 min             | 0.8 GB, 30,000 files |
-| `tinyrao`          | ≈ 2.5 min           | 0.3 GB, 11,000 files |
-| `tinyorl`          | ≈ 4 min             | 1.1 GB, 29,000 files |
-| `tinyfte`          | seconds             | a few MB             |
-| `tinyvlc`          | ≈ 1 min             | 0.2 GB               |
-| `tinylas`          | ≈ 1 min             | 0.2 GB               |
-| `tinylax`          | ≈ 4 min             | 0.7 GB, 23,000 files |
-| `tinydal`          | ≈ 1.5 min (+ wiki)  | 0.3 GB, 10,500 files |
-| `tinycvg`          | ≈ 1 min (+ wiki)    | 0.2 GB, 6,300 files  |
-| `tinypit`          | ≈ 1 min (+ wiki)    | 0.2 GB, 5,200 files  |
-| `tinyphl`          | ≈ 1.5 min (+ wiki)  | 0.1 GB, 5,300 files  |
-| `tinycos`          | ≈ 2 min (+ wiki)    | 0.4 GB, 11,700 files |
-| `tinytkf`          | ≈ 1 min (+ wiki)    | 0.2 GB, 4,200 files  |
-| `tinywinterfell`   | 3 s (no fetch)      | 4 MB, 230 files      |
-| `tinykingslanding` | 8 s (no fetch)      | 21 MB, 730 files     |
-| `tinywesteros`     | ≈ 2 min (no fetch)  | 0.2 GB, 14,100 files |
+| City               | Full run (20 cores)      | Output                                             |
+| ------------------ | ------------------------ | -------------------------------------------------- |
+| `tinynyc`          | ≈ 5 min (+ walk 3.5 min) | 0.8 GB, 30,000 files (+ walk 118 MB, 37,246 files) |
+| `tinyrao`          | ≈ 2.5 min                | 0.3 GB, 11,000 files                               |
+| `tinyorl`          | ≈ 4 min                  | 1.1 GB, 29,000 files                               |
+| `tinyfte`          | seconds                  | a few MB                                           |
+| `tinyvlc`          | ≈ 1 min                  | 0.2 GB                                             |
+| `tinylas`          | ≈ 1 min                  | 0.2 GB                                             |
+| `tinylax`          | ≈ 4 min                  | 0.7 GB, 23,000 files                               |
+| `tinydal`          | ≈ 1.5 min (+ wiki)       | 0.3 GB, 10,500 files                               |
+| `tinycvg`          | ≈ 1 min (+ wiki)         | 0.2 GB, 6,300 files                                |
+| `tinypit`          | ≈ 1 min (+ wiki)         | 0.2 GB, 5,200 files                                |
+| `tinyphl`          | ≈ 1.5 min (+ wiki)       | 0.1 GB, 5,300 files                                |
+| `tinycos`          | ≈ 2 min (+ wiki)         | 0.4 GB, 11,700 files                               |
+| `tinytkf`          | ≈ 1 min (+ wiki)         | 0.2 GB, 4,200 files                                |
+| `tinywinterfell`   | 3 s (no fetch)           | 4 MB, 230 files                                    |
+| `tinykingslanding` | 8 s (no fetch)           | 21 MB, 730 files                                   |
+| `tinywesteros`     | ≈ 2 min (no fetch)       | 0.2 GB, 14,100 files                               |
 
 ## Commands
 
 ```bash
-npm run all -- --city tinyrao        # fetch → scene → render → index
+npm run all -- --city tinyrao        # fetch → scene → render → index (→ wiki, quiz, walk where the city has them)
 npm run cli -- --city tinyrao fetch [--force]   # raw data into data/<city>/raw (skips what is there)
 npm run cli -- --city tinyrao scene             # raw data → data/<city>/scene (typed arrays in map px)
 npm run cli -- --city tinyrao render            # scene → ../tinyworlds-frontend/public/data/<city>
@@ -37,6 +37,9 @@ npm run cli -- --city tinyrao index             # places.json, hoods.json, life.
                                                 # and the indexes' version in manifest.json (`indexes`)
 npm run cli -- --city tinynyc wiki [--force]    # sights.<locale>.json from Wikipedia (cached)
 npm run cli -- --city tinynyc quiz [--list] [--force-views]   # quiz.<locale>.json: Guess the building's questions
+npm run cli -- --city tinynyc walk [--out <dir>]   # the street walk: walk/cells/*.bin, walk/walk.json, manifest.walk
+npm run cli -- --city tinynyc walk --around -73.9857,40.7580,600   # only the squares near a point
+npm run cli -- --city tinynyc walk --stamp      # only the version of the walk folder there, into the manifest
 npm run cli -- --city tinyrao card              # the share card → ../tinyworlds-frontend/public/og/<city>.jpg
 npm run cli -- home-card                        # the front page's share card → …/public/og/tinyworlds.jpg
 npm run cli -- preview --at -73.9969,40.7061 --size 1300,800 --zoom 2 --out /tmp/p.png
@@ -45,7 +48,8 @@ npm test          # vitest
 npm run lint      # eslint + prettier --check   (lint:fix to fix)
 ```
 
-`npm run cli` compiles with `tsc` first; worker threads load the compiled `dist/render/worker.js`.
+`npm run cli` compiles with `tsc` first and gives Node a 16 GB heap (New York's `walk` peaks
+around 6 GB, past Node's default); worker threads load the compiled `dist/render/worker.js`.
 `preview` is the tool for tuning the look: it renders one rectangle to a PNG in ~100 ms
 (`--shrink n` draws n times the area and averages it down, to judge the zoomed-out look).
 `TINY_CITY` in the environment is the same as `--city`.
@@ -117,6 +121,7 @@ src/
 │   ├── plate.ts       # a picture cut from a world's finished tiles (any world, no scene needed)
 │   ├── home-card.ts   # the front page's share card: six cities in leaning slices, from their tiles
 │   ├── bin.ts run.ts worker.ts pyramid.ts encode.ts scene.ts
+├── walk/              # the street walk's squares (see "Street walk")
 └── index/
     ├── build.ts       # search index, area outlines, ferry routes and flights (from data)
     ├── sights.ts      # which search entries are sights and what they are called; sights.json
@@ -443,6 +448,89 @@ change to the rules below.
   viewer has `sights` and no `quiz`. The files are written all the same.
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
+
+## Street walk (`walk/`)
+
+The `walk` step (run last by `all` for a city whose file says `walk: true`: New York) writes the
+viewer's street walk into `walk/` of the world's data folder: the city in squares of 200 m of
+metres east and north of the projection's origin, one gzipped file of typed arrays each
+(`walk/cells/<i>_<j>.bin`), the index (`walk/walk.json`) and their version in the manifest
+(`walk`). The contract is in the root `CLAUDE.md`. It reads the scene and `raw/segment.parquet`
+and fetches nothing. **One walk per world, from its own view** (north up for a real city): the
+walk is in metres, so the viewer walks the same one whichever way the map is turned. `walk`
+refuses `--view` for the other view, `all --view grid` leaves it out, and the other view's
+manifest names no walk. Its paving follows the street grid's own bearing (`gridDeg` in
+`walk.json`, the city file's), not the view's.
+
+| File                       | Does                                                                         |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `grid.ts`                  | world space (e, n), squares, map px to metres                                |
+| `format.ts`                | a square's file; `packed` refuses a value its typed array cannot hold        |
+| `clip.ts`, `cut.ts`        | the scene cut into squares: volumes by their centre, ground split by         |
+|                            | quadtree, the map's ways clipped to the square grown by 30 m, trees, cables  |
+| `mask.ts`, `shore.ts`      | land and water per 2 m cell, painted in the map's order; the distance from   |
+|                            | each water cell to the land, across squares (an exact distance transform     |
+|                            | over 512 m round each square)                                                |
+| `segments.ts`, `pieces.ts` | Overture's segments, cut at their connectors and densified to 10 m; gaps in  |
+|                            | a bridge's levels and flags shorter than its ramps would need are filled     |
+| `heights.ts`               | bridges on the map's decks (their own where decks stack, the steps smoothed; |
+|                            | at least their level from level 2), overpasses at their level × 6.5 m,       |
+|                            | ramps of 8% (12% on links), 4.5 m clear over the ways below                  |
+| `network.ts`               | nodes (numbered for the whole city), streets, walks, elevated ways, lights,  |
+|                            | tunnels                                                                      |
+| `moorings.ts`              | boats along the piers the hash picks, every 12 m on the water side           |
+| `build.ts`                 | the step: the map's decks for the heights, which squares, filing, the files  |
+
+- **Which squares.** A square is written when the fog leaves its centre on the map (`fog.end`),
+  or when it holds something the map draws (volumes, ways, trees, cables). Ground alone does not
+  count: the harbour's polygons reach tens of kilometres past the map. A square on the map with
+  no ground at all is water, as the map paints it. Streets, walks and elevated ways are filed
+  under every written square their strip touches, boats under the one they float in.
+- **Ways keep the vertices their shape needs** (`shapeOf`): the pieces are cut every 10 m for
+  the heights, but a vertex within 0.1 m of the line through its neighbours, in plan and height,
+  is left out of the file (both ends of a change of who builds an elevated deck stay). That
+  takes a quarter to a third off a dense square.
+- **The map's decks** (`deckAtFromScene`): the tops of every floating deck volume (`F_FLOATING`,
+  `Roof.Deck`) holding a point, found through a 25 m grid. `decksOf` (`heights.ts`) picks a
+  way's own along each piece where decks stack (the Queensboro's levels and ramps, Queens
+  Plaza): the most continuous choice, carried across gaps in the deck, a lone vertex far off
+  the line through its neighbours taken off the deck (a seam over a lower ramp), each at the
+  mean of its deck over one 7 m step either side (so the steps become a slope and overlapping
+  ways agree). The walk does not draw the map's decks, so it need not stand on them: the map
+  draws a suspension bridge as a hump that lands on each shore, and on a bridge of level 2 or
+  more a vertex on the deck asks for its level's height instead (no higher than the crest of
+  the deck it is on, followed across every piece on it), coming down by a ramp to a deck the
+  map holds lower. The Brooklyn, Manhattan and Williamsburg approaches stay at 13 to 26 m; near
+  the shores the walk's deck stands up to 18 m above the one the tiles draw. The run says how
+  many vertices are on the decks, how many their level raised, and how many stand off a deck
+  that holds them: in New York 7,340, 708 and 13.
+- **Gaps in the levels** (`pieces.ts` `fillGaps`): Overture often leaves a stretch of a bridge
+  with no level or no bridge flag (the Brooklyn Bridge's approach, 250 m of the Williamsburg's).
+  A dip in a way's levels that no connector breaks, and that its ramps could never reach the
+  bottom of (`2 · level · 6.5 m / 8%`: 160 m a level), takes the lower level either side. Runs of
+  pieces through connectors only they meet at count as one, and a connector another way raises
+  bounds a dip (the Williamsburg's westbound approach meets its span's segment and an on-ramp
+  there). A longer dip is ground the way comes down to (two creek bridges on one segment).
+- **Tunnels.** A portal is open where the map is whole: its fog under `fog.start`, in a square
+  that is written. Anywhere else it is closed by a barrier: that end is `null`, the open one
+  first, and a tunnel with no open portal is left out. So the Holland and Lincoln tunnels are
+  closed at their New Jersey portals (2.0 and 1.6 km from the city, where the map fades), as
+  are a few underpasses past the city line in Nassau and New Jersey.
+- **`--around lon,lat,metres`** writes only the squares within that distance of a point and
+  leaves the others as they are; the version is still a hash of every file. It reads the whole
+  city all the same (node numbers are the whole city's, and a square's shore and boats need
+  the masks round it): Times Square at 600 m takes 20 to 45 s and 3 GB, 40 squares, 0.2 MB; the
+  7 × 7 squares round it come to 0.27 MB.
+- A value that does not fit its array (a vertex 3.2 km from its square's corner, a volume below
+  the ground, a ring of more than 65,535 vertices) stops the run with the square and the array
+  named, rather than writing a wrong square.
+- **`--stamp`** only writes the version of the walk folder already there into the manifest (for a
+  walk made elsewhere and copied in). `render` keeps the manifest's `walk` when it writes a new
+  manifest (of the city's own view; the other view's keeps none): the walk is cut from the
+  scene, not the tiles.
+- New York, the whole city: 212 s, 37,246 squares, 117.7 MB gzipped (before gzip the largest
+  arrays are `shore`, 148 MB, and `vol.xy`, 34 MB), 1,719 boats; the largest square is 22 kB.
+  It peaks around 6 GB of memory, which the `cli` script's heap allows.
 
 ## How a tile is drawn (`render/chunk.ts`)
 

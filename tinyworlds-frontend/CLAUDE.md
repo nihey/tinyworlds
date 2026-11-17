@@ -135,9 +135,16 @@ src/
 │   ├── life.ts          # ferries and flights
 │   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
 │   ├── quiz.ts          # Guess the building's questions (quiz.<locale>.json): parseQuiz
+│   ├── person.ts        # the street walk's little person, one character per pixel
+│   ├── walker.ts        # the walk on the map: you and your view cone, the drop's lit ways
 │   └── __tests__/
+├── walk/                # the street walk (below): pure simulation, its data, and render/
+│                        # (three.js); reached only through import()
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
+├── components/walk/     # the street walk's screen (walk-screen.tsx, by import() only), its
+│                        # signs, wasted screen, controls menu and touch pad; the person in
+│                        # the tool column (walk-person.tsx)
 ├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
 │                        # "Build the next city" (build-next.tsx), a city's card and its
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
@@ -172,7 +179,8 @@ src/
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
-│                        # useAdminSession, useLists, useJoinReturn, …
+│                        # useAdminSession, useLists, useJoinReturn, useStreetWalk (the
+│                        # walk as the map sees it), …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
@@ -501,11 +509,13 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   same sign.
 - **What the page analytics hear** (`lib/site-events.ts`): `donate_open`, `donate_checkout`,
   `donate_cancelled`, `donate_complete` (the conversion, with `value` in US$ and `currency`),
-  `explore_more` and `quiz_start`, each with `world` (and `city`, `amount` when there are). `siteEvent()` pushes
+  `explore_more`, `quiz_start` and `walk_start` (a street walk opened), each with `world` (and
+  `city`, `amount` when there are). `siteEvent()` pushes
   every one to Tag Manager's `dataLayer`, where the container sends it on to Google Analytics.
   Rybbit hears the clicks from declarative hooks on the buttons (`data-rybbit-event` with
   `data-rybbit-prop-world`, `-city`, `-amount`), so `siteEvent(…, { rybbit: true })` is only for
-  the two returns from the checkout, which no click marks. What the donor chose rides to the
+  what no click marks: the two returns from the checkout, and `walk_start` (said once the walk
+  has opened: the person's button is pressed for drags, taps and drops that find no street). What the donor chose rides to the
   checkout and back in session storage (`tinyworlds.checkout`); only an API checkout returns
   here, so a payment-link donation is not a `donate_complete` (the API still knows it from
   Stripe). Every message carries all its keys, `undefined` when absent, because the data layer
@@ -818,7 +828,9 @@ runway. It only animates things that are never hidden behind a building, because
 no depth information: no cars.
 
 Layers are called every frame while life is on; with `prefers-reduced-motion` they are called
-once per redraw with `timeMs = 0`. The live engine is also on `window.tinyworld` for the console.
+once per redraw with `timeMs = 0`. A layer added with `{ always: true }` is a sign, not life (the
+street walk's person and the drop's lit ways, `map/walker.ts`): it is drawn with life off too,
+whenever the map is redrawn. The live engine is also on `window.tinyworld` for the console.
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
@@ -936,7 +948,8 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
   points every data URL at the other set (`setMapView`, `viewDataBase` in `map/data.ts`) and
   starts the engine again from the address bar, as a shared link would. A game of Guess the
   building ends first. Nothing of one view is mixed with the other's: `dataUrl()` follows the
-  view by default, so the minimap and the quiz follow too.
+  view by default, so the minimap and the quiz follow too. The street walk is the one exception:
+  it is the world's own whichever way the map is turned (`worldDataUrl`, below).
 - **Remembered per world** in the visitor's preferences (`prefs.view`, `"north"` by default), not
   in the shared link: a link always opens north up. The tab reads it once, when it opens (the
   view is in no markup before the map is in, so the page still hydrates as prerendered): turning
@@ -946,6 +959,185 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
   whose compass, the one way out, is never drawn.
 - The About notes say so in each language: north is up, and the compass turns the map the way
   it was first drawn.
+
+## The street walk (`src/walk/`, `components/walk/`)
+
+In a world with `walk: true` (New York) whose manifest names `walk` (the data has `walk/`), the
+city can be walked at street level, in 3D: on foot, at the wheel and on the water. The root
+`CLAUDE.md` has the data (`walk/walk.json`, `walk/cells/<i>_<j>.bin`) and the design is
+`docs/superpowers/specs/2026-11-16-street-walk-design.md`.
+
+- **One walk for both views.** The walk is in metres, so it is the world's own (`walk/` of its
+  own folder, never `grid/`): its files come through `worldDataUrl` with the version the
+  world's own manifest names. North up that is the map's manifest; turned to the street grid,
+  whose manifest names no walk, `map-app.tsx` reads the world's own beside it
+  (`loadWorldManifest`, `walkManifest`), and the person stands in the tools once it is in. On
+  the map side everything goes through the engine's current projection: `mapFrame` (in
+  `walk/load.ts`) takes the walk's metres to the map's px through lon/lat, and the drop
+  (`dropAtMap`, `pickDeck`), the lit ways (`waysNearMap`, `dropHighlight`) and the click beside
+  the walk take it; you and your cone are placed with `engine.projection` (`walkerPoint`).
+  Turning the map starts a new engine; the compass is not there while walking, so a walk never
+  outlives its map.
+- **Nothing of it is in the map's first bundle.** `walk-screen.tsx` is the only way in: its
+  default export is reached by `import()` from `useStreetWalk` (`hooks/use-street-walk.ts`,
+  the walk as the map sees it) when a walk opens, and three.js and every module under
+  `src/walk/` come with it. First the tiny `walk/webgl.ts` says whether the browser can draw
+  it at all (WebGL 2, and a browser that can unzip the squares): otherwise a toast says so and
+  nothing more is downloaded. It is asked as soon as the person is picked up (dragged or
+  tapped), before the drop's squares are fetched or "Let go to walk here" is said. The map itself
+  carries only the person's button (`walk-person.tsx`, `map/person.ts`), the hook, the walk
+  link's parser (`map/hash.ts`) and the split's CSS; `map/walker.ts` and the drop's data
+  (`walk/load.ts`) are imported when the person is picked up or a walk opens.
+- **Getting in.** The little person stands in the tool column (in the map's pixel style, its
+  shirt the accent; not anyone else's figure). Drag it onto the map: the ways near the pointer
+  it can stand on light up (`dropHighlight`, from the squares under the pointer, read as it
+  moves) and it dangles over the spot with "Let go to walk here" or "No street here". A point
+  of the map is taken as the map draws it (`WalkData.dropAtMap`): bridges and overpasses are
+  drawn raised by z·kz, so a deck is hit where it is drawn (`pickDeck`, in map px, within its
+  half-width) and not at its footprint (71 m away for the Brooklyn Bridge's 41 m span); off
+  any deck, `snapDrop` puts it on the nearest sidewalk or street to the ground point within
+  150 m, facing along it; nothing near is the "No street here" toast and no walk. A tap on the
+  person then a tap on the map does the same (`armed`, the map's own tap taken by the hook;
+  its sign says tap or click after what pressed the person; Esc lets go). **W** (free among
+  the map's keys), or the button from the keyboard, puts it down in the middle of the map. A
+  link `#walk=lat,lon,heading` opens the walk there (`parseWalkHash`, also on `hashchange`; a
+  link carries no height, so on a deck's footprint it opens on the deck), and the walk writes
+  one through `writeHash` whenever you stand still. Analytics: `walk_start` through
+  `siteEvent` with `world`, Rybbit included, once the walk has opened.
+- **The split** (`.walk-split` in `globals.css`): the walk 7, the map 3, side by side; stacked
+  (the map below) under 800 px or in portrait. The map is the same `MapEngine` on its two
+  canvases, moved into the grid's map cell: it follows you (`jumpTo` on every move, the wheel
+  zooming about you), draws you and a view cone (`walkerLayer`) at your height (on a bridge,
+  on its deck as the map draws it: the walk tells the map the surface under your feet, from
+  the game's own height, never the camera's), and a click
+  or tap on it takes you there (`dropAtScreen`, then the game's `teleport`). Its other signs
+  give way (search, banners, quiz, tools, minimap, the building spotlight); "Click (or Tap)
+  the map to go there" and the credit stay. M or "Back to the map" leaves with the map centred
+  where you are, from the moment the walk is asked for: while its code downloads, while it
+  loads and after it fails.
+- **The screen** (`WalkScreen`): checks WebGL 2 again (`canDrawWalk`), reads `walk.json`
+  ("couldn't start" with Try again, on a new canvas, and Back), builds
+  `WalkView` (the renderer) and `WalkGame` (the game: `game.ts` and the modules it ties
+  together), and takes the keys while it is open (not while typing or while a dialog is open:
+  the map's own keys stand aside), the mouse through pointer lock (a click on the view asks,
+  "Click to look around" until then, Esc lets go), and on a touch screen the touch pad. New
+  York's first walk of the visit, opened within 400 m of the manifest's `start`, finds a red
+  supercar parked there (`starter`; put elsewhere before its squares are in, or after 15 s
+  whatever they do, it is given up, so the streets still park). A phone may take the GPU back
+  (`webglcontextlost`): the walk says it stopped, and Try again opens where you were.
+- **Automatic quality** (`walk/quality.ts`, `QualityLadder`): under 30 fps for 3 s (counted a
+  few seconds after the first squares are in, while the page is in view), one step down, then
+  3 s more to see: the water's reflections, then fewer people and cars (150 → 90 → 60 people,
+  70 → 45 → 30 cars: `setCrowd`; the crowd lets the farthest out of sight go), then the pixels a
+  size bigger, up to 5, unless the visitor chose one. It never steps back up in a walk (quality
+  that comes and goes reads as a bug, and a phone slow in one street is slow in the next); the
+  crowd and the pixel size it reached stay for the visit's next walk. The map beside is told of
+  your moves at most 20 times a second (it is redrawn for each).
+- **The signs** (`walk-hud.tsx`, text from `walk/hud-text.ts`): the corner sign with the life
+  bar, always (20 pixel cells of 5, green, amber under 50, red under 25, flashing on a hit,
+  "Life 64 of 100" for a screen reader), the damage bar beside it at the wheel or "Wrecked",
+  the speed in the world's units (`units: "imperial"` is mph, else km/h) and the vehicle's
+  name, the line of keys built from the current bindings (not on touch), "F get in the taxi",
+  the messages, and the buttons (controls, back to the map: above even the wasted screen). A
+  hit reddens the view's edges (a plain red frame under reduced motion). React hears the game
+  only when what the signs say changes; what fades every frame goes to the DOM through refs.
+- **The wasted screen** (`wasted-overlay.tsx`): the word ("WASTED", "DETONADO", "ACABADO") in
+  Tiny5, paper white outlined one of its own pixels wide, over a vignette dithered in whole
+  pixels (a Bayer matrix on a small canvas), faded as `wastedAt` says; said once in a polite
+  live region (`wastedSaid`); a key or a tap skips once it is up. The greying, the slow motion
+  and the lifting camera are the game's and the view's.
+- **The controls** (`controls-menu.tsx`, a shadcn `Dialog`, P or its button): every action by
+  group with two keys; a key button waits for the next key (Esc stops waiting) and `rebind`
+  takes it from whatever it would clash with; "Reset to defaults"; the pixel size (1 to 6) and
+  the sound switch. Defaults are GTA's keyboard plus turning on the arrows and M for the map
+  (`walk/controls.ts`).
+- **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half,
+  dragging the right half looks, buttons for jump and get in on foot, horn, camera, brake and
+  get out at the wheel.
+- **The water** (the rules and their numbers in `walk/water.ts`, the shader in
+  `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
+  according to" a write-up of layered pixel-art water, whose ideas are re-made here for a
+  first-person view. Every layer picks one palette tone per pixel, never a blend; where two
+  tones meet, the line is crossed in a 4 × 4 Bayer pattern over a few pixels. Each square with
+  water has its own surface (and the open water lies only where no square is shown, so the
+  water is drawn once, after the ground's depth), shaded by a field made once from the data's
+  `shore` (`shoreField` in `render/shore.ts`: the distance to land, smoothed so the bands
+  follow the bank, which way the land lies, and the land's own distance to the water; a wet
+  square whose data lacks `shore` is drawn as the open water is, never a hole). Past the edge of
+  the data the open water lies only where no shown square beside it is all land, so where the
+  data ends inland the city ends in the fog's wall. The layers: **depth** (a teal shallow rim at
+  the shore, 2 m but never more than a few pixels across, a light rim, the base, the deep beyond
+  about 14 m), as the shore says at any angle, darker away from the land from a bridge as from
+  the water (an angle band once drew a dark ring round anyone looking down from a bridge);
+  **the horizon** (towards it the sky takes the depth back a shade at a time, up to the map's
+  water, so along any look outwards the water changes with the shore, then only lightens);
+  **reflections** (a camera mirrored under the surface
+  draws everything but the sky, the water, the ground and the particles into a picture of the
+  drawing's size, half of it on a touch screen; the water reads it in three flat tones, one,
+  two and three shades under the water they lie on, so they always show, its rows shifted
+  sideways by whole pixels the farther they are under their foot (a pixel whose own texel is
+  sky takes a neighbour's that sways onto it, `mirrorSource`, so a cable is not dotted), a
+  shade fewer at a time with the fog along the mirrored path); **the shore** (the first metre
+  of land a shade darker, not on a pier nor on what is painted over one, a plaza or a path on
+  it; on a near, lit shore a light lapping line two or three cells out, a pixel or
+  two wide, in dashes travelling along it; on a quiet one, farther than 150 m or facing away
+  from the sun, a dark line where it meets the water instead; a broken light line at the
+  waterline of what stands in the water, bridge piers, piles and boats, whose walls reach down
+  to it); **the living surface** (short horizontal dashes a shade lighter or darker, one in
+  some squares of a world grid whose squares double where they would be too small on screen,
+  so they stay a few pixels apart, drifting and showing for part of the loop); **glints** on
+  the open water, new places every loop; and **ripple rings** round every splash, a person
+  knocked off a quay too (`particles.ts`; the crowd says who went in, `CrowdEvents.splashes`). Every motion is a whole number of cycles in a 5 s loop. Under reduced
+  motion nothing on the water moves (no wobble, no glints, the lapping on its near ring, the
+  dashes still); the rings, being events, still show. What lies on the water or is the ground
+  goes on the layer `NOT_MIRRORED`; the shore's own faces mark themselves in the mirror's
+  alpha, so they get no light line. The mirror costs about one more drawing of the city: it is
+  drawn only when a square's water within 500 m is in the camera's view (`waterInView`), and
+  let go for the rest of the walk when the frames that drew it stay under 40 fps for 2 s
+  (`SlowWatch`: a slow street far from the water says nothing of the mirror's cost; a frame
+  over 1 s is a gap); the automatic quality's first step lets it go too.
+  `view.setReflections(on)` sets it again, `view.reflections` says whether it is on.
+- **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
+  than the gaps between its lines), so which deck you are on is told by your history and your
+  direction (`surfaceUnder`'s `on` and `going`). You stay on the way you are on while its strip
+  holds you, whatever rises or falls beside it; another takes over only where the two are one
+  surface (within 0.2 m for a car, 0.09 m for a walker: less than either's snap down) and goes
+  your way clearly better (a car's direction is where it will point in half a second, so a
+  driver turning onto a branch at a fork gets it). Coming off a way's end or edge, landing or
+  put down, you are on the deck nearest your height that fits best: nearest its line as a share
+  of its half-width, its direction nearest yours, of the kind you were on (footway after
+  footway); a car goes onto a footway only where no roadway is, and ties go to the deck nearest
+  your height, never to the higher. A car (and a walker) keeps the way it was last on through
+  the air and comes down on it. A way's round end counts only where no way holds the point
+  beside its line, where it stands well above them (the outside of a bend), or where it is
+  nearer your height than what is beside (the outside of a joint, a ledge the data leaves
+  between two ways' ends), so where one way ends and the next goes on down there is no ledge.
+  A deck holds you 0.5 m past its rails. **A rail stands for a body on its own way** unless what
+  lies 0.8 m past it (a deck, the ground) is within 0.5 m of the deck: where a branch parts from
+  yours, its rail holds you on yours. For anyone else a rail is open where another way's deck is
+  within 3 m of it (`JOIN_HEIGHT`: a car and a rail), so a car on the other way, in whose lanes
+  it lies, passes. Rails are closed round the outside of a bend, and each square gives the
+  pieces along its own stretch, so none is missing where a way crosses into the next square.
+  In a way's strip, from 0.5 m under its deck (three times its grade there, a car's nose on a
+  steep ramp, where that is more) to 5 m over it, no volume is a wall: the towers' openings, the
+  Queensboro's columns under its upper deck; at a gentle ramp's foot that reaches only its
+  first 6 m.
+- **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
+  try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
+  one cannot bind a key to two clashing actions). The pixel size and the sound last for the
+  visit, in memory. It sends nothing (no API): the privacy policy lists the keys under
+  `#your-browser`.
+- **The modules** (`src/walk/`, no React): `format.ts` `walk-index.ts` `cell.ts` `geo.ts`
+  (the data, in world metres east and north of the projection's origin), `load.ts` (fetching
+  it, `?v=<manifest.walk>`, and `mapFrame`: the walk on the map being shown), `world.ts` (surfaces, water, walls), `player.ts` `health.ts`
+  `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
+  `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
+  `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,
+  `quality.ts`, `game.ts`;
+  `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
+  `deck-mesh.ts` `shore.ts`, `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
+  production build has no `window.walk`: development builds put the game there for the
+  console (`walk.sim(5)`, `walk.state`).
 
 ## Design
 
@@ -973,4 +1165,5 @@ exposed to Tailwind as `bg-sign`, `text-paper-dim`, `bg-taxi`, etc.
 - A Radix tooltip and popover on the same button both set `data-state`; style open buttons with
   `aria-expanded` / `aria-pressed` instead.
 - Keyboard shortcuts are in `map-app.tsx` and are ignored while typing or while a dialog or the
-  settings panel is open.
+  settings panel is open; while a street walk is open they stand aside and the walk's own
+  (`walk-screen.tsx`, by `KeyboardEvent.code`, rebindable) take over.

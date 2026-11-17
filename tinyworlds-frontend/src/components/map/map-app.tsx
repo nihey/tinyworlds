@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { toast } from "sonner";
 import { DonateDialog } from "@/components/donate/donate-dialog";
 import { ExploreBanner } from "@/components/map/explore-banner";
+import { WalkPerson } from "@/components/walk/walk-person";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useQuiz } from "@/hooks/use-quiz";
 import { usePrefs } from "@/hooks/use-prefs";
+import { useStreetWalk, walkLinkView } from "@/hooks/use-street-walk";
 import {
   useDocumentLanguage,
   useDonationReturn,
@@ -28,6 +30,7 @@ import {
   loadPlaces,
   loadSights,
   loadSightTexts,
+  loadWorldManifest,
   setMapView,
 } from "@/map/data";
 import type { Sight, SightTexts } from "@/map/sights";
@@ -63,7 +66,6 @@ interface Session {
 }
 
 const PAN_STEP = 160; // CSS px per arrow key press
-
 /** The whole page: the map's two canvases, and the signs floating over them. */
 export function MapApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -113,6 +115,28 @@ export function MapApp() {
       ? "grid"
       : "north",
   );
+  // what a finger or a mouse does to the map beside the walk
+  const coarse = useMediaQuery("(pointer: coarse)");
+  // the world's own manifest, whichever way the map is turned: the street walk is one for both
+  // views, and that manifest names its version (north up it is the map's own; turned to the
+  // street grid it is read beside the map's)
+  const [walkManifest, setWalkManifest] = useState<Manifest | null>(null);
+
+  // the street walk: the person put down on the map, the split, and the way back
+  const street = useStreetWalk({
+    engine,
+    manifest: session ? walkManifest : null,
+    canvasRef,
+    sights,
+    // the map's other signs give way
+    onOpening: () => {
+      quizRef.current.stop();
+      setQuery("");
+      setSettingsOpen(false);
+    },
+  });
+  // the hook's ref and setter stay the same object for the page's life
+  const { walking, walkingRef, setArmed } = street;
 
   // Load the manifest, then start the engine on the two canvases; places and hoods follow.
   // Turning the map starts it all again on the other view's data, where the map was.
@@ -123,6 +147,14 @@ export function MapApp() {
     const abort = new AbortController();
     let started: MapEngine | null = null;
     setMapView(view);
+
+    // turned to the street grid, the walk's version is in the world's own manifest: asked at
+    // once, beside the map's (a failure only leaves the walk out of this view)
+    const own =
+      WORLD.walk && view === "grid" && WORLD.turn === "grid"
+        ? loadWorldManifest(abort.signal)
+        : null;
+    own?.catch(() => {});
 
     (async () => {
       try {
@@ -135,11 +167,20 @@ export function MapApp() {
           tileUrl: (z, tx, ty) => dataUrl(`tiles/${z}/${tx}_${ty}.webp`, manifest.build),
           fileUrl: (path) => dataUrl(path, manifest.indexes),
           reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-          start: parseHash(window.location.hash) ?? undefined,
+          start: parseHash(window.location.hash) ?? walkLinkView(window.location.hash),
         });
         started = live;
         window.tinyworld = live; // a handle for the console: tinyworld.flyTo({ lon, lat })
         setSession({ manifest, engine: live });
+        if (WORLD.walk) {
+          if (!own) setWalkManifest(manifest);
+          else
+            own
+              .then((m) => {
+                if (!abort.signal.aborted) setWalkManifest(m);
+              })
+              .catch(() => {});
+        }
 
         // the map is usable without these; search and lines arrive when they arrive
         loadPlaces(manifest.indexes, abort.signal)
@@ -171,7 +212,8 @@ export function MapApp() {
             loadSights(manifest.indexes, abort.signal)
               .then((list) => {
                 if (abort.signal.aborted) return;
-                live.setSights(list);
+                // beside the walk no building lights up: they will when it closes
+                if (!walkingRef.current) live.setSights(list);
                 setSights(list);
               })
               .catch(() => {});
@@ -197,12 +239,13 @@ export function MapApp() {
       abort.abort();
       started?.destroy();
     };
-  }, [attempt, view]);
+  }, [attempt, view, walkingRef]);
 
   const retry = () => {
     setErrorMessage(null);
     setFailed(false);
     setSession(null);
+    setWalkManifest(null);
     setPlaces(null);
     setPlacesFailed(false);
     setHasHoods(false);
@@ -249,6 +292,7 @@ export function MapApp() {
     if (quizOn) quiz.stop();
     writeHash(formatHash({ ...engine.getCentre(), scale: engine.getView().scale }));
     setSession(null);
+    setWalkManifest(null);
     setPlaces(null);
     setPlacesFailed(false);
     setHasHoods(false);
@@ -276,21 +320,24 @@ export function MapApp() {
   useEffect(() => {
     if (!engine) return;
     const write = () => {
+      // while walking the address holds the walk link, written by the walk
+      if (walkingRef.current) return;
       const centre = engine.getCentre();
       const hash = formatHash({ ...centre, scale: engine.getView().scale });
       if (window.location.hash !== hash) writeHash(hash);
     };
     const off = engine.on("settle", write);
     const onHashChange = () => {
+      // a walk link is the walk's (useStreetWalk)
       const view = parseHash(window.location.hash);
-      if (view) engine.flyTo(view);
+      if (view && !walkingRef.current) engine.flyTo(view);
     };
     window.addEventListener("hashchange", onHashChange);
     return () => {
       off();
       window.removeEventListener("hashchange", onHashChange);
     };
-  }, [engine]);
+  }, [engine, walkingRef]);
 
   const index = useMemo(() => (places ? createSearchIndex(places) : null), [places]);
 
@@ -327,9 +374,15 @@ export function MapApp() {
   }, [engine, t]);
 
   // keys
+  const walkKeyRef = useRef(street.putDownAtCentre);
+  useEffect(() => {
+    walkKeyRef.current = street.putDownAtCentre;
+  });
   useEffect(() => {
     if (!engine) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      // the walk takes the keys while it is open
+      if (walkingRef.current) return;
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)))
@@ -394,8 +447,15 @@ export function MapApp() {
         case "M":
           toggle("minimap");
           break;
+        case "w":
+        case "W":
+          // the little person, picked up and put down in the middle of the map
+          if (!WORLD.walk || e.repeat) return;
+          walkKeyRef.current();
+          break;
         case "Escape":
           setQuery("");
+          setArmed(null);
           engine.setPin(null);
           engine.releaseSight();
           break;
@@ -406,7 +466,7 @@ export function MapApp() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [engine, hasHoods]);
+  }, [engine, hasHoods, walkingRef, setArmed]);
 
   const tiltOn = prefs.tilt && prefs.tiltStrength > 0;
   const rootStyle = {
@@ -417,7 +477,10 @@ export function MapApp() {
     ({ "--sign-delay": `${ms}ms`, "--sign-from": `${from}px` }) as CSSProperties;
 
   return (
-    <div className={cn("map-root", tiltOn && "tilt-on")} style={rootStyle}>
+    <div
+      className={cn("map-root", tiltOn && !walking && "tilt-on", walking && "walk-split")}
+      style={rootStyle}
+    >
       <canvas ref={canvasRef} className="map-tiles" tabIndex={0} aria-label={copy.mapLabel} />
       <div aria-hidden className="dusk-wash" />
       <div aria-hidden className="tilt-band" data-edge="top" data-depth="near" />
@@ -428,7 +491,45 @@ export function MapApp() {
 
       {!session && <Splash failed={failed} onRetry={retry} />}
 
-      {session && engine && (
+      {/* the street walk, large, with the map beside it (below it on a phone) */}
+      {session && walking && (
+        <div className="walk-area">
+          {street.Screen && street.screenProps ? (
+            <street.Screen {...street.screenProps} />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-sign p-4">
+              <div className="sign flex flex-col items-center gap-3 px-5 py-4 text-sm">
+                <p role="status" className="font-semibold">
+                  {t.walk.loading}
+                </p>
+                {/* the walk's own keys are not there yet: the way back is */}
+                <button
+                  type="button"
+                  onClick={street.leave}
+                  className="h-8 rounded-full bg-sign-raised px-3.5 text-xs font-semibold hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-taxi focus-visible:outline-none"
+                >
+                  {t.walk.back}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {session && engine && walking && (
+        <div className="walk-map-signs">
+          <p className="sign absolute top-2 left-2 rounded-full px-3 py-1.5 text-xs font-semibold text-paper-dim">
+            {coarse ? t.walk.mapTapThere : t.walk.mapGoThere}
+          </p>
+          <CreditStrip
+            engine={engine}
+            onAbout={() => setAboutOpen(true)}
+            readout={false}
+            className="pointer-events-auto absolute right-2 bottom-2"
+          />
+        </div>
+      )}
+
+      {session && engine && !walking && (
         <>
           {lit && litSight && !quizRound && (
             <SightSign
@@ -508,6 +609,19 @@ export function MapApp() {
             settingsOpen={settingsOpen}
             onSettingsOpenChange={setSettingsOpen}
             settings={<SettingsPanel prefs={prefs} onChange={setPrefs} hoodLines={hasHoods} />}
+            person={
+              street.canWalk ? (
+                <WalkPerson
+                  engine={engine}
+                  version={street.version}
+                  armed={street.armed}
+                  onArmedChange={setArmed}
+                  onDropAt={street.putDownAtScreen}
+                  onCentre={street.putDownAtCentre}
+                  canDraw={street.canDraw}
+                />
+              ) : undefined
+            }
             className="sign-in fixed top-[calc(var(--edge-t)+3.9375rem)] right-(--edge-r) sm:top-(--edge-t)"
             style={delay(140)}
           />
@@ -533,6 +647,7 @@ export function MapApp() {
         onOpenChange={setAboutOpen}
         attribution={session?.manifest.attribution ?? []}
         hoodLines={hasHoods}
+        canWalk={street.canWalk}
         onDonate={
           takesDonations
             ? () => {

@@ -80,6 +80,8 @@ export const tinynyc: World = {
   accent: { color: "#f7c21b", ink: "#1a1503" },
   sights: true,
   quiz: true,
+  walk: true,
+  units: "imperial",
   search: {
     ...EN_RULES,
     // what follows a place's name to say which city it is in: read past at the end of a query

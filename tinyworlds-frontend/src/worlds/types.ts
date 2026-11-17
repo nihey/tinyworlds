@@ -79,6 +79,16 @@ export interface World {
    * from one to the other. Without it the compass only says where north is.
    */
   turn?: "grid";
+  /**
+   * Its data has the street walk (walk/, in its own folder: one walk whichever way the map is
+   * turned): the little person on the map opens a walk at street level, on foot, at the wheel or
+   * on the water. Without it the viewer never asks for the files.
+   */
+  walk?: boolean;
+  /**
+   * Speeds in the walk are in miles per hour (the country drives by them). Absent: km/h.
+   */
+  units?: "imperial";
   /** How queries are read. This follows the language of the map's names, not the interface's. */
   search: SearchRules;
 }

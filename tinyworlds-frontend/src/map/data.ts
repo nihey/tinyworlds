@@ -60,6 +60,14 @@ export function dataUrl(path: string, build?: string, dataBase = viewBase): stri
   return build ? `${url}?v=${encodeURIComponent(build)}` : url;
 }
 
+/**
+ * URL of a file in the world's own data folder, whichever way the map is turned: the street
+ * walk's, one for both views (it is in metres, not map px), with its version as a cache key.
+ */
+export function worldDataUrl(path: string, version?: string): string {
+  return dataUrl(path, version, DATA_BASE);
+}
+
 async function getJson(url: string, init?: RequestInit): Promise<unknown> {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(activeStrings().errors.answered(url, res.status));
@@ -69,6 +77,14 @@ async function getJson(url: string, init?: RequestInit): Promise<unknown> {
 /** The manifest names the build, so it is the one file always revalidated with the server. */
 export async function loadManifest(signal?: AbortSignal): Promise<Manifest> {
   return parseManifest(await getJson(dataUrl("manifest.json"), { cache: "no-cache", signal }));
+}
+
+/**
+ * The world's own manifest (north up), whichever way the map is turned: the one that names the
+ * street walk's version. Turned to the street grid, the map reads it beside its own.
+ */
+export async function loadWorldManifest(signal?: AbortSignal): Promise<Manifest> {
+  return parseManifest(await getJson(worldDataUrl("manifest.json"), { cache: "no-cache", signal }));
 }
 
 export async function loadPlaces(build: string, signal?: AbortSignal): Promise<Place[]> {
@@ -101,9 +117,18 @@ export function parseFlights(value: unknown): Flight[] {
   return flights;
 }
 
-/** Routes for the life layer. Optional: an older data set simply has no ferries or flights. */
-export async function loadLife(build: string, signal?: AbortSignal): Promise<LifeFile> {
-  const file = (await getJson(dataUrl("life.json", build), { signal })) as Partial<LifeFile>;
+/**
+ * Routes for the life layer. Optional: an older data set simply has no ferries or flights.
+ * `own`: from the world's own folder whichever way the map is turned (the street walk's ferries,
+ * with the version of the world's own manifest).
+ */
+export async function loadLife(
+  build: string,
+  signal?: AbortSignal,
+  { own = false }: { own?: boolean } = {},
+): Promise<LifeFile> {
+  const url = own ? worldDataUrl("life.json", build) : dataUrl("life.json", build);
+  const file = (await getJson(url, { signal })) as Partial<LifeFile>;
   return {
     ferries: Array.isArray(file?.ferries) ? file.ferries.filter((f) => Array.isArray(f?.path)) : [],
     flights: parseFlights(file?.flights),
