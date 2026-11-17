@@ -580,6 +580,11 @@ whose shadows reach it, and margins for both.
   (`scene/brooklyn-arches.ts`). Each opening begins under the lowest mapped deck through its
   tower. The recesses widen at the entrances so the openings remain visible from both map views.
   The scene assigns every piece to Brooklyn Bridge so the sight outline uses the new openings.
+- Surveyed pairs of steel suspension towers in New York and Philadelphia use profiles in
+  `scene/suspension-tower.ts`. The scene intersects their footprints with aligned deck steps
+  to set each portal's width and clearance, then adds the span's arches, crossbeams or bracing
+  and seats the main cables over the legs. The city and the surveyed support height identify
+  the profile. Each rebuilt tower is owned by the named bridge.
 - A deck only comes down where its bridge ends. Pieces that meet end to end are one bridge, and
   `holdDecks` (`scene/decks.ts`) keeps it up over land it merely passes: between two crossings it
   stays at the lower of their crests (the Queensboro over Roosevelt Island, the Throgs Neck over
@@ -618,7 +623,9 @@ whose shadows reach it, and margins for both.
 - **Towers mapped as buildings.** Cincinnati's Roebling Bridge has detailed towers in the
   building data, not bridge supports, so nothing would string cables between them: the city
   names the span in `suspensions` (the two tower tops, the cables' height, how far out they are
-  anchored), and the scene strings it like the data's. For it to light up as one bridge, the
+  anchored), and the scene strings it like the data's. The roadway and sidewalks rise to the
+  23 m mapped footings, and `scene/roebling-tower.ts` builds round crowns beneath the lintels.
+  For it to light up as one bridge, the
   building's name goes in `sights.bridges` with the roads' other names: a building of a name
   listed there is filed under it in `owners.json`.
 - **Boats the data has no route for** (`boats`: Cincinnati's riverboat on the Ohio) sail like

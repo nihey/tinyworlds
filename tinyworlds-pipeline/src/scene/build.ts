@@ -8,6 +8,8 @@ import { GeomKind, readWkb } from "../geom/wkb.js";
 import { EARTH_RADIUS, makeGeo, makeProjection, type Projection } from "../projection.js";
 import { fillPolygon } from "../render/raster.js";
 import { brooklynArchVolumes } from "./brooklyn-arches.js";
+import { ROEBLING_DECK_HEIGHT, ROEBLING_ROAD_WIDTH, roeblingPortalShoulders } from "./roebling-tower.js";
+import { deckAtTower, mappedTowerFrame, steelTower } from "./suspension-tower.js";
 import {
   buildFog,
   buildFogBuiltUp,
@@ -656,11 +658,22 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   // ---- infrastructure: lots, piers, aprons, tanks, runways
   const tanks: { bytes: Uint8Array; height: number | null; cls: string }[] = [];
   const supports: { bytes: Uint8Array; height: number }[] = [];
+  // The George Washington Bridge's two tower footprints are surveyed as closed lines.
+  const infrastructureGeometry =
+    CITY.id === "tinynyc"
+      ? `CASE WHEN class = 'bridge_support' AND height = 184 AND ST_GeometryType(geometry) = 'LINESTRING'
+                   AND ST_IsClosed(geometry) AND ST_NPoints(geometry) >= 4
+              THEN ST_MakePolygon(geometry) ELSE geometry END`
+      : "geometry";
   await each(
     conn,
-    `SELECT subtype, class, height, ST_AsWKB(geometry), ST_GeometryType(geometry)::VARCHAR FROM '${raw("infrastructure.parquet")}'
-     WHERE subtype IN ('transit', 'pier', 'airport', 'utility', 'bridge', 'power')
-       AND ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON', 'LINESTRING')`,
+    `SELECT subtype, class, height, ST_AsWKB(geometry), ST_GeometryType(geometry)::VARCHAR
+     FROM (
+       SELECT subtype, class, height, ${infrastructureGeometry} AS geometry
+       FROM '${raw("infrastructure.parquet")}'
+       WHERE subtype IN ('transit', 'pier', 'airport', 'utility', 'bridge', 'power')
+     )
+     WHERE ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON', 'LINESTRING')`,
     (row) => {
       const cls = str(row[1]);
       const bytes = blob(row[3]);
@@ -751,6 +764,8 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   const cut: number[] = [];
   let bridges = 0;
   const bridgePieces: { pts: number[]; kind: number; width: number; name: string }[] = [];
+  const roeblingRoad = (name: string) =>
+    CITY.id === "tinycvg" && name === "John A. Roebling Suspension Bridge";
   await each(
     conn,
     `SELECT subtype, class, subclass,
@@ -781,6 +796,7 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
       if (n < 2 || !near()) return;
       const mapped = num(row[6]);
       const width = !rail && mapped && mapped > 2 && mapped < 60 ? mapped : spec.width;
+      const name = str(row[8]) ?? "";
 
       if (flags.length === 0 && levels.length === 0) {
         lines.add(mapBuf, n, spec.kind, width, 0);
@@ -805,7 +821,12 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         if (bridge) bridges++;
         const m = slicePath(n, a, b, k, cut);
         if (bridge && m >= 2)
-          bridgePieces.push({ pts: cut.slice(0, m * 2), kind: spec.kind, width, name: str(row[8]) ?? "" });
+          bridgePieces.push({
+            pts: cut.slice(0, m * 2),
+            kind: spec.kind,
+            width: roeblingRoad(name) ? ROEBLING_ROAD_WIDTH : width,
+            name,
+          });
         else lines.add(cut, m, spec.kind, width, 0);
       }
     },
@@ -1247,9 +1268,11 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
         const g = readWkb(bytes);
         if (!g || g.kind !== GeomKind.Polygon) return;
         const seed = hashString((row[0] as string) ?? "part");
+        const height = num(row[1]);
+        const base = num(row[3]) ?? 0;
         withParts++;
         for (const rings of g.parts) {
-          addVolume(rings, seed, num(row[1]), num(row[3]) ?? 0, {
+          const attrs: VolumeAttrs = {
             cls: str(row[5]),
             subtype: str(row[4]),
             floors: num(row[2]),
@@ -1261,7 +1284,24 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
             isPart: true,
             name: str(row[12]) ?? grounds.get(row[0] as string),
             keepHeight: str(row[12]) === null && grounds.has(row[0] as string) && row[13] === true,
-          });
+          };
+          addVolume(rings, seed, height, base, attrs);
+          if (
+            CITY.id === "tinycvg" &&
+            attrs.name === "John A. Roebling Bridge" &&
+            height === 57 &&
+            base === 46 &&
+            rings.length === 1
+          ) {
+            const n = project(proj, rings[0], true);
+            const outline = Array.from(gridBuf.subarray(0, n * 2));
+            for (const arch of roeblingPortalShoulders(outline, base)) {
+              const coords: number[] = [];
+              for (let j = 0; j < arch.ring.length; j += 2)
+                coords.push(...proj.toLonLat(...proj.gridToMap(arch.ring[j], arch.ring[j + 1])));
+              addVolume([Float64Array.from(coords)], seed, arch.top, arch.base, attrs);
+            }
+          }
         }
       },
     );
@@ -1478,6 +1518,35 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   // where the bridge ends: a step outside the steel stands as high as its share of the way there.
   const RAMP_REACH = 900;
   const steelBorne = laid.map((steps) => steps.map(() => false));
+  let roeblingDeckAt: ((p: number, q: number) => { height: number; ramp: boolean } | undefined) | undefined;
+  if (CITY.id === "tinycvg" && CITY.suspensions?.length) {
+    const span = CITY.suspensions[0];
+    const [p, q] = proj.toGrid(...span.a);
+    const [endP, endQ] = proj.toGrid(...span.b);
+    const length = Math.hypot(endP - p, endQ - q);
+    const up = (endP - p) / length;
+    const uq = (endQ - q) / length;
+    const landing = 86;
+    const footing = 11;
+    roeblingDeckAt = (mp, mq) => {
+      const along = (mp - p) * up + (mq - q) * uq;
+      const across = (mq - q) * up - (mp - p) * uq;
+      const beyond = Math.max(-along, along - length);
+      if (beyond >= landing || Math.abs(across) > 15) return;
+      const grade = 1 - Math.max(0, beyond - footing) / (landing - footing);
+      return { height: ROEBLING_DECK_HEIGHT * grade, ramp: beyond > footing };
+    };
+    bridgePieces.forEach(({ name, kind }, b) => {
+      if (!roeblingRoad(name) && kind !== G.Path) return;
+      laid[b].forEach(({ mp, mq, up: stepP, uq: stepQ }, n) => {
+        if (Math.abs(up * stepP + uq * stepQ) < 0.7) return;
+        const deck = roeblingDeckAt?.(mp, mq);
+        if (!deck) return;
+        runs[b].h[n] = deck.ramp ? Math.max(runs[b].h[n], deck.height) : deck.height;
+        steelBorne[b][n] = !deck.ramp;
+      });
+    });
+  }
   if (cantilevers.length > 0) {
     const paths: DeckPath[] = runs.map((r, b) => ({
       a: r.a,
@@ -1527,6 +1596,53 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   };
   const alongBrooklyn = archAxis();
 
+  const frames = new Map<number, { name: string; shape: NonNullable<ReturnType<typeof steelTower>> }>();
+  for (const pair of sameHeight.values()) {
+    if (pair.length !== 2) continue;
+    const [a, b] = pair;
+    const profile = mappedTowerFrame(CITY.id, a.height);
+    if (!profile) continue;
+    const span = Math.hypot(b.p - a.p, b.q - a.q);
+    if (span < 250 || span > 1600) continue;
+    const axis = [(b.p - a.p) / span, (b.q - a.q) / span] as const;
+    const [name, frame] = profile;
+    for (const tower of pair) {
+      const parts = supportParts[tower.support];
+      if (!parts || parts.length !== 1 || parts[0].length !== 1) continue;
+      const center = [tower.p, tower.q] as const;
+      const n = project(proj, parts[0][0], true);
+      const outline = Array.from(gridBuf.subarray(0, n * 2));
+      let halfWidth = 0;
+      for (let j = 0; j < outline.length; j += 2) {
+        const across = (outline[j + 1] - tower.q) * axis[0] - (outline[j] - tower.p) * axis[1];
+        halfWidth = Math.max(halfWidth, Math.abs(across));
+      }
+      const decks: NonNullable<ReturnType<typeof deckAtTower>>[] = [];
+      bridgePieces.forEach(({ width }, piece) => {
+        laid[piece].forEach((step, n) => {
+          if (Math.hypot(step.mp - tower.p, step.mq - tower.q) > halfWidth + 15) return;
+          const cut = deckAtTower(center, axis, halfWidth, {
+            p: step.p0,
+            q: step.q0,
+            up: step.up,
+            uq: step.uq,
+            a: step.a,
+            b: step.z,
+            width,
+            z: runs[piece].h[n],
+          });
+          if (cut) decks.push(cut);
+        });
+      });
+      const shape = steelTower(outline, center, axis, tower.height, decks, frame);
+      if (shape) frames.set(tower.support, { name, shape });
+    }
+  }
+  if (frames.size)
+    lap(
+      `steel portals: ${frames.size} towers, ${new Set([...frames.values()].map((f) => f.name)).size} bridges`,
+    );
+
   for (let i = 0; i < supports.length; i++) {
     const parts = supportParts[i];
     if (!parts) continue;
@@ -1550,6 +1666,17 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
           roof: R.tan,
         });
       own("Brooklyn Bridge", from);
+      continue;
+    }
+
+    const frame = frames.get(i);
+    if (frame) {
+      for (const part of frame.shape.pieces)
+        addShape(part.ring, seed, part.top, part.base, "bridge_support", F_NO_OUTLINE, {
+          wall: R.steel,
+          roof: R.steel,
+        });
+      own(frame.name, from);
       continue;
     }
 
@@ -1577,6 +1704,8 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   );
   /** How high the deck stands at a point: as the water has it, or held up over land. */
   const deckAt = (p: number, q: number): number => {
+    const deck = roeblingDeckAt?.(p, q);
+    if (deck && !deck.ramp) return deck.height;
     let h = deckHeight(p, q);
     for (const s of lifted) if (s.h > h && Math.hypot(s.p - p, s.q - q) < 20) h = s.h;
     return h;
@@ -1672,16 +1801,31 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     cabBox.push4(minX, minY, maxX, maxY);
     cabKind.push(kind);
   };
+  for (const { shape } of frames.values()) for (const brace of shape.braces) cable(3, brace);
   /** Two tower tops in grid metres, the height the cables leave them at, how far out they are anchored. */
-  const strung: { a: { p: number; q: number }; b: { p: number; q: number }; top: number; side?: number }[] =
-    [];
+  const strung: {
+    a: { p: number; q: number };
+    b: { p: number; q: number };
+    top: number;
+    side?: number;
+    offsets?: [[number, number], [number, number]];
+  }[] = [];
   for (let i = 0; i < towers.length; i++) {
     const a = towers[i];
     const pair = towers.filter((t) => Math.abs(t.height - a.height) < 0.5);
     if (pair.length !== 2) continue; // more of one height are a cantilever bridge, above
     const b = pair[0] === a ? pair[1] : pair[0];
     if (towers.indexOf(b) < i) continue;
-    strung.push({ a, b, top: a.height - 2 });
+    const first = frames.get(a.support);
+    const second = frames.get(b.support);
+    const offsets =
+      first && second
+        ? ([
+            [first.shape.cableOffsets[0], second.shape.cableOffsets[0]],
+            [first.shape.cableOffsets[1], second.shape.cableOffsets[1]],
+          ] as [[number, number], [number, number]])
+        : undefined;
+    strung.push({ a, b, top: a.height - 2, offsets });
   }
   // and the spans whose towers are buildings, which the city names
   for (const s of CITY.suspensions ?? []) {
@@ -1690,17 +1834,27 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     strung.push({ a: { p: ap, q: aq }, b: { p: bp, q: bq }, top: s.top, side: s.side });
   }
   let spans = 0;
-  for (const { a, b, top, side: anchored } of strung) {
+  for (const {
+    a,
+    b,
+    top,
+    side: anchored,
+    offsets = [
+      [-9, -9],
+      [9, 9],
+    ],
+  } of strung) {
     const span = Math.hypot(b.p - a.p, b.q - a.q);
     if (span < 250 || span > 1600) continue;
     spans++;
     const up = (b.p - a.p) / span;
     const uq = (b.q - a.q) / span;
     const side = anchored ?? span * 0.42;
-    for (const offset of [-9, 9]) {
-      const op = -uq * offset;
-      const oq = up * offset;
-      const at = (along: number): [number, number] => [a.p + up * along + op, a.q + uq * along + oq];
+    for (const [first, second] of offsets) {
+      const at = (along: number): [number, number] => {
+        const offset = first + (second - first) * Math.max(0, Math.min(1, along / span));
+        return [a.p + up * along - uq * offset, a.q + uq * along + up * offset];
+      };
       /** Height of the cable at a distance along the bridge, measured from tower A. */
       const cableAt = (along: number): number => {
         const [p, q] = at(along);
