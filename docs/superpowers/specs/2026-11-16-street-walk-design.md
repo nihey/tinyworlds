@@ -78,7 +78,12 @@ whole city, built for real, with its bridges, overpasses and water.
   the whole screen, with a minimap of the streets in its bottom-left corner (Layout, below).
 - **Mouse and keyboard** with pointer lock; **on a touch screen** a thumb stick on the left half
   and drag-to-look on the right half, with buttons for what keys do.
-- **Daytime only.** Signs and billboards are generic: no real brands anywhere.
+- **Daytime only.** Signs and billboards are generic: no real brands anywhere. After launch the
+  owner asked to "put the billboards in times square": the walls round the bowtie face the street
+  with animated pixel-art screens (pictograms, tickers of coloured blocks, sweeping bands, blinking
+  pictures) in the palette's bright colours, wordless (no brands, logos, letters or digits), placed
+  from the data so they are the same every visit; a world lists the areas that have them
+  (`billboards`). The viewer's `CLAUDE.md` has the rules.
 
 ## Calls made after the review (Claude's; the owner may change them)
 
@@ -321,6 +326,7 @@ tick on the rim where north is. No labels, no other marks, nothing of GTA's own 
   side, glints and ripple rings, all on one 5 s loop; the shore a low edge (quay stone along paved land and piers, a bank
   elsewhere);
 - trees as upright pixel billboards;
+- in Times Square, screens on the street-facing walls (the owner's later ask, under Signs above);
 - sky and a fog from 140 m to 560 m; squares within 3 load, beyond 4.5 unload;
 - rendered at a low resolution and scaled up without smoothing: pixel size 3 by default,
   changeable;
@@ -395,8 +401,11 @@ apart; an impulse with a little bounce (0.25) spins them by where they touched. 
 stops for 2.5 s, or leaves its lane and slides loose if the knock is hard (over 2.2 m/s); a
 parked car hit becomes loose. Loose cars slide, spin, slow and come to rest where they end up
 (kept while within 700 m), or roll off an edge and fall. Buildings and parapets stop a car,
-which slides along them. **Damage** per hit: (impact speed − 3 m/s) × 0.022, divided by the
-car's toughness; the lighter car takes more; a fall counts as a hit at the landing speed. From
+which slides along them. **Damage** per hit: (impact speed − 3 m/s) × 0.011, divided by the
+car's toughness; the lighter car takes more; a fall counts as a hit at the landing speed; boats
+the same. (It was 0.022 at launch; the owner then asked to "increase the level of damage cars can
+sustain", so every hit does half: a hatchback into a wall at 30 m/s is left smoking, not
+wrecked, and is wrecked from about 48 m/s.) From
 35% the glass cracks, from 55% the engine smokes, at 100% the car catches fire (9 s), turns black
 and smokes black, and will not drive; it is still solid and can be climbed. Damage costs
 acceleration. Sparks, glass and a crunch on hits; a dull boom on a wreck.

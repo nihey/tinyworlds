@@ -40,6 +40,13 @@ import {
   WOBBLE_STILL,
   WOBBLE_WAVE,
 } from "../water";
+import {
+  BILLBOARD_VERTEX,
+  billboardFragment,
+  pictogramTexture,
+  SCREEN_LOOP,
+} from "./billboard-material";
+import { screenColours } from "./billboard-mesh";
 import { DEEP, HALF, HIGH, LIT, OUTLINE, PAINT_DRY, SHADE, SHADES, type Palette } from "./palette";
 
 /**
@@ -656,6 +663,8 @@ export interface WalkMaterials {
   edge: THREE.ShaderMaterial;
   /** The sky's dome: drawn first, behind everything. */
   sky: THREE.ShaderMaterial;
+  /** Billboards' screens and their housings (`billboard-material.ts`). */
+  billboard: THREE.ShaderMaterial;
   /**
    * A square's own ground materials: its colours (no depth, painted in rank order), then its
    * depth (no colour), both cut out where `mask` (a 100 × 100 water mask, null for all land)
@@ -669,7 +678,8 @@ export interface WalkMaterials {
   waterOf(shore: THREE.Texture): THREE.ShaderMaterial;
   /** What the mirror saw this frame, for the water to read; null: no reflections. */
   mirror(m: Mirror | null): void;
-  /** Under reduced motion the water stands still: no wobble, no glints, the lapping on its near ring. */
+  /** Under reduced motion the water stands still (no wobble, no glints, the lapping on its near
+   * ring) and the billboards keep one frame each. */
   setStill(still: boolean): void;
   /** Once a frame: the clock (seconds), the camera and the drawing's size in pixels, for the water and the trees. */
   frame(time: number, camera: THREE.Camera, width: number, height: number): void;
@@ -851,6 +861,22 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
   });
   const land = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat);
   land.needsUpdate = true;
+  const pictograms = pictogramTexture();
+  const screens = screenColours(palette);
+  const billboardUniforms = {
+    ...shared,
+    clock: { value: 0 },
+    still: { value: 0 },
+    picto: { value: pictograms },
+    housing: { value: screens?.housing ?? 0 },
+    frameC: { value: screens?.frame ?? 0 },
+  };
+  const billboard = new THREE.ShaderMaterial({
+    uniforms: billboardUniforms,
+    vertexShader: BILLBOARD_VERTEX,
+    fragmentShader: billboardFragment({ hash: HASH, fog: FOG, palette: PALETTE }),
+    side: THREE.DoubleSide,
+  });
 
   return {
     wall,
@@ -861,6 +887,7 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     water,
     edge,
     sky,
+    billboard,
     ground(mask, shore) {
       const uniforms = {
         ...shared,
@@ -902,6 +929,7 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     },
     setStill(still) {
       waterShared.still.value = still ? 1 : 0;
+      billboardUniforms.still.value = still ? 1 : 0;
     },
     setGrey(amount) {
       shared.grey.value = Number.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
@@ -911,14 +939,16 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
       const t = Math.max(0, time);
       waterShared.loopT.value = t % LOOP;
       waterShared.loopN.value = Math.floor(t / LOOP) % 65536;
+      billboardUniforms.clock.value = t % SCREEN_LOOP;
       waterShared.screen.value.set(Math.max(1, width), Math.max(1, height));
       camRight.setFromMatrixColumn(camera.matrixWorld, 0).setY(0);
       if (camRight.lengthSq() < 1e-8) camRight.set(1, 0, 0);
       camRight.normalize();
     },
     dispose() {
-      for (const m of [wall, roof, deck, tree, cable, water, edge, sky]) m.dispose();
+      for (const m of [wall, roof, deck, tree, cable, water, edge, sky, billboard]) m.dispose();
       atlas.dispose();
+      pictograms.dispose();
       land.dispose();
       for (const t of [open, blank]) t.dispose();
     },

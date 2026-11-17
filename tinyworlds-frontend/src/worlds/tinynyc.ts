@@ -81,6 +81,9 @@ export const tinynyc: World = {
   sights: true,
   quiz: true,
   walk: true,
+  // Times Square: centred where Broadway crosses Seventh Avenue (the bowtie's waist, as the walk's
+  // streets have it), reaching West 42nd and West 47th Street
+  billboards: [{ lon: -73.98582, lat: 40.75759, radius: 215 }],
   units: "imperial",
   search: {
     ...EN_RULES,

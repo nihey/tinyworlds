@@ -86,6 +86,12 @@ export interface World {
    */
   walk?: boolean;
   /**
+   * Areas of the walk (a centre and a radius in metres) whose street-facing walls carry
+   * billboards: generic animated pixel-art screens, no brands, no words (`walk/render/billboards.ts`).
+   * Absent: none. Only read with `walk`.
+   */
+  billboards?: { lon: number; lat: number; radius: number }[];
+  /**
    * Speeds in the walk are in miles per hour (the country drives by them). Absent: km/h.
    */
   units?: "imperial";

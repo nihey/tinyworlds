@@ -80,9 +80,9 @@ describe("collide", () => {
     expect(bus.v).toBeGreaterThan(0);
     expect(hatch.v).toBeLessThan(15);
     expect(crunches.length).toBe(1);
-    // closing at 15: (15 − 3) × 0.022 × (2 · 12000 / 13100), the bus a third of its little share
-    expect(hatch.damage).toBeCloseTo(12 * 0.022 * ((2 * 12000) / 13100), 2);
-    expect(bus.damage).toBeCloseTo((12 * 0.022 * ((2 * 1100) / 13100)) / 3, 3);
+    // closing at 15: (15 − 3) × 0.011 × (2 · 12000 / 13100), the bus a third of its little share
+    expect(hatch.damage).toBeCloseTo(12 * 0.011 * ((2 * 12000) / 13100), 2);
+    expect(bus.damage).toBeCloseTo((12 * 0.011 * ((2 * 1100) / 13100)) / 3, 3);
   });
 
   it("knocks a traffic car loose when hit hard, for the game to keep, and only stops it when not", () => {
