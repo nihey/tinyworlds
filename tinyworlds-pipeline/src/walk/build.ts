@@ -23,7 +23,7 @@ import { readScene, type Arr } from "../scene/store.js";
 import { cutScene, squareArrays, type SceneSquare } from "./cut.js";
 import { encodeCell, packed, type CellArrays, type IntType } from "./format.js";
 import { CELL, cellKey, lonLatToEN, mapToEN, type Geo } from "./grid.js";
-import { solveHeights, type DeckAt } from "./heights.js";
+import { decksOf, solveHeights, type DeckAt, type DeckStats } from "./heights.js";
 import { waterAt } from "./mask.js";
 import { mooringsOf, type Mooring } from "./moorings.js";
 import { buildNetwork, type NetNode, type Network, type Tunnel } from "./network.js";
@@ -72,9 +72,10 @@ function holds(rings: number[][], e: number, n: number): boolean {
 }
 
 /**
- * The map's deck height under a point: the top of a floating deck volume (`F_FLOATING`,
- * `Roof.Deck`: the decks the scene raises over the water) whose footprint holds it, the highest
- * where several do, else null.
+ * The map's deck heights under a point: the top of every floating deck volume (`F_FLOATING`,
+ * `Roof.Deck`: the decks the scene raises over the water) whose footprint holds it, highest
+ * first; none off the decks. Where decks stack (the Queensboro's levels and ramps), which one a
+ * way is on is the heights' choice (`decksOf`).
  */
 export function deckAtFromScene(scene: Scene, geo: Geo): DeckAt {
   const A = scene.arrays;
@@ -115,13 +116,13 @@ export function deckAtFromScene(scene: Scene, geo: Geo): DeckAt {
       }
   }
   return (e, n) => {
-    let best: number | null = null;
+    const tops: number[] = [];
     for (const at of grid.get(num(Math.floor(e / DECK_GRID), Math.floor(n / DECK_GRID))) ?? []) {
       const d = decks[at];
-      if (e < d.e0 || e > d.e1 || n < d.n0 || n > d.n1 || (best !== null && d.top <= best)) continue;
-      if (holds(d.rings, e, n)) best = d.top;
+      if (e < d.e0 || e > d.e1 || n < d.n0 || n > d.n1) continue;
+      if (holds(d.rings, e, n) && !tops.includes(d.top)) tops.push(d.top);
     }
-    return best;
+    return tops.sort((a, b) => b - a);
   };
 }
 
@@ -219,22 +220,22 @@ function piersOf(scene: Scene, geo: Geo): number[][][] {
 /** The network: streets, walks, elevated ways, tunnels, with heights on the map's decks. */
 function networkOf(segments: Segment[], deckAt: DeckAt, log: (m: string) => void): Network {
   const pieces = piecesOf(segments);
-  const z = solveHeights(pieces, deckAt);
-  // the map's deck is exact: nothing on it should stand higher
-  let onDeck = 0;
+  const stats: DeckStats = { onDeck: 0, floored: 0, dropped: 0 };
+  const decks = decksOf(pieces, deckAt, stats);
+  const z = solveHeights(pieces, deckAt, { decks });
+  // a vertex on a deck stands at it (unless its level asks for more): only where pieces meet on
+  // different decks can one stand higher
   let above = 0;
   pieces.forEach((p, i) => {
-    if (p.tunnel) return;
-    for (let k = 0; k < p.level.length; k++) {
-      if (!p.bridge[k] && p.level[k] <= 0) continue;
-      const d = deckAt(p.pts[k * 2], p.pts[k * 2 + 1]);
-      if (d === null) continue;
-      onDeck++;
-      if (z[i][k] > d + DECK_SLACK) above++;
-    }
+    for (let k = 0; k < p.level.length; k++)
+      if (decks.floor[i][k] === 0 && z[i][k] > decks.at[i][k] + DECK_SLACK) above++;
   });
-  log(`walk: ${pieces.length} pieces; ${onDeck} vertices on the map's decks, ${above} of them above it`);
-  return buildNetwork(pieces, z, deckAt);
+  log(
+    `walk: ${pieces.length} pieces; ${stats.onDeck} vertices on the map's decks (${stats.floored} ` +
+      `raised to their bridge's level, ${above} above their deck where pieces meet); ` +
+      `${stats.dropped} off a deck that holds them`,
+  );
+  return buildNetwork(pieces, z, decks.at);
 }
 
 /** Metres: a vertex this close to the line through the vertices kept either side is left out. */

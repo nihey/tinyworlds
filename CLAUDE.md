@@ -57,8 +57,9 @@ Each sub-project has its own `CLAUDE.md`.
 - **New York can be walked.** The street walk is the city at street level, in 3D: on foot, at
   the wheel and in the water. It is static too: the pipeline's `walk` step (for a world whose
   file says `walk: true`) cuts the map's own scene and Overture's streets into squares of 200 m
-  (`walk/`, below): the buildings, ground and trees the map draws, its bridges with their decks
-  at the map's heights and overpasses ramped to theirs, the network traffic and people follow
+  (`walk/`, below): the buildings, ground and trees the map draws, its bridges on the map's
+  decks (a bridge of level 2 or more no lower than its level, where the map's hump comes down to
+  the shore) and overpasses ramped to theirs, the network traffic and people follow
   (lights, one-way streets, crosswalks, tunnels; a tunnel whose far end is where the map fades,
   as the Holland and Lincoln tunnels' New Jersey ends are, is closed there), land and water,
   and boats tied at the piers. Only squares on the map are written. In the viewer, a little

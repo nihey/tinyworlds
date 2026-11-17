@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { solveHeights } from "./heights.js";
+import { decksOf, solveHeights, type DeckStats } from "./heights.js";
 import type { Piece } from "./pieces.js";
 
 /** A straight line from (e0, n0) to (e1, n1), a vertex every `step` metres. */
@@ -63,7 +63,14 @@ function zAt(p: Piece, z: Float32Array, e: number): number {
   throw new Error(`${e} is off the piece`);
 }
 
-const none = (): number | null => null;
+const none = (): number[] => [];
+/** A deck that is one height or none at each point, as a `DeckAt`. */
+const one =
+  (at: (e: number, n: number) => number | null) =>
+  (e: number, n: number): number[] => {
+    const d = at(e, n);
+    return d === null ? [] : [d];
+  };
 
 describe("solveHeights", () => {
   it("a level-1 overpass 400 m long comes down to the ground at both ends", () => {
@@ -105,7 +112,7 @@ describe("solveHeights", () => {
     b.bridge = b.bridge.map((_, i) => b.pts[i * 2] >= 100 && b.pts[i * 2] <= 500);
     const pieces = [piece("w", "b0", line(-600, 0, 0, 0)), b, piece("b1", "e", line(600, 0, 1200, 0))];
     const deck = (e: number): number | null => (e >= 150 && e <= 450 ? 41 : null);
-    const z = solveHeights(pieces, deck);
+    const z = solveHeights(pieces, one(deck));
     for (let i = 0; i < b.pts.length / 2; i++) {
       const e = b.pts[i * 2];
       if (e >= 150 && e <= 450) expect(z[1][i]).toBe(41);
@@ -234,7 +241,7 @@ describe("solveHeights", () => {
     b.bridge = b.bridge.map(() => true);
     const under = piece("u0", "u1", line(200, -100, 200, 100));
     const deck = (e: number): number | null => (e >= 150 && e <= 250 ? 4 : null);
-    const z = solveHeights([b, under], deck);
+    const z = solveHeights([b, under], one(deck));
     for (let i = 0; i < b.pts.length / 2; i++) {
       const d = deck(b.pts[i * 2]);
       if (d !== null) expect(z[0][i]).toBe(Math.fround(d));
@@ -251,9 +258,9 @@ describe("solveHeights", () => {
     const approach = levelOn(piece("l", "s", line(-300, 0, 0, 0)), -300, 0);
     const bridge = piece("s", "x", line(0, 0, 400, 0));
     bridge.bridge = bridge.bridge.map(() => true);
-    const z = solveHeights([approach, bridge], deck);
-    for (let i = 0; i < bridge.pts.length / 2; i++)
-      expect(z[1][i]).toBe(Math.fround(deck(bridge.pts[i * 2])!));
+    const z = solveHeights([approach, bridge], one(deck));
+    // on the deck (its mean over a step either side, which on a smooth deck is the deck)
+    for (let i = 0; i < bridge.pts.length / 2; i++) expect(z[1][i]).toBeCloseTo(deck(bridge.pts[i * 2])!, 1);
     expect(z[0].at(-1)).toBe(0);
     for (let i = 0; i < approach.pts.length / 2; i++) {
       const d = -approach.pts[i * 2];
@@ -262,6 +269,130 @@ describe("solveHeights", () => {
     // inland it is an overpass again
     expect(z[0][20]).toBeCloseTo(6.5, 6);
     expect(z[0][0]).toBeCloseTo(6.5, 6);
+  });
+
+  /** A suspension bridge as the map draws it: 0 within 10 m of each shore (e = 0 and e = 600),
+   * climbing to 41 m 220 m out, none drawn under 1.6 m. */
+  const hump = (e: number): number | null => {
+    if (e < 0 || e > 600) return null;
+    const t = Math.min(1, Math.max(0, (Math.min(e, 600 - e) - 10) / 210));
+    const h = 41 * t * t * (3 - 2 * t);
+    return h >= 1.6 ? h : null;
+  };
+
+  it("a bridge of level 3 stays at its level between its approaches, over the map's hump", () => {
+    const b = levelOn(piece("b0", "b1", line(-300, 0, 900, 0)), -300, 900, 3);
+    b.bridge = b.bridge.map((_, i) => b.pts[i * 2] >= 0 && b.pts[i * 2] <= 600);
+    const pieces = [piece("w", "b0", line(-600, 0, -300, 0)), b, piece("b1", "e", line(900, 0, 1200, 0))];
+    const z = solveHeights(pieces, one(hump));
+    for (let i = 0; i < b.pts.length / 2; i++) expect(z[1][i]).toBeGreaterThanOrEqual(19.5 - 1e-4);
+    expect(Math.max(...z[1])).toBeCloseTo(41, 4);
+    expect(zAt(b, z[1], -100)).toBeCloseTo(19.5, 4);
+    expect(zAt(b, z[1], 700)).toBeCloseTo(19.5, 4);
+    // the streets either side are its ramps (the deck itself climbs as steeply as the map's)
+    expect(z[0][0]).toBe(0);
+    expect(z[2].at(-1)).toBe(0);
+    expect(steepest([pieces[0], pieces[2]], [z[0], z[2]])).toBeLessThanOrEqual(0.08 + 1e-6);
+  });
+
+  it("knows its crest where it is cut into pieces on the deck, by the shore too", () => {
+    // the same bridge cut at e = 100, where the map's hump is only 10 m up
+    const shore = levelOn(piece("b0", "c", line(-300, 0, 100, 0)), -300, 100, 3);
+    shore.bridge = shore.bridge.map((_, i) => shore.pts[i * 2] >= 0);
+    const span = levelOn(piece("c", "b1", line(100, 0, 900, 0)), 100, 900, 3);
+    span.bridge = span.bridge.map((_, i) => span.pts[i * 2] <= 600);
+    const pieces = [
+      piece("w", "b0", line(-600, 0, -300, 0)),
+      shore,
+      span,
+      piece("b1", "e", line(900, 0, 1200, 0)),
+    ];
+    const z = solveHeights(pieces, one(hump));
+    for (const k of [1, 2])
+      for (let i = 0; i < pieces[k].pts.length / 2; i++) expect(z[k][i]).toBeGreaterThanOrEqual(19.5 - 1e-4);
+  });
+
+  it("a level-1 bridge over a creek still follows the map's deck", () => {
+    const creek = (e: number): number | null => (e >= 5 && e <= 35 ? 3 : null);
+    const b = levelOn(piece("b0", "b1", line(-100, 0, 140, 0)), -100, 140, 1);
+    b.bridge = b.bridge.map((_, i) => b.pts[i * 2] >= 0 && b.pts[i * 2] <= 40);
+    const z = solveHeights([b], one(creek));
+    for (const e of [10, 20, 30]) expect(zAt(b, z[0], e)).toBeCloseTo(3, 5);
+  });
+
+  it("smooths the map's deck steps, so ways side by side agree", () => {
+    // 7 m treads rising 1.5 m each, sampled by two ways whose vertices are 3.5 m apart along it
+    const stairs = (e: number): number | null => (e >= -20 && e <= 420 ? 10 + 1.5 * Math.floor(e / 7) : null);
+    const a = piece("a0", "a1", line(0, 0, 400, 0), { bridge: new Array<boolean>(41).fill(true) });
+    const b = piece("b0", "b1", line(3.5, 5, 393.5, 5), { bridge: new Array<boolean>(40).fill(true) });
+    const z = solveHeights([a, b], one(stairs));
+    for (let i = 1; i < b.pts.length / 2 - 1; i++)
+      expect(Math.abs(z[1][i] - zAt(a, z[0], b.pts[i * 2]))).toBeLessThan(0.2);
+  });
+
+  it("stays on its own deck where another bridge's deck lies over it", () => {
+    // its deck at 5 m, a bridge at 13 m crossing over its middle
+    const decks = (e: number): number[] => (e >= 95 && e <= 105 ? [13, 5] : e >= 0 && e <= 200 ? [5] : []);
+    const b = piece("b0", "b1", line(0, 0, 200, 0), { bridge: new Array<boolean>(21).fill(true) });
+    const z = solveHeights([b], decks);
+    expect(z[0][10]).toBeCloseTo(5, 5);
+    expect(Math.max(...z[0])).toBeCloseTo(5, 5);
+    // where two decks hold all of it, the one nearest its level
+    const both = (): number[] => [13, 5];
+    expect(solveHeights([levelOn(piece("c0", "c1", line(0, 0, 100, 0)), 0, 100, 2)], both)[0][5]).toBeCloseTo(
+      13,
+      5,
+    );
+    expect(solveHeights([levelOn(piece("c0", "c1", line(0, 0, 100, 0)), 0, 100, 1)], both)[0][5]).toBeCloseTo(
+      5,
+      5,
+    );
+  });
+
+  it("stands off a lower deck under a gap in its own", () => {
+    // its deck from 29 to 31 m, missing round e = 100, where only a 14.9 m ramp's is
+    const decks = (e: number): number[] => {
+      if (e < 0 || e > 200) return [];
+      return e > 97 && e < 103 ? [14.9] : [29 + 0.01 * e];
+    };
+    const b = levelOn(piece("b0", "b1", line(0, 0, 200, 0)), 0, 200, 2);
+    b.bridge = b.bridge.map(() => true);
+    const stats: DeckStats = { onDeck: 0, floored: 0, dropped: 0 };
+    const own = decksOf([b], decks, stats);
+    expect(Number.isNaN(own.at[0][10])).toBe(true);
+    expect(stats.dropped).toBe(1);
+    const z = solveHeights([b], decks, { decks: own });
+    expect(Math.abs(z[0][10] - 30)).toBeLessThan(1);
+    expect(z[0][9]).toBeCloseTo(29.9, 4);
+  });
+
+  it("takes a lone vertex off its deck where only a lower one holds it, between two of its own", () => {
+    // its deck climbs from 30 m at 20%; at e = 100 only a ramp's deck 4 m under its line is there
+    const decks = (e: number): number[] => {
+      if (e < 0 || e > 200) return [];
+      return Math.abs(e - 100) < 3 ? [30 + 0.2 * e - 4] : [30 + 0.2 * e];
+    };
+    const b = piece("b0", "b1", line(0, 0, 200, 0), { bridge: new Array<boolean>(21).fill(true) });
+    const own = decksOf([b], decks);
+    expect(Number.isNaN(own.at[0][10])).toBe(true);
+    // between its neighbours' heights (48 and 52), not down in the pit at 46
+    const z = solveHeights([b], decks, { decks: own });
+    expect(z[0][10]).toBeGreaterThanOrEqual(48 - 1e-4);
+    expect(z[0][10]).toBeLessThanOrEqual(52);
+  });
+
+  it("carries its own deck across a gap in it, never starting afresh on a lower one", () => {
+    // its deck climbing from 27 m, nothing at all round e = 100, then its own and a lower ramp's
+    const decks = (e: number): number[] => {
+      if (e < 0 || e > 200) return [];
+      if (e > 96 && e < 104) return [];
+      return e > 104 ? [27 + 0.03 * e, 12.6] : [27 + 0.03 * e];
+    };
+    const b = levelOn(piece("b0", "b1", line(0, 0, 200, 0)), 0, 200, 2);
+    b.bridge = b.bridge.map(() => true);
+    const own = decksOf([b], decks);
+    expect(own.at[0][11]).toBeCloseTo(27 + 0.03 * 110, 4);
+    expect(own.at[0][15]).toBeCloseTo(27 + 0.03 * 150, 4);
   });
 
   it("keeps tunnels out, and rails to rails", () => {

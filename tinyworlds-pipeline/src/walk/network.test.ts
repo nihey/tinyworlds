@@ -33,7 +33,10 @@ function piece(a: string, b: string, pts: number[], over: Partial<Piece> = {}): 
 const walk = (a: string, b: string, pts: number[], crosswalk = false): Piece =>
   piece(a, b, pts, { kind: "walk", cls: -1, width: crosswalk ? 3 : 2.5, crosswalk });
 const flat = (pieces: Piece[]): Float32Array[] => pieces.map((p) => new Float32Array(p.pts.length / 2));
-const none = (): number | null => null;
+/** The deck under each vertex of every piece, as `decksOf` gives it: NaN off the map's decks. */
+const decksWhere = (pieces: Piece[], at: (e: number) => number | null): Float32Array[] =>
+  pieces.map((p) => Float32Array.from({ length: p.pts.length / 2 }, (_, k) => at(p.pts[k * 2]) ?? NaN));
+const noDecks = (pieces: Piece[]): Float32Array[] => decksWhere(pieces, () => null);
 
 /** Four streets meeting at "c": a narrow one running north and south, a wide one east and west. */
 const crossing = (): Piece[] => [
@@ -46,7 +49,7 @@ const crossing = (): Piece[] => [
 describe("buildNetwork", () => {
   it("puts lights where four streets meet, along the widest one", () => {
     const pieces = crossing();
-    const net = buildNetwork(pieces, flat(pieces), none);
+    const net = buildNetwork(pieces, flat(pieces), noDecks(pieces));
     const c = net.nodes.get("c")!;
     expect(c.flags & 1).toBe(1);
     expect(c.bearing).toBeCloseTo(Math.PI / 2, 9);
@@ -62,11 +65,11 @@ describe("buildNetwork", () => {
       piece("b", "m", line(-100, 0, 0, 0), { cls: 0 }),
       piece("m", "c", line(0, 0, 0, 100), { cls: 1 }),
     ];
-    expect(buildNetwork(ramps, flat(ramps), none).nodes.get("m")!.flags & 1).toBe(0);
+    expect(buildNetwork(ramps, flat(ramps), noDecks(ramps)).nodes.get("m")!.flags & 1).toBe(0);
     const pieces = crossing();
     const z = flat(pieces);
     z[0][0] = z[1][0] = z[2][10] = z[3][10] = 6.5;
-    expect(buildNetwork(pieces, z, none).nodes.get("c")!.flags & 1).toBe(0);
+    expect(buildNetwork(pieces, z, noDecks(pieces)).nodes.get("c")!.flags & 1).toBe(0);
   });
 
   it("gives a crosswalk near lights the phase it crosses with", () => {
@@ -77,7 +80,7 @@ describe("buildNetwork", () => {
       walk("z0", "z1", line(-8, 60, 8, 60), true), // too far from the lights
       walk("v0", "v1", line(-8, 14, 8, 14)), // a sidewalk, not a crosswalk
     ];
-    const net = buildNetwork(pieces, flat(pieces), none);
+    const net = buildNetwork(pieces, flat(pieces), noDecks(pieces));
     expect(net.walks.map((w) => w.flags)).toEqual([1 | 2, 1 | 4, 1, 0]);
     expect(net.walks[0].a).toBe(net.nodes.get("x0")!.id);
   });
@@ -88,7 +91,9 @@ describe("buildNetwork", () => {
       piece("b", "c", line(100, 0, 200, 0), { ow: -1 }),
       piece("c", "d", line(200, 0, 300, 0), { link: true }),
     ];
-    expect(buildNetwork(pieces, flat(pieces), none).streets.map((s) => s.flags)).toEqual([2, 4, 1]);
+    expect(buildNetwork(pieces, flat(pieces), noDecks(pieces)).streets.map((s) => s.flags)).toEqual([
+      2, 4, 1,
+    ]);
   });
 
   it("files elevated ways where they are off the ground, with what the map holds up", () => {
@@ -100,8 +105,11 @@ describe("buildNetwork", () => {
     const z = flat(pieces);
     z[0].set([0, 0, 0, 1, 2, 3, 3, 2, 1, 0, 0]);
     z[2].set([0, 0, 0, 0, 0, 6.5, 0, 0, 0, 0, 0]);
-    const deck = (e: number): number | null => (e >= 50 ? 30 : null);
-    const net = buildNetwork(pieces, z, deck);
+    const net = buildNetwork(
+      pieces,
+      z,
+      decksWhere(pieces, (e) => (e >= 50 ? 30 : null)),
+    );
     expect(net.streets[0].flags & 8).toBe(8);
     expect(net.walks[0].flags & 8).toBe(0);
     expect(net.elevated).toHaveLength(2);
@@ -123,7 +131,7 @@ describe("buildNetwork", () => {
       piece("m", "p2", line(200, 0, 500, 0), { tunnel: true, name: "Holland Tunnel" }),
       piece("p2", "g3", line(500, 0, 600, 0)),
     ];
-    const net = buildNetwork(pieces, flat(pieces), none);
+    const net = buildNetwork(pieces, flat(pieces), noDecks(pieces));
     expect(net.streets).toHaveLength(2);
     expect(net.nodes.has("m")).toBe(false);
     expect(net.tunnels).toHaveLength(1);
@@ -146,7 +154,7 @@ describe("buildNetwork", () => {
       piece("p1", "m", line(0, 0, 0, -200), { tunnel: true }),
       piece("m", "end", line(0, -200, 0, -500), { tunnel: true }),
     ];
-    const net = buildNetwork(pieces, flat(pieces), none);
+    const net = buildNetwork(pieces, flat(pieces), noDecks(pieces));
     expect(net.tunnels).toHaveLength(1);
     expect(net.tunnels[0].b).toBeNull();
     expect(net.tunnels[0].a[2]).toBeCloseTo(Math.PI, 9);
@@ -155,8 +163,8 @@ describe("buildNetwork", () => {
 
   it("numbers nodes the same way on every run, in the order they are met", () => {
     const pieces = [...crossing(), walk("x0", "c", line(-8, 12, 0, 0))];
-    const a = buildNetwork(pieces, flat(pieces), none);
-    const b = buildNetwork(pieces, flat(pieces), none);
+    const a = buildNetwork(pieces, flat(pieces), noDecks(pieces));
+    const b = buildNetwork(pieces, flat(pieces), noDecks(pieces));
     expect([...a.nodes.entries()]).toEqual([...b.nodes.entries()]);
     expect([...a.nodes.keys()]).toEqual(["c", "n1", "e1", "s1", "w1", "x0"]);
     expect([...a.nodes.values()].map((n) => n.id)).toEqual([0, 1, 2, 3, 4, 5]);

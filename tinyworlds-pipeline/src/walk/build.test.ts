@@ -348,13 +348,14 @@ describe("buildWalk", () => {
 });
 
 describe("deckAtFromScene", () => {
-  it("is the top of the floating deck holding the point, else null", () => {
+  it("is the top of every floating deck holding the point, else none", () => {
     const deckAt = deckAtFromScene({ arrays: volumes(), meta: { geo } }, geo);
-    expect(deckAt(500, 50)).toBeCloseTo(20, 4);
-    expect(deckAt(401, 41)).toBeCloseTo(20, 4);
-    expect(deckAt(500, 70)).toBeNull();
+    expect(deckAt(500, 50)).toHaveLength(1);
+    expect(deckAt(500, 50)[0]).toBeCloseTo(20, 4);
+    expect(deckAt(401, 41)[0]).toBeCloseTo(20, 4);
+    expect(deckAt(500, 70)).toEqual([]);
     // the building is no deck
-    expect(deckAt(20, 20)).toBeNull();
+    expect(deckAt(20, 20)).toEqual([]);
   });
 });
 

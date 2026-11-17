@@ -3,7 +3,6 @@
  * whole city), street edges for traffic, walking edges for people, the elevated ways the walk
  * builds decks for, and the tunnels traffic passes through unseen. Points are flat e, n, z.
  */
-import type { DeckAt } from "./heights.js";
 import type { Piece } from "./pieces.js";
 
 export interface NetNode {
@@ -109,8 +108,9 @@ function withZ(pts: number[], z: Float32Array, from = 0, to = z.length - 1): num
   return out;
 }
 
-/** The stretches of a piece off the ground, each with one ground vertex either side. */
-function elevatedOf(p: Piece, z: Float32Array, deckAt: DeckAt, out: NetElevated[]): void {
+/** The stretches of a piece off the ground, each with one ground vertex either side; `decks` is
+ * the map's deck under each vertex (`decksOf`), NaN where the walk builds its own. */
+function elevatedOf(p: Piece, z: Float32Array, decks: Float32Array, out: NetElevated[]): void {
   const kind = p.kind === "street" ? ELEV_ROAD : p.kind === "walk" ? ELEV_FOOTWAY : ELEV_RAIL;
   const m = z.length;
   for (let k = 0; k < m; k++) {
@@ -120,7 +120,7 @@ function elevatedOf(p: Piece, z: Float32Array, deckAt: DeckAt, out: NetElevated[
     const from = Math.max(0, k - 1);
     const to = Math.min(m - 1, end + 1);
     const own = new Uint8Array(to - from + 1);
-    for (let i = from; i <= to; i++) own[i - from] = deckAt(p.pts[i * 2], p.pts[i * 2 + 1]) === null ? 1 : 0;
+    for (let i = from; i <= to; i++) own[i - from] = Number.isNaN(decks[i]) ? 1 : 0;
     out.push({ kind, width: p.width, pts: withZ(p.pts, z, from, to), own });
     k = end;
   }
@@ -230,7 +230,7 @@ function tunnelsOf(
   return { tunnels, portals: marked };
 }
 
-export function buildNetwork(pieces: Piece[], z: Float32Array[], deckAt: DeckAt): Network {
+export function buildNetwork(pieces: Piece[], z: Float32Array[], decks: Float32Array[]): Network {
   const nodes = new Map<string, NetNode>();
   const meetings: Meeting[] = [];
   const streets: NetStreet[] = [];
@@ -261,7 +261,7 @@ export function buildNetwork(pieces: Piece[], z: Float32Array[], deckAt: DeckAt)
   pieces.forEach((p, i) => {
     const zs = z[i];
     if (p.tunnel) return;
-    elevatedOf(p, zs, deckAt, elevated);
+    elevatedOf(p, zs, decks[i], elevated);
     if (p.kind === "rail") return;
     const a = nodeAt(p.a, p, zs, 0);
     const b = nodeAt(p.b, p, zs, 1);

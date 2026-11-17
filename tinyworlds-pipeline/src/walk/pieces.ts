@@ -2,6 +2,7 @@
  * Segments cut into pieces between their connectors: the walk's street, sidewalk and rail
  * stretches, densified, each vertex knowing whether it is on a bridge and at what level.
  */
+import { LEVEL_HEIGHT, LINK_RAMP, RAMP } from "./heights.js";
 import { CAR_CLASSES, CAR_WIDTH, oneWayOf, type Rule, type Segment } from "./segments.js";
 
 export interface Piece {
@@ -44,6 +45,63 @@ function levelAt(levels: Rule[], at: number): number {
     if (r.value != null && (!r.between || (at >= r.between[0] - EPS && at <= r.between[1] + EPS)))
       return r.value;
   return 0;
+}
+
+/**
+ * Overture's level rules and bridge flags often leave a gap inside one elevated stretch (a few
+ * metres of the Brooklyn Bridge's approach with no level, 250 m of the Williamsburg's approach
+ * with neither level nor bridge). With no connector in the gap nothing can meet the way there, so
+ * a dip the ramps either side could never reach the bottom of is part of the bridge: it takes
+ * the lower of the levels either side. A longer dip is ground the way really comes down to (two
+ * creek bridges a kilometre apart on one motorway segment). A vertex's height in levels is its
+ * level, at least one on a bridge, none on the ground; a dip is what water poured on that
+ * profile would fill.
+ */
+function fillGaps(
+  pts: number[],
+  bridge: boolean[],
+  level: number[],
+  slope: number,
+  ends: [EndRule | undefined, EndRule | undefined] = [undefined, undefined],
+): void {
+  const m = level.length;
+  // an end that another way raises at its connector bounds a dip as if it were this one's own
+  const kept = [bridge[0], level[0], bridge[m - 1], level[m - 1]] as const;
+  ends.forEach((end, x) => {
+    const k = x === 0 ? 0 : m - 1;
+    if (!end) return;
+    bridge[k] = bridge[k] || end.bridge;
+    level[k] = Math.max(level[k], end.level);
+  });
+  const height = (k: number): number => (bridge[k] || level[k] > 0 ? Math.max(level[k], 1) : 0);
+  const along = [0];
+  for (let k = 1; k < m; k++)
+    along.push(along[k - 1] + Math.hypot(pts[k * 2] - pts[k * 2 - 2], pts[k * 2 + 1] - pts[k * 2 - 1]));
+  const left: number[] = [];
+  for (let k = 0; k < m; k++) left.push(Math.max(height(k), k > 0 ? left[k - 1] : 0));
+  const right = new Array<number>(m);
+  for (let k = m - 1; k >= 0; k--) right[k] = Math.max(height(k), k + 1 < m ? right[k + 1] : 0);
+  for (let k = 1; k + 1 < m; k++) {
+    if (height(k) >= Math.min(left[k], right[k])) continue;
+    let b = k;
+    while (b + 1 < m - 1 && height(b + 1) < Math.min(left[b + 1], right[b + 1])) b++;
+    const a = k - 1;
+    const z = b + 1;
+    const lower = Math.min(height(a), height(z));
+    if (along[z] - along[a] < (2 * lower * LEVEL_HEIGHT) / slope)
+      for (let g = k; g <= b; g++) {
+        bridge[g] = bridge[g] || bridge[a] || bridge[z];
+        level[g] = Math.max(level[g], Math.min(level[a], level[z]));
+      }
+    k = b;
+  }
+  [bridge[0], level[0], bridge[m - 1], level[m - 1]] = kept;
+}
+
+/** What the other ways meeting at a connector say of it: raised, at what level. */
+interface EndRule {
+  bridge: boolean;
+  level: number;
 }
 
 export function piecesOf(segments: Segment[]): Piece[] {
@@ -149,5 +207,124 @@ export function piecesOf(segments: Segment[]): Piece[] {
       });
     }
   });
+  fillChains(out);
   return out;
+}
+
+/**
+ * Fills the gaps (`fillGaps`) along each run of pieces that meet end to end at connectors
+ * nothing else meets: a dip there can meet nothing either, wherever the segments were cut (the
+ * Williamsburg's westbound approach has no level on its last 200 m before the span's own
+ * segment, which is at level 2 again).
+ */
+function fillChains(pieces: Piece[]): void {
+  const keyOf = (p: Piece, id: string): string => `${p.kind === "rail" ? "rail" : "way"}:${id}`;
+  const at = new Map<string, number[]>();
+  pieces.forEach((p, i) => {
+    if (p.tunnel) return;
+    for (const id of new Set([p.a, p.b])) {
+      const list = at.get(keyOf(p, id));
+      if (list) list.push(i);
+      else at.set(keyOf(p, id), [i]);
+    }
+  });
+  /** The one other piece of the same kind through a connector only two pieces meet at, else -1. */
+  const through = (i: number, id: string): number => {
+    const list = at.get(keyOf(pieces[i], id));
+    if (!list || list.length !== 2 || pieces[i].a === pieces[i].b) return -1;
+    const j = list[0] === i ? list[1] : list[0];
+    return pieces[j].kind === pieces[i].kind && pieces[j].a !== pieces[j].b ? j : -1;
+  };
+  // what every way says of each connector, for the ends of a run
+  const said = new Map<string, EndRule>();
+  pieces.forEach((p) => {
+    if (p.tunnel) return;
+    const m = p.level.length;
+    for (const [id, k] of [
+      [p.a, 0],
+      [p.b, m - 1],
+    ] as const) {
+      const r = said.get(keyOf(p, id)) ?? { bridge: false, level: 0 };
+      said.set(keyOf(p, id), { bridge: r.bridge || p.bridge[k], level: Math.max(r.level, p.level[k]) });
+    }
+  });
+  const seen = new Uint8Array(pieces.length);
+  pieces.forEach((p, i) => {
+    if (p.tunnel || seen[i] || !(p.bridge.some(Boolean) || p.level.some((l) => l > 0))) return;
+    // walk back to the run's first piece, then forward along it, each piece in its direction
+    let first = i;
+    let id = p.a;
+    for (let guard = 0; guard < pieces.length; guard++) {
+      const j = through(first, id);
+      if (j < 0 || j === i) break;
+      id = pieces[j].a === id ? pieces[j].b : pieces[j].a;
+      first = j;
+    }
+    const run: { piece: number; reversed: boolean }[] = [];
+    let cur = first;
+    let entry = id;
+    while (cur >= 0 && !seen[cur]) {
+      seen[cur] = 1;
+      const q = pieces[cur];
+      const reversed = q.b === entry && q.a !== entry;
+      run.push({ piece: cur, reversed });
+      const exit = reversed ? q.a : q.b;
+      cur = through(cur, exit);
+      entry = exit;
+    }
+    const head = pieces[run[0].piece];
+    const tail = pieces[run[run.length - 1].piece];
+    const outer: [EndRule | undefined, EndRule | undefined] = [
+      said.get(keyOf(head, run[0].reversed ? head.b : head.a)),
+      said.get(keyOf(tail, run[run.length - 1].reversed ? tail.a : tail.b)),
+    ];
+    if (run.length === 1) {
+      fillGaps(
+        head.pts,
+        head.bridge,
+        head.level,
+        head.link ? LINK_RAMP : RAMP,
+        run[0].reversed ? [outer[1], outer[0]] : outer,
+      );
+      return;
+    }
+    // the run as one profile, each joint once
+    const pts: number[] = [];
+    const bridge: boolean[] = [];
+    const level: number[] = [];
+    const back: { piece: number; k: number }[][] = [];
+    for (const { piece, reversed } of run) {
+      const q = pieces[piece];
+      const m = q.level.length;
+      for (let x = 0; x < m; x++) {
+        const k = reversed ? m - 1 - x : x;
+        if (x === 0 && back.length > 0) {
+          back[back.length - 1].push({ piece, k });
+          continue;
+        }
+        pts.push(q.pts[k * 2], q.pts[k * 2 + 1]);
+        bridge.push(q.bridge[k]);
+        level.push(q.level[k]);
+        back.push([{ piece, k }]);
+      }
+    }
+    // a joint takes the higher of what its two pieces say
+    back.forEach((owners, v) => {
+      for (const { piece, k } of owners) {
+        bridge[v] = bridge[v] || pieces[piece].bridge[k];
+        level[v] = Math.max(level[v], pieces[piece].level[k]);
+      }
+    });
+    const before = level.slice();
+    const wasBridge = bridge.slice();
+    fillGaps(pts, bridge, level, run.every(({ piece }) => pieces[piece].link) ? LINK_RAMP : RAMP, outer);
+    // only what the fill changed goes back: a joint keeps what each of its pieces says
+    back.forEach((owners, v) => {
+      if (level[v] === before[v] && bridge[v] === wasBridge[v]) return;
+      for (const { piece, k } of owners) {
+        pieces[piece].bridge[k] = bridge[v];
+        pieces[piece].level[k] = level[v];
+      }
+    });
+  });
 }

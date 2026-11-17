@@ -12,15 +12,20 @@
  * target and every neighbour's height less the slope times the distance, found by spreading
  * from the highest down (a max-heap), so only what rises is ever visited.
  *
- * The map's deck is exact: a vertex on it stands at its height and nothing moves it, and no
- * vertex off it stands higher than a ramp climbing from it (a cap spread outward from the decks
- * before the heights are). The deck climbs from the shore far faster than a ramp may, so near
- * the shore the cap wins: the approach comes down to meet it, steeper where it must.
+ * A vertex on the map's deck stands at that deck and nothing moves it, and no vertex off it
+ * stands higher than a ramp climbing from it (a cap spread outward from the decks before the
+ * heights are). Which deck is the way's own where decks stack (the Queensboro's two levels and
+ * ramps) is chosen along each piece for continuity (`decksOf`), and the deck's 7 m steps are
+ * smoothed into a slope. The map draws a suspension bridge as a hump that lands on each shore;
+ * the walk does not draw the map's decks, so on a bridge of level 2 or more a vertex on the deck
+ * reaches for the level's height instead (no higher than the bridge's crest) where that is
+ * higher, as a vertex off the deck does, and the approaches stay up; it still comes down by a
+ * ramp to a deck the map holds lower (where the level changes along a tangle of ramps).
  */
 import type { Piece } from "./pieces.js";
 
-/** The map's deck height (metres) where it draws one holding this point, else null. */
-export type DeckAt = (e: number, n: number) => number | null;
+/** Every height (metres) of the map's decks holding this point: none off them, several where they stack. */
+export type DeckAt = (e: number, n: number) => readonly number[];
 
 /** Metres between one level and the next, over land. */
 export const LEVEL_HEIGHT = 6.5;
@@ -161,9 +166,239 @@ function graphOf(pieces: Piece[], slope: number, linkSlope: number): Graph {
 /** Off the ground in the data: on a bridge, or above level 0. */
 const raised = (p: Piece, k: number): boolean => p.bridge[k] || p.level[k] > 0;
 
-/** What each vertex must reach (the map's deck, or its level's height), and whether it is the
- * map's deck: a vertex any piece finds on a deck stands at that deck, whatever the levels say. */
-function targetsOf(pieces: Piece[], g: Graph, deckAt: DeckAt): { target: Float64Array; onDeck: Uint8Array } {
+/** Metres a piece's deck may change between two vertices this far apart before the second is
+ * taken for another deck: a step plus the steepest the map's hump climbs. */
+const deckJump = (d: number): number => 3 + 0.4 * d;
+/** How steeply the map's own deck may climb between two vertices at no cost to the choice (its
+ * 7 m steps, sampled every 10 m, read up to 41%). */
+const DECK_GRADE = 0.45;
+/** What standing off a deck that holds the vertex costs the choice, in metres of jump. */
+const OFF_DECK = 4;
+/** Metres a vertex on the deck may stand off the line through its neighbours on it (the map's
+ * steps put it up to about one either side). */
+const OFF_LINE = 2.5;
+/** What each metre between a deck and the vertex's level costs: only enough to break a tie. */
+const LEVEL_PULL = 0.01;
+/** Metres either side of a vertex, along its piece, that its deck height is the mean of: one of
+ * the map's deck steps, so the staircase becomes a slope wherever the vertices fall. */
+const SMOOTH = 3.5;
+const SMOOTH_SAMPLES = 15;
+/** A sample of the smoothing on another deck than the vertex's (farther than this) is left out. */
+const SMOOTH_SAME = 2;
+
+/** A choice at one vertex: on a deck at z, or off the decks with z the last one stood on (NaN
+ * for none yet) and s where along the piece that was; its cost so far and the choice before. */
+interface DeckState {
+  on: boolean;
+  z: number;
+  s: number;
+  cost: number;
+  back: number;
+}
+
+/** Per piece vertex: the map's deck it stands on (metres, NaN off the decks), and the height its
+ * bridge's level asks of it there (0 where none is asked: a bridge below level 2, or off a deck). */
+export interface PieceDecks {
+  at: Float32Array[];
+  floor: Float32Array[];
+}
+
+export interface DeckStats {
+  /** Vertices that stand on a deck of the map. */
+  onDeck: number;
+  /** Of them, asked by their bridge's level to stand above the deck the map draws. */
+  floored: number;
+  /** Vertices a deck holds that stand off it: another bridge's deck, or a gap in their own. */
+  dropped: number;
+}
+
+/**
+ * The deck each piece vertex stands on (metres, NaN off the map's decks), its piece's own where
+ * several hold it. Along each piece the choice is the most continuous one (a Viterbi pass over
+ * every deck at every raised vertex, or none): a vertex whose only decks are another bridge's
+ * (a spike) or the one under a gap in its own (a pit) stands off them, and the solver ramps it.
+ */
+export function decksOf(pieces: Piece[], deckAt: DeckAt, stats?: DeckStats): PieceDecks {
+  const floors: Float32Array[] = [];
+  const at = pieces.map((p) => {
+    const m = p.level.length;
+    const out = new Float32Array(m).fill(NaN);
+    floors.push(new Float32Array(m));
+    if (p.tunnel) return out;
+    const cands: (readonly number[])[] = [];
+    for (let k = 0; k < m; k++) cands.push(raised(p, k) ? deckAt(p.pts[k * 2], p.pts[k * 2 + 1]) : []);
+    if (cands.every((c) => c.length === 0)) return out;
+
+    // the states at each vertex: on one of its decks, or off them remembering the last deck stood
+    // on (and where), so a gap in a deck never lets the next vertex start afresh on another one
+    const along = new Float64Array(m);
+    for (let k = 1; k < m; k++)
+      along[k] =
+        along[k - 1] + Math.hypot(p.pts[k * 2] - p.pts[k * 2 - 2], p.pts[k * 2 + 1] - p.pts[k * 2 - 1]);
+    const steps: DeckState[][] = [];
+    for (let k = 0; k < m; k++) {
+      const c = cands[k];
+      const target = Math.max(p.level[k], 1) * LEVEL_HEIGHT;
+      const prev = k > 0 ? steps[k - 1] : [{ on: false, z: NaN, s: 0, cost: 0, back: -1 }];
+      const here: DeckState[] = [];
+      for (const z of c) {
+        let cost = Infinity;
+        let back = -1;
+        for (let ri = 0; ri < prev.length; ri++) {
+          const r = prev[ri];
+          let step = 0;
+          if (!Number.isNaN(r.z)) {
+            const d = along[k] - r.s;
+            const rise = Math.abs(z - r.z);
+            if (rise > deckJump(d)) continue;
+            step = Math.max(0, rise - DECK_GRADE * d);
+          }
+          if (r.cost + step < cost) [cost, back] = [r.cost + step, ri];
+        }
+        if (back >= 0)
+          here.push({ on: true, z, s: along[k], cost: cost + LEVEL_PULL * Math.abs(z - target), back });
+      }
+      // off: from each state before, keeping its last deck (the cheapest of those that agree)
+      const off = c.length > 0 ? OFF_DECK : 0;
+      prev.forEach((r, ri) => {
+        const z = r.z;
+        const s = r.on ? along[k - 1] : r.s;
+        const same = here.find(
+          (h) => !h.on && (Number.isNaN(z) ? Number.isNaN(h.z) : Math.abs(h.z - z) < 0.5),
+        );
+        if (!same) here.push({ on: false, z, s, cost: r.cost + off, back: ri });
+        else if (r.cost + off < same.cost) Object.assign(same, { z, s, cost: r.cost + off, back: ri });
+      });
+      steps.push(here);
+    }
+    let x = 0;
+    const last = steps[m - 1];
+    for (let y = 1; y < last.length; y++) if (last[y].cost < last[x].cost) x = y;
+    for (let k = m - 1; k >= 0; k--) {
+      const st = steps[k][x];
+      if (st.on) out[k] = st.z;
+      else if (stats && cands[k].length > 0) stats.dropped++;
+      x = st.back;
+    }
+
+    // a lone vertex far off the line through its neighbours on the deck is on the wrong one (a
+    // seam between two of its own steps over a lower ramp, a gap over another deck): the one
+    // nearest that line, or none; the farthest off first, so a pit does not condemn its neighbour
+    const lineAt = (k: number): number => {
+      if (k < 1 || k + 1 >= m || Number.isNaN(out[k - 1]) || Number.isNaN(out[k]) || Number.isNaN(out[k + 1]))
+        return NaN;
+      const u = (along[k] - along[k - 1]) / Math.max(1e-6, along[k + 1] - along[k - 1]);
+      return out[k - 1] + (out[k + 1] - out[k - 1]) * u;
+    };
+    for (let round = 0; round < m; round++) {
+      let worst = -1;
+      let off = OFF_LINE;
+      for (let k = 1; k + 1 < m; k++) {
+        const d = Math.abs(out[k] - lineAt(k));
+        if (d > off) [worst, off] = [k, d];
+      }
+      if (worst < 0) break;
+      const line = lineAt(worst);
+      let near = NaN;
+      let gap = OFF_LINE;
+      for (const z of cands[worst]) if (Math.abs(z - line) <= gap) [near, gap] = [z, Math.abs(z - line)];
+      if (Number.isNaN(near) && stats) stats.dropped++;
+      out[worst] = near;
+    }
+
+    // each deck vertex at the mean of its own deck over a step either side, along the piece
+    const chosen = out.slice();
+    for (let k = 0; k < m; k++) {
+      if (Number.isNaN(chosen[k])) continue;
+      const k0 = Math.max(0, k - 1);
+      const k1 = Math.min(m - 1, k + 1);
+      const de = p.pts[k1 * 2] - p.pts[k0 * 2];
+      const dn = p.pts[k1 * 2 + 1] - p.pts[k0 * 2 + 1];
+      const len = Math.hypot(de, dn);
+      if (len < 1e-6) continue;
+      let sum = 0;
+      let count = 0;
+      for (let x = 0; x < SMOOTH_SAMPLES; x++) {
+        const o = -SMOOTH + (2 * SMOOTH * x) / (SMOOTH_SAMPLES - 1);
+        let near = NaN;
+        let gap = SMOOTH_SAME;
+        for (const z of deckAt(p.pts[k * 2] + (de / len) * o, p.pts[k * 2 + 1] + (dn / len) * o))
+          if (Math.abs(z - chosen[k]) <= gap) {
+            near = z;
+            gap = Math.abs(z - chosen[k]);
+          }
+        if (!Number.isNaN(near)) {
+          sum += near;
+          count++;
+        }
+      }
+      if (count > 0) out[k] = sum / count;
+    }
+
+    return out;
+  });
+
+  // a bridge of level 2 or more asks for its level, never above its crest: the highest of the
+  // deck it is on, followed along every piece on it (a bridge is cut into pieces at its towers
+  // and junctions, and the one by the shore must still know how high the span goes)
+  const first = new Int32Array(pieces.length + 1);
+  pieces.forEach((p, i) => (first[i + 1] = first[i] + p.level.length));
+  const parent = Int32Array.from({ length: first[pieces.length] }, (_, x) => x);
+  const root = (x: number): number => {
+    while (parent[x] !== x) x = parent[x] = parent[parent[x]];
+    return x;
+  };
+  const join = (x: number, y: number): void => {
+    parent[root(x)] = root(y);
+  };
+  const ends = new Map<string, number>();
+  pieces.forEach((p, i) => {
+    const m = p.level.length;
+    for (let k = 0; k + 1 < m; k++)
+      if (!Number.isNaN(at[i][k]) && !Number.isNaN(at[i][k + 1])) join(first[i] + k, first[i] + k + 1);
+    for (const [id, k] of [
+      [p.a, 0],
+      [p.b, m - 1],
+    ] as const) {
+      if (Number.isNaN(at[i][k])) continue;
+      const key = (p.kind === "rail" ? "rail:" : "") + id;
+      const other = ends.get(key);
+      if (other === undefined) ends.set(key, first[i] + k);
+      else join(first[i] + k, other);
+    }
+  });
+  const crest = new Float64Array(parent.length).fill(-Infinity);
+  pieces.forEach((p, i) => {
+    for (let k = 0; k < p.level.length; k++) {
+      if (Number.isNaN(at[i][k])) continue;
+      const r = root(first[i] + k);
+      crest[r] = Math.max(crest[r], at[i][k]);
+    }
+  });
+  pieces.forEach((p, i) => {
+    for (let k = 0; k < p.level.length; k++) {
+      if (Number.isNaN(at[i][k])) continue;
+      if (stats) stats.onDeck++;
+      if (p.level[k] < 2) continue;
+      const floor = Math.min(p.level[k] * LEVEL_HEIGHT, crest[root(first[i] + k)]);
+      if (floor > at[i][k]) {
+        floors[i][k] = floor;
+        if (stats) stats.floored++;
+      }
+    }
+  });
+  return { at, floor: floors };
+}
+
+/** What each vertex must reach (its deck, or its level's height), and whether it is on a deck:
+ * a vertex any piece stands on a deck at stands at that deck, whatever the levels say, unless its
+ * bridge's level asks for more (then it is a target like any other, and the cap from the decks
+ * the map holds lower brings it down by a ramp). */
+function targetsOf(
+  pieces: Piece[],
+  g: Graph,
+  decks: PieceDecks,
+): { target: Float64Array; onDeck: Uint8Array } {
   const target = new Float64Array(g.size);
   const deck = new Float64Array(g.size).fill(-Infinity);
   pieces.forEach((p, i) => {
@@ -171,8 +406,10 @@ function targetsOf(pieces: Piece[], g: Graph, deckAt: DeckAt): { target: Float64
     for (let k = 0; k < p.level.length; k++) {
       if (!raised(p, k)) continue;
       const v = g.vert[g.off[i] + k];
-      const d = deckAt(p.pts[k * 2], p.pts[k * 2 + 1]);
-      if (d !== null) deck[v] = Math.max(deck[v], d);
+      const d = decks.at[i][k];
+      const lift = decks.floor[i][k];
+      if (lift > 0) target[v] = Math.max(target[v], lift);
+      else if (!Number.isNaN(d)) deck[v] = Math.max(deck[v], d);
       else target[v] = Math.max(target[v], Math.max(p.level[k], 1) * LEVEL_HEIGHT);
     }
   });
@@ -441,16 +678,17 @@ function liftOverCrossings(
   return [...lifted];
 }
 
-/** The height of every vertex of every piece, metres above the land (tunnels at 0). */
+/** The height of every vertex of every piece, metres above the land (tunnels at 0). `decks`
+ * are `decksOf(pieces, deckAt)`, when the caller has them already. */
 export function solveHeights(
   pieces: Piece[],
   deckAt: DeckAt,
-  opts: { slope?: number; linkSlope?: number } = {},
+  opts: { slope?: number; linkSlope?: number; decks?: PieceDecks } = {},
 ): Float32Array[] {
   const slope = opts.slope ?? RAMP;
   const linkSlope = opts.linkSlope ?? LINK_RAMP;
   const g = graphOf(pieces, slope, linkSlope);
-  const { target, onDeck } = targetsOf(pieces, g, deckAt);
+  const { target, onDeck } = targetsOf(pieces, g, opts.decks ?? decksOf(pieces, deckAt));
   // nothing stands higher than the highest target plus a headroom for every round
   const cap = capsOf(
     g,

@@ -453,9 +453,11 @@ and fetches nothing.
 | `mask.ts`, `shore.ts`      | land and water per 2 m cell, painted in the map's order; the distance from   |
 |                            | each water cell to the land, across squares (an exact distance transform     |
 |                            | over 512 m round each square)                                                |
-| `segments.ts`, `pieces.ts` | Overture's segments, cut at their connectors and densified to 10 m           |
-| `heights.ts`               | bridges at the map's decks exactly, overpasses at their level × 6.5 m, ramps |
-|                            | of 8% (12% on links), 4.5 m clear over the ways below                        |
+| `segments.ts`, `pieces.ts` | Overture's segments, cut at their connectors and densified to 10 m; gaps in  |
+|                            | a bridge's levels and flags shorter than its ramps would need are filled     |
+| `heights.ts`               | bridges on the map's decks (their own where decks stack, the steps smoothed; |
+|                            | at least their level from level 2), overpasses at their level × 6.5 m,       |
+|                            | ramps of 8% (12% on links), 4.5 m clear over the ways below                  |
 | `network.ts`               | nodes (numbered for the whole city), streets, walks, elevated ways, lights,  |
 |                            | tunnels                                                                      |
 | `moorings.ts`              | boats along the piers the hash picks, every 12 m on the water side           |
@@ -470,10 +472,27 @@ and fetches nothing.
   the heights, but a vertex within 0.1 m of the line through its neighbours, in plan and height,
   is left out of the file (both ends of a change of who builds an elevated deck stay). That
   takes a quarter to a third off a dense square.
-- **The map's decks** (`deckAtFromScene`): the tops of the floating deck volumes (`F_FLOATING`,
-  `Roof.Deck`), found through a 25 m grid. The run says how many vertices on them stand above
-  them: in New York 22 of 7,353, all ends of footways where several meet and find different
-  steps of the deck (the vertex takes the highest), at most 1.5 m over.
+- **The map's decks** (`deckAtFromScene`): the tops of every floating deck volume (`F_FLOATING`,
+  `Roof.Deck`) holding a point, found through a 25 m grid. `decksOf` (`heights.ts`) picks a
+  way's own along each piece where decks stack (the Queensboro's levels and ramps, Queens
+  Plaza): the most continuous choice, carried across gaps in the deck, a lone vertex far off
+  the line through its neighbours taken off the deck (a seam over a lower ramp), each at the
+  mean of its deck over one 7 m step either side (so the steps become a slope and overlapping
+  ways agree). The walk does not draw the map's decks, so it need not stand on them: the map
+  draws a suspension bridge as a hump that lands on each shore, and on a bridge of level 2 or
+  more a vertex on the deck asks for its level's height instead (no higher than the crest of
+  the deck it is on, followed across every piece on it), coming down by a ramp to a deck the
+  map holds lower. The Brooklyn, Manhattan and Williamsburg approaches stay at 13 to 26 m; near
+  the shores the walk's deck stands up to 18 m above the one the tiles draw. The run says how
+  many vertices are on the decks, how many their level raised, and how many stand off a deck
+  that holds them: in New York 7,340, 708 and 13.
+- **Gaps in the levels** (`pieces.ts` `fillGaps`): Overture often leaves a stretch of a bridge
+  with no level or no bridge flag (the Brooklyn Bridge's approach, 250 m of the Williamsburg's).
+  A dip in a way's levels that no connector breaks, and that its ramps could never reach the
+  bottom of (`2 · level · 6.5 m / 8%`: 160 m a level), takes the lower level either side. Runs of
+  pieces through connectors only they meet at count as one, and a connector another way raises
+  bounds a dip (the Williamsburg's westbound approach meets its span's segment and an on-ramp
+  there). A longer dip is ground the way comes down to (two creek bridges on one segment).
 - **Tunnels.** A portal is open where the map is whole: its fog under `fog.start`, in a square
   that is written. Anywhere else it is closed by a barrier: that end is `null`, the open one
   first, and a tunnel with no open portal is left out. So the Holland and Lincoln tunnels are
