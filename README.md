@@ -19,13 +19,13 @@ search, every building at its height.
 | --- | --- | --- |
 | ![Downtown Pittsburgh and its rivers](tinyworlds-frontend/public/og/tinypit.jpg) | ![Center City Philadelphia](tinyworlds-frontend/public/og/tinyphl.jpg) | ![Downtown Colorado Springs](tinyworlds-frontend/public/og/tinycos.jpg) |
 
-| tinytkf · Truckee | tinywinterfell | tinykingslanding |
+| tinytkf · Truckee | tinyaus · Austin | tinywinterfell |
 | --- | --- | --- |
-| ![Downtown Truckee, the railroad and the river](tinyworlds-frontend/public/og/tinytkf.jpg) | ![Winterfell](tinyworlds-frontend/public/og/tinywinterfell.jpg) | ![King's Landing](tinyworlds-frontend/public/og/tinykingslanding.jpg) |
+| ![Downtown Truckee, the railroad and the river](tinyworlds-frontend/public/og/tinytkf.jpg) | ![Downtown Austin and Lady Bird Lake](tinyworlds-frontend/public/og/tinyaus.jpg) | ![Winterfell](tinyworlds-frontend/public/og/tinywinterfell.jpg) |
 
-| tinywesteros |
-| --- |
-| ![Westeros and Essos](tinyworlds-frontend/public/og/tinywesteros.jpg) |
+| tinykingslanding | tinywesteros |
+| --- | --- |
+| ![King's Landing](tinyworlds-frontend/public/og/tinykingslanding.jpg) | ![Westeros and Essos](tinyworlds-frontend/public/og/tinywesteros.jpg) |
 
 Nothing is drawn by hand and no image model is involved. The maps are rendered procedurally from
 open data by a software rasterizer written for the purpose: building footprints and heights,
@@ -68,8 +68,11 @@ a few minutes to render on a desktop machine.
 - **tinytkf**: Truckee, California: the old railroad town's Commercial Row facing the depot
   across the tracks, the Truckee River, Donner Lake and the Pioneer Monument in Donner Memorial
   State Park, Tahoe Donner's houses in the pines, Glenshire, and the airport in Martis Valley.
+- **tinyaus**: Austin, Texas: the Capitol and downtown skyline, East Sixth Street, UT Austin,
+  South Congress, Barton Springs, Lady Bird Lake and the bridges over it, Lake Austin and the
+  airport. Street Walk lets you explore at street level on foot, by car, by motorcycle or by boat.
 
-New York, Dallas, Cincinnati, Pittsburgh, Philadelphia and Colorado Springs light up their famous
+New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs and Austin light up their famous
 buildings under the pointer, with a line from Wikipedia, and play "Guess the building" with them.
 Truckee lights up its own (Commercial Row's hotels, the old jail, the depot, the Pioneer
 Monument), but too few of them are on Wikipedia for the game.

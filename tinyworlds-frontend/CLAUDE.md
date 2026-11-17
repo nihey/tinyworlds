@@ -5,7 +5,7 @@ The map viewer: a Next.js 16 static export that draws the tiles and indexes writ
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
 (El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), `tinydal`
 (Dallas), `tinycvg` (Cincinnati), `tinypit` (Pittsburgh), `tinyphl` (Philadelphia), `tinycos`
-(Colorado Springs), `tinytkf` (Truckee), and three
+(Colorado Springs), `tinytkf` (Truckee), `tinyaus` (Austin), and three
 places that do not exist, `tinywinterfell`,
 `tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
 lists the worlds. The interface speaks the visitor's language (English, Brazilian

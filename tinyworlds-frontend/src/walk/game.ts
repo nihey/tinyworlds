@@ -104,6 +104,7 @@ export interface WalkGameOptions {
   units: "imperial" | "metric";
   /** New York's first walk: a red supercar waits by the start */
   starter?: boolean;
+  statenIslandFerry?: boolean;
   random?: () => number;
 }
 
@@ -285,7 +286,7 @@ export class WalkGame {
     this.traffic = new Traffic(this.net, this.world, opts.ix.tunnels, this.random);
     this.crowd = new Crowd(this.world, this.random);
     this.fleet = new Fleet(this.world);
-    this.ferries = new Ferries(opts.life, opts.ix.geo);
+    this.ferries = new Ferries(opts.life, opts.ix.geo, opts.statenIslandFerry);
     const s = opts.start;
     this.player = newPlayer(s.e, s.n, s.z ?? 0, s.yaw);
     this.placeZ = s.z === undefined;

@@ -25,6 +25,20 @@ function harbour(): ReturnType<typeof worldOf> {
 }
 
 describe("which boat is the Staten Island ferry", () => {
+  it("keeps Austin's cruise the standard size", () => {
+    const ferries = new Ferries(
+      [
+        {
+          name: "Lady Bird Lake cruise",
+          path: [-97.7655, 30.269435, -97.7625, 30.268466],
+        },
+      ],
+      { ...geo, lon0: -97.740349, lat0: 30.274663 },
+    );
+    expect(ferries.boats()).toMatchObject([{ color: 0, kind: "ferry" }]);
+    expect(ferries.boats()[0].size).toBeUndefined();
+  });
+
   it("is the St. George route whose other end is nearest Whitehall, in lower Manhattan", () => {
     const stGeorge = [-74.07417, 40.64609];
     const batteryPark = [-74.01807, 40.71516];
@@ -35,6 +49,7 @@ describe("which boat is the Staten Island ferry", () => {
         { name: "Sunset Park – Rockaway", path: [-74.02648, 40.6463, -73.83174, 40.58419] },
       ],
       geo,
+      true,
     );
     // out along their routes, away from St. George where both begin
     ferries.step(
@@ -65,6 +80,7 @@ describe("the Staten Island ferry", () => {
       route("St. George – Whitehall", [0, 100], [2000, 100]),
     ],
     geo,
+    true,
   );
   const boats = ferries.boats();
   const staten = boats.find((b) => b.color === 1)!;

@@ -17,6 +17,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Street walk
 
+- New York and Austin use the same walk controls and physics. Each world has one walk data set that either map orientation can open. Set billboard areas in the world's config.
 - `src/walk/world.ts` resolves which deck supports each player. On foot, a nearby footway can take over from an overlapping roadway when both decks are level, as on the Brooklyn Bridge's Brooklyn approach. Keep the height tolerance and roadway preference for drivers when changing this logic.
 - Motorcycles use the shared road vehicle physics and spawn mix in `src/walk/vehicles.ts`. Keep the model, camera and localized riding prompts in sync when adding vehicle kinds.
 - The Brooklyn Bridge's landmark geometry in `src/walk/render/brooklyn-bridge.ts` uses the surveyed tower locations and existing walk cells. Keep its openings aligned with the roadway and promenade.

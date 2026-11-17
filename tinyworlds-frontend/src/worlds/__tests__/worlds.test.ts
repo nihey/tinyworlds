@@ -29,6 +29,7 @@ describe("resolveWorld", () => {
       "tinyphl",
       "tinycos",
       "tinytkf",
+      "tinyaus",
       "tinywinterfell",
       "tinykingslanding",
     ]) {
@@ -52,6 +53,7 @@ describe("resolveWorld", () => {
       "tinyphl",
       "tinycos",
       "tinytkf",
+      "tinyaus",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -70,6 +72,16 @@ describe("resolveWorld", () => {
 });
 
 describe("worlds", () => {
+  it("opens Austin's street walk from both map views and offers the building quiz", () => {
+    expect(resolveWorld("tinyaus")).toMatchObject({
+      turn: "grid",
+      walk: true,
+      sights: true,
+      quiz: true,
+      units: "imperial",
+    });
+  });
+
   it("are filed under their own id and have a dictionary", () => {
     for (const [key, world] of Object.entries(WORLDS)) {
       expect(world.id).toBe(key);
@@ -306,6 +318,7 @@ describe("worlds", () => {
       "tinyphl",
       "tinycos",
       "tinytkf",
+      "tinyaus",
     ]);
     // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
     for (const world of Object.values(WORLDS)) {

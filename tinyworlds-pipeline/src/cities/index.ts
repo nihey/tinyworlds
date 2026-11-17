@@ -1,3 +1,4 @@
+import { tinyaus } from "./tinyaus.js";
 import { tinycos } from "./tinycos.js";
 import { tinycvg } from "./tinycvg.js";
 import { tinydal } from "./tinydal.js";
@@ -32,6 +33,7 @@ export const CITIES: Record<string, City> = {
   tinyphl,
   tinycos,
   tinytkf,
+  tinyaus,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,

@@ -451,7 +451,7 @@ change to the rules below.
 
 ## Street walk (`walk/`)
 
-The `walk` step (run last by `all` for a city whose file says `walk: true`: New York) writes the
+The `walk` step (run last by `all` for a city whose file says `walk: true`: New York and Austin) writes the
 viewer's street walk into `walk/` of the world's data folder: the city in squares of 200 m of
 metres east and north of the projection's origin, one gzipped file of typed arrays each
 (`walk/cells/<i>_<j>.bin`), the index (`walk/walk.json`) and their version in the manifest
@@ -666,6 +666,7 @@ have no floors mapped (the Academy's halls, the Broadmoor).
 | Los Angeles County Enterprise GIS   | Countywide Statistical Areas: cities, LA's communities, unincorporated areas  | open, attribution                                   |
 | City of Pittsburgh (WPRDC)          | Pittsburgh's 90 neighbourhoods                                                | CC BY                                               |
 | Abaca Labs (OpenDataPhilly)         | Philadelphia's 159 neighbourhoods                                             | CC BY 4.0                                           |
+| City of Austin Open Data            | Austin's Neighborhood Reporting Areas                                         | City of Austin open data                            |
 | Wikipedia (en, pt, es)              | the openings of the sights' articles, and their links (`wiki`)                | CC BY-SA 4.0                                        |
 
 `data/` (raw downloads and scenes, per city) is gitignored and reproducible.

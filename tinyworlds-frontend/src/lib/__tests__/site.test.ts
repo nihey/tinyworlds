@@ -97,6 +97,7 @@ describe("site", () => {
       "Filadelfia",
       "Colorado Springs",
       "Truckee",
+      "Austin",
       "Winterfell",
       "Invernalia",
       "King's Landing",

@@ -118,7 +118,7 @@ function boatOf(r: Route, pose: { e: number; n: number; yaw: number }): Vehicle 
 export class Ferries {
   private readonly routes: Route[] = [];
 
-  constructor(life: LifeRoutes, geo: WalkGeo) {
+  constructor(life: LifeRoutes, geo: WalkGeo, statenIslandFerry = false) {
     (life ?? []).forEach((route, i) => {
       const pts: number[] = [];
       const cum: number[] = [];
@@ -142,27 +142,28 @@ export class Ferries {
         boat: null,
       });
     });
-    // the Staten Island route's boat is the long orange one: of the routes from St. George (its
-    // terminal), the one whose other end is nearest Whitehall, where the real one docks in
-    // Manhattan; with none, the longest route
-    const [we, wn] = lonLatToEN(geo, WHITEHALL[0], WHITEHALL[1]);
-    const toWhitehall = (r: Route) => {
-      const last = r.pts.length - 2;
-      return Math.min(
-        Math.hypot(r.pts[0] - we, r.pts[1] - wn),
-        Math.hypot(r.pts[last] - we, r.pts[last + 1] - wn),
-      );
-    };
-    const fromStGeorge = this.routes.filter((r) => /staten island|st\.? george/i.test(r.name));
-    const staten =
-      fromStGeorge.reduce<Route | undefined>(
-        (a, b) => (!a || toWhitehall(b) < toWhitehall(a) ? b : a),
-        undefined,
-      ) ??
-      this.routes.reduce<Route | undefined>((a, b) => (!a || b.len > a.len ? b : a), undefined);
-    if (staten) {
-      staten.staten = true;
-      staten.speed = STATEN_SPEED;
+    if (statenIslandFerry) {
+      // Pick the route from St. George that ends closest to Whitehall. If the data has no
+      // St. George route, use the longest route in New York's harbor.
+      const [we, wn] = lonLatToEN(geo, WHITEHALL[0], WHITEHALL[1]);
+      const toWhitehall = (r: Route) => {
+        const last = r.pts.length - 2;
+        return Math.min(
+          Math.hypot(r.pts[0] - we, r.pts[1] - wn),
+          Math.hypot(r.pts[last] - we, r.pts[last + 1] - wn),
+        );
+      };
+      const fromStGeorge = this.routes.filter((r) => /staten island|st\.? george/i.test(r.name));
+      const staten =
+        fromStGeorge.reduce<Route | undefined>(
+          (a, b) => (!a || toWhitehall(b) < toWhitehall(a) ? b : a),
+          undefined,
+        ) ??
+        this.routes.reduce<Route | undefined>((a, b) => (!a || b.len > a.len ? b : a), undefined);
+      if (staten) {
+        staten.staten = true;
+        staten.speed = STATEN_SPEED;
+      }
     }
     for (const r of this.routes) r.boat = boatOf(r, poseAt(r, 0));
   }

@@ -219,6 +219,7 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
           sound,
           units: UNITS,
           starter,
+          statenIslandFerry: WORLD.id === "tinynyc",
         });
         // the crowd an earlier walk of the visit had to lower
         const crowd = new QualityLadder(keptCrowd).crowd;

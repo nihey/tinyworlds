@@ -17,6 +17,11 @@ describe('seed data', () => {
 
   it('names the world of every built city', () => {
     for (const city of BUILT) expect(city.worldId).toMatch(/^[a-z0-9]{3,20}$/);
+    expect(BUILT).toContainEqual({
+      slug: 'austin',
+      name: 'Austin',
+      worldId: 'tinyaus',
+    });
   });
 });
 
