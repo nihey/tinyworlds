@@ -18,8 +18,11 @@ import { makePalette, type Palette } from "./palette";
  * everything, and the squares streamed in around the camera. Reached only by dynamic import.
  */
 
-/** Squares whose middle is within this many squares of the camera's square are loaded. */
-export const LOAD_RADIUS = 3;
+/**
+ * Squares whose middle is within this many squares of the camera's square are loaded: the
+ * spec's 3, and half a square more as the spike had it, so nothing pops in under thin fog.
+ */
+export const LOAD_RADIUS = 3.5;
 /** Beyond this many they are let go (out of the scene and out of `world`). */
 export const UNLOAD_RADIUS = 4.5;
 /** Squares asked for at once. */
@@ -39,12 +42,14 @@ interface Slot<T> {
   state: "loading" | "ready" | "failed";
   cell: WalkCell | null;
   retryAt: number;
-  /** What the view made of it (meshes, or the fog standing in for a square that failed). */
+  /** What the view made of it once it is in. */
   shown: T | null;
+  /** What stands in for it since it failed: kept while it is asked again, until it is shown. */
+  fog: T | null;
 }
 
 export interface StreamHooks<T> {
-  /** What stands where a square failed to load, until it is asked for again or let go. */
+  /** What stands where a square failed to load or to be shown, until it is shown or let go. */
   failed(i: number, j: number): T;
   /** Lets go of what the view made of a square. */
   drop(shown: T): void;
@@ -129,7 +134,23 @@ export class SquareStream<T> {
       return;
     }
     if (slot.shown !== null) this.hooks.drop(slot.shown);
+    if (slot.fog !== null) this.hooks.drop(slot.fog);
+    slot.fog = null;
     slot.shown = shown;
+  }
+
+  /**
+   * A square that came in but could not be shown (its meshes failed): out of `world` (a wall),
+   * fog in its place, asked again after `RETRY_AFTER`, as if it had failed to load.
+   */
+  reject(cell: WalkCell): void {
+    const slot = this.slots.get(cell.key);
+    if (!slot || slot.cell !== cell) return;
+    if (slot.state === "ready") this.world.remove(cell.key);
+    if (slot.shown !== null) this.hooks.drop(slot.shown);
+    slot.shown = null;
+    slot.cell = null;
+    this.fail(slot);
   }
 
   /** How many squares are in, asked for, and failed. */
@@ -152,7 +173,16 @@ export class SquareStream<T> {
     const key = keyOf(i, j);
     const old = this.slots.get(key);
     if (old?.shown) this.hooks.drop(old.shown);
-    const slot: Slot<T> = { i, j, state: "loading", cell: null, retryAt: 0, shown: null };
+    // a square asked again keeps its fog until what comes in is shown
+    const slot: Slot<T> = {
+      i,
+      j,
+      state: "loading",
+      cell: null,
+      retryAt: 0,
+      shown: null,
+      fog: old?.fog ?? null,
+    };
     this.slots.set(key, slot);
     this.loading++;
     let promise: Promise<WalkCell>;
@@ -178,17 +208,19 @@ export class SquareStream<T> {
     );
   }
 
-  /** A square that failed stays out of `world` (a wall), with the fog standing in, until asked again. */
+  /** A square that failed stays out of `world` (a wall), with the fog standing in (the same fog, if it had one), until asked again. */
   private fail(slot: Slot<T>): void {
     slot.state = "failed";
     slot.retryAt = this.clock + RETRY_AFTER;
-    slot.shown = this.hooks.failed(slot.i, slot.j);
+    slot.fog ??= this.hooks.failed(slot.i, slot.j);
   }
 
   private forget(key: string, slot: Slot<T>): void {
     if (slot.state === "ready") this.world.remove(key);
     if (slot.shown !== null) this.hooks.drop(slot.shown);
+    if (slot.fog !== null) this.hooks.drop(slot.fog);
     slot.shown = null;
+    slot.fog = null;
     this.slots.delete(key);
   }
 }
@@ -208,6 +240,8 @@ export class WalkView {
   private drawn = { w: 0, h: 0, pixel: 0 };
   private time = 0;
   private at = { e: 0, n: 0 };
+  /** Whether a square's meshes have failed already (said once in the console). */
+  private meshFailed = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -288,11 +322,19 @@ export class WalkView {
     this.time += Math.max(0, dt);
     this.stream.update(dt, this.at.e, this.at.n);
     const cell = this.stream.next(this.at.e, this.at.n);
-    if (cell) {
-      const group = buildCellMeshes(cell, this.ctx);
-      this.scene.add(group);
-      this.stream.show(cell, group);
+    if (!cell) return;
+    let group: THREE.Group;
+    try {
+      group = buildCellMeshes(cell, this.ctx);
+    } catch (err) {
+      // a square that cannot be drawn is a wall in the fog, asked for again later; the walk goes on
+      if (!this.meshFailed) console.warn(`walk: square ${cell.key} could not be drawn`, err);
+      this.meshFailed = true;
+      this.stream.reject(cell);
+      return;
     }
+    this.scene.add(group);
+    this.stream.show(cell, group);
   }
 
   render(): void {

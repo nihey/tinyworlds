@@ -90,9 +90,12 @@ function chop(
  * piers and towers hold it up), never where `under` (a street or water below) is true, moving
  * along the way, then out to the deck's edges, to find free ground. The roadway all along.
  *
- * With `within` ([e0, n0, e1, n1]), only what may lie in that box is worked out (a square asks
- * for its own part of a way that crosses many): the stretches whose strip reaches it and the
- * columns whose station is near enough to end up in it, each as it would be without the box.
+ * With `within` ([e0, n0, e1, n1], half-open: a square), only what that square draws, so
+ * squares that each know only the ways filed under them never disagree at their borders: the
+ * slab and roadway pieces of the segments that reach it (cut the same way in every square: it
+ * keeps those whose middle it holds), the parapets' metre steps whose middle lies in it (so
+ * `open` is asked only there), and the columns whose station lies in it, each standing wholly
+ * inside it (so `under` is asked only there).
  */
 export function deckGeometry(
   way: ElevatedWay,
@@ -111,6 +114,10 @@ export function deckGeometry(
   const surface: DeckSpan[] = [];
   const columns: [number, number, number][] = [];
   if (m < 2) return { slab, parapets, columns, surface };
+
+  /** Whether a point is the box's to draw (everywhere without one). */
+  const holds = (e: number, n: number) =>
+    !within || (e >= within[0] && e < within[2] && n >= within[1] && n < within[3]);
 
   // distance along the middle line at every vertex
   const at = new Float64Array(m);
@@ -140,11 +147,12 @@ export function deckGeometry(
 
     const de = (be - ae) / len;
     const dn = (bn - an) / len;
+    // a step a metre long at most, cut the same in every square whatever it knows
+    const steps = Math.max(1, Math.ceil(len));
     for (const side of [1, -1]) {
       // the left edge is the middle line moved by the left normal (-dn, de)
       const oe = -dn * half * side;
       const on = de * half * side;
-      const steps = open ? Math.max(1, Math.ceil(len)) : 1;
       let from = -1;
       const flush = (to: number) => {
         if (from < 0) return;
@@ -164,9 +172,9 @@ export function deckGeometry(
       };
       for (let s = 0; s < steps; s++) {
         const t = (s + 0.5) / steps;
-        const closed =
-          !open || !open(ae + (be - ae) * t + oe, an + (bn - an) * t + on, az + (bz - az) * t);
-        if (!closed) flush(s);
+        const e = ae + (be - ae) * t + oe;
+        const n = an + (bn - an) * t + on;
+        if (!holds(e, n) || (open && open(e, n, az + (bz - az) * t))) flush(s);
         else if (from < 0) from = s;
       }
       flush(steps);
@@ -177,7 +185,6 @@ export function deckGeometry(
   const total = at[m - 1];
   const r = columnSide(way.width) / 2;
   const reach = Math.max(0, half - r);
-  /** The point at distance s along the way: position, deck height, direction; null where no column may stand. */
   /** The segment that distance s along the way falls on. */
   const segmentAt = (s: number) => {
     let lo = 0;
@@ -189,54 +196,40 @@ export function deckGeometry(
     }
     return lo;
   };
-  const spot = (s: number) => {
-    if (s < 0 || s > total) return null;
+  /** The point at distance s along the way: position, deck height, direction, and whether a column may stand under it. */
+  const pointAt = (s: number) => {
     const k = segmentAt(s);
-    if (!way.own[k] || !way.own[k + 1]) return null;
     const len = at[k + 1] - at[k];
-    if (len < 1e-6) return null;
-    const t = (s - at[k]) / len;
+    const t = len > 1e-6 ? (s - at[k]) / len : 0;
     const z = p[k * 3 + 2] + (p[k * 3 + 5] - p[k * 3 + 2]) * t;
-    if (z < COLUMN_MIN_Z) return null;
     return {
       e: p[k * 3] + (p[k * 3 + 3] - p[k * 3]) * t,
       n: p[k * 3 + 1] + (p[k * 3 + 4] - p[k * 3 + 1]) * t,
       z,
-      ue: (p[k * 3 + 3] - p[k * 3]) / len,
-      un: (p[k * 3 + 4] - p[k * 3 + 1]) / len,
+      ue: len > 1e-6 ? (p[k * 3 + 3] - p[k * 3]) / len : 1,
+      un: len > 1e-6 ? (p[k * 3 + 4] - p[k * 3 + 1]) / len : 0,
+      ok: len > 1e-6 && way.own[k] === 1 && way.own[k + 1] === 1 && z >= COLUMN_MIN_Z,
     };
   };
-  /** Whether a column's square footprint, centred at (e, n) and lined up with the way, is clear. */
+  /** Whether a column's square footprint, centred at (e, n) and lined up with the way, is the box's and clear. */
   const clear = (e: number, n: number, ue: number, un: number) => {
-    if (under(e, n)) return false;
+    const corners: [number, number][] = [[e, n]];
     for (const a of [-r, r])
-      for (const b of [-r, r]) if (under(e + ue * a - un * b, n + un * a + ue * b)) return false;
-    return true;
+      for (const b of [-r, r]) corners.push([e + ue * a - un * b, n + un * a + ue * b]);
+    return corners.every(([ce, cn]) => holds(ce, cn)) && !corners.some(([ce, cn]) => under(ce, cn));
   };
   const shifts = [0];
   for (let d = SHIFT_STEP; d <= SHIFT; d += SHIFT_STEP) shifts.push(d, -d);
   const sideways = reach > 0 ? [0, reach, -reach] : [0];
-  // a column stands at most this far from its station
-  const margin = SHIFT + half + 1;
   for (let station = COLUMN_SPACING / 2; station <= total; station += COLUMN_SPACING) {
-    if (within) {
-      const k = segmentAt(station);
-      const len = at[k + 1] - at[k];
-      const t = len > 1e-6 ? (station - at[k]) / len : 0;
-      const e = p[k * 3] + (p[k * 3 + 3] - p[k * 3]) * t;
-      const n = p[k * 3 + 1] + (p[k * 3 + 4] - p[k * 3 + 1]) * t;
-      if (
-        e < within[0] - margin ||
-        e > within[2] + margin ||
-        n < within[1] - margin ||
-        n > within[3] + margin
-      )
-        continue;
-    }
+    const at0 = pointAt(station);
+    if (!holds(at0.e, at0.n)) continue;
     search: for (const across of sideways)
       for (const shift of shifts) {
-        const q = spot(station + shift);
-        if (!q) continue;
+        const s = station + shift;
+        if (s < 0 || s > total) continue;
+        const q = pointAt(s);
+        if (!q.ok) continue;
         const e = q.e - q.un * across;
         const n = q.n + q.ue * across;
         if (!clear(e, n, q.ue, q.un)) continue;

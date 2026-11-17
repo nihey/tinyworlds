@@ -40,7 +40,7 @@ export interface MeshContext {
   palette: Palette;
   materials: WalkMaterials;
   index: WalkIndex;
-  /** The squares loaded so far: where the water is, under a column near a square's edge too. */
+  /** The squares loaded so far: where the water is (asked only inside the square being built, already in it). */
   world: WalkWorld;
 }
 
@@ -431,6 +431,8 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
 
   // ---- elevated ways: what holds them up where the map has nothing, parapets, the roadway
   const concrete = palette.ramp("concrete");
+  // a street or the water under a column: asked only inside this square, where its streets
+  // (every one that touches it is filed under it) and its mask are the whole story
   const underStreet = streetsBelow(cell.streets);
   const under = (e: number, n: number) => world.isWater(e, n) || underStreet(e, n);
   const square = [oe, on, oe + side, on + side] as const;
@@ -457,6 +459,8 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
               const oz = deckAt(o, e, n);
               return oz !== null && Math.abs(oz - z) <= JOIN_HEIGHT;
             });
+    // the parapets and columns come as this square's own; of the slab and the roadway (cut the
+    // same in every square), it draws the pieces whose middle it holds
     const g = deckGeometry(way, under, { open, within: square });
     const mid = (s: DeckSpan) => inSquare((s.e0 + s.e1) / 2, (s.n0 + s.n1) / 2);
     const hw = way.width / 2;
@@ -526,7 +530,6 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
     const top = concrete * SHADES + HIGH;
     const t = PARAPET_THICK / 2;
     for (const s of g.parapets) {
-      if (!mid(s)) continue;
       const L = Math.hypot(s.e1 - s.e0, s.n1 - s.n0);
       if (L < 1e-6) continue;
       const le = -(s.n1 - s.n0) / L;
@@ -563,7 +566,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
 
     const half = columnSide(way.width) / 2;
     for (const [e, n, h] of g.columns) {
-      if (!inSquare(e, n) || h < 0.2) continue;
+      if (h < 0.2) continue;
       const [ue, un] = directionAt(way, e, n);
       const corner = (a: number, b: number) => [e + ue * a - un * b, n + un * a + ue * b];
       const cs = [

@@ -180,8 +180,8 @@ describe("deckGeometry", () => {
       expect(lengthOf(s)).toBeLessThanOrEqual(25 + 1e-6);
   });
 
-  it("works out, within a box, exactly what the whole way has there", () => {
-    // a long way that bends, with a street under it and a way joining it
+  it("works out, within a box, exactly the slab and roadway pieces the whole way has there", () => {
+    // a long way that bends
     const way = deckWay([
       [0, 0, 0],
       [80, 0, 8],
@@ -189,21 +189,72 @@ describe("deckGeometry", () => {
       [700, 140, 8],
       [900, 140, 0],
     ]);
-    const under = (e: number, n: number) => Math.abs(e - 420) < 6 || n > 135;
-    const open = (e: number) => e > 640 && e < 660;
-    const full = deckGeometry(way, under, { open });
+    const full = deckGeometry(way, nowhere);
     const box = [400, 0, 600, 200] as const;
-    const part = deckGeometry(way, under, { open, within: box });
+    const part = deckGeometry(way, nowhere, { within: box });
     const inBox = (e: number, n: number) => e >= box[0] && e < box[2] && n >= box[1] && n < box[3];
     const held = (list: DeckSpan[]) =>
       list.filter((s) => inBox((s.e0 + s.e1) / 2, (s.n0 + s.n1) / 2));
-    for (const key of ["slab", "parapets", "surface"] as const) {
+    for (const key of ["slab", "surface"] as const) {
       expect(held(part[key]).length).toBeGreaterThan(0);
       expect(held(part[key])).toEqual(held(full[key]));
       expect(part[key].length).toBeLessThan(full[key].length);
     }
-    const columnsIn = (g: typeof full) => g.columns.filter(([e, n]) => inBox(e, n));
-    expect(columnsIn(part).length).toBeGreaterThan(0);
-    expect(columnsIn(part)).toEqual(columnsIn(full));
+  });
+
+  it("draws each metre of parapet in one square only, whatever each square knows of the ways joining", () => {
+    const way = deckWay([
+      [0, 100, 7],
+      [400, 100, 7],
+    ]);
+    const A = [0, 0, 200, 200] as const;
+    const B = [200, 0, 400, 200] as const;
+    // a ramp joins the left side from 233 to 243 m: only B, whose square it touches, knows of it
+    const openB = (e: number, n: number) => n > 100 && e >= 233 && e <= 243;
+    const both = [
+      ...deckGeometry(way, nowhere, { within: A }).parapets,
+      ...deckGeometry(way, nowhere, { open: openB, within: B }).parapets,
+    ];
+    const runs = (side: DeckSpan[]) => {
+      const sorted = [...side].sort((a, b) => a.e0 - b.e0);
+      const gaps: [number, number][] = [];
+      let e = 0;
+      for (const p of sorted) {
+        // never drawn twice
+        expect(p.e0).toBeGreaterThanOrEqual(e - 1e-6);
+        if (p.e0 > e + 1e-6) gaps.push([e, p.e0]);
+        e = p.e1;
+      }
+      expect(e).toBeCloseTo(400, 6);
+      return gaps;
+    };
+    const gaps = runs(both.filter((p) => p.n0 > 100));
+    expect(gaps.length).toBe(1);
+    expect(gaps[0][0]).toBeCloseTo(233, 6);
+    expect(gaps[0][1]).toBeCloseTo(243, 6);
+    expect(runs(both.filter((p) => p.n0 < 100))).toEqual([]);
+  });
+
+  it("decides each column in the square holding its station alone, standing wholly inside it", () => {
+    const way = deckWay([
+      [0, 100, 8],
+      [400, 100, 8],
+    ]);
+    const A = [0, 0, 200, 200] as const;
+    const B = [200, 0, 400, 200] as const;
+    // A sees open ground at the station at 195 m; B sees a street there, out to 204 m
+    const underB = (e: number) => e >= 185 && e <= 204;
+    const r = columnSide(way.width) / 2;
+    const fromA = deckGeometry(way, nowhere, { within: A }).columns;
+    const fromB = deckGeometry(way, underB, { within: B }).columns;
+    for (const [e] of fromA) {
+      expect(e - r).toBeGreaterThanOrEqual(0);
+      expect(e + r).toBeLessThan(200);
+    }
+    for (const [e] of fromB) expect(e - r).toBeGreaterThanOrEqual(200);
+    // one for each station, 15 m, 45 m, … 375 m, none twice
+    const es = [...fromA, ...fromB].map(([e]) => e).sort((a, b) => a - b);
+    expect(es.length).toBe(13);
+    for (let k = 1; k < es.length; k++) expect(es[k] - es[k - 1]).toBeGreaterThan(18);
   });
 });

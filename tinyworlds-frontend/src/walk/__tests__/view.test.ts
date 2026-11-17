@@ -69,7 +69,7 @@ function hooks() {
 }
 
 describe("SquareStream", () => {
-  it("asks for the squares within 3 of the camera's, six at a time, nearest first", async () => {
+  it("asks for the squares within 3.5 of the camera's, six at a time, nearest first", async () => {
     const l = loader();
     const s = new SquareStream(indexOf(-10, -10, 20, 20), l.load, hooks().hooks);
     s.update(0.016, 100, 100);
@@ -90,14 +90,14 @@ describe("SquareStream", () => {
       await settle();
       s.update(0.016, 100, 100);
     }
-    // every square whose index is within 3 of (0, 0): 29 of them, and nothing else
-    expect(l.asked.length).toBe(29);
+    // every square whose index is within 3.5 of (0, 0): 37 of them, and nothing else
+    expect(l.asked.length).toBe(37);
     for (const key of l.asked) {
       const [i, j] = key.split("_").map(Number);
-      expect(Math.hypot(i, j)).toBeLessThanOrEqual(3);
+      expect(Math.hypot(i, j)).toBeLessThanOrEqual(3.5);
     }
-    expect(s.world.has(3, 0)).toBe(true);
-    expect(s.world.has(3, 1)).toBe(false);
+    expect(s.world.has(3, 1)).toBe(true);
+    expect(s.world.has(3, 2)).toBe(false);
   });
 
   it("never asks for a square the index does not have", () => {
@@ -125,7 +125,8 @@ describe("SquareStream", () => {
     expect(s.next(100, 100)!.key).toBe("1_0");
   });
 
-  it("keeps a square that failed out of the world, with fog in its place, and asks again after 10 s", async () => {
+  /** A stream round (100, 100) where every square but (0, 0) has come in and (0, 0) has failed once. */
+  async function oneFailed() {
     const l = loader();
     const h = hooks();
     const s = new SquareStream(indexOf(-10, -10, 20, 20), l.load, h.hooks);
@@ -142,22 +143,72 @@ describe("SquareStream", () => {
       }
     }
     await settle();
+    return { l, h, s, askedFor: () => l.asked.filter((k) => k === "0_0").length };
+  }
+
+  it("keeps a square that failed out of the world, with fog in its place, and asks again after 10 s", async () => {
+    const { l, h, s, askedFor } = await oneFailed();
     expect(s.counts().loading).toBe(0);
     expect(s.world.has(0, 0)).toBe(false);
     expect(s.world.inData(100, 100)).toBe(false);
     expect(h.fogs).toEqual(["0_0"]);
     expect(s.counts().failed).toBe(1);
 
+    for (let t = 0; t < 9.9; t += 0.1) s.update(0.1, 100, 100);
+    expect(askedFor()).toBe(1);
+    s.update(0.2, 100, 100);
+    expect(askedFor()).toBe(2);
+    // the fog stays while it is asked again, and until what came in is shown
+    expect(h.dropped).not.toContain("fog 0_0");
+    l.pending.get("0_0")!.ok();
+    await settle();
+    expect(s.world.has(0, 0)).toBe(true);
+    expect(h.dropped).not.toContain("fog 0_0");
+    const cell = s.next(100, 100)!;
+    expect(cell.key).toBe("0_0");
+    s.show(cell, "meshes 0_0");
+    expect(h.dropped).toEqual(["fog 0_0"]);
+  });
+
+  it("keeps the same fog when the square fails again", async () => {
+    const { l, h, s, askedFor } = await oneFailed();
+    for (let t = 0; t < 10.1; t += 0.1) s.update(0.1, 100, 100);
+    expect(askedFor()).toBe(2);
+    l.pending.get("0_0")!.fail();
+    await settle();
+    expect(h.fogs).toEqual(["0_0"]);
+    expect(h.dropped).toEqual([]);
+    expect(s.counts().failed).toBe(1);
+    expect(s.world.has(0, 0)).toBe(false);
+  });
+
+  it("puts a square that came in but could not be shown back to fog, out of the world, asked again after 10 s", async () => {
+    const l = loader();
+    const h = hooks();
+    const s = new SquareStream(indexOf(-10, -10, 20, 20), l.load, h.hooks);
+    s.update(0.016, 100, 100);
+    l.pending.get("0_0")!.ok();
+    l.pending.delete("0_0");
+    await settle();
+    const cell = s.next(100, 100)!;
+    s.reject(cell);
+    expect(s.world.has(0, 0)).toBe(false);
+    expect(h.fogs).toEqual(["0_0"]);
+    expect(s.next(100, 100)?.key).not.toBe("0_0");
+    // answer the rest, then wait out the 10 s
+    for (let rounds = 0; rounds < 20; rounds++) {
+      await settle();
+      s.update(0, 100, 100);
+      for (const [key, p] of [...l.pending]) {
+        p.ok();
+        l.pending.delete(key);
+      }
+    }
     const askedFor = () => l.asked.filter((k) => k === "0_0").length;
     for (let t = 0; t < 9.9; t += 0.1) s.update(0.1, 100, 100);
     expect(askedFor()).toBe(1);
     s.update(0.2, 100, 100);
     expect(askedFor()).toBe(2);
-    expect(h.dropped).toContain("fog 0_0");
-
-    l.pending.get("0_0")!.ok();
-    await settle();
-    expect(s.world.has(0, 0)).toBe(true);
   });
 
   it("lets go of squares beyond 4.5, out of the world, and drops what was shown of them", async () => {
