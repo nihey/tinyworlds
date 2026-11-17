@@ -38,7 +38,7 @@ export const tinylax: City = {
   title: "Los Angeles",
   // City Hall, where the city's street numbers start
   origin: { lon: -118.24276, lat: 34.05368 },
-  betaDeg: -0.1,
+  gridDeg: -0.1,
   k: 2,
   bbox: BBOX,
   // downtown's towers, from the Wilshire Grand to the Disney Concert Hall

@@ -42,6 +42,9 @@ export interface Strings {
     startSomewhere: string;
     nothing: string;
     stillLoading: string;
+    /** a result that is another of the site's maps: "{city}" is its name, and what it is */
+    openMap: string;
+    otherMap: string;
   };
   tools: {
     navLabel: string;
@@ -106,8 +109,9 @@ export interface Strings {
     /** the cities being funded, in order of funding; and the ones that reached their goal */
     ranking: string;
     funded: string;
-    /** nobody has given anything yet */
+    /** nobody has given anything yet; and so the order is how many people are waiting */
     rankingEmpty: string;
+    rankingEmptyWaiting: string;
     /** names the button of a row: "{city}" is the city */
     donateTo: string;
     /** names the flag beside a row: opens the city's benefactors; "{city}" is the city */
@@ -192,6 +196,8 @@ export interface Strings {
     amount: string;
     customAmount: string;
     customPlaceholder: string;
+    /** what is typed is outside the limits: "{min}", "{max}" */
+    amountRange: string;
     progress: string;
     /** the bar with the donation about to be made added to it */
     preview: string;
@@ -232,6 +238,8 @@ export interface Strings {
         build: { title: string; body: string };
       };
       stonesLaid: string;
+      /** a city nobody has given to yet: what it takes, "{goal}" */
+      goal: string;
       firstUnclaimed: string;
       raised: string;
       /** a built city whose donations reached its goal */
@@ -362,6 +370,10 @@ export interface Strings {
     downLeft: string;
     /** the letter at the needle's tip */
     letter: string;
+    /** in a world drawn both ways, what pressing the compass does: from north up… */
+    toGrid: string;
+    /** …and back */
+    toNorth: string;
   };
   share: {
     copied: string;
@@ -841,6 +853,19 @@ export interface Strings {
     contents: string;
     /** above the few lines that sum the page up */
     summary: string;
+  };
+  /** the page of an address that leads nowhere (the front page's 404.html) */
+  notFound: {
+    title: string;
+    body: string;
+    everyCity: string;
+    /** the address names a city that is not built: "{city}", "{goal}", "{raised}" */
+    cityTitle: string;
+    cityBody: string;
+    cityHas: string;
+    cityNone: string;
+    /** the address names one of the site's maps, or a page under one: "{city}" */
+    worldBody: string;
   };
   errors: {
     answered: (url: string, status: number) => string;

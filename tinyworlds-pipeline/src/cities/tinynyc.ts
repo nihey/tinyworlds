@@ -18,7 +18,7 @@ export const tinynyc: City = {
   title: "New York City",
   // the Empire State Building
   origin: { lon: -73.98566, lat: 40.74844 },
-  betaDeg: 28.9,
+  gridDeg: 28.9,
   k: 2,
   bbox: { west: -74.3, south: 40.45, east: -73.66, north: 40.95 },
   // the Empire State Building, top to bottom, with Midtown around it

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makeGeo, makeProjection } from "./projection.js";
+import { makeGeo, makeProjection, turnGrid } from "./projection.js";
 
 const proj = makeProjection(makeGeo(-73.98566, 40.74844, 28.9, 2));
 
@@ -44,5 +44,37 @@ describe("projection", () => {
   it("points north up and about 30° to the right", () => {
     expect(proj.northDeg).toBeGreaterThan(28);
     expect(proj.northDeg).toBeLessThan(32);
+  });
+
+  it("points north straight up when turned to 45°", () => {
+    expect(makeProjection(makeGeo(-73.98566, 40.74844, 45, 2)).northDeg).toBeCloseTo(0, 12);
+  });
+});
+
+describe("turnGrid", () => {
+  it("moves a point between grids of two bearings without moving it on the ground", () => {
+    const g = makeProjection(makeGeo(-73.98566, 40.74844, 28.9, 2));
+    const v = makeProjection(makeGeo(-73.98566, 40.74844, 45, 2));
+    for (const [p, q] of [
+      [100, 0],
+      [0, -250],
+      [-37.5, 412],
+    ]) {
+      const [pv, qv] = turnGrid(p, q, 45 - 28.9);
+      const a = g.toLonLat(...g.gridToMap(p, q));
+      const b = v.toLonLat(...v.gridToMap(pv, qv));
+      expect(b[0]).toBeCloseTo(a[0], 9);
+      expect(b[1]).toBeCloseTo(a[1], 9);
+    }
+  });
+
+  it("sends a metre north on a compass grid to (√½, −√½) on one turned 45°", () => {
+    const [p, q] = turnGrid(1, 0, 45);
+    expect(p).toBeCloseTo(Math.SQRT1_2, 12);
+    expect(q).toBeCloseTo(-Math.SQRT1_2, 12);
+  });
+
+  it("leaves a point alone when there is no turn", () => {
+    expect(turnGrid(3, -4, 0)).toEqual([3, -4]);
   });
 });

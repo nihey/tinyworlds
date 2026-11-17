@@ -578,7 +578,8 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
     cell: CELL,
     ...cellsIndex(squaresOnDisk(cells)),
     geo,
-    gridDeg: CITY.betaDeg,
+    // the street grid's own bearing (the city file's), whichever way the map is turned
+    gridDeg: CITY.gridDeg,
     sunDeg: SUN_BEARING,
     palette: { names: RAMP_NAMES, rgb: rgb.flat() },
     paintRank: Array.from(PAINT_RANK),

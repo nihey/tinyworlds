@@ -59,7 +59,9 @@ Any host that can run containers works.
 
 The front page is `site/index.html`; each world is a folder beside it (`site/tinynyc/`,
 `site/tinyrao/`). `nginx.conf` matches worlds by pattern, so adding one needs no configuration
-change.
+change. An address with nothing behind it is answered with the front page's `site/404.html`
+(`error_page`, status 404), which reads the address and offers what it can; a missing tile,
+index or script keeps nginx's plain 404.
 
 **API**
 
@@ -176,6 +178,10 @@ and it is copied last so a new build or a new set of indexes is only announced o
 up. `--index` sends the manifest too, so returning visitors get the new indexes; because a
 manifest also describes the tiles, it refuses (before sending anything) when the server's
 manifest is from another render than the local one: deploy the data first.
+A world drawn both ways carries its street-grid view in `grid/` inside its data folder: `--data`
+sends it with the rest (its manifest after its tiles, the world's own manifest last), `--index`
+sends its indexes first, and the checks fail a world marked `turn: "grid"` whose `grid/` view
+is missing, here or (for `--no-data` and the release) on the server.
 `deploy.sh` also copies `nginx.conf` (in place, because it is a single-file bind mount); when
 its contents changed, it redeploys the site's container through `SITE_DEPLOY_WEBHOOK` (Dokploy
 starts the new container before stopping the old one, and rolls back if it fails), or, without

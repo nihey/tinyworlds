@@ -123,7 +123,7 @@ export const tinypit: City = {
   id: "tinypit",
   title: "Pittsburgh",
   origin: { lon: -80.01164, lat: 40.44174 },
-  betaDeg: 61,
+  gridDeg: 61,
   k: 2,
   bbox: { west: -80.07, south: 40.405, east: -79.905, north: 40.485 },
   start: { lon: -80.0035, lat: 40.44, scale: 1 },

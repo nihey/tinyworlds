@@ -13,7 +13,9 @@ import {
   donateUrl,
   formatUsd,
   isCheckoutUrl,
-  parseAmount,
+  parseAmountCents,
+  amountInRange,
+  formatAmount,
   parseMilestones,
   paymentLinkFor,
   progress,
@@ -116,6 +118,16 @@ describe("formatUsd", () => {
   });
 });
 
+describe("formatAmount", () => {
+  it("shows cents only when the amount has some", () => {
+    expect(formatAmount(750, "en-US")).toBe("$7.50");
+    expect(formatAmount(1000, "en-US")).toBe("$10");
+    expect(formatAmount(100_050, "en-US")).toBe("$1,000.50");
+    expect(formatAmount(750, "pt-BR").replace(/\s/g, " ")).toBe("US$ 7,50");
+    expect(formatAmount(750, "es-ES").replace(/\s/g, " ")).toBe("7,50 US$");
+  });
+});
+
 describe("parseMilestones", () => {
   it("keeps well-formed cities and tidies the rest", () => {
     const parsed = parseMilestones([
@@ -201,7 +213,7 @@ describe("the donor's choice", () => {
     expect(
       checkoutInput(
         { kind: "city", name: "Lisboa" },
-        25,
+        2500,
         "tinyrao",
         "pt-BR",
         "https://example.com/tinyrao/",
@@ -217,9 +229,9 @@ describe("the donor's choice", () => {
     });
     const visit = "0b0e7a52-6c1d-4f0a-9c55-2f1b8e3d4a10";
     expect(
-      checkoutInput({ kind: "none" }, 5, "home", "en-US", "https://example.com/", visit).visitId,
+      checkoutInput({ kind: "none" }, 500, "home", "en-US", "https://example.com/", visit).visitId,
     ).toBe(visit);
-    const none = checkoutInput({ kind: "none" }, 1, "home", "en-US", "https://example.com/");
+    const none = checkoutInput({ kind: "none" }, 100, "home", "en-US", "https://example.com/");
     expect(none.city).toBeNull();
     expect(none.amountCents).toBe(100);
   });
@@ -227,17 +239,22 @@ describe("the donor's choice", () => {
   it("carries the name to put on the city, or null", () => {
     const url = "https://example.com/";
     expect(
-      checkoutInput({ kind: "none" }, 20, "tinynyc", "en-US", url, null, "Ana").benefactorName,
+      checkoutInput({ kind: "none" }, 2000, "tinynyc", "en-US", url, null, "Ana").benefactorName,
     ).toBe("Ana");
-    expect(checkoutInput({ kind: "none" }, 20, "tinynyc", "en-US", url).benefactorName).toBeNull();
+    expect(
+      checkoutInput({ kind: "none" }, 2000, "tinynyc", "en-US", url).benefactorName,
+    ).toBeNull();
   });
 
   it("keeps the amount it sends within the limits, and can leave it to the checkout", () => {
-    const at = (dollars: number | null) =>
-      checkoutInput({ kind: "none" }, dollars, "home", "en-US", "https://example.com/").amountCents;
+    const at = (cents: number | null) =>
+      checkoutInput({ kind: "none" }, cents, "home", "en-US", "https://example.com/").amountCents;
     expect(at(0)).toBe(AMOUNT_MIN * 100);
-    expect(at(999999)).toBe(AMOUNT_MAX * 100);
-    expect(at(12.6)).toBe(1300);
+    expect(at(99_999_999)).toBe(AMOUNT_MAX * 100);
+    // cents are sent as they are
+    expect(at(750)).toBe(750);
+    expect(at(1260.4)).toBe(1260);
+    expect(at(Number.NaN)).toBe(AMOUNT_MIN * 100);
     expect(at(null)).toBeNull();
   });
 
@@ -321,23 +338,49 @@ describe("amounts", () => {
     expect(AMOUNT_DEFAULT).toBe(10);
   });
 
-  it("reads what is typed as whole dollars", () => {
-    expect(parseAmount("25")).toBe(25);
-    expect(parseAmount(" 7 ")).toBe(7);
-    expect(parseAmount("$40")).toBe(40);
-    expect(parseAmount("25.90")).toBe(25);
-    expect(parseAmount("25,50")).toBe(25);
+  it("reads what is typed as cents, never dropping the decimal point", () => {
+    const en = (text: string) => parseAmountCents(text, "en-US");
+    expect(en("25")).toBe(2500);
+    expect(en(" 7 ")).toBe(700);
+    expect(en("$40")).toBe(4000);
+    // seven dollars fifty, not seven hundred and fifty
+    expect(en("7.50")).toBe(750);
+    expect(en("7.5")).toBe(750);
+    expect(en("0.5")).toBe(50);
+    expect(en(".5")).toBe(50);
+    expect(en("7.")).toBe(700);
+    expect(en("25.90")).toBe(2590);
+    expect(en("1,000")).toBe(100_000);
+    expect(en("1,000.50")).toBe(100_050);
+    // rounded to the cent
+    expect(en("7.505")).toBe(751);
+  });
+
+  it("reads a comma as the decimal point where the language writes one", () => {
+    const pt = (text: string) => parseAmountCents(text, "pt-BR");
+    expect(pt("7,50")).toBe(750);
+    expect(pt("25,5")).toBe(2550);
+    expect(pt("1.000")).toBe(100_000);
+    expect(pt("1.000,50")).toBe(100_050);
+    // "7.50" is typed everywhere: two digits after the point are cents in every language
+    expect(pt("7.50")).toBe(750);
+    expect(parseAmountCents("7,50", "en-US")).toBe(750);
+    expect(parseAmountCents("1.000", "es-ES")).toBe(100_000);
   });
 
   it("is no amount when there is no number", () => {
-    for (const text of ["", "   ", "abc", "$", "-"]) expect(parseAmount(text), text).toBeNull();
+    for (const text of ["", "   ", "abc", "$", "-", ".", ","])
+      expect(parseAmountCents(text, "en-US"), text).toBeNull();
   });
 
-  it("keeps amounts between one and ten thousand dollars", () => {
-    expect(parseAmount("0")).toBe(AMOUNT_MIN);
-    expect(parseAmount("000")).toBe(AMOUNT_MIN);
-    expect(parseAmount("10000")).toBe(10000);
-    expect(parseAmount("99999")).toBe(AMOUNT_MAX);
+  it("says whether an amount may be given, from one to ten thousand dollars", () => {
+    expect(amountInRange(100)).toBe(true);
+    expect(amountInRange(750)).toBe(true);
+    expect(amountInRange(1_000_000)).toBe(true);
+    expect(amountInRange(99)).toBe(false);
+    expect(amountInRange(0)).toBe(false);
+    expect(amountInRange(1_000_001)).toBe(false);
+    expect(amountInRange(Number.NaN)).toBe(false);
     expect(clampAmount(-3)).toBe(AMOUNT_MIN);
     expect(clampAmount(2.4)).toBe(2);
     expect(clampAmount(Number.NaN)).toBe(AMOUNT_MIN);

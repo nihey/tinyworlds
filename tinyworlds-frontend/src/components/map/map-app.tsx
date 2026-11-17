@@ -18,7 +18,7 @@ import {
 } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
-import { prefsStore } from "@/lib/prefs";
+import { prefsStore, type MapView } from "@/lib/prefs";
 import { quizKey } from "@/lib/quiz";
 import { cn } from "@/lib/utils";
 import { textsFor } from "@/lib/sight-sign";
@@ -30,6 +30,7 @@ import {
   loadPlaces,
   loadSights,
   loadSightTexts,
+  setMapView,
 } from "@/map/data";
 import type { Sight, SightTexts } from "@/map/sights";
 import type { Locale } from "@/i18n/locale";
@@ -104,6 +105,15 @@ export function MapApp() {
   const quizSheet = useMediaQuery("(max-width: 895.98px)");
 
   const engine = session?.engine ?? null;
+  // which way the map is turned: north up, or (in a world drawn both ways) to its street grid.
+  // This tab's own: the stored choice is read once, so turning the map in another tab leaves
+  // this one as it is. Read before the first effect (nothing of it is in the markup until the
+  // map is in, so the page still hydrates as prerendered) to ask for one view only.
+  const [view, setView] = useState<MapView>(() =>
+    WORLD.turn && typeof window !== "undefined" && prefsStore.getSnapshot().view === "grid"
+      ? "grid"
+      : "north",
+  );
   // what a finger or a mouse does to the map beside the walk
   const coarse = useMediaQuery("(pointer: coarse)");
 
@@ -124,12 +134,14 @@ export function MapApp() {
   const { walking, walkingRef, setArmed } = street;
 
   // Load the manifest, then start the engine on the two canvases; places and hoods follow.
+  // Turning the map starts it all again on the other view's data, where the map was.
   useEffect(() => {
     const canvas = canvasRef.current;
     const marks = marksRef.current;
     if (!canvas || !marks) return;
     const abort = new AbortController();
     let started: MapEngine | null = null;
+    setMapView(view);
 
     (async () => {
       try {
@@ -189,6 +201,13 @@ export function MapApp() {
         }
       } catch (error) {
         if (abort.signal.aborted) return;
+        // a street-grid view that will not load gives way to the map north up, and is forgotten:
+        // no visitor is left on a view whose map never comes, with no compass to leave it by
+        if (view === "grid") {
+          prefsStore.set({ view: "north" });
+          setView("north");
+          return;
+        }
         setFailed(true);
         setErrorMessage(error instanceof Error ? error.message : String(error));
       }
@@ -198,7 +217,7 @@ export function MapApp() {
       abort.abort();
       started?.destroy();
     };
-  }, [attempt, walkingRef]);
+  }, [attempt, view, walkingRef]);
 
   const retry = () => {
     setErrorMessage(null);
@@ -241,6 +260,24 @@ export function MapApp() {
     compact: quizSheet,
   });
   const quizOn = quiz.state.phase !== "off";
+
+  // The compass turns the map (a world drawn both ways): the other view opens on the same spot
+  // and zoom, read from the address bar as a shared link would be. A game ends first: its
+  // building's outline belongs to the view it was lit in.
+  const turn = () => {
+    if (!engine) return;
+    if (quizOn) quiz.stop();
+    writeHash(formatHash({ ...engine.getCentre(), scale: engine.getView().scale }));
+    setSession(null);
+    setPlaces(null);
+    setPlacesFailed(false);
+    setHasHoods(false);
+    setSights([]);
+    setLit(null);
+    const next = view === "grid" ? "north" : "grid";
+    setView(next);
+    setPrefs({ view: next });
+  };
   // a round holds its building lit: the map's own sign for it waits until it is answered
   const quizRound = ["loading", "asking", "answered"].includes(quiz.state.phase);
   const quizArticle = quiz.sight && litSight?.id === quiz.sight.id ? litText : undefined;
@@ -529,6 +566,8 @@ export function MapApp() {
           </div>
           <ToolColumn
             northDeg={session.manifest.northDeg}
+            view={view}
+            onTurn={WORLD.turn ? turn : undefined}
             onZoomIn={() => engine.zoomStep(1)}
             onZoomOut={() => engine.zoomStep(-1)}
             onWholeMap={() => engine.fitAll()}

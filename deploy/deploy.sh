@@ -99,6 +99,16 @@ world_problems() {
   grep -q "\`$world\`" "$ROOT/CLAUDE.md" || echo "not in the worlds table of CLAUDE.md"
   grep -q "$world" "$ROOT/README.md" || echo "not in README.md"
   grep -q "\`$world\`" "$FRONTEND/CLAUDE.md" || echo "not in tinyworlds-frontend/CLAUDE.md"
+  # a world drawn both ways (`turn: "grid"`) has its street-grid view in grid/: the compass
+  # turns the map to it
+  if grep -q 'turn: "grid"' "$FRONTEND/src/worlds/$world.ts" 2>/dev/null &&
+    [[ -f "$data/manifest.json" && ! -f "$data/grid/manifest.json" ]]; then
+    if [[ -n "${SERVER_DATA:-}" ]]; then
+      echo "no street-grid view on the server (send it: 'deploy/deploy.sh $world --data')"
+    else
+      echo "no street-grid view (run 'npm run all -- --city $world --view grid' in tinyworlds-pipeline)"
+    fi
+  fi
   if grep -q "quiz: true" "$FRONTEND/src/worlds/$world.ts" 2>/dev/null &&
     [[ ! -f "$data/quiz.en-US.json" ]]; then
     if [[ -n "${SERVER_DATA:-}" ]]; then
@@ -171,13 +181,15 @@ server_cat() {
   ((status != -1))
 }
 
-# Copies every world's manifest, quiz and street walk's index from the server into
-# <dir>/<world>/data/: what a deploy without data counts on finding there.
+# Copies every world's manifest, quiz and street walk's index, and its street-grid view's
+# manifest, from the server into <dir>/<world>/data/: what a deploy without data counts on
+# finding there.
 mirror_server_data() {
   mkdir -p "$1"
   rsync -r --prune-empty-dirs --include='/*/' --include='/*/data/' \
     --include='/*/data/manifest.json' --include='/*/data/quiz.en-US.json' \
-    --include='/*/data/walk/' --include='/*/data/walk/walk.json' --exclude='*' \
+    --include='/*/data/walk/' --include='/*/data/walk/walk.json' \
+    --include='/*/data/grid/' --include='/*/data/grid/manifest.json' --exclude='*' \
     "$DEPLOY_HOST:$DEPLOY_DIR/site/" "$1/"
 }
 
@@ -306,13 +318,14 @@ build_of() { { grep -o '"build":"[^"]*"' || true; } | head -n 1 | cut -d '"' -f 
 # version), and a manifest also describes the tiles and the other indexes: it may only replace
 # one that differs from it in <field> alone (`indexes` or `walk`), or it would point the viewer at
 # files that are not on the server (and an immutable cache would keep the wrong ones under the new
-# version). Says what differs and fails otherwise.
+# version). <server manifest> is its path under the deploy folder: a view inside a world's data
+# folder (grid/) is checked against its own. Says what differs and fails otherwise.
 same_manifest() {
-  local target="$1" data="$2" base_path="$3" field="$4" there problems status=0
+  local target="$1" here="$2" remote="$3" field="$4" there problems status=0
   there="$(mktemp)"
-  server_cat "site$base_path/data/manifest.json" >"$there" || status=$?
+  server_cat "$remote" >"$there" || status=$?
   if ((status == 0)); then
-    problems="$(node "$ROOT/deploy/walk-check.mjs" manifest "$data/manifest.json" "$there" "$field")" || status=$?
+    problems="$(node "$ROOT/deploy/walk-check.mjs" manifest "$here" "$there" "$field")" || status=$?
   fi
   rm -f "$there"
   ((status == 0)) || return "$status"
@@ -334,6 +347,21 @@ walk_ready() {
   return 1
 }
 
+# Sends one view's indexes (a world's data folder, or the grid/ inside it) to <remote dir>: the
+# sights with their texts and pictures where it has them (the pictures first: sights.json points
+# at them), Guess the building's questions, then the manifest, which names the indexes' version,
+# so visitors ask for them anew.
+upload_indexes() {
+  local data="$1" remote="$2" indexes sight
+  if [[ -d "$data/sights" ]]; then
+    rsync -az --mkpath --delete "$data/sights/" "$DEPLOY_HOST:$remote/sights/" || return
+  fi
+  indexes=("$data/places.json" "$data/hoods.json" "$data/life.json")
+  for sight in "$data"/sights*.json "$data"/quiz*.json; do [[ -e "$sight" ]] && indexes+=("$sight"); done
+  rsync -az --mkpath "${indexes[@]}" "$DEPLOY_HOST:$remote/" || return
+  rsync -a "$data/manifest.json" "$DEPLOY_HOST:$remote/" || return
+}
+
 # Copies one target to the server: its built site from <out> (unless mode is --data or --walk), and its
 # map data as the mode says. Every step is checked: uploads side by side run inside an `if`,
 # where `set -e` does not reach. --mkpath makes the folders a new world needs.
@@ -351,11 +379,26 @@ upload() {
   fi
   # before anything is sent, so a refusal leaves the site as it was
   if [[ "$mode" == "--index" && "$target" != "home" ]]; then
-    same_manifest "$target" "$data" "$base_path" indexes || return
+    same_manifest "$target" "$data/manifest.json" "site$base_path/data/manifest.json" indexes || return
+    if [[ -f "$data/grid/manifest.json" ]]; then
+      same_manifest "$target (street grid)" "$data/grid/manifest.json" \
+        "site$base_path/data/grid/manifest.json" indexes || return
+    fi
+  fi
+  # a world drawn both ways sends its street-grid view with its data: without it here, --delete
+  # would empty the server's grid/ and leave its manifest pointing at tiles that are gone (a walk
+  # alone sends nothing of grid/: the walk is the world's own, whichever way the map is turned)
+  if [[ "$target" != "home" && "$mode" != "--no-data" && "$mode" != "--index" && "$mode" != "--walk" ]] &&
+    grep -q 'turn: "grid"' "$FRONTEND/src/worlds/$target.ts" 2>/dev/null &&
+    [[ ! -f "$data/grid/manifest.json" ]]; then
+    echo "Not sending $target's data: it is drawn both ways, and its street-grid view is not" \
+      "here ($data/grid/). Draw it first: 'npm run all -- --city $target --view grid'" \
+      "in tinyworlds-pipeline." >&2
+    return 1
   fi
   if [[ "$mode" == "--walk" ]]; then
     walk_ready "$target" "$data" || return
-    same_manifest "$target" "$data" "$base_path" walk || return
+    same_manifest "$target" "$data/manifest.json" "site$base_path/data/manifest.json" walk || return
   fi
   # a full data upload carries the walk with it (and --deletes what the server has beyond it)
   if [[ ( -z "$mode" || "$mode" == "--data" ) && "$target" != "home" && -d "$data/walk" ]]; then
@@ -386,21 +429,19 @@ upload() {
         rsync -a --delete "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
         ;;
       --index)
-        # the indexes, and the sights with their texts and pictures where the world has them
-        # (the pictures first: sights.json points at them)
-        if [[ -d "$data/sights" ]]; then
-          rsync -az --mkpath --delete "$data/sights/" "$DEPLOY_HOST:$site/data/sights/" || return
+        if [[ -f "$data/grid/manifest.json" ]]; then
+          upload_indexes "$data/grid" "$site/data/grid" || return
         fi
-        local indexes=("$data/places.json" "$data/hoods.json" "$data/life.json") sight
-        # the sights' texts, and Guess the building's questions where the world has them
-        for sight in "$data"/sights*.json "$data"/quiz*.json; do [[ -e "$sight" ]] && indexes+=("$sight"); done
-        rsync -az --mkpath "${indexes[@]}" "$DEPLOY_HOST:$site/data/" || return
-        # the manifest last: it names the indexes' version, so visitors ask for them anew
-        rsync -a "$data/manifest.json" "$DEPLOY_HOST:$site/data/" || return
+        upload_indexes "$data" "$site/data" || return
         ;;
       *)
-        # tiles first, manifest last: visitors never see a manifest that points at tiles not yet there
-        rsync -a --mkpath --delete --exclude 'manifest.json' "$progress" "$data/" "$DEPLOY_HOST:$site/data/" || return
+        # tiles first, manifests last (the street-grid view's, then the world's own): visitors
+        # never see a manifest that points at tiles not yet there
+        rsync -a --mkpath --delete --exclude '/manifest.json' --exclude '/grid/manifest.json' \
+          "$progress" "$data/" "$DEPLOY_HOST:$site/data/" || return
+        if [[ -f "$data/grid/manifest.json" ]]; then
+          rsync -a "$data/grid/manifest.json" "$DEPLOY_HOST:$site/data/grid/" || return
+        fi
         rsync -a "$data/manifest.json" "$DEPLOY_HOST:$site/data/" || return
         ;;
     esac

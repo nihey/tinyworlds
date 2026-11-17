@@ -50,8 +50,8 @@ function areas(rawDir: string): Areas {
   };
 }
 
-/** The bearing of the grid the view is turned to (see `betaDeg`). */
-const BETA = 0.2;
+/** The street grid's bearing (see `gridDeg`): the arch's boxes are stepped along it. */
+const GRID = 0.2;
 
 // Love Field's runways run north-west from their south-east ends, from the map data: one kilometre along them
 const NW_KM: [number, number] = [-0.00746, 0.006443];
@@ -74,7 +74,7 @@ export const tinydal: City = {
   title: "Dallas",
   // Dealey Plaza, where the city began
   origin: { lon: -96.80857, lat: 32.77852 },
-  betaDeg: BETA,
+  gridDeg: GRID,
   k: 2,
   bbox: { west: -96.9, south: 32.72, east: -96.7, north: 32.875 },
   // the skyline, Reunion Tower in front of it
@@ -105,7 +105,7 @@ export const tinydal: City = {
     "winspear opera house": 28,
     "american airlines center": 34,
   },
-  statues: [REUNION_BALL, huntHillArch(BETA)],
+  statues: [REUNION_BALL, huntHillArch(GRID)],
   sights: {
     placeWords: ["Dallas", "Texas", "Big D", "DFW", "North Texas"],
     // the context lines say "Downtown" or "Arts District": a question's area is its town

@@ -66,7 +66,7 @@ export const tinycvg: City = {
   title: "Cincinnati",
   // the Genius of Water in Fountain Square
   origin: { lon: -84.51246, lat: 39.10162 },
-  betaDeg: -11.1,
+  gridDeg: -11.1,
   k: 2,
   bbox: { west: -84.585, south: 39.065, east: -84.41, north: 39.165 },
   // the skyline over the river, the Roebling Bridge in front

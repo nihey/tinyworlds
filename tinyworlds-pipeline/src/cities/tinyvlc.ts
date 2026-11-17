@@ -44,7 +44,7 @@ export const tinyvlc: City = {
   title: "València",
   // Plaça de l'Ajuntament
   origin: { lon: -0.37643, lat: 39.47019 },
-  betaDeg: 61.58,
+  gridDeg: 61.58,
   k: 2,
   bbox: { west: -0.515, south: 39.4, east: -0.29, north: 39.53 },
   start: { lon: -0.3762, lat: 39.4722, scale: 1 },

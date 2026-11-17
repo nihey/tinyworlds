@@ -142,7 +142,7 @@ export const tinyphl: City = {
   id: "tinyphl",
   title: "Philadelphia",
   origin: { lon: -75.16352, lat: 39.95234 },
-  betaDeg: -8.1,
+  gridDeg: -8.1,
   k: 2,
   // north past 40°: Overture's land comes in one-degree tiles, and the fog's margin needs the next one
   bbox: { west: -75.235, south: 39.895, east: -75.105, north: 40.003 },

@@ -67,7 +67,7 @@ export const tinycos: City = {
   id: "tinycos",
   title: "Colorado Springs",
   origin: { lon: -104.8214, lat: 38.8339 },
-  betaDeg: 2.3,
+  gridDeg: 2.3,
   k: 2,
   bbox: { west: -104.93, south: 38.765, east: -104.74, north: 39.025 },
   start: { lon: -104.8238, lat: 38.8335, scale: 1 },

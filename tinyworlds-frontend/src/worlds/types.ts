@@ -74,6 +74,12 @@ export interface World {
    */
   quiz?: boolean;
   /**
+   * It is drawn both ways: north up (its data folder) and turned to its street grid, the way
+   * the map was first drawn (a full data set in `grid/` inside it). The compass turns the map
+   * from one to the other. Without it the compass only says where north is.
+   */
+  turn?: "grid";
+  /**
    * Its data has the street walk (walk/): the little person on the map opens a walk at street
    * level, on foot, at the wheel or on the water. Without it the viewer never asks for the files.
    */

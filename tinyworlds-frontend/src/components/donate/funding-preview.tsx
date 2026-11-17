@@ -2,7 +2,7 @@ import { PartyPopper } from "lucide-react";
 import type { Locale, Strings } from "@/i18n";
 import { STONE_CENTS, stonePreview } from "@/lib/benefactors";
 import { previewBar, withGoal } from "@/lib/city-picker";
-import { formatUsd, type CityMilestone } from "@/lib/donate";
+import { formatAmount, formatUsd, type CityMilestone } from "@/lib/donate";
 
 interface FundingPreviewProps {
   /** the chosen city as it stands; a city nobody has given to yet stands at zero */
@@ -43,7 +43,7 @@ export function FundingPreview({
     .replace("{raised}", formatUsd(city.raisedCents, locale))
     .replace("{goal}", formatUsd(city.goalCents, locale))
     .split("{added}");
-  const added = formatUsd(amountCents, locale);
+  const added = formatAmount(amountCents, locale);
   const text = `${before}${added}${after ?? ""}`;
   return (
     <div className="rounded-xl bg-white/[0.045] px-3.5 pt-3 pb-3.5">

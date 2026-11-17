@@ -35,7 +35,7 @@ export const tinyfte: City = {
   // the middle of Avenida del Libertador
   origin: { lon: -72.2648, lat: -50.3379 },
   // the town's loose grid; north ends up to the upper right, the lake with it
-  betaDeg: -6.74,
+  gridDeg: -6.74,
   k: 2,
   bbox: { west: -72.37, south: -50.375, east: -72.17, north: -50.29 },
   start: { lon: -72.2655, lat: -50.3368, scale: 1 },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Place } from "../manifest";
-import { createSearchIndex, normalize } from "../search";
-import { ES_RULES, PT_RULES, roman } from "../search-rules";
+import { createSearchIndex, normalize, PIN_RANK } from "../search";
+import { EN_RULES, ES_RULES, PT_RULES, roman } from "../search-rules";
 
 const p = (n: string, t: Place["t"], r: number, b?: string): Place => ({
   n,
@@ -317,5 +317,78 @@ describe("Valencia's own shorthand", () => {
     expect(found("miguelete")).toEqual(["El Micalet"]);
     expect(found("calle jativa")).toEqual(["Carrer de Xàtiva"]);
     expect(found("oceanografico")).toEqual(["L'Oceanogràfic"]);
+  });
+});
+
+describe("one row per place", () => {
+  // the Magic Kingdom as the pipeline lists it, and the pins people dropped under its name
+  const at = (
+    n: string,
+    t: Place["t"],
+    r: number,
+    lat: number,
+    lon: number,
+    b?: string,
+  ): Place => ({
+    n,
+    t,
+    r,
+    b,
+    lat,
+    lon,
+  });
+  const ORLANDO = { ...EN_RULES, home: ["orlando", "fl", "florida", "usa"] };
+  const places = [
+    at("Magic Kingdom", "landmark", 97, 28.41941, -81.58178, "Walt Disney World"),
+    at("Magic Kingdom", "landmark", PIN_RANK, 28.35233, -81.60321, "Bay Lake"),
+    at("Magic Kingdom", "landmark", PIN_RANK, 28.37195, -81.50283, "Orlando"),
+    at("Magic Kingdom Orlando Fl", "landmark", PIN_RANK, 28.34401, -81.57493, "Orlando"),
+    at("Magic Kingdom Railroad", "landmark", PIN_RANK, 28.4192, -81.58477, "Bay Lake"),
+    at("Magic Kingdom station", "station", 30, 28.41595, -81.58225, "Bay Lake"),
+    at("Orlando Magic Basketball Arena", "landmark", PIN_RANK, 28.52956, -81.46632, "Orlando"),
+    at("Wynn", "landmark", 60, 28.5, -81.4, "Orlando"),
+    at("Wynn Orlando", "landmark", 50, 28.6, -81.4, "Orlando"),
+    at("Lake Eola", "park", 70, 28.5434, -81.3731, "Orlando"),
+    at("Lake Eola", "park", 40, 28.62, -81.2, "Orlando"),
+    at("Church Street", "street", 40, 28.54, -81.38, "Orlando"),
+    at("Church Street", "street", 30, 28.6, -81.3, "Winter Park"),
+  ];
+  const index = createSearchIndex(places, ORLANDO);
+  const found = (q: string) => index.search(q).map((h) => `${h.place.n} ${h.place.r}`);
+
+  it("lists a place once, as its best-ranked entry, however many pins carry its name", () => {
+    expect(found("magic kingdom")).toEqual([
+      "Magic Kingdom 97",
+      "Magic Kingdom Railroad 34",
+      "Magic Kingdom station 30",
+    ]);
+  });
+
+  it("reads past the city's own words at the end of a query", () => {
+    expect(found("Magic Kingdom Orlando FL")[0]).toBe("Magic Kingdom 97");
+    expect(found("magic kingdom, orlando, florida, usa")[0]).toBe("Magic Kingdom 97");
+    // what was typed still comes first when a name has those words of its own
+    expect(found("orlando magic")[0]).toBe("Orlando Magic Basketball Arena 34");
+  });
+
+  it("leaves out a copy of something the query did not find", () => {
+    // the pin "Magic Kingdom Orlando Fl" matches "orlando magic", but it is the Magic Kingdom
+    expect(found("orlando magic")).toEqual(["Orlando Magic Basketball Arena 34"]);
+  });
+
+  it("keeps two places of one name that are no pins and stand apart", () => {
+    expect(found("wynn")).toEqual(["Wynn 60", "Wynn Orlando 50"]);
+  });
+
+  it("never folds parks or streets, which share names across a city", () => {
+    expect(found("lake eola")).toEqual(["Lake Eola 70", "Lake Eola 40"]);
+    expect(found("church street")).toEqual(["Church Street 40", "Church Street 30"]);
+  });
+
+  it("reads every word where the city names no words of its own", () => {
+    const plain = createSearchIndex(places, EN_RULES);
+    expect(plain.search("Magic Kingdom Orlando Fl").map((h) => h.place.n)[0]).toBe(
+      "Magic Kingdom Orlando Fl",
+    );
   });
 });

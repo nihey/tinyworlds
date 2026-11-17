@@ -92,9 +92,20 @@ export interface City {
   title: string;
   /** Map px (0, 0). */
   origin: { lon: number; lat: number };
-  /** Bearing of the street grid's "uptown" axis, clockwise from true north. Aligning the view to
-   *  it puts the grid's streets on exact 2:1 pixel slopes. */
-  betaDeg: number;
+  /** Bearing of the street grid's "uptown" axis, clockwise from true north: measured, not guessed.
+   *  Statues are written along it (`dp`, `dq`, `hp`, `hq`), and `view: "grid"` turns the map to it. */
+  gridDeg: number;
+  /**
+   * Which way the map is turned. `"north"` (the default) puts true north straight up: a compass
+   * grid's streets then run straight across and straight up the screen, and its buildings show
+   * their roofs and south walls. `"grid"` turns the map to the street grid (`gridDeg`), whose
+   * streets then run on exact 2:1 pixel slopes, with north wherever that leaves it.
+   *
+   * A city drawn both ways (the viewer's `turn: "grid"`, every real city) keeps `"north"`: its
+   * street-grid view is the other one, drawn with `--view grid` into `grid/`. `"grid"` is for a
+   * world shown on its street grid alone, whose viewer then has no `turn`.
+   */
+  view?: "north" | "grid";
   /** Map px per metre along either ground axis (one metre uptown moves k px right, k/2 px up). */
   k: number;
   /** Everything fetched and drawn lies inside this box; the fog decides what is actually kept. */

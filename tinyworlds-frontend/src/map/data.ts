@@ -9,7 +9,9 @@ import {
 
 import { activeStrings } from "@/i18n";
 import type { Locale } from "@/i18n/locale";
+import type { MapView } from "@/lib/prefs";
 import { WORLD } from "@/worlds";
+import type { World } from "@/worlds/types";
 import type { Flight, LifeFile } from "./life";
 import { parseSights, parseSightTexts, type Sight, type SightTexts } from "./sights";
 import { parseQuiz, type QuizQuestion } from "./quiz";
@@ -34,8 +36,26 @@ const DATA_BASE = resolveDataBase({
   world: WORLD.id,
 });
 
-/** URL of a file in the world's data folder, with the build id as a cache key. */
-export function dataUrl(path: string, build?: string, dataBase = DATA_BASE): string {
+/**
+ * The data folder of one view of a world: its own folder north up, and the full data set in
+ * `grid/` inside it turned to the street grid, for a world drawn both ways (`World.turn`).
+ */
+export function viewDataBase(base: string, view: MapView, turn: World["turn"]): string {
+  return view === "grid" && turn === "grid" ? `${base}/grid` : base;
+}
+
+let viewBase = DATA_BASE;
+
+/**
+ * Point every data URL at one view of the world. The map sets it before it asks for anything,
+ * and starts again when the visitor turns it: the files of one view never mix with the other's.
+ */
+export function setMapView(view: MapView): void {
+  viewBase = viewDataBase(DATA_BASE, view, WORLD.turn);
+}
+
+/** URL of a file in the world's data folder (of the view the map is turned to), with the build id as a cache key. */
+export function dataUrl(path: string, build?: string, dataBase = viewBase): string {
   const url = `${dataBase}/${path.replace(/^\/+/, "")}`;
   return build ? `${url}?v=${encodeURIComponent(build)}` : url;
 }

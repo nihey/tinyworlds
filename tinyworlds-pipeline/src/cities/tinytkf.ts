@@ -65,7 +65,7 @@ export const tinytkf: City = {
   title: "Truckee",
   // the town's point in Overture's divisions: Commercial Row
   origin: { lon: -120.18358, lat: 39.32795 },
-  betaDeg: 71.1,
+  gridDeg: 71.1,
   k: 2,
   bbox: { west: -120.32, south: 39.295, east: -120.07, north: 39.39 },
   start: { lon: -120.1855, lat: 39.3275, scale: 1 },
