@@ -10,8 +10,9 @@ import type { WalkGame, WalkState } from "@/walk/game";
  * The walk on a touch screen: a thumb stick wherever a finger comes down on the left half
  * (it walks, swims, drives or sails), dragging on the right half looks round, and buttons do
  * what the keys would: jump and get in on foot, the horn, the camera, the brake and getting out
- * at the wheel. Back to the map is the signs' own button, which stays above even the wasted
- * screen, so it is one tap away whatever happens.
+ * at the wheel, in the bottom-right corner (above the credit, clear of the minimap across from
+ * it, which lets touches through to the stick). Back to the map is the signs' own button, which
+ * stays above even the wasted screen, so it is one tap away whatever happens.
  */
 
 /** How far the stick's knob goes from where the thumb came down, CSS px. */
@@ -141,8 +142,9 @@ export function TouchPad({ game }: { game: WalkGame }) {
         />
       </div>
 
-      <div className="pointer-events-none absolute right-3 bottom-4 flex flex-col items-end gap-2">
-        <div className="flex gap-2">
+      {/* in the bottom-right corner over the credit, wrapping before they reach the minimap */}
+      <div className="pointer-events-none absolute right-(--edge-r) bottom-[calc(var(--edge-b)+2.25rem)] flex max-w-[calc(100%-var(--walk-mm)-2.75rem)] flex-col items-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           {driving ? (
             <>
               <button type="button" className={button} {...hold("horn")}>

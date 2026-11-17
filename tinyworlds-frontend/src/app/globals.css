@@ -238,55 +238,36 @@
 
 /* ---- the street walk (components/walk) ---------------------------------------------------- */
 
-/* the walk large and the map beside it, 7 to 3; stacked, the map below, on a narrow screen or
-   in portrait. The map's two canvases leave the whole screen for their pane; its other signs
-   are not drawn meanwhile */
-.walk-split {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
-  grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "walk map";
-  background: var(--sign);
-}
-@media (max-width: 799.98px), (orientation: portrait) {
-  .walk-split {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
-    grid-template-areas: "walk" "map";
-  }
-  .walk-split > .walk-area {
-    box-shadow: 0 1px 0 rgb(0 0 0 / 0.6);
-  }
-}
-.walk-split > .map-tiles,
-.walk-split > .map-marks,
-.walk-split > .dusk-wash {
-  position: relative;
-  grid-area: map;
-}
-.walk-split > .map-tiles {
-  /* a click takes you there */
-  cursor: pointer;
-}
-.walk-split > .tilt-band {
-  display: none;
+/* the walk takes the whole screen. The map waits underneath, hidden and still (its engine is
+   paused), for the way back; its other signs are not drawn meanwhile */
+.walk-full > .map-tiles,
+.walk-full > .map-marks,
+.walk-full > .dusk-wash,
+.walk-full > .tilt-band {
+  visibility: hidden;
 }
 .walk-area {
-  grid-area: walk;
-  position: relative;
+  position: fixed;
+  inset: 0;
   z-index: 3;
-  min-width: 0;
-  min-height: 0;
-  /* the map's pane is on its right, or below it */
-  box-shadow: 1px 0 0 rgb(0 0 0 / 0.6);
 }
-.walk-map-signs {
-  grid-area: map;
-  position: relative;
-  z-index: 3;
-  pointer-events: none;
+
+/* the walk's minimap (street-minimap.tsx), in the bottom-left corner, clear of the notches and
+   home bars; `--walk-mm` is its size, which the touch pad's buttons and the "get in" sign keep
+   clear of (the minimap itself sets its exact size, a whole number of device pixels a pixel) */
+.walk-pane {
+  --walk-mm: 176px;
+}
+@media (max-width: 639.98px), (max-height: 499.98px) {
+  .walk-pane {
+    --walk-mm: 128px;
+  }
+}
+.walk-minimap {
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  width: var(--walk-mm);
+  height: var(--walk-mm);
 }
 
 /* the person carried over the map: held by the head, swinging a little */

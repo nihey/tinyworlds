@@ -115,14 +115,12 @@ export function MapApp() {
       ? "grid"
       : "north",
   );
-  // what a finger or a mouse does to the map beside the walk
-  const coarse = useMediaQuery("(pointer: coarse)");
   // the world's own manifest, whichever way the map is turned: the street walk is one for both
   // views, and that manifest names its version (north up it is the map's own; turned to the
   // street grid it is read beside the map's)
   const [walkManifest, setWalkManifest] = useState<Manifest | null>(null);
 
-  // the street walk: the person put down on the map, the split, and the way back
+  // the street walk: the person put down on the map, the walk over it, and the way back
   const street = useStreetWalk({
     engine,
     manifest: session ? walkManifest : null,
@@ -212,7 +210,7 @@ export function MapApp() {
             loadSights(manifest.indexes, abort.signal)
               .then((list) => {
                 if (abort.signal.aborted) return;
-                // beside the walk no building lights up: they will when it closes
+                // under the walk no building lights up: they will when it closes
                 if (!walkingRef.current) live.setSights(list);
                 setSights(list);
               })
@@ -478,7 +476,7 @@ export function MapApp() {
 
   return (
     <div
-      className={cn("map-root", tiltOn && !walking && "tilt-on", walking && "walk-split")}
+      className={cn("map-root", tiltOn && !walking && "tilt-on", walking && "walk-full")}
       style={rootStyle}
     >
       <canvas ref={canvasRef} className="map-tiles" tabIndex={0} aria-label={copy.mapLabel} />
@@ -491,7 +489,7 @@ export function MapApp() {
 
       {!session && <Splash failed={failed} onRetry={retry} />}
 
-      {/* the street walk, large, with the map beside it (below it on a phone) */}
+      {/* the street walk, over the whole screen: the map waits underneath, still */}
       {session && walking && (
         <div className="walk-area">
           {street.Screen && street.screenProps ? (
@@ -515,18 +513,14 @@ export function MapApp() {
           )}
         </div>
       )}
+      {/* the credit stays, in the corner across from the walk's minimap */}
       {session && engine && walking && (
-        <div className="walk-map-signs">
-          <p className="sign absolute top-2 left-2 rounded-full px-3 py-1.5 text-xs font-semibold text-paper-dim">
-            {coarse ? t.walk.mapTapThere : t.walk.mapGoThere}
-          </p>
-          <CreditStrip
-            engine={engine}
-            onAbout={() => setAboutOpen(true)}
-            readout={false}
-            className="pointer-events-auto absolute right-2 bottom-2"
-          />
-        </div>
+        <CreditStrip
+          engine={engine}
+          onAbout={() => setAboutOpen(true)}
+          readout={false}
+          className="fixed right-(--edge-r) bottom-(--edge-b)"
+        />
       )}
 
       {session && engine && !walking && (

@@ -20,6 +20,7 @@ import { WalkSound } from "@/walk/sound";
 import { canDrawWalk } from "@/walk/webgl";
 import { WORLD } from "@/worlds";
 import { ControlsMenu } from "./controls-menu";
+import { StreetMinimap } from "./street-minimap";
 import { TouchPad } from "./touch-pad";
 import { WalkHud } from "./walk-hud";
 import { WastedOverlay } from "./wasted-overlay";
@@ -30,9 +31,11 @@ import { WastedOverlay } from "./wasted-overlay";
  * It checks that the browser can draw it, reads the walk's index, builds the view and the game,
  * and takes the keys (not while typing or while a dialog is open; the controls menu takes the
  * next key itself when a key is being changed), the mouse through pointer lock (a click on the
- * view asks for it, Esc lets it go), and the touch pad on a touch screen. The map's key (M) works
- * from the moment it mounts, before the walk is in and after it fails. It tells the map where you
- * are as you move (on a bridge, how high), and writes a walk link once you stand still.
+ * view asks for it, Esc lets it go), and the touch pad on a touch screen. It fills the screen,
+ * with the minimap of the streets round you in its corner (`StreetMinimap`); the map waits
+ * underneath, still. The map's key (M) works from the moment it mounts, before the walk is in and
+ * after it fails. It writes a walk link once you stand still, and leaves with where you are (on a
+ * bridge, how high) for the map to open there.
  */
 
 export interface WalkStart {
@@ -44,7 +47,7 @@ export interface WalkStart {
   z?: number;
 }
 
-/** Where you are, for the map: the ground point, how high (a deck: the map draws it raised), and which way you face (degrees). */
+/** Where you are, for the map and the walk link: the ground point, how high (a deck: the map draws it raised), and which way you face (degrees). */
 export interface WalkAt {
   lat: number;
   lon: number;
@@ -53,16 +56,15 @@ export interface WalkAt {
 }
 
 export interface WalkScreenProps {
-  /** the world's own manifest (north up), whichever way the map beside is turned: the walk's
+  /** the world's own manifest (north up), whichever way the map underneath is turned: the walk's
    * version, its origin (`geo`), the first view (`start`) and the ferries' version */
   manifest: Manifest;
   start: WalkStart;
-  /** a click on the map beside the walk: you are put there (a new `id` each time) */
+  /** a walk link followed while walking: you are put there (a new `id` each time) */
   goTo?: (WalkStart & { id: number }) | null;
   /** the walk is open: its game runs (said once per walk, for the page analytics) */
   onOpen?: () => void;
   onExit: (at: WalkAt) => void;
-  onMove: (at: WalkAt) => void;
 }
 
 /** Only the visit's first walk, opened by New York's first view, finds the red supercar there. */
@@ -73,8 +75,6 @@ const FEET = 0.25;
 const SETTLE = 0.6;
 /** Ms after the first squares are shown before the frame rate counts. */
 const WARM_UP = 3000;
-/** Ms between two moves told to the map beside (it is redrawn for each: 20 a second is plenty). */
-const MAP_EVERY = 50;
 const UNITS = WORLD.units === "imperial" ? "imperial" : "metric";
 
 // kept for the visit, never stored: what the walk was left with
@@ -104,14 +104,7 @@ function loseContext(canvas: HTMLCanvasElement): void {
   }
 }
 
-export default function WalkScreen({
-  manifest,
-  start,
-  goTo,
-  onOpen,
-  onExit,
-  onMove,
-}: WalkScreenProps) {
+export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: WalkScreenProps) {
   const { t } = useI18n();
   const touch = useMediaQuery("(pointer: coarse)");
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -134,12 +127,10 @@ export default function WalkScreen({
 
   // the latest callbacks and keys, for the loops that outlive a render
   const exitRef = useRef(onExit);
-  const moveRef = useRef(onMove);
   const openRef = useRef(onOpen);
   const bindingsRef = useRef(bindings);
   useEffect(() => {
     exitRef.current = onExit;
-    moveRef.current = onMove;
     openRef.current = onOpen;
     bindingsRef.current = bindings;
   });
@@ -149,8 +140,8 @@ export default function WalkScreen({
     pixelRef.current = pixel;
   });
 
-  /** Where you are for the map: the game's place and heading, and the surface under your feet
-   * (the deck you are on, never one above you, whatever the camera does). */
+  /** Where you are for the map and the walk link: the game's place and heading, and the surface
+   * under your feet (the deck you are on, never one above you, whatever the camera does). */
   const whereAt = useCallback(
     (p: { e: number; n: number; z: number; yaw: number }): WalkAt => {
       const [lon, lat] = enToLonLat(manifest.geo, p.e, p.n);
@@ -275,8 +266,8 @@ export default function WalkScreen({
     setPixel(Math.max(PIXEL_MIN, Math.min(PIXEL_MAX, Math.round(n))));
   }, []);
 
-  // a click on the map beside: you are put there (once: a new game after Try again starts
-  // where the walk was to start, not at the last click)
+  // a walk link followed while walking: you are put there (once: a new game after Try again
+  // starts where the walk was to start, not at the last link)
   const wentTo = useRef<number | null>(null);
   useEffect(() => {
     if (!game || !goTo || wentTo.current === goTo.id) return;
@@ -292,14 +283,12 @@ export default function WalkScreen({
     });
   }, [game]);
 
-  // where you are, for the map beside, and the walk link once you stand still; the frame rate
+  // the walk link once you stand still; the frame rate
   useEffect(() => {
     if (!game) return;
     let raf = 0;
     let last = { e: Number.NaN, n: Number.NaN, yaw: Number.NaN };
     let lastZ = 0;
-    let told = -Infinity;
-    let untold = false;
     let still = 0;
     let written = false;
     let before = performance.now();
@@ -325,20 +314,12 @@ export default function WalkScreen({
         lastZ = at.z;
         still = 0;
         written = false;
-        untold = true;
       } else if (dt < 0.25) {
         still += dt;
         if (!written && still >= SETTLE) {
           written = true;
           writeHash(formatWalkHash(at));
         }
-      }
-      // the map beside is redrawn for every move it hears of: not more than 20 a second, and
-      // the last one always
-      if (untold && (now - told >= MAP_EVERY || still > 0)) {
-        untold = false;
-        told = now;
-        moveRef.current(at);
       }
       // too slow: a step down (`QualityLadder`), counted from a few seconds after the first
       // squares are in (building them is slow for a moment anywhere), while the page is in view
@@ -466,6 +447,7 @@ export default function WalkScreen({
 
       {game && phase === "ready" && (
         <>
+          <StreetMinimap game={game} reducedMotion={reducedMotion} />
           {touch && <TouchPad game={game} />}
           <WalkHud
             game={game}

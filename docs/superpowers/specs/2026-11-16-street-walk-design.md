@@ -71,8 +71,11 @@ whole city, built for real, with its bridges, overpasses and water.
 
 ## Proposed in the conversation and not contradicted (Claude's calls; the owner may change them)
 
-- **Split screen**: the walk large, the map beside it (below it on a phone or in portrait)
-  following you, with your position and which way you face; a click on the map takes you there.
+- ~~**Split screen**: the walk large, the map beside it (below it on a phone or in portrait)
+  following you, with your position and which way you face; a click on the map takes you there.~~
+  Changed by the owner after launch: "Instead of the map being on the right side make a mini map
+  in the bottom left side with just the streets just like it works on GTA." The walk now takes
+  the whole screen, with a minimap of the streets in its bottom-left corner (Layout, below).
 - **Mouse and keyboard** with pointer lock; **on a touch screen** a thumb stick on the left half
   and drag-to-look on the right half, with buttons for what keys do.
 - **Daytime only.** Signs and billboards are generic: no real brands anywhere.
@@ -286,10 +289,19 @@ map's free ones). A link can open the walk directly, at a place and heading (the
 walk form; the map's plain `#lat,lon,scale` keeps working). "Back to the map" (and M) leaves the
 walk with the map at where you are.
 
-**Layout.** The walk large, the map beside it at 7:3 (stacked below in portrait or under
-800 px wide). The map is the viewer's own `MapEngine`, following you, with the person standing
-where you are and a view cone (a scene layer); a click on it takes you there. The map's other
-signs give way while walking.
+**Layout.** The owner's call, after the first release: "Instead of the map being on the right
+side make a mini map in the bottom left side with just the streets just like it works on GTA."
+So the walk takes the whole screen (it was the walk large and the map beside it at 7:3, stacked
+below in portrait or under 800 px wide, with a click on the map taking you there; that is gone).
+The viewer's own `MapEngine` stays underneath, hidden and not drawing, for the way back to open at
+your place; the map's other signs give way while walking, and its credit stays in a corner. In
+the bottom-left corner a small square sign (about 176 px, 128 on a phone) shows just the streets
+round you, as a game's radar does: centred on you and turned with you (straight ahead is up),
+zoomed out with your speed (about 150 m across on foot, out to about 450 m at 30 m/s), drawn in
+pixels from the walk's own squares: the streets at their real width in a light paper tone (the
+major ones a touch brighter), the bridges and elevated highways in their own tone over them, the
+water in the palette's deep water, the land the sign's dark, you an arrow in the accent, and a
+tick on the rim where north is. No labels, no other marks, nothing of GTA's own radar art.
 
 **The scene.** As in the spike (`walk.html`):
 

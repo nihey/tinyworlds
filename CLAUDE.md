@@ -64,10 +64,10 @@ Each sub-project has its own `CLAUDE.md`.
   as the Holland and Lincoln tunnels' New Jersey ends are, is closed there), land and water,
   and boats tied at the piers. Only squares on the map are written. In the viewer, a little
   person in the map's tools is dropped onto a street (or W puts it down mid-map, or a
-  `#walk=lat,lon,heading` link opens it): the walk fills most of the screen with the map beside
-  it following you, loads the squares round you as you go, and nothing of it loads until one
-  opens. It sends nothing anywhere (the page analytics hear `walk_start`) and keeps only the
-  keys a visitor chose, in the browser.
+  `#walk=lat,lon,heading` link opens it): the walk fills the screen, with a minimap of the
+  streets round you in its corner, loads the squares round you as you go, and nothing of it loads
+  until one opens. It sends nothing anywhere (the page analytics hear `walk_start`) and keeps
+  only the keys a visitor chose, in the browser.
 - **The API exists for donations** (and keeps the answers of "Guess the building", below). Each proposed city is built when donations for it reach
   its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the
