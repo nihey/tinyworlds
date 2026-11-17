@@ -4,6 +4,7 @@ import { cellExists, type WalkIndex } from "../walk-index";
 import { WalkWorld } from "../world";
 import { billboardMesh } from "./billboard-mesh";
 import { placeBillboards, squareInAreas, type BillboardArea } from "./billboards";
+import { brooklynBridge } from "./brooklyn-bridge";
 import {
   buildCellMeshes,
   disposeCellMeshes,
@@ -426,7 +427,7 @@ export class WalkView {
     private readonly canvas: HTMLCanvasElement,
     ix: WalkIndex,
     load: (i: number, j: number) => Promise<WalkCell>,
-    options: { billboards?: readonly BillboardArea[] } = {},
+    options: { billboards?: readonly BillboardArea[]; brooklynBridge?: boolean } = {},
   ) {
     this.areas = options.billboards ?? [];
     this.renderer = new THREE.WebGLRenderer({
@@ -487,7 +488,13 @@ export class WalkView {
       },
     });
     this.world = this.stream.world;
-    this.ctx = { palette: this.palette, materials: this.materials, index: ix, world: this.world };
+    this.ctx = {
+      palette: this.palette,
+      materials: this.materials,
+      index: ix,
+      world: this.world,
+      bridge: options.brooklynBridge ? brooklynBridge(ix.geo) : undefined,
+    };
   }
 
   /** Screen pixels per pixel drawn, 1 to 6. */

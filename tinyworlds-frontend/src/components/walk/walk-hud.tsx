@@ -157,8 +157,12 @@ export function WalkHud({
     const code = a ?? b;
     return code ? keyLabel(code, w.keys) : w.unbound;
   };
+  const nearKind = s.near?.kind;
+  const enterPrompt = nearKind === "motorcycle" ? w.getOnMotorcycle : w.getIn;
   const near =
-    s.near && !touch ? w.getIn.replace("{vehicle}", w.vehicles[s.near.kind]).split("{key}") : null;
+    nearKind && !touch
+      ? enterPrompt.replace("{vehicle}", w.vehicles[nearKind]).split("{key}")
+      : null;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-30 text-paper">
@@ -220,7 +224,9 @@ export function WalkHud({
           </div>
         )}
         {!touch && (
-          <p className="leading-snug text-paper-dim">{hintText(hintMode(s.mode), bindings, w)}</p>
+          <p className="leading-snug text-paper-dim">
+            {hintText(hintMode(s.mode, v?.kind), bindings, w)}
+          </p>
         )}
       </div>
 

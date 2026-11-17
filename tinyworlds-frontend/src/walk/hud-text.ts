@@ -1,6 +1,7 @@
 import type { Strings } from "@/i18n/types";
 import { keyLabel, type ActionId, type Bindings } from "./controls";
 import { LIFE_MAX } from "./health";
+import type { BoatKind, CarKind } from "./kinds";
 
 /**
  * What the walk's corner sign says, as plain text from the state and the dictionary: the life
@@ -47,8 +48,12 @@ export function speedText(ms: number, units: "imperial" | "metric", w: WalkWords
 export type HintMode = keyof WalkWords["hints"];
 
 /** Which line of keys a way of moving shows; lying in the street shows the one you get up to. */
-export function hintMode(mode: "foot" | "swim" | "drive" | "down" | "boat"): HintMode {
+export function hintMode(
+  mode: "foot" | "swim" | "drive" | "down" | "boat",
+  kind?: CarKind | BoatKind,
+): HintMode {
   if (mode === "boat") return "sail";
+  if (mode === "drive" && kind === "motorcycle") return "ride";
   if (mode === "swim" || mode === "drive") return mode;
   return "foot";
 }

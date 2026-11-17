@@ -80,16 +80,17 @@ describe("the kinds", () => {
       "muscle",
       "sports",
       "supercar",
+      "motorcycle",
       "boxTruck",
       "bus",
     ];
     expect(kinds.map((k) => CARS[k].vmax)).toEqual([
-      40, 42, 40, 38, 40, 40, 52, 60, 64, 82, 28, 24,
+      40, 42, 40, 38, 40, 40, 52, 60, 64, 82, 58, 28, 24,
     ]);
     expect(kinds.map((k) => CARS[k].mass)).toEqual([
-      1100, 1500, 1600, 2100, 2300, 2600, 1800, 1650, 1350, 1400, 5500, 12000,
+      1100, 1500, 1600, 2100, 2300, 2600, 1800, 1650, 1350, 1400, 310, 5500, 12000,
     ]);
-    expect(kinds.map((k) => CARS[k].tough)).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 3]);
+    expect(kinds.map((k) => CARS[k].tough)).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.85, 2, 3]);
     expect(Object.keys(CARS).sort()).toEqual([...kinds].sort());
     const grips = kinds.map((k) => CARS[k].grip);
     expect(Math.min(...grips)).toBe(CARS.muscle.grip);
@@ -134,6 +135,13 @@ describe("the kinds", () => {
 });
 
 describe("driving", () => {
+  it("lets a motorcycle back up at walking speed after braking", () => {
+    const bike = car("motorcycle", 300, 100, EAST, 10);
+    run(bike, { ...idle, brake: 1 }, worldOf(...strip(3)), 4);
+    expect(bike.v).toBeCloseTo(-1.4);
+    expect(bike.z).toBe(0);
+  });
+
   it("reaches near its top speed on the flat at full throttle, and no more", () => {
     const w = worldOf(...strip(30));
     for (const kind of ["supercar", "bus"] as const) {

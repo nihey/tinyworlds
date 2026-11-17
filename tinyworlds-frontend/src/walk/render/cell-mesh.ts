@@ -3,6 +3,8 @@ import { isMapDeck, type ElevatedWay, type GroundWay, type Volume, type WalkCell
 import { mix } from "../math";
 import { cellExists, type WalkIndex } from "../walk-index";
 import { deckAt, JOIN_HEIGHT, PARAPET_HEIGHT, WATER_Z, type WalkWorld } from "../world";
+import { brooklynTowerVolumes, onBrooklynPromenade, type BrooklynBridge } from "./brooklyn-bridge";
+import { brooklynBridgeStays } from "./brooklyn-bridge-stays";
 import {
   columnSide,
   cutTo,
@@ -14,7 +16,14 @@ import {
   type Box,
   type DeckSpan,
 } from "./deck-mesh";
-import { NOT_MIRRORED, SHORE_FACE, TREE_RAMPS, type WalkMaterials } from "./materials";
+import {
+  NOT_MIRRORED,
+  SHORE_FACE,
+  STONE_BLOCKS,
+  TREE_RAMPS,
+  WOOD_BOARDS,
+  type WalkMaterials,
+} from "./materials";
 import {
   DEEP,
   G,
@@ -50,6 +59,7 @@ export interface MeshContext {
   palette: Palette;
   materials: WalkMaterials;
   index: WalkIndex;
+  bridge?: BrooklynBridge;
   /** The squares loaded so far: where the water is (asked only inside the square being built, already in it). */
   world: WalkWorld;
 }
@@ -125,7 +135,7 @@ const WALL_ATTRS = [
 
 /** Builds one square. Free it with `disposeCellMeshes`. */
 export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
-  const { palette, materials, index, world } = ctx;
+  const { palette, materials, index, world, bridge } = ctx;
   const side = index.cell;
   const oe = cell.i * side;
   const on = cell.j * side;
@@ -265,9 +275,14 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
   };
 
   // ---- buildings (not the map's deck pieces: every elevated way has the walk's own roadway)
-  for (const v of cell.volumes) if (!isMapDeck(v)) buildVolume(v);
+  for (const v of cell.volumes) {
+    if (isMapDeck(v)) continue;
+    const tower = bridge && brooklynTowerVolumes(bridge, v);
+    if (tower) for (const piece of tower) buildVolume(piece, STONE_BLOCKS);
+    else buildVolume(v);
+  }
 
-  function buildVolume(v: Volume) {
+  function buildVolume(v: Volume, pattern = v.pattern) {
     const wallTop = v.roofShape === 1 ? v.top + v.roofH : v.top;
     // what stands on the ground stands in the water where its walls are over it (a bridge's
     // pier, a pile): a plain skirt of its wall from the land's level down to the shore's foot,
@@ -300,7 +315,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
           wallTop,
           v.wall,
           v.glass,
-          v.pattern,
+          pattern,
           v.seed,
           tone,
         );
@@ -486,6 +501,8 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
 
   // ---- elevated ways: what holds them up where the map has nothing, parapets, the roadway
   const concrete = palette.ramp("concrete");
+  const wood = bridge ? palette.ramp("pier") * SHADES : 0;
+  const boards = [wood + LIT, wood + HALF, 0, WOOD_BOARDS];
   // a street or the water under a column: asked only inside this square, where its streets
   // (every one that touches it is filed under it) and its mask are the whole story
   const underStreet = streetsBelow(cell.streets);
@@ -526,6 +543,10 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
 
     for (const s of g.surface) {
       if (!mid(s)) continue;
+      const promenade =
+        bridge &&
+        way.kind === 1 &&
+        onBrooklynPromenade(bridge, (s.e0 + s.e1) / 2, (s.n0 + s.n1) / 2, (s.z0 + s.z1) / 2);
       ribbon(
         decks,
         s.e0,
@@ -535,7 +556,7 @@ export function buildCellMeshes(cell: WalkCell, ctx: MeshContext): THREE.Group {
         s.n1,
         s.z1 + ROADWAY_LIFT,
         way.width,
-        roadPaint,
+        promenade ? boards : roadPaint,
         s.along,
         Math.min(hw / 2, 2),
       );
@@ -795,14 +816,16 @@ function addCables(
   group: THREE.Group,
   disposables: { dispose(): void }[],
 ) {
-  if (cell.cables.length === 0) return;
+  const stays = ctx.bridge ? brooklynBridgeStays(ctx.bridge, cell.i, cell.j, ctx.index.cell) : [];
+  const cables = stays.length === 0 ? cell.cables : cell.cables.concat(stays);
+  if (cables.length === 0) return;
   const oe = cell.i * ctx.index.cell;
   const on = cell.j * ctx.index.cell;
   const steel = ctx.palette.ramp("steel");
   const tan = ctx.palette.ramp("tan");
   const pos: number[] = [];
   const colour: number[] = [];
-  for (const c of cell.cables) {
+  for (const c of cables) {
     const truss = c.kind >= 2;
     const main = c.kind === 0 || c.kind === 2;
     const idx = (truss ? tan : steel) * SHADES + (main ? DEEP : SHADE);

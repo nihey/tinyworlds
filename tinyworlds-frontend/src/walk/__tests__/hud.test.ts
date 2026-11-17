@@ -45,6 +45,7 @@ describe("hintMode", () => {
     expect(hintMode("foot")).toBe("foot");
     expect(hintMode("swim")).toBe("swim");
     expect(hintMode("drive")).toBe("drive");
+    expect(hintMode("drive", "motorcycle")).toBe("ride");
     expect(hintMode("boat")).toBe("sail");
     expect(hintMode("down")).toBe("foot");
   });
@@ -80,7 +81,7 @@ describe("hintText", () => {
   it("leaves no placeholder in any language", () => {
     const d = defaultBindings();
     for (const dict of [en, ptBR, esES])
-      for (const mode of ["foot", "swim", "drive", "sail"] as const)
+      for (const mode of ["foot", "swim", "drive", "ride", "sail"] as const)
         expect(hintText(mode, d, dict.walk), `${dict.walk.back} ${mode}`).not.toMatch(/[{}]/);
   });
 });

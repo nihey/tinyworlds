@@ -149,7 +149,7 @@ export class Cameras {
       const longer = s.length / sizeOf(v.kind).length;
       const eh = EYES[v.kind][0] * longer;
       const ef = EYES[v.kind][1] * longer;
-      const side = v.boat ? 0 : -0.36;
+      const side = v.boat || v.kind === "motorcycle" ? 0 : -0.36;
       const sy = Math.sin(v.yaw);
       const cy = Math.cos(v.yaw);
       return (this.eye = {

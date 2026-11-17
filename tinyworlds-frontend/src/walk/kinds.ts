@@ -1,4 +1,4 @@
-/** The cars and boats of the walk. Their names live in the dictionaries (`walk.vehicles`). */
+/** The road vehicles and boats of the walk. Their names live in the dictionaries (`walk.vehicles`). */
 export type CarKind =
   | "hatchback"
   | "sedan"
@@ -10,6 +10,7 @@ export type CarKind =
   | "muscle"
   | "sports"
   | "supercar"
+  | "motorcycle"
   | "boxTruck"
   | "bus";
 

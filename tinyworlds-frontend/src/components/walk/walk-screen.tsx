@@ -195,6 +195,7 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
         try {
           view = new WalkView(canvas, data.ix, (i, j) => data.square(i, j), {
             billboards: billboardAreas(data.ix.geo, WORLD.billboards),
+            brooklynBridge: WORLD.id === "tinynyc",
           });
         } catch {
           // a context the browser would not give after all

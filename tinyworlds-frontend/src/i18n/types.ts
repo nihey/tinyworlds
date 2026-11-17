@@ -797,9 +797,10 @@ export interface Strings {
       capsLock: string;
     };
     /** the corner sign's line for each way of moving, with the actions' ids as placeholders */
-    hints: { foot: string; swim: string; drive: string; sail: string };
+    hints: { foot: string; swim: string; drive: string; ride: string; sail: string };
     /** near a vehicle: "{key}" is the key to get in, "{vehicle}" a name from `vehicles` */
     getIn: string;
+    getOnMotorcycle: string;
     vehicles: Record<CarKind | BoatKind, string>;
     /** "{n}" is the speed */
     speed: { mph: string; kmh: string };
@@ -833,6 +834,8 @@ export interface Strings {
       jump: string;
       enter: string;
       exit: string;
+      mount: string;
+      dismount: string;
       horn: string;
       camera: string;
       brake: string;

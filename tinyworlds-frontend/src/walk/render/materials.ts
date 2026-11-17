@@ -159,6 +159,8 @@ vec2 fromGrid(vec2 g) { g /= kz; return vec2(g.x * gridRot.x + g.y * gridRot.y, 
 
 /** A wall's pattern for the shore's own face: blank, and marked so in the mirror (it is not something standing in the water). */
 export const SHORE_FACE = 7;
+export const STONE_BLOCKS = 8;
+export const WOOD_BOARDS = 4;
 
 /**
  * Walls: the map's window patterns (`render/chunk.ts`), one texel per map pixel (1/kz m), the
@@ -203,7 +205,14 @@ void main() {
   bool tallEnough = wallH >= 3 * F;
   vec3 col = wallC;
   int vf = vv % F;
-  if (vv == wallH - 1 && wallH >= 4) col = wallHi;
+  if (pattern == ${STONE_BLOCKS}) {
+    float course = vUV.y / 1.1;
+    float block = vUV.x / 2.7 + 0.5 * mod(floor(course), 2.0);
+    if (max(fwidth(vUV.x), fwidth(vUV.y)) < 0.35) {
+      if (fract(course) < 0.065 || fract(block) < 0.025) col = wallLo;
+      else if ((hash2(int(floor(block)), int(floor(course))) & 7u) == 0u) col = wallHi;
+    }
+  } else if (vv == wallH - 1 && wallH >= 4) col = wallHi;
   else if (pattern == 1) {            // punched windows, shopfronts below
     if (vv == wallH - 2 && tallEnough) col = wallLo;
     else if (ub >= 0) {
@@ -233,7 +242,7 @@ void main() {
   }
   // far away a texel is smaller than a pixel: settle on the wall's average instead of shimmering
   float fw = max(fwidth(vUV.x * kz), fwidth(vUV.y * kz));
-  vec3 average = pattern == 0 || pattern == ${SHORE_FACE} ? wallC : mix(wallC, winC, 0.28);
+  vec3 average = pattern == 0 || pattern >= ${SHORE_FACE} ? wallC : mix(wallC, winC, 0.28);
   col = mix(col, average, smoothstep(0.55, 1.4, fw));
   // the shore's own face says so in the alpha, which only the water's mirror keeps
   gl_FragColor = vec4(fogged(col, length(vMV)), pattern == ${SHORE_FACE} ? 0.5 : 1.0);
@@ -280,8 +289,10 @@ void main() {
   ivec2 t = ivec2(floor(g));
   float r = float(hash2(t.x, t.y) & 1023u) / 1024.0;
   int pat = int(vPaint.w);
+#ifdef GROUND
   bool dry = pat >= ${PAINT_DRY};
   pat = pat % ${PAINT_DRY};
+#endif
   float idx = vPaint.x;
   if (pat == 0) { if (r < vPaint.z) idx = vPaint.y; }
   else if (pat == 1) { if ((t.x & 7) == 0 || (t.y & 7) == 0) idx = vPaint.y; }
@@ -290,6 +301,11 @@ void main() {
     if (r < vPaint.z) idx = vPaint.y;
     float w = vLane.y;
     if (w > 9.0 && abs(vLane.x) * w * 0.5 < 0.12 && fract(vAlong / 6.0) < 0.5) idx = laneColour;
+  }
+  else if (pat == ${WOOD_BOARDS}) {
+    float board = vAlong / 0.25;
+    if (fwidth(board) < 0.75 && (fract(board) < 0.14 || (mixh(uint(int(floor(board))), 13u) & 7u) == 0u))
+      idx = vPaint.y;
   }
 #ifdef GROUND
   // damp: the land's distance to the water, at the middle of this texel

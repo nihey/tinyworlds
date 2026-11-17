@@ -51,6 +51,7 @@ export const CARS: Record<CarKind, CarSpec> = {
   muscle: { vmax: 60, mass: 1650, accel: 12, grip: 7.5, tough: 1, length: 4.9, width: 1.9, height: 1.35 },
   sports: { vmax: 64, mass: 1350, accel: 13, grip: 13, tough: 1, length: 4.4, width: 1.9, height: 1.2 },
   supercar: { vmax: 82, mass: 1400, accel: 18, grip: 14.5, tough: 1, length: 4.5, width: 2, height: 1.1 },
+  motorcycle: { vmax: 58, mass: 310, accel: 15, grip: 14, tough: 0.85, length: 2.2, width: 0.88, height: 1.15 },
   boxTruck: { vmax: 28, mass: 5500, accel: 3.6, grip: 9, tough: 2, length: 7.5, width: 2.5, height: 3.4 },
   bus: { vmax: 24, mass: 12000, accel: 2.4, grip: 9, tough: 3, length: 12, width: 2.55, height: 3.1 },
 };
@@ -64,14 +65,15 @@ export const BOATS: Record<BoatKind, BoatSpec> = {
 
 /** How often each kind is met in traffic and parked at the kerb (they add up to 100). */
 export const TRAFFIC_MIX: Record<CarKind, number> = {
-  sedan: 24,
-  taxi: 21,
-  suv: 14,
-  hatchback: 11,
-  pickup: 7,
+  sedan: 22,
+  taxi: 20,
+  suv: 13,
+  hatchback: 10,
+  pickup: 6,
   police: 6,
   boxTruck: 5,
   bus: 4,
+  motorcycle: 6,
   muscle: 3.5,
   sports: 2.5,
   limousine: 1.5,
@@ -232,6 +234,8 @@ const BISECT = 7;
 const BRAKE = 11;
 const REVERSE = 4.5;
 const REVERSE_TOP = 9;
+/** A rider can walk the motorcycle backwards, at walking speed. */
+const MOTORCYCLE_REVERSE_TOP = 1.4;
 const ROLLING = 0.7;
 const AIR_DRAG = 0.008;
 const HANDBRAKE = 5;
@@ -686,24 +690,36 @@ function sinkStep(v: Vehicle, floatShare: number, h: number) {
 }
 
 /** The wheel, the pedals and the handbrake: the speeds along and across after `h` seconds, and the turn. */
-function drive(v: Vehicle, s: CarSpec, input: DriveInput, vf: number, vl: number, h: number) {
+function drive(
+  v: Vehicle,
+  s: CarSpec,
+  input: DriveInput,
+  skid: boolean,
+  vf: number,
+  vl: number,
+  h: number,
+) {
   const thr = clamp(input.throttle - input.brake, -1, 1);
   if (thr > 0.05) {
     if (vf < -0.5) vf = Math.min(0, vf + BRAKE * thr * h);
     else vf += s.accel * accelFactor(v) * thr * Math.max(0, 1 - vf / s.vmax) * h;
   } else if (thr < -0.05) {
     if (vf > 0.5) vf = Math.max(0, vf + BRAKE * thr * h);
-    else vf = Math.max(-Math.min(REVERSE_TOP, s.vmax / 4), vf + REVERSE * thr * h);
+    else {
+      const top =
+        v.kind === "motorcycle" ? MOTORCYCLE_REVERSE_TOP : Math.min(REVERSE_TOP, s.vmax / 4);
+      vf = Math.max(-top, vf + REVERSE * thr * h);
+    }
   } else vf = toward0(vf, (ROLLING + AIR_DRAG * vf * vf) * h);
   if (input.handbrake) vf = toward0(vf, HANDBRAKE * h);
-  vl *= Math.exp(-(input.handbrake ? HANDBRAKE_GRIP : s.grip) * h);
+  vl *= Math.exp(-(skid ? HANDBRAKE_GRIP : s.grip) * h);
   // the faster, the less lock: steering tightens at speed
   const lock = STEER / (1 + Math.abs(vf) / STEER_FADE);
   const turn =
     (vf / (s.length * WHEELBASE)) *
     Math.tan(clamp(input.steer, -1, 1) * lock) *
-    (input.handbrake ? HANDBRAKE_TURN : 1);
-  v.w += (turn - v.w) * Math.min(1, (input.handbrake ? HELM_HANDBRAKE : HELM) * h);
+    (skid ? HANDBRAKE_TURN : 1);
+  v.w += (turn - v.w) * Math.min(1, (skid ? HELM_HANDBRAKE : HELM) * h);
   return [vf, vl];
 }
 
@@ -791,10 +807,11 @@ function carStep(
 ) {
   const s = CARS[v.kind as CarKind];
   const driving = input !== null && v.state !== "wrecked";
-  const [vf, vl] = driving ? drive(v, s, input, v.v, v.vs, h) : coast(v, v.v, v.vs, h);
+  const skid = driving && input.handbrake && v.kind !== "motorcycle";
+  const [vf, vl] = driving ? drive(v, s, input, skid, v.v, v.vs, h) : coast(v, v.v, v.vs, h);
   // the tyres carry the speed round the turn as far as they grip; the rest is the back stepping
   // out (all of it with nobody at the wheel: a spinning car slides on the way it was going)
-  const carry = !driving ? 0 : input.handbrake ? HANDBRAKE_CARRY : Math.min(1, s.grip / GRIP_FULL);
+  const carry = !driving ? 0 : skid ? HANDBRAKE_CARRY : Math.min(1, s.grip / GRIP_FULL);
   const frame = v.yaw + carry * v.w * h;
   const sy = Math.sin(frame);
   const cy = Math.cos(frame);
