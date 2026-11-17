@@ -74,7 +74,8 @@ registry_worlds() {
 }
 
 # Where a world's map data is looked for: the generated folder here or, with SERVER_DATA set (a
-# deploy without data), the server's manifests and quizzes copied there by mirror_server_data.
+# deploy without data), the server's manifests, quizzes and street-walk indexes copied there by
+# mirror_server_data.
 data_of() {
   if [[ -n "${SERVER_DATA:-}" ]]; then echo "$SERVER_DATA/$1/data"; else echo "$FRONTEND/public/data/$1"; fi
 }
@@ -300,9 +301,8 @@ build_all() {
 build_of() { { grep -o '"build":"[^"]*"' || true; } | head -n 1 | cut -d '"' -f 4; }
 
 # An index-only (or walk-only) upload sends the manifest too (it names the indexes', or the walk's,
-# version), and a manifest
-# also describes the tiles: it may only replace one from the same render, or it would point the
-# viewer at tiles that are not on the server. Says so and fails otherwise.
+# version), and a manifest also describes the tiles: it may only replace one from the same render,
+# or it would point the viewer at tiles that are not on the server. Says so and fails otherwise.
 same_render() {
   local target="$1" data="$2" base_path="$3" here there
   here="$(build_of <"$data/manifest.json")"
@@ -323,15 +323,15 @@ upload() {
   site="$DEPLOY_DIR/site$base_path"
   data="$FRONTEND/public/data/$target"
   [[ -t 1 ]] && progress="--info=progress2"
-  # before anything is sent, so a refusal leaves the site as it was
-  if [[ ( "$mode" == "--index" || "$mode" == "--walk" ) && "$target" != "home" ]]; then
-    same_render "$target" "$data" "$base_path" || return
-  fi
   if [[ "$mode" == "--walk" && ! -f "$data/walk/walk.json" ]]; then
     # `all --walk` passes by the worlds that have no walk; named alone, a world must have one
     if [[ "$target" == "home" || "${WALK_OPTIONAL:-}" == 1 ]]; then return 0; fi
     echo "No street walk for $target: run 'npm run cli -- --city $target walk' in tinyworlds-pipeline first." >&2
     return 1
+  fi
+  # before anything is sent, so a refusal leaves the site as it was
+  if [[ ( "$mode" == "--index" || "$mode" == "--walk" ) && "$target" != "home" ]]; then
+    same_render "$target" "$data" "$base_path" || return
   fi
   if [[ "$mode" != "--data" && "$mode" != "--walk" ]]; then
     if [[ "$target" == "home" ]]; then
@@ -347,11 +347,14 @@ upload() {
     case "$mode" in
       --no-data) ;;
       --walk)
-        # the squares first (a walk.json of the new version never points at a square not there),
-        # then walk.json, then the manifest: it names the walk's version, so visitors ask anew
-        rsync -a --mkpath --delete "$progress" "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
+        # the new squares first, beside the old (a walk.json of the new version never points at
+        # a square not there, and a visitor still on the old one keeps finding its squares), then
+        # walk.json, then the manifest, which names the walk's version so visitors ask anew;
+        # only then the squares the new walk no longer has are removed
+        rsync -a --mkpath "$progress" "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
         rsync -a --mkpath "$data/walk/walk.json" "$DEPLOY_HOST:$site/data/walk/" || return
         rsync -a "$data/manifest.json" "$DEPLOY_HOST:$site/data/" || return
+        rsync -a --delete "$data/walk/cells/" "$DEPLOY_HOST:$site/data/walk/cells/" || return
         ;;
       --index)
         # the indexes, and the sights with their texts and pictures where the world has them

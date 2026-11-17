@@ -143,8 +143,9 @@ worlds go up first and the front page last, since its links lead to them. `all` 
 server): the check lists it as missing otherwise.
 
 **The street walk's data** (`walk/cells/*.bin`, `walk/walk.json`, about 120 MB for New York) goes
-up with a full `--data`, or on its own with `--walk`: the squares first (with `--delete`), then
-`walk.json`, then the manifest, which names the walk's version (`manifest.walk`, appended as
+up with a full `--data`, or on its own with `--walk`: the squares first, then `walk.json`, then
+the manifest, and last a pass over the squares that `--delete`s those the new walk no longer has
+(so a visitor on the old version does not meet a missing square). The manifest names the walk's version (`manifest.walk`, appended as
 `?v=` to them; the squares are cached as immutable). Like `--index`, it refuses when the server's
 manifest is from another render than the local one. It builds and announces nothing. `all --walk`
 sends every world's walk and passes by the worlds that have none. Send it **before** merging the
