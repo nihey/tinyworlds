@@ -576,6 +576,10 @@ whose shadows reach it, and margins for both.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
+- The Brooklyn Bridge's two surveyed towers are cut into stone piers and stepped Gothic arches
+  (`scene/brooklyn-arches.ts`). Each opening begins under the lowest mapped deck through its
+  tower. The recesses widen at the entrances so the openings remain visible from both map views.
+  The scene assigns every piece to Brooklyn Bridge so the sight outline uses the new openings.
 - A deck only comes down where its bridge ends. Pieces that meet end to end are one bridge, and
   `holdDecks` (`scene/decks.ts`) keeps it up over land it merely passes: between two crossings it
   stays at the lower of their crests (the Queensboro over Roosevelt Island, the Throgs Neck over

@@ -7,6 +7,7 @@ import { readAreas } from "../geom/geojson.js";
 import { GeomKind, readWkb } from "../geom/wkb.js";
 import { EARTH_RADIUS, makeGeo, makeProjection, type Projection } from "../projection.js";
 import { fillPolygon } from "../render/raster.js";
+import { brooklynArchVolumes } from "./brooklyn-arches.js";
 import {
   buildFog,
   buildFogBuiltUp,
@@ -1390,32 +1391,16 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
   const deckPaths = bridgePieces
     .filter((piece) => piece.name)
     .map((piece) => ({ name: piece.name, xy: piece.pts }));
+  const bridgeNear = (x: number, y: number) => nearestBridge(x, y, deckPaths, 40 * proj.pxPerMetre);
   /** What stands by a deck belongs to the bridge whose deck passes within 40 m. */
   const ownNear = (x: number, y: number, from: number): void => {
-    const name = nearestBridge(x, y, deckPaths, 40 * proj.pxPerMetre);
+    const name = bridgeNear(x, y);
     if (name) own(name, from);
   };
-
-  for (let i = 0; i < supports.length; i++) {
-    const parts = supportParts[i];
-    if (!parts) continue;
-    // a cantilever's tower is a masonry pier up to the deck: its steel comes with the trusses
-    const pier = cantileverOf.get(i);
-    const from = volumes.count;
-    for (const rings of parts)
-      addVolume(rings, mix(i, 777), pier ? pier.deck - DECK : supports[i].height, 0, {
-        cls: "bridge_support",
-      });
-    const ring = parts[0][0];
-    let lon = 0;
-    let lat = 0;
-    for (let j = 0; j < ring.length; j += 2) {
-      lon += ring[j] / (ring.length / 2);
-      lat += ring[j + 1] / (ring.length / 2);
-    }
-    const [x, y] = proj.toMap(lon, lat);
-    ownNear(x, y, from);
-  }
+  const brooklynName = (name: string | null) =>
+    /^Brooklyn Bridge(?: Promenade| Bicycle Path)?$/i.test(name ?? "");
+  const brooklynTowers =
+    CITY.id === "tinynyc" ? towers.filter((t) => brooklynName(bridgeNear(...proj.gridToMap(t.p, t.q)))) : [];
 
   /** One step of a deck: the stretch [a, z] of the leg that starts at (p0, q0) and runs along (up, uq). */
   interface DeckStep {
@@ -1532,6 +1517,56 @@ export async function buildScene(opts: BuildOptions = {}): Promise<void> {
     }
   }
   const heldUp = holdDecks(runs);
+  const archAxis = (): readonly [number, number] | null => {
+    if (brooklynTowers.length !== 2) return null;
+    const [a, b] = brooklynTowers;
+    const dp = b.p - a.p;
+    const dq = b.q - a.q;
+    const span = Math.hypot(dp, dq);
+    return span > 0 ? [dp / span, dq / span] : null;
+  };
+  const alongBrooklyn = archAxis();
+
+  for (let i = 0; i < supports.length; i++) {
+    const parts = supportParts[i];
+    if (!parts) continue;
+    const from = volumes.count;
+    const seed = mix(i, 777);
+    const tower = brooklynTowers.find((t) => t.support === i);
+    if (tower && alongBrooklyn && parts.length === 1 && parts[0].length === 1) {
+      let deck = Infinity;
+      bridgePieces.forEach((piece, b) => {
+        if (!brooklynName(piece.name)) return;
+        for (const [n, st] of laid[b].entries()) {
+          if (Math.hypot(st.mp - tower.p, st.mq - tower.q) <= 19) deck = Math.min(deck, runs[b].h[n]);
+        }
+      });
+      const foot = Number.isFinite(deck) ? Math.max(0, deck - DECK) : 0;
+      const n = project(proj, parts[0][0], true);
+      const outline = Array.from(gridBuf.subarray(0, n * 2));
+      for (const part of brooklynArchVolumes(outline, alongBrooklyn, tower.height, foot))
+        addShape(part.ring, seed, part.top, part.base, "bridge_support", F_NO_OUTLINE, {
+          wall: R.tan,
+          roof: R.tan,
+        });
+      own("Brooklyn Bridge", from);
+      continue;
+    }
+
+    // A cantilever's masonry stops at the deck; the steel above comes with the trusses.
+    const pier = cantileverOf.get(i);
+    for (const rings of parts)
+      addVolume(rings, seed, pier ? pier.deck - DECK : supports[i].height, 0, { cls: "bridge_support" });
+    const ring = parts[0][0];
+    let lon = 0;
+    let lat = 0;
+    for (let j = 0; j < ring.length; j += 2) {
+      lon += ring[j] / (ring.length / 2);
+      lat += ring[j + 1] / (ring.length / 2);
+    }
+    ownNear(...proj.toMap(lon, lat), from);
+  }
+
   // what hangs over a deck must know where it was held up
   const lifted: { p: number; q: number; h: number }[] = [];
   runs.forEach((r, b) =>
