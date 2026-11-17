@@ -456,7 +456,11 @@ viewer's street walk into `walk/` of the world's data folder: the city in square
 metres east and north of the projection's origin, one gzipped file of typed arrays each
 (`walk/cells/<i>_<j>.bin`), the index (`walk/walk.json`) and their version in the manifest
 (`walk`). The contract is in the root `CLAUDE.md`. It reads the scene and `raw/segment.parquet`
-and fetches nothing.
+and fetches nothing. **One walk per world, from its own view** (north up for a real city): the
+walk is in metres, so the viewer walks the same one whichever way the map is turned. `walk`
+refuses `--view` for the other view, `all --view grid` leaves it out, and the other view's
+manifest names no walk. Its paving follows the street grid's own bearing (`gridDeg` in
+`walk.json`, the city file's), not the view's.
 
 | File                       | Does                                                                         |
 | -------------------------- | ---------------------------------------------------------------------------- |
@@ -522,7 +526,8 @@ and fetches nothing.
   named, rather than writing a wrong square.
 - **`--stamp`** only writes the version of the walk folder already there into the manifest (for a
   walk made elsewhere and copied in). `render` keeps the manifest's `walk` when it writes a new
-  manifest: the walk is cut from the scene, not the tiles.
+  manifest (of the city's own view; the other view's keeps none): the walk is cut from the
+  scene, not the tiles.
 - New York, the whole city: 212 s, 37,246 squares, 117.7 MB gzipped (before gzip the largest
   arrays are `shore`, 148 MB, and `vol.xy`, 34 MB), 1,719 boats; the largest square is 22 kB.
   It peaks around 6 GB of memory, which the `cli` script's heap allows.

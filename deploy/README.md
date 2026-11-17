@@ -180,8 +180,11 @@ manifest also describes the tiles, it refuses (before sending anything) when the
 manifest is from another render than the local one: deploy the data first.
 A world drawn both ways carries its street-grid view in `grid/` inside its data folder: `--data`
 sends it with the rest (its manifest after its tiles, the world's own manifest last), `--index`
-sends its indexes first, and the checks fail a world marked `turn: "grid"` whose `grid/` view
-is missing, here or (for `--no-data` and the release) on the server.
+sends its indexes first (its manifest held to the server's `grid/manifest.json` as the world's
+own is to its own), and the checks fail a world marked `turn: "grid"` whose `grid/` view
+is missing, here or (for `--no-data` and the release) on the server. The street walk is not in
+`grid/`: it is the world's own whichever way the map is turned, so `--walk` sends nothing of
+`grid/` and the other view's manifest names no walk.
 `deploy.sh` also copies `nginx.conf` (in place, because it is a single-file bind mount); when
 its contents changed, it redeploys the site's container through `SITE_DEPLOY_WEBHOOK` (Dokploy
 starts the new container before stopping the old one, and rolls back if it fails), or, without

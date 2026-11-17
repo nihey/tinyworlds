@@ -160,6 +160,12 @@ program
   .option("--around <lon,lat,metres>", "only write the squares near a point; the others are kept")
   .option("--stamp", "only write the version of the walk folder already there into the manifest", false)
   .action(async (opts: { out?: string; around?: string; stamp: boolean }) => {
+    // one walk per world, in its own folder, whichever way the map is turned
+    if (OTHER_VIEW) {
+      throw new Error(
+        `The street walk is cut from ${CITY.id}'s own view (${CITY.view ?? "north"}): run it without --view ${VIEW}`,
+      );
+    }
     if (opts.stamp) {
       const out = path.resolve(opts.out ?? DIRS.out);
       if (!fs.existsSync(path.join(out, "walk", "walk.json")))
@@ -173,7 +179,7 @@ program
 program
   .command("all")
   .description(
-    "fetch, scene, render, index, (where a city has sights) wiki and quiz, and (where it has a walk) walk, in order",
+    "fetch, scene, render, index, (where a city has sights) wiki and quiz, and (where it has a walk, in its own view) walk, in order",
   )
   .action(async () => {
     await fetchAll({ force: false });
@@ -184,7 +190,8 @@ program
       await buildWiki();
       await writeQuiz();
     }
-    if (CITY.walk) await buildWalk();
+    // the walk is the world's own view's: the other view is drawn without one
+    if (CITY.walk && !OTHER_VIEW) await buildWalk();
   });
 
 await program.parseAsync();

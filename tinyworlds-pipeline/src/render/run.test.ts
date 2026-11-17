@@ -20,6 +20,12 @@ describe("keptFromManifest", () => {
     expect(keptFromManifest(file)).toEqual({ walk: "0123456789ab" });
   });
 
+  it("keeps no walk in the other view's manifest: the walk is the world's own view's", () => {
+    const file = path.join(dir, "manifest.json");
+    fs.writeFileSync(file, JSON.stringify({ name: "tinynyc", build: "old", walk: "0123456789ab" }));
+    expect(keptFromManifest(file, true)).toEqual({});
+  });
+
   it("keeps nothing from a manifest without a walk, an unreadable one or none", () => {
     const file = path.join(dir, "manifest.json");
     expect(keptFromManifest(file)).toEqual({});

@@ -402,8 +402,11 @@ World space is metres east (`e`) and north (`n`) of the projection origin `geo.l
 (`e = (lon − lon0)·π/180·R·cos(lat0)`, `n = (lat − lat0)·π/180·R`), heights `z` in metres
 above the land (0). Square `(i, j)` covers `e ∈ [200i, 200i+200)`, `n ∈ [200j, 200j+200)`. Map px
 at ground become (e, n) by `p+q = X/k`, `q−p = 2Y/k`, `e = p·sinβ + q·cosβ`,
-`n = p·cosβ − q·sinβ`; px heights ÷ `kz`. `geo` is the scene's (New York's β is 45), not the
-city file's `betaDeg`.
+`n = p·cosβ − q·sinβ`; px heights ÷ `kz`. `geo` is the scene's, of the world's own view (New
+York's β is 45: north up), not the street grid's `gridDeg`. There is one walk per world, in its
+own folder, never in `grid/`: in the other view the viewer still reads `walk/` with the
+version the world's own `manifest.json` names, and goes between the walk's metres and the map
+it shows through lon/lat and that map's own projection.
 
 ```ts
 // walk.json
@@ -413,7 +416,7 @@ interface WalkIndex {
   i0: number; j0: number; cols: number; rows: number;
   cells: string;                      // base64 bitset, bit (i−i0) + (j−j0)·cols, LSB-first: the file exists
   geo: { lon0: number; lat0: number; betaDeg: number; k: number; kz: number };   // the scene's
-  gridDeg: number;                    // the street grid's bearing for paving (the city file's betaDeg)
+  gridDeg: number;                    // the street grid's bearing for paving (the city file's gridDeg)
   sunDeg: number;                     // where the sun is, degrees
   palette: { names: string[]; rgb: number[] };   // names × 6 shades × 3 bytes
   paintRank: number[];                // paint order, per ground kind
