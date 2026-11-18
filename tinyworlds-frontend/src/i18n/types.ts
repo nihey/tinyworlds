@@ -104,13 +104,21 @@ export interface Strings {
     description: string;
     /** what the front page's share card shows, for those who cannot see it */
     cardAlt: string;
-    tagline: string;
+    tagline: { lead: string; accent: string };
     pitch: string;
     /** the hero's button, into the map its picture shows: "{city}" is that world's city */
     explore: string;
-    cities: string;
-    /** the heading of the worlds that are not real places */
-    imagined: string;
+    catalogue: {
+      title: string;
+      ranked: string;
+      search: string;
+      filters: string;
+      all: string;
+      real: string;
+      imagined: string;
+      count: { one: string; other: string };
+      empty: string;
+    };
     /** the cities being funded, in order of funding; and the ones that reached their goal */
     ranking: string;
     funded: string;
@@ -130,14 +138,9 @@ export interface Strings {
     /** names the row of links to the page's sections */
     navLabel: string;
     /** the line under each section's title */
-    citiesLine: string;
-    imaginedLine: string;
     rankingLine: string;
-    /** the hero's button, where the sign names the city beside it; and the one towards funding */
     exploreShort: string;
-    fundNext: string;
-    /** the hero goes round the worlds: its name, its arrows, and a dot's ("{city}") */
-    carousel: { label: string; previous: string; next: string; show: string };
+    carousel: { label: string; previous: string; next: string; play: string; pause: string };
     /** under the hero, each a figure and what it counts (the figure is set apart: no "{n}") */
     numbers: {
       worlds: { one: string; other: string };
@@ -145,8 +148,6 @@ export interface Strings {
       live: string;
       funding: { one: string; other: string };
     };
-    /** the tile after the cities: which one is built next; "{goal}" is a sum */
-    next: { kicker: string; title: string; body: string; action: string; ranking: string };
     /** why donate, when there is no list of cities to show */
     nextPitch: string;
     openSource: string;
@@ -247,9 +248,9 @@ export interface Strings {
       goal: string;
       firstUnclaimed: string;
       raised: string;
-      /** a built city whose donations reached its goal */
       fundedInFull: string;
       groupBuilt: string;
+      publicRecognition: string;
       /** the card for a city nobody has named yet */
       other: { title: string; body: string; action: string };
     };

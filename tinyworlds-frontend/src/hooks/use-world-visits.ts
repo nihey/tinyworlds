@@ -14,8 +14,8 @@ export interface WorldVisitsState {
   /** the latest counts; null until the first answer, and for good without an API */
   counts: WorldCounts | null;
   /**
-   * The first counts that came: what the cards are ordered by. Later answers change the numbers
-   * on the cards, never their order, so nothing moves under the pointer.
+   * The first counts establish the page's visit ranking. Later replies refresh the displayed
+   * counts while preserving navigation and card order.
    */
   ranked: WorldCounts | null;
 }

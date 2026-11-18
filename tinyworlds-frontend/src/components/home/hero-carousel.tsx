@@ -1,50 +1,32 @@
 "use client";
 
-import { ArrowUpRight, ChevronLeft, ChevronRight, Heart } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-} from "react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MovingPicture } from "@/components/home/moving-picture";
 import { Wordmark } from "@/components/map/wordmark";
-import { ACTION, ACTION_QUIET } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { FADE_MS, lastSeen, mayAdvance, SLIDE_MS, stepSlide } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { documentPage, watchHidden } from "@/lib/visits";
-import { HERO_FILMS, heroSlides, worldHero, worldUrl } from "@/site";
+import { worldHero, worldUrl } from "@/site";
 import { WORLDS } from "@/worlds";
 
-/** The worlds the hero goes round: every one of the registry that has a film, in its order. */
-const SLIDES = heroSlides(Object.keys(WORLDS), HERO_FILMS);
-
 const ARROW =
-  "grid size-10 shrink-0 place-items-center rounded-full text-paper outline-none transition-colors hover:bg-sign-raised focus-visible:shadow-[0_0_0_2px_var(--taxi)]";
+  "grid size-9 shrink-0 place-items-center rounded-sm text-paper outline-none transition-colors hover:bg-white/15 focus-visible:shadow-[inset_0_0_0_2px_var(--taxi)]";
 
 interface Slides {
-  current: number;
-  leaving: number | null;
-  pending: number | null;
+  current: string;
+  leaving: string | null;
+  pending: { id: string; reason: "timer" | "manual" | "ranking" } | null;
 }
 
-/**
- * The top of the front page: every world in turn, alive, with the page's sign over its lower
- * left corner. The sign keeps the site's name and what it is; under them it names the world
- * being shown, and its button leads there. The hero moves on by itself every few seconds, for
- * someone who is watching (`mayAdvance`), and never for a visitor who asked for less motion or
- * less data; arrows and a dot per world choose one, and a choice stops it: from then on the
- * hero is the visitor's, and each world they choose is said to a screen reader. With one world to show
- * it is a picture and a sign, as it was. On a narrow screen the sign hangs from the picture's
- * edge instead of covering it.
- */
-export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
+/** A fixed introduction beside a rotating, linked city panorama. */
+export function HeroCarousel({ order }: { order: string[] }) {
   const { t, locale } = useI18n();
-  const [slides, setSlides] = useState<Slides>({ current: 0, leaving: null, pending: null });
+  const [first] = useState(order[0]);
+  const [lead, setLead] = useState(first);
+  const [slides, setSlides] = useState<Slides>({ current: first, leaving: null, pending: null });
   const { current, leaving, pending } = slides;
   // the visitor has chosen a slide: the hero stops moving by itself, and says each choice
   const [chosen, setChosen] = useState(false);
@@ -62,10 +44,19 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   const calm = useMediaQuery("(prefers-reduced-motion: reduce)");
   const picture = useRef<HTMLDivElement>(null);
 
-  const world = WORLDS[SLIDES[current]];
+  // The first successful visit counts can change the lead. Keep a visitor's choice and keep
+  // the visible panorama in place while a newly ranked lead decodes.
+  if (lead !== order[0]) {
+    setLead(order[0]);
+    if (current === lead && !pending && !chosen) {
+      setSlides({ ...slides, pending: { id: order[0], reason: "ranking" } });
+    }
+  }
+
+  const world = WORLDS[current];
   const copy = world.copy[locale];
   const moving = mayAdvance({
-    slides: SLIDES.length,
+    slides: order.length,
     calm,
     saveData,
     hidden,
@@ -76,19 +67,23 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   });
 
   /** The visitor's choice of a slide: from here on the hero waits for them. */
-  const choose = (to: number) => {
+  const step = (by: number) => {
     setChosen(true);
-    setSlides((was) => ({ ...was, pending: to === was.current ? null : to }));
+    setSlides((was) => {
+      const from = was.pending?.reason === "manual" ? was.pending.id : was.current;
+      const id = order[stepSlide(order.indexOf(from), by, order.length)];
+      return { ...was, pending: id === was.current ? null : { id, reason: "manual" } };
+    });
   };
-  const step = (by: number) => choose(stepSlide(pending ?? current, by, SLIDES.length));
 
   const showPending = useCallback(() => {
     setSlides((was) => {
       if (pending === null || was.pending !== pending) return was;
-      if (!moving && !chosen) return { ...was, pending: null };
-      return { current: pending, leaving: calm ? null : was.current, pending: null };
+      if (pending.reason === "timer" && !moving) return { ...was, pending: null };
+      if (pending.reason === "ranking" && (focused || hovered || chosen)) return was;
+      return { current: pending.id, leaving: calm ? null : was.current, pending: null };
     });
-  }, [pending, calm, moving, chosen]);
+  }, [pending, calm, moving, focused, hovered, chosen]);
 
   // what the moment is: a tab behind another (it may have been opened there), the hero off screen
   useEffect(() => {
@@ -109,15 +104,16 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
   // At the next world's turn, start its still. The current slide stays until the still is ready.
   useEffect(() => {
     if (!moving || pending !== null) return;
+    const id = order[stepSlide(order.indexOf(current), 1, order.length)];
     const turn = window.setTimeout(() => {
       setSlides((was) =>
         was.current === current && was.pending === null
-          ? { ...was, pending: stepSlide(current, 1, SLIDES.length) }
+          ? { ...was, pending: { id, reason: "timer" } }
           : was,
       );
     }, SLIDE_MS);
     return () => window.clearTimeout(turn);
-  }, [moving, current, pending]);
+  }, [moving, current, pending, order]);
 
   // the slide left behind stays under the new one until that has faded in
   useEffect(() => {
@@ -139,158 +135,123 @@ export function HeroCarousel({ takesDonations }: { takesDonations: boolean }) {
 
   const explore = t.home.explore.replace("{city}", copy.city);
   // Keep the same image node as a slide moves from prepared to current to leaving.
-  const layers = [...new Set([leaving, current, pending])].filter((index) => index !== null);
+  const layers = [...new Set([leaving, current, pending?.id])].filter((id) => id != null);
 
   return (
     <header
-      className="relative"
+      className="grid overflow-hidden rounded-sm bg-[#20342d] text-[#f8f3e7] md:min-h-[clamp(20rem,35vw,28.5rem)] md:grid-cols-[39%_61%]"
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
-      // the focus a key moved in: a click on an arrow should not hold the hero still for good
       onFocus={(event) => setFocused(event.target.matches(":focus-visible"))}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       }}
     >
-      {/* said to a screen reader: the world the visitor chose, never one the timer brought. The
-          region is there, and polite, from the start: one made polite along with its first
-          words would not be heard */}
-      <p aria-live="polite" aria-atomic className="sr-only">
-        {chosen ? copy.city : ""}
-      </p>
+      <div className="flex min-w-0 flex-col items-start justify-center px-5 py-6 md:p-[clamp(1.5rem,3.4vw,3rem)]">
+        <h1 className="text-[clamp(2rem,9.5vw,3.4rem)] leading-[0.96] font-extrabold tracking-[-0.06em] md:text-[clamp(2rem,4.45vw,4.1rem)]">
+          {t.home.tagline.lead}{" "}
+          <span className="block text-[#f7d65c]">{t.home.tagline.accent}</span>
+        </h1>
+        <p className="mt-3.5 max-w-[30ch] text-base leading-snug text-[#e7e9dc] md:mt-5 md:text-[clamp(1rem,1.45vw,1.25rem)]">
+          {t.home.pitch}
+        </p>
+        <a
+          href={worldUrl(world.id)}
+          className="mt-5 inline-flex min-h-11 items-center gap-4 rounded-sm bg-taxi px-4 py-2.5 text-sm leading-tight font-bold text-taxi-ink outline-none hover:bg-[#ffdb57] focus-visible:ring-2 focus-visible:ring-taxi focus-visible:ring-offset-4 focus-visible:ring-offset-[#20342d] md:mt-6 md:text-base"
+        >
+          {explore}
+          <ArrowUpRight aria-hidden className="size-4 shrink-0" strokeWidth={2.5} />
+        </a>
+      </div>
       <div
         ref={picture}
-        className="relative aspect-[16/11] w-full overflow-hidden rounded-[10px] bg-sign-raised shadow-[0_0_0_1px_rgb(0_0_0/0.6),0_16px_34px_-14px_rgb(0_0_0/0.65)] sm:aspect-[16/9] lg:aspect-[2/1]"
+        className="relative row-start-1 aspect-[1.68] min-w-0 overflow-hidden bg-sign-raised md:col-start-2 md:aspect-auto"
       >
-        {layers.map((index) => {
-          const city = WORLDS[SLIDES[index]];
-          const film = worldHero(city.id);
-          const shown = index === current;
-          const prepared = index === pending;
+        {layers.map((id) => {
+          const city = WORLDS[id];
+          const film = worldHero(id);
+          const shown = id === current;
+          const prepared = id === pending?.id;
           return (
             <MovingPicture
-              key={city.id}
+              key={id}
               still={film.still}
               loop={film.loop}
               alt=""
+              focus="right"
               fallback={
                 <Wordmark suffix={city.wordmark} accent={city.accent.color} className="text-4xl" />
               }
-              eager={shown && current === 0}
-              active={shown}
+              eager={shown && id === first}
+              active={shown && !chosen}
               onStillReady={prepared ? showPending : undefined}
               className={cn(
                 "absolute inset-0 size-full",
-                prepared && index !== leaving && "invisible",
+                prepared && id !== leaving && "invisible",
                 shown && leaving !== null && "hero-in",
               )}
-              style={shown && leaving !== null ? { animationDuration: `${FADE_MS}ms` } : undefined}
+              style={shown && leaving !== null ? { animationDuration: FADE_MS + "ms" } : undefined}
             />
           );
         })}
-        {/* the picture leads where the sign's button does: for a pointer only, the button is the link */}
         <a
           href={worldUrl(world.id)}
           tabIndex={-1}
           aria-hidden
           className="absolute inset-0 outline-none"
         />
-      </div>
-
-      <div className="home-arrive sign relative mx-3 -mt-14 overflow-hidden sm:mx-5 sm:-mt-24 sm:max-w-md lg:absolute lg:bottom-5 lg:left-5 lg:m-0 lg:w-full">
-        <div aria-hidden className="home-hero-rule h-[3px] bg-taxi" />
-        <div className="px-5 pt-5 pb-5 sm:px-6 sm:pt-6 sm:pb-6">
-          <h1>
-            <Wordmark className="text-[clamp(2.75rem,12vw,3.75rem)]" />
-          </h1>
-          <p className="pt-2.5 text-xl leading-tight font-semibold text-paper">{t.home.tagline}</p>
-          <p className="pt-1.5 text-[15px] leading-relaxed text-paper-dim">{t.home.pitch}</p>
-          {/* the world being shown: one line each, so the sign is as tall whatever the world */}
-          <div className="mt-4 border-t border-sign-line pt-3.5">
-            {/* the world's wordmark at one size for every world: there is room here for the
-                longest, which `Wordmark` would set smaller */}
-            <span
-              role="img"
-              aria-label={`tiny${world.wordmark}`}
-              className="block font-pixel text-xl leading-none tracking-[0.03em] select-none"
+        <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-end justify-between gap-2 text-xs md:inset-x-3.5 md:bottom-3.5">
+          {order.length > 1 && (
+            <div
+              role="group"
+              aria-label={t.home.carousel.label}
+              onKeyDown={onKeys}
+              className="pointer-events-auto flex shrink-0 items-center rounded-sm bg-[#18211e] px-0.5"
             >
-              <span aria-hidden>
-                tiny<span style={{ color: world.accent.color }}>{world.wordmark}</span>
-              </span>
-            </span>
-            <p className="truncate pt-1.5 text-[22px] leading-7 font-semibold text-paper">
-              {copy.city}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2.5 pt-4 sm:flex-row">
-            <a href={worldUrl(world.id)} aria-label={explore} className={ACTION}>
-              {t.home.exploreShort}
-              <ArrowUpRight aria-hidden className="size-4" strokeWidth={2.5} />
-            </a>
-            {takesDonations && (
-              <a href="#ranking" className={ACTION_QUIET}>
-                <Heart aria-hidden className="size-4" strokeWidth={2.25} />
-                {t.home.fundNext}
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {SLIDES.length > 1 && (
-        <div
-          role="group"
-          aria-label={t.home.carousel.label}
-          onKeyDown={onKeys}
-          style={{ "--dot": world.accent.color } as CSSProperties}
-          className="home-arrive sign absolute top-3 right-3 flex h-11 items-center rounded-full px-0.5 [--home-delay:140ms] lg:top-auto lg:right-5 lg:bottom-5"
-        >
-          <button
-            type="button"
-            onClick={() => step(-1)}
-            aria-label={t.home.carousel.previous}
-            className={ARROW}
-          >
-            <ChevronLeft aria-hidden className="size-4" strokeWidth={2.5} />
-          </button>
-          {/* a dot per world from `sm`; on a phone, where they would be too small to press, a count */}
-          <span
-            aria-hidden
-            className="px-1 text-xs font-semibold text-paper tabular-nums sm:hidden"
-          >
-            {current + 1} / {SLIDES.length}
-          </span>
-          <span className="hidden items-center sm:flex">
-            {SLIDES.map((id, i) => (
               <button
-                key={id}
                 type="button"
-                onClick={() => choose(i)}
-                aria-label={t.home.carousel.show.replace("{city}", WORLDS[id].copy[locale].city)}
-                aria-current={i === current ? "true" : undefined}
-                className="group grid h-8 place-items-center px-[5px] outline-none"
+                onClick={() => step(-1)}
+                aria-label={t.home.carousel.previous}
+                className={ARROW}
               >
-                <span
-                  className={cn(
-                    "h-1.5 rounded-full transition-[width,background-color] duration-200 group-focus-visible:shadow-[0_0_0_2px_var(--taxi)]",
-                    i === current
-                      ? "w-[18px] bg-(--dot)"
-                      : "w-1.5 bg-paper/35 group-hover:bg-paper",
-                  )}
-                />
+                <ChevronLeft aria-hidden className="size-4" strokeWidth={2.5} />
               </button>
-            ))}
-          </span>
-          <button
-            type="button"
-            onClick={() => step(1)}
-            aria-label={t.home.carousel.next}
-            className={ARROW}
-          >
-            <ChevronRight aria-hidden className="size-4" strokeWidth={2.5} />
-          </button>
+              <span aria-hidden className="px-0.5 font-semibold text-paper tabular-nums">
+                {order.indexOf(current) + 1} / {order.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => step(1)}
+                aria-label={t.home.carousel.next}
+                className={ARROW}
+              >
+                <ChevronRight aria-hidden className="size-4" strokeWidth={2.5} />
+              </button>
+              {!calm && !saveData && (
+                <button
+                  type="button"
+                  onClick={() => setChosen(!chosen)}
+                  aria-label={chosen ? t.home.carousel.play : t.home.carousel.pause}
+                  className={ARROW}
+                >
+                  {chosen ? (
+                    <Play aria-hidden className="size-3.5" />
+                  ) : (
+                    <Pause aria-hidden className="size-3.5" />
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+          <p className="ml-auto flex min-w-0 items-center gap-2 rounded-sm bg-[#18211e] px-2 py-1.5 font-semibold text-paper">
+            <span aria-hidden className="size-1.5 shrink-0 bg-taxi" />
+            <span className="truncate">{copy.city}</span>
+          </p>
         </div>
-      )}
+        <span aria-live="polite" aria-atomic className="sr-only">
+          {chosen ? copy.city : ""}
+        </span>
+      </div>
     </header>
   );
 }

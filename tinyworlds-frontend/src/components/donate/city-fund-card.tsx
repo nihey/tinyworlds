@@ -211,6 +211,9 @@ export function BuiltCityCard({
         <span className="font-semibold text-taxi">{t.donate.build.fundedInFull}</span>
         <span>· {donationsLabel(city.donations, locale, t.donate.donations)}</span>
       </p>
+      <p className="text-sm leading-snug font-medium text-paper">
+        {t.donate.build.publicRecognition}
+      </p>
       <div className="mt-auto flex flex-wrap gap-2">
         <button
           type="button"

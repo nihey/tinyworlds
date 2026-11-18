@@ -14,9 +14,9 @@ import { HALL_URL, SITE_ID } from "@/site";
 
 /**
  * From this width there is room beside the page for a column of benefactors on each side;
- * below it they are a strip in the page. The same number as the `min-[90rem]` classes here.
+ * below it they are a strip in the page. Match the strip's CSS breakpoint.
  */
-const WIDE = "(min-width: 90rem)";
+const WIDE = "(min-width: 110rem)";
 
 /** How fast the columns drift up, in CSS px a second. */
 const COLUMN_SPEED = 16;
@@ -162,9 +162,9 @@ function Column({
     <aside
       aria-label={t.benefactors.wall.label}
       className={cn(
-        // beside the page's column (64rem wide, centred), a little into its own margin; as far
+        // beside the page's column (84rem wide, centred), a little into its own margin; as far
         // down as the page's links (2.25rem) and the gap under them, then the plaques
-        "home-arrive fixed inset-y-0 flex w-[clamp(10.5rem,calc(50%-32rem-0.75rem),15.5rem)] flex-col gap-4 py-6",
+        "home-arrive fixed inset-y-0 flex w-[clamp(10.5rem,calc(50%-42rem-0.75rem),15.5rem)] flex-col gap-4 py-6",
         className,
       )}
     >
@@ -213,14 +213,14 @@ export function WallColumns({ load, onCity, onDonate }: WallProps) {
         entries={left}
         onCity={onCity}
         onDonate={onDonate}
-        className="right-[calc(50%+32rem-0.25rem)]"
+        className="right-[calc(50%+42rem-0.25rem)]"
       />
       <Column
         side="right"
         entries={right}
         onCity={onCity}
         onDonate={onDonate}
-        className="left-[calc(50%+32rem-0.25rem)]"
+        className="left-[calc(50%+42rem-0.25rem)]"
       />
     </>
   );
@@ -259,7 +259,7 @@ export function WallStrip({ load, onCity, onDonate }: WallProps) {
   // nothing to show and nothing to invite to: no room is kept for it
   if (!waiting && load.entries.length === 0 && !onDonate) return null;
   return (
-    <section aria-labelledby="our-benefactors" className="min-[90rem]:hidden">
+    <section aria-labelledby="our-benefactors" className="min-[110rem]:hidden">
       {/* there from the first paint, like the row's own room */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pb-2.5">
         <h2 id="our-benefactors" className={cn(TITLE, "text-[17px] leading-tight")}>

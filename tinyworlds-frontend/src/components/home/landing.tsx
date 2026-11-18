@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, Code, UserRound } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BenefactorsSign } from "@/components/benefactors/benefactors-sign";
 import type { CityRef } from "@/components/benefactors/benefactors-panel";
@@ -10,39 +10,41 @@ import { BuildNext } from "@/components/donate/build-next";
 import { DonateDialog } from "@/components/donate/donate-dialog";
 import { WallColumns, WallStrip } from "@/components/home/benefactor-wall";
 import { HeroCarousel } from "@/components/home/hero-carousel";
-import { NextCityTile } from "@/components/home/next-city-tile";
 import { SectionHead } from "@/components/home/section-head";
 import { SiteNumbers } from "@/components/home/site-numbers";
-import { WorldCard } from "@/components/home/world-card";
+import { WorldCatalogue } from "@/components/home/world-catalogue";
 import { LegalLinks } from "@/components/legal/legal-links";
+import { Wordmark } from "@/components/map/wordmark";
 import { ACTION_QUIET } from "@/components/styles";
 import { useAdminSession } from "@/hooks/use-admin-session";
 import { useDonorSession } from "@/hooks/use-donor-session";
 import { useJoinReturn } from "@/hooks/use-join-return";
 import { useLists } from "@/hooks/use-lists";
 import { useI18n } from "@/hooks/use-i18n";
-import { useMilestones, type Milestones } from "@/hooks/use-milestones";
+import { useMilestones } from "@/hooks/use-milestones";
 import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
 import { useTheme } from "@/hooks/use-theme";
 import { useWall } from "@/hooks/use-wall";
 import { useWorldVisits } from "@/hooks/use-world-visits";
-import { broughtByWorld, type BroughtWorld } from "@/lib/brought-by";
+import { broughtByWorld } from "@/lib/brought-by";
 import { rankCities } from "@/lib/city-picker";
 import { API_URL, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { type ListKey } from "@/lib/lists";
 import { cn } from "@/lib/utils";
-import { byVisits, siteTotals, type WorldCounts } from "@/lib/visits";
+import { byVisits, siteTotals } from "@/lib/visits";
 import {
   ADMIN_PATH,
   CONTACT_EMAIL,
   CONTACT_URL,
   GITHUB_URL,
   HALL_URL,
+  HERO_FILMS,
   ME_PATH,
   SITE_ID,
+  heroSlides,
 } from "@/site";
-import { WORLDS, type World } from "@/worlds";
+import { WORLDS } from "@/worlds";
 
 /** the footer's quiet links: the address, the terms and the privacy policy, the cookie settings, the admin pages */
 const FOOTER_LINK =
@@ -53,111 +55,8 @@ const TOP_LINK =
   "rounded-sm text-[#15171a]/70 outline-none hover:text-[#15171a] focus-visible:underline focus-visible:underline-offset-4 dusk:text-paper-dim dusk:hover:text-paper";
 
 /** Every world the front page lists, for the count of their visits. */
-const WORLD_IDS = Object.keys(WORLDS);
-
-/**
- * One group of worlds as cards: the cities, or the places that only exist in stories. After
- * the cities' cards, where donations are taken, the tile that asks which city comes next.
- */
-function WorldGrid({
-  id,
-  title,
-  line,
-  worlds,
-  columns,
-  onBenefactors,
-  benefactorWorlds,
-  brought,
-  visits,
-  next,
-}: {
-  id: string;
-  title: string;
-  line: string;
-  worlds: World[];
-  /** how many cards the widest group has: the grid is laid out for that many */
-  columns: number;
-  onBenefactors: (world: string) => void;
-  /** the worlds the API knows a city for: only their cards offer the benefactors */
-  benefactorWorlds: ReadonlySet<string>;
-  /** the worlds whose benefactors brought them to the map, and who they were */
-  brought: ReadonlyMap<string, BroughtWorld>;
-  /** each world's visits; undefined when the build has no API, and the cards say none */
-  visits?: WorldCounts | null;
-  /** the tile after the cards: the list it draws its cities from, and how to open the donate sign */
-  next?: {
-    milestones: Milestones;
-    onDonate: () => void;
-    newCities?: { on: boolean; onJoin: () => void; onLeave: () => void };
-  };
-}) {
-  const grid = useRef<HTMLUListElement>(null);
-  const hasNext = next !== undefined;
-
-  useEffect(() => {
-    const list = grid.current;
-    if (
-      !list ||
-      typeof IntersectionObserver === "undefined" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-      return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const { target, isIntersecting } of entries) {
-          if (!isIntersecting) continue;
-          target.setAttribute("data-entered", "");
-          observer.unobserve(target);
-        }
-      },
-      { rootMargin: "0px 0px 24px" },
-    );
-    for (const card of list.children) {
-      if (!card.hasAttribute("data-entered")) observer.observe(card);
-    }
-    return () => observer.disconnect();
-  }, [hasNext]);
-
-  return (
-    <section aria-labelledby={id}>
-      <SectionHead id={id} title={title} line={line} />
-      {/* the same columns for every group, so a card is the same size wherever it is listed */}
-      <ul
-        ref={grid}
-        data-columns={Math.min(columns, 3)}
-        className={cn(
-          "home-world-grid grid gap-4",
-          columns > 1 && "sm:grid-cols-2",
-          columns > 2 && "lg:grid-cols-3",
-        )}
-      >
-        {worlds.map((world) => (
-          <li key={world.id} className="min-w-0">
-            <WorldCard
-              world={world}
-              count={visits?.get(world.id)}
-              showVisits={visits !== undefined}
-              onBenefactors={
-                benefactorWorlds.has(world.id) ? () => onBenefactors(world.id) : undefined
-              }
-              brought={brought.get(world.id)}
-            />
-          </li>
-        ))}
-        {next && (
-          <NextCityTile
-            cards={worlds.length}
-            columns={columns}
-            milestones={next.milestones}
-            onDonate={next.onDonate}
-            newCities={next.newCities}
-          />
-        )}
-      </ul>
-    </section>
-  );
-}
+const WORLD_LIST = Object.values(WORLDS);
+const WORLD_IDS = WORLD_LIST.map((world) => world.id);
 
 /** The front page: what this is, the cities there are, the ones people are funding, and where the code lives. */
 export function Landing() {
@@ -215,19 +114,17 @@ export function Landing() {
     name: city.name,
   });
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
-  // the real cities first, then the places that only exist in stories; each group most visited
-  // first, by the first counts that came (the registry's order until then)
   const visits = useWorldVisits(WORLD_IDS);
   const shownVisits = API_URL !== "" ? visits.counts : undefined;
-  const cities = byVisits(
-    Object.values(WORLDS).filter((world) => !world.fictional),
-    visits.ranked,
+  const worlds = useMemo(() => byVisits(WORLD_LIST, visits.ranked), [visits.ranked]);
+  const carouselOrder = useMemo(
+    () =>
+      heroSlides(
+        worlds.map((world) => world.id),
+        HERO_FILMS,
+      ),
+    [worlds],
   );
-  const imagined = byVisits(
-    Object.values(WORLDS).filter((world) => world.fictional),
-    visits.ranked,
-  );
-  const columns = Math.max(cities.length, imagined.length);
   const openFor = (city: string) => setDonate({ city });
   // everyone who gave to a city: down the page's sides where there is room, a strip otherwise
   const wall = useWall();
@@ -262,22 +159,22 @@ export function Landing() {
   const [beforeEmail, afterEmail] = t.home.contact.split("{email}");
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-12 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-14 sm:px-6 sm:pt-6">
-      <div className="flex flex-col gap-4">
-        <nav aria-label={t.home.navLabel} className="flex min-h-9 items-center gap-5">
-          <ul className="hidden items-center gap-5 text-sm font-semibold sm:flex">
+    <main className="home-landing mx-auto flex min-h-dvh w-full max-w-[84rem] flex-col gap-8 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:gap-10 sm:px-6 lg:px-7">
+      <div className="flex flex-col gap-5 sm:gap-7">
+        <nav
+          aria-label={t.home.navLabel}
+          className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[#d9d7cb] pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 dusk:border-sign-line"
+        >
+          <Wordmark
+            accent="var(--home-wordmark)"
+            className="text-[30px] text-[#172321] sm:text-4xl dusk:text-paper"
+          />
+          <ul className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold sm:gap-x-6 sm:text-sm">
             <li>
               <a href="#cities" className={TOP_LINK}>
-                {t.home.cities}
+                {t.home.catalogue.all}
               </a>
             </li>
-            {imagined.length > 0 && (
-              <li>
-                <a href="#imagined" className={TOP_LINK}>
-                  {t.home.imagined}
-                </a>
-              </li>
-            )}
             {takesDonations && (
               <li>
                 <a href="#ranking" className={TOP_LINK}>
@@ -286,31 +183,23 @@ export function Landing() {
               </li>
             )}
             {withApi && (
-              <li>
+              <li className="hidden sm:block">
                 <a href={HALL_URL} className={TOP_LINK}>
                   {t.hall.open}
                 </a>
               </li>
             )}
-            <li>
-              <a href="#open-source" className={TOP_LINK}>
-                {t.home.openSource}
-              </a>
-            </li>
+            {withApi && (
+              <li>
+                <a href={ME_PATH} className={cn(TOP_LINK, "inline-flex items-center gap-1.5")}>
+                  <UserRound aria-hidden className="size-3.5" strokeWidth={2.25} />
+                  {t.home.yourCities}
+                </a>
+              </li>
+            )}
           </ul>
-          {withApi && (
-            <a
-              href={ME_PATH}
-              className="sign ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold text-paper transition-colors outline-none hover:text-taxi focus-visible:shadow-[0_0_0_2px_var(--taxi)]"
-            >
-              <UserRound aria-hidden className="size-4" strokeWidth={2.25} />
-              {t.home.yourCities}
-            </a>
-          )}
         </nav>
-
-        <HeroCarousel takesDonations={takesDonations} />
-
+        <HeroCarousel order={carouselOrder} />
         {withApi && (
           <SiteNumbers
             worlds={WORLD_IDS.length}
@@ -318,43 +207,7 @@ export function Landing() {
             funding={funding}
           />
         )}
-
-        {withApi && <WallStrip {...wallProps} />}
       </div>
-
-      <WorldGrid
-        id="cities"
-        title={t.home.cities}
-        line={t.home.citiesLine}
-        worlds={cities}
-        columns={columns}
-        onBenefactors={(world) => openBenefactors({ world })}
-        benefactorWorlds={benefactorWorlds}
-        brought={brought}
-        visits={shownVisits}
-        next={
-          takesDonations
-            ? {
-                milestones,
-                onDonate: () => setDonate({ city: null }),
-                newCities: withApi ? newCities : undefined,
-              }
-            : undefined
-        }
-      />
-      {imagined.length > 0 && (
-        <WorldGrid
-          id="imagined"
-          title={t.home.imagined}
-          line={t.home.imaginedLine}
-          worlds={imagined}
-          columns={columns}
-          onBenefactors={(world) => openBenefactors({ world })}
-          benefactorWorlds={benefactorWorlds}
-          brought={brought}
-          visits={shownVisits}
-        />
-      )}
 
       {takesDonations && (
         <section aria-labelledby="ranking">
@@ -364,9 +217,20 @@ export function Landing() {
             onDonate={(city) => setDonate({ city })}
             onBenefactors={(slug) => openBenefactors({ slug })}
             lists={withApi ? cityLists : undefined}
+            newCities={withApi ? newCities : undefined}
           />
         </section>
       )}
+
+      <WorldCatalogue
+        worlds={worlds}
+        visits={shownVisits}
+        benefactorWorlds={benefactorWorlds}
+        brought={brought}
+        onBenefactors={(world) => openBenefactors({ world })}
+      />
+
+      {withApi && <WallStrip {...wallProps} />}
 
       <section
         aria-labelledby="open-source"
