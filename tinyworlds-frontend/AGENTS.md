@@ -51,6 +51,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep the touch HUD and action buttons within the safe-area insets and clear of the minimap. Capture movement and camera fingers independently and release held input on pointer cancellation.
 - Critical damage ignites road vehicles for eight seconds before they explode. Leaving keeps the fuse running, and sinking clears it. The blast knocks down pedestrians and damages the player and nearby vehicles, with damage falling off from the hull. Any road vehicle wrecked by the blast starts its own fuse.
 - Punching on foot uses the center of the view and the world's collision geometry. The original fist overlay follows the simulated swing and respects reduced motion. Keep saved keybindings intact when adding controls.
+- Street Walk synthesizes its impact sounds in `src/walk/sound.ts` and uses the existing Sound switch. Vehicle hits on pedestrians get a thud scaled by speed and proximity, punches get an impact on contact, and actual player health loss triggers the hurt cue once per simulation step.
 - The Golden Gate Bridge uses the map palette’s red ramp for its main cables and suspenders. Keep the cable kinds in sync with the pipeline when changing their rendering.
 - The Brooklyn Bridge's landmark geometry in `src/walk/render/brooklyn-bridge.ts` uses the surveyed tower locations and existing walk cells. Keep its openings aligned with the roadway and promenade.
 

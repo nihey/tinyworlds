@@ -1,9 +1,7 @@
 /**
- * The walk's few sounds, made with WebAudio as they are needed, from noise and two tones (no
- * files): a horn, a crash (louder and brighter the harder the hit), the dull boom of a wreck
- * catching fire, a fist swish and impact, and a splash. The audio context is made on the first key or tap
- * (`wake`, which the game calls on each): browsers keep audio off until a gesture. Where there is
- * no WebAudio (an old browser, a test) every call does nothing.
+ * Street Walk synthesizes its horn, crashes, explosions, splashes and combat sounds with Web Audio.
+ * `wake` creates or resumes the audio context on a key or tap. Every sound is optional on browsers
+ * without Web Audio.
  */
 
 type Context = AudioContext;
@@ -161,8 +159,27 @@ export class WalkSound {
   punch(): void {
     const a = this.live();
     if (!a) return;
-    this.burst(a, 0.08, 0.13, "lowpass", 780);
-    this.thump(a, 0.09, 0.16, 158, 68);
+    this.burst(a, 0.08, 0.34, "bandpass", 1550, 0.7);
+    this.thump(a, 0.12, 0.24, 180, 74);
+  }
+
+  /** A deeper thud when a vehicle knocks down a pedestrian. */
+  pedestrianHit(strength: number): void {
+    const a = this.live();
+    const s = Math.min(1, strength);
+    if (!a || s <= 0.01) return;
+    this.burst(a, 0.16, 0.38 * s, "lowpass", 530);
+    this.thump(a, 0.23, 0.35 * s, 125, 45);
+  }
+
+  /** A short descending grunt, scaled by the fraction of health lost. */
+  hurt(strength: number): void {
+    const a = this.live();
+    if (!a || strength <= 0) return;
+    const s = 0.6 + 0.4 * Math.min(1, strength);
+    this.thump(a, 0.26, 0.22 * s, 235, 112);
+    this.thump(a, 0.26, 0.09 * s, 470, 224);
+    this.burst(a, 0.13, 0.17 * s, "bandpass", 690, 1.2);
   }
 
   /** Something going into the water. */

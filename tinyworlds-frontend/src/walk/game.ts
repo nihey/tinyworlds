@@ -139,6 +139,8 @@ const HIT_COOL = 0.8;
 const CRASH_LOUD = 25;
 const CRASH_HEAR = 80;
 const BOOM_HEAR = 150;
+const PEDESTRIAN_HIT_LOUD = 12;
+const PEDESTRIAN_HIT_HEAR = 24;
 const CRASH_SCARE = 20;
 const HORN_SCARE = 12;
 const WRECK_SCARE = 40;
@@ -529,6 +531,7 @@ export class WalkGame {
     }
     this.gather();
     const p = this.player;
+    const lifeBefore = p.life;
     this.before = { e: p.e, n: p.n };
     const playing = !this.tunnel && !this.wasted && !this.waiting;
     if (this.tunnel) this.tunnelStep(real);
@@ -566,6 +569,12 @@ export class WalkGame {
         this.nearby.filter((v) => !v.boat),
         this.cams.visible,
       );
+      for (const hit of crowd.knocks) {
+        const distance = Math.hypot(hit.e - me.e, hit.n - me.n);
+        if (distance >= PEDESTRIAN_HIT_HEAR) continue;
+        const strength = Math.min(1, hit.speed / PEDESTRIAN_HIT_LOUD);
+        this.sound.pedestrianHit(strength * (1 - distance / PEDESTRIAN_HIT_HEAR));
+      }
       // someone knocked into the water: a ring where they went in, as for you
       for (const s of crowd.splashes) this.splash(s.e, s.n, 1.2, 0.5);
     }
@@ -585,6 +594,10 @@ export class WalkGame {
       if (within(v, this.focus(), SMOKE_REACH) && !(v === this.yours && this.tunnel))
         this.particles.from(v, h);
     this.particles.step(h);
+    if (p.life < lifeBefore) {
+      this.hurtFlash = 1;
+      this.sound.hurt((lifeBefore - p.life) / LIFE_MAX);
+    }
     this.lifeStep(h);
     if (!this.wasted && p.life <= 0) this.goDown();
     if (this.wasted && wastedAt(this.wastedT, this.reduced).done) this.comeToNow();
@@ -655,7 +668,6 @@ export class WalkGame {
     const p = this.player;
     p.life = Math.max(0, p.life - amount);
     p.sinceHurt = 0;
-    this.hurtFlash = 1;
   }
 
   /** The roof of a car under a point, for you on foot. */
@@ -851,7 +863,6 @@ export class WalkGame {
       this.world.roofs = null;
     }
     if (input.jump && p.vz > 0) this.jumpFor = 0;
-    if (ev.hurt > 0) this.hurtFlash = 1;
     if (ev.splashed) this.splash(p.e, p.n, 1.2, 0.5);
   }
 

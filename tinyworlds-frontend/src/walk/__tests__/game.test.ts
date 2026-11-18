@@ -106,6 +106,7 @@ function play(cells: WalkCell[], opts: Opts) {
   const world = new WalkWorld(ix);
   for (const c of cells) world.add(c);
   const view = fakeView(world);
+  const sound = new WalkSound();
   const game = new WalkGame({
     view,
     ix,
@@ -113,7 +114,7 @@ function play(cells: WalkCell[], opts: Opts) {
     start: { yaw: 0, ...opts.start },
     bindings: defaultBindings(),
     reduced: opts.reduced ?? false,
-    sound: new WalkSound(),
+    sound,
     units: "imperial",
     starter: opts.starter,
     random: seeded(11),
@@ -129,7 +130,7 @@ function play(cells: WalkCell[], opts: Opts) {
     }
     return until();
   };
-  return { game, world, view, now, simUntil };
+  return { game, world, view, now, simUntil, sound };
 }
 
 /** A parked sedan at (e, n), facing north unless `yaw` says. */
@@ -494,7 +495,9 @@ function streetWorld(): WalkCell[] {
 
 describe("punching", () => {
   it("swings once, hits the closest pedestrian in front, and gives them time to get up", () => {
-    const { game, now } = play(streetWorld(), { start: { e: 100, n: 109 } });
+    const { game, now, sound } = play(streetWorld(), { start: { e: 100, n: 109 } });
+    const swingSound = vi.spyOn(sound, "swing");
+    const impactSound = vi.spyOn(sound, "punch");
     const crowd = game["crowd"];
     const target = crowd.addAt("n", 90)!;
     const farther = crowd.addAt("n", 91)!;
@@ -506,10 +509,13 @@ describe("punching", () => {
     game.sim(0.04);
     expect(now().punch).toMatchObject({ hit: null });
     expect(target.state).not.toBe("down");
+    expect(swingSound).toHaveBeenCalledTimes(1);
+    expect(impactSound).not.toHaveBeenCalled();
     game.sim(0.1);
     expect(now().punch).toMatchObject({ hit: true });
     expect(target.state).toBe("down");
     expect(farther.state).not.toBe("down");
+    expect(impactSound).toHaveBeenCalledTimes(1);
     const swing = now().punch?.sequence;
     game.press("punch", true);
     game.press("punch", false);
@@ -518,12 +524,15 @@ describe("punching", () => {
 
     game.sim(6);
     expect(target.state).not.toBe("down");
+    expect(swingSound).toHaveBeenCalledTimes(1);
+    expect(impactSound).toHaveBeenCalledTimes(1);
   });
 
   it("swings without hitting a pedestrian through a wall", () => {
     const cells = streetWorld();
     cells.find(({ key }) => key === "0_0")!.volumes.push(boxVolume(99.25, 106, 99.45, 112));
-    const { game, now } = play(cells, { start: { e: 98.6, n: 109 } });
+    const { game, now, sound } = play(cells, { start: { e: 98.6, n: 109 } });
+    const impactSound = vi.spyOn(sound, "punch");
     const target = game["crowd"].addAt("n", 90)!;
     game.teleport(target.e - 1.5, target.n, target.z, Math.PI / 2);
     game.sim(0.1);
@@ -532,7 +541,33 @@ describe("punching", () => {
     game.sim(0.15);
     expect(now().punch).toMatchObject({ hit: false });
     expect(target.state).not.toBe("down");
+    expect(impactSound).not.toHaveBeenCalled();
   });
+});
+
+it("plays one impact when the player's car knocks down a pedestrian", () => {
+  const car = sedan(100, 109, Math.PI / 2);
+  const { game, now, simUntil, sound } = play(streetWorld(), {
+    start: { e: 100, n: 110.9 },
+    vehicles: [car],
+  });
+  const impactSound = vi.spyOn(sound, "pedestrianHit");
+  game.sim(0.1);
+  game.keyDown("KeyF");
+  game.keyUp("KeyF");
+  game.sim(0.1);
+  expect(now().mode).toBe("drive");
+  expect(impactSound).not.toHaveBeenCalled();
+
+  const pedestrian = game["crowd"].addAt("n", 93)!;
+  car.n = pedestrian.n;
+  car.v = 5;
+  game.keyDown("KeyW");
+  expect(simUntil(() => pedestrian.state === "down", 0.3)).toBe(true);
+  game.keyUp("KeyW");
+  game.sim(0.2);
+  expect(impactSound).toHaveBeenCalledTimes(1);
+  expect(impactSound.mock.calls[0][0]).toBeGreaterThan(0);
 });
 
 describe("going down", () => {
@@ -594,10 +629,11 @@ describe("going down", () => {
   });
 
   it("being hit on foot at 5 m/s hurts and knocks you down, and you get up", () => {
-    const { game, now } = play(area(-1, -1, 1, 1), {
+    const { game, now, sound } = play(area(-1, -1, 1, 1), {
       start: { e: 100, n: 100 },
       vehicles: [comingAt(5)],
     });
+    const hurtSound = vi.spyOn(sound, "hurt");
     game.sim(0.3);
     expect(now().wasted).toBeNull();
     expect(now().life).toBeCloseTo(73, 0);
@@ -605,6 +641,8 @@ describe("going down", () => {
     expect(now().hurt).toBeGreaterThan(0);
     game.sim(2);
     expect(now().mode).toBe("foot");
+    expect(hurtSound).toHaveBeenCalledTimes(1);
+    expect(hurtSound.mock.calls[0][0]).toBeCloseTo(0.27, 2);
   });
 
   it("warns you when your car is wrecked and kills you at the end of the countdown", () => {
@@ -801,7 +839,10 @@ describe("fast cars", () => {
 
 describe("life", () => {
   it("comes back at 2 a second once nothing has hurt you for 5 s", () => {
-    const { game, now, simUntil } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100, z: 8 } });
+    const { game, now, simUntil, sound } = play(area(-1, -1, 1, 1), {
+      start: { e: 100, n: 100, z: 8 },
+    });
+    const hurtSound = vi.spyOn(sound, "hurt");
     expect(simUntil(() => now().life < 100, 3)).toBe(true);
     const hurt = now().life;
     // a fall of 8 m: (8 − 4) / 11 of it
@@ -812,6 +853,8 @@ describe("life", () => {
     expect(now().life).toBeCloseTo(hurt + 2, 0);
     game.sim(30);
     expect(now().life).toBe(100);
+    expect(hurtSound).toHaveBeenCalledTimes(1);
+    expect(hurtSound.mock.calls[0][0]).toBeCloseTo(4 / 11, 2);
   });
 });
 
@@ -872,8 +915,7 @@ describe("parked cars", () => {
 
 describe("the sound", () => {
   it("is let go with the game: its audio context closed, so walk after walk does not keep one each", () => {
-    const { game } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100 } });
-    const sound = (game as unknown as { sound: WalkSound }).sound;
+    const { game, sound } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100 } });
     let closed = 0;
     const ctx = { state: "running", close: () => ((closed += 1), Promise.resolve()) };
     (sound as unknown as { ctx: unknown }).ctx = ctx;
