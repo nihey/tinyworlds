@@ -10,6 +10,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Front page
 
+- “Build the next city” keeps one draggable row per funding group, with native touch scrolling and manual navigation. Search all three with the donation picker’s city spellings, preserve the full funding rank on filtered cards, and keep the action to name a city beside the search.
+
 - Keep the first hero still eager and high priority. The carousel keeps the current slide visible until the requested still has decoded or its fallback is ready.
 - `MovingPicture` only starts a loop once its still has settled and at least 40% of its active frame is visible. Respect reduced motion and Save-Data.
 - Home entrance animations live in `src/app/globals.css`. The world grids animate each card once near the viewport, with visible static content available before hydration.

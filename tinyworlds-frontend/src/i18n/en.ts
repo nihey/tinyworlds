@@ -176,9 +176,8 @@ export const en: Strings = {
     },
     donations: { none: "No donations yet", one: "{n} donation", other: "{n} donations" },
     status: { funded: "Funded, in the queue", building: "Being built", built: "Built" },
-    showAll: "Show all cities",
-    showFewer: "Show fewer",
     build: {
+      matches: { one: "{n} city found", other: "{n} cities found" },
       steps: {
         pick: { title: "Pick a city", body: "The most funded one is built next." },
         give: {

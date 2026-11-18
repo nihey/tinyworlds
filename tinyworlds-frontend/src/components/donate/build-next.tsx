@@ -1,29 +1,19 @@
 "use client";
 
-import { BadgeCheck, Heart } from "lucide-react";
-import { useState } from "react";
+import { BadgeCheck, Heart, Plus, Search, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { PixelIcon, type PixelArtName } from "@/components/benefactors/pixel-badge";
-import { ACTION, QUIET } from "@/components/styles";
+import { ACTION, PILL_GHOST } from "@/components/styles";
 import type { Milestones } from "@/hooks/use-milestones";
 import { useI18n } from "@/hooks/use-i18n";
-import {
-  BUILT_LIMIT,
-  defaultGoal,
-  leading,
-  RANKING_LIMIT,
-  rankCities,
-  withGoal,
-} from "@/lib/city-picker";
+import { CITY_CATALOGUE } from "@/lib/city-catalogue";
+import { defaultGoal, fold, leading, rankCities, searchRanking, withGoal } from "@/lib/city-picker";
 import { API_URL, formatUsd, type CityMilestone } from "@/lib/donate";
 import { cityListState, type MyLists } from "@/lib/lists";
 import { cn } from "@/lib/utils";
 import { SITE_ID } from "@/site";
+import { CityCarousel } from "./city-carousel";
 import { BuiltCityCard, CityFundCard, OtherCityCard } from "./city-fund-card";
-
-const GROUP =
-  "flex items-center gap-1.5 pt-5 pb-2 text-[10.5px] font-semibold tracking-[0.14em] text-paper-dim uppercase";
-
-const GRID = "grid gap-3 sm:grid-cols-2 lg:grid-cols-3";
 
 interface Handlers {
   /** open the donate sign: with that city chosen, or with none */
@@ -116,7 +106,7 @@ function Steps({ goalCents }: { goalCents: number }) {
 /**
  * "Build the next city", whole: how it works, then every city in three groups. The ones built
  * with their goal reached stay, lit, at the top; then the ones that reached it and wait; then
- * the ones still collecting, numbered, with an empty lot for a city nobody has named. Without a
+ * the ones still collecting, numbered. Visitors can search all three rows or name a city. Without a
  * list of cities it is a sentence and a Donate button.
  */
 export function BuildNext({
@@ -126,8 +116,16 @@ export function BuildNext({
   lists,
 }: { milestones: Milestones } & Handlers) {
   const { t } = useI18n();
-  const [allBuilt, setAllBuilt] = useState(false);
-  const [allRanked, setAllRanked] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchInput = useRef<HTMLInputElement>(null);
+  const search = fold(query);
+  const ranking = useMemo(() => rankCities(milestones.cities), [milestones.cities]);
+  const { built, funded, ranked } = useMemo(
+    () => searchRanking(ranking, CITY_CATALOGUE, search),
+    [ranking, search],
+  );
+  const total = built.length + funded.length + ranked.length;
+  const hasCities = ranking.built.length + ranking.funded.length + ranking.ranked.length > 0;
 
   if (!listed(milestones))
     return (
@@ -135,15 +133,6 @@ export function BuildNext({
         <Pitch onDonate={onDonate} />
       </div>
     );
-
-  const { built, funded, ranked, anyRaised } = rankCities(milestones.cities);
-  const shownBuilt = allBuilt ? built : built.slice(0, BUILT_LIMIT);
-  const shownRanked = allRanked ? ranked : ranked.slice(0, RANKING_LIMIT);
-  const more = (open: boolean, toggle: () => void) => (
-    <button type="button" onClick={toggle} aria-expanded={open} className={cn(QUIET, "mt-3")}>
-      {open ? t.donate.showFewer : t.donate.showAll}
-    </button>
-  );
 
   return (
     <div className="sign px-4 py-4 sm:px-6 sm:py-5">
@@ -155,76 +144,120 @@ export function BuildNext({
         </p>
       )}
 
-      {built.length > 0 && (
+      {milestones.state === "ready" && hasCities && (
         <>
-          <h3 className={GROUP}>
-            <PixelIcon art="keystone" />
-            {t.donate.build.groupBuilt}
-          </h3>
-          <ul className={GRID}>
-            {shownBuilt.map((city) => (
-              <li key={city.id} className="min-w-0">
-                <BuiltCityCard city={city} onBenefactors={onBenefactors} />
-              </li>
-            ))}
-          </ul>
-          {built.length > BUILT_LIMIT && more(allBuilt, () => setAllBuilt(!allBuilt))}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="flex h-11 min-w-0 flex-[1_1_12rem] items-center gap-2.5 rounded-lg border border-sign-line bg-white/[0.04] pl-3.5 focus-within:border-taxi">
+              <Search aria-hidden className="size-4 shrink-0 text-paper-dim" />
+              <input
+                ref={searchInput}
+                type="search"
+                aria-label={t.donate.pickerPlaceholder}
+                placeholder={t.donate.pickerPlaceholder}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-full min-w-0 flex-1 bg-transparent pr-2 text-base text-paper outline-none placeholder:text-paper-dim sm:text-sm [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label={t.search.clear}
+                  onClick={() => {
+                    setQuery("");
+                    searchInput.current?.focus();
+                  }}
+                  className="mr-1 inline-flex size-9 items-center justify-center rounded-md text-paper-dim hover:text-paper focus-visible:outline-2 focus-visible:outline-taxi"
+                >
+                  <X aria-hidden className="size-4" />
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => onDonate(null)}
+              data-rybbit-event="donate_open"
+              data-rybbit-prop-world={SITE_ID}
+              className={cn(PILL_GHOST, "h-11 px-3.5")}
+            >
+              <Plus aria-hidden className="size-4 text-taxi" />
+              {t.donate.otherPlaceholder}
+            </button>
+          </div>
+          <p role="status" className={search ? "pt-3 text-sm text-paper-dim" : "sr-only"}>
+            {search &&
+              (total === 0
+                ? t.donate.noMatch
+                : t.donate.build.matches[total === 1 ? "one" : "other"].replace(
+                    "{n}",
+                    String(total),
+                  ))}
+          </p>
         </>
+      )}
+
+      {built.length > 0 && (
+        <CityCarousel
+          title={t.donate.build.groupBuilt}
+          icon={<PixelIcon art="keystone" />}
+          query={search}
+        >
+          {built.map((city) => (
+            <li key={city.id}>
+              <BuiltCityCard city={city} onBenefactors={onBenefactors} />
+            </li>
+          ))}
+        </CityCarousel>
       )}
 
       {funded.length > 0 && (
-        <>
-          <h3 className={GROUP}>
-            <BadgeCheck aria-hidden className="size-3.5 text-taxi" strokeWidth={2.5} />
-            {t.home.funded}
-          </h3>
-          <ul className={GRID}>
-            {funded.map((city) => (
-              <li key={city.id} className="min-w-0">
-                <CityFundCard
-                  city={city}
-                  onDonate={onDonate}
-                  onBenefactors={onBenefactors}
-                  {...listProps(lists, city.slug)}
-                />
-              </li>
-            ))}
-          </ul>
-        </>
+        <CityCarousel
+          title={t.home.funded}
+          icon={<BadgeCheck aria-hidden className="size-3.5 text-taxi" strokeWidth={2.5} />}
+          query={search}
+        >
+          {funded.map((city) => (
+            <li key={city.id}>
+              <CityFundCard
+                city={city}
+                onDonate={onDonate}
+                onBenefactors={onBenefactors}
+                {...listProps(lists, city.slug)}
+              />
+            </li>
+          ))}
+        </CityCarousel>
       )}
 
-      {milestones.state === "ready" && (
-        <>
-          {built.length > 0 || funded.length > 0 ? (
-            <h3 className={GROUP}>{t.donate.groupFunding}</h3>
-          ) : (
-            <div className="pt-5" />
-          )}
-          {!anyRaised && ranked.length > 0 && (
-            <p className="pb-2 text-sm leading-relaxed text-taxi">
-              {ranked.some((city) => city.waiting > 0)
+      {ranked.length > 0 && (
+        <CityCarousel
+          title={t.donate.groupFunding}
+          query={search}
+          note={
+            !ranking.anyRaised && !search
+              ? ranking.ranked.some((city) => city.waiting > 0)
                 ? t.home.rankingEmptyWaiting
-                : t.home.rankingEmpty}
-            </p>
-          )}
-          <ol className={GRID}>
-            {shownRanked.map((city, i) => (
-              <li key={city.id} className="min-w-0">
-                <CityFundCard
-                  city={city}
-                  place={i + 1}
-                  onDonate={onDonate}
-                  onBenefactors={onBenefactors}
-                  {...listProps(lists, city.slug)}
-                />
-              </li>
-            ))}
-            <li className="min-w-0">
-              <OtherCityCard onDonate={() => onDonate(null)} />
+                : t.home.rankingEmpty
+              : undefined
+          }
+        >
+          {ranked.map(({ city, place }) => (
+            <li key={city.id} value={place}>
+              <CityFundCard
+                city={city}
+                place={place}
+                onDonate={onDonate}
+                onBenefactors={onBenefactors}
+                {...listProps(lists, city.slug)}
+              />
             </li>
-          </ol>
-          {ranked.length > RANKING_LIMIT && more(allRanked, () => setAllRanked(!allRanked))}
-        </>
+          ))}
+        </CityCarousel>
+      )}
+
+      {milestones.state === "ready" && !hasCities && (
+        <div className="mt-5 sm:max-w-sm">
+          <OtherCityCard onDonate={() => onDonate(null)} />
+        </div>
       )}
     </div>
   );

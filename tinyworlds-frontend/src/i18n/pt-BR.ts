@@ -177,9 +177,8 @@ export const ptBR: Strings = {
     },
     donations: { none: "Ainda sem doações", one: "{n} doação", other: "{n} doações" },
     status: { funded: "Meta batida, na fila", building: "Em construção", built: "No ar" },
-    showAll: "Ver todas as cidades",
-    showFewer: "Ver menos",
     build: {
+      matches: { one: "{n} cidade encontrada", other: "{n} cidades encontradas" },
       steps: {
         pick: {
           title: "Escolha uma cidade",
