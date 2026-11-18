@@ -1,12 +1,22 @@
 import { R } from "../render/palette.js";
 import { G, Pattern, Roof } from "../scene/kinds.js";
 import { blob, chaikin, disc, plant, rect } from "../scene/medieval.js";
-import { peak, range } from "../scene/worldkit.js";
+import { nearestOnPath, peak, range } from "../scene/worldkit.js";
 import { bridge, greenbelt, metroCity } from "./metro.js";
 
 const VALLEY = blob(-221, 581, 560, 0.14, 103);
 const LAKE = blob(349, 342, 239, 0.21, 212);
 const TIMBER = blob(1004, -79, 315, 0.33, 55);
+const STATE_HIGHWAY = chaikin(
+  [683, 825, 386, 969, -116, 866, -455, 610, -845, 382, -1001, 218, -1080, -142, -1103, -499],
+  2,
+);
+const FARMS = [
+  rect(-407, 514, 68, 96, -0.19),
+  rect(-314, 382, 66, 39, -0.19),
+  rect(-513, 325, 61, 49, -0.19),
+  rect(-180, 417, 56, 66, -0.19),
+];
 
 export const tinysanandreas = metroCity(
   {
@@ -15,6 +25,20 @@ export const tinysanandreas = metroCity(
     inspiration: "Grand Theft Auto: San Andreas",
     accent: "#f4bd77",
     flora: "temperate",
+    colors: {
+      water: "#477e98",
+      waterShallow: "#679da4",
+      park: "#94a56a",
+      lawn: "#afba78",
+      forest: "#638351",
+      scrub: "#a2a66b",
+      steppe: "#c7a76e",
+      steppeDark: "#9e8055",
+      terraRoxa: "#ab6d4d",
+      redStone: "#ba7958",
+      roofTerracotta: "#b98159",
+      roofClay: "#cd9261",
+    },
     start: { p: -20, q: 35, scale: 0.23 },
     card: { p: -40, q: 125, shrink: 7 },
   },
@@ -66,6 +90,24 @@ export const tinysanandreas = metroCity(
         angle: 0.25,
         greens: 0.25,
       },
+      {
+        name: "Glass Arroyo",
+        center: [701, 411],
+        blocks: [3, 3],
+        block: [61, 68],
+        style: "resort",
+        angle: 0.2,
+        greens: 0.18,
+        heightScale: 0.62,
+      },
+      {
+        name: "Sundown Freight Yards",
+        center: [-1069, 277],
+        blocks: [3, 4],
+        block: [68, 64],
+        style: "warehouse",
+        angle: 0.12,
+      },
       { name: "Dry Creek", center: [-133, 858], blocks: [3, 3], block: [75, 62], style: "bungalow" },
     ],
     roads: [
@@ -82,22 +124,19 @@ export const tinysanandreas = metroCity(
       {
         kind: G.Highway,
         width: 20,
-        path: chaikin(
-          [683, 825, 386, 969, -116, 866, -455, 610, -845, 382, -1001, 218, -1080, -142, -1103, -499],
-          2,
-        ),
+        path: STATE_HIGHWAY,
       },
       { kind: G.Road, width: 8, path: [-395, 463, -276, 572, -266, 685, -113, 830] },
       { kind: G.Road, width: 9, path: [511, -828, 574, -913, 672, -1043] },
     ],
     decorate(b) {
-      b.ground(G.Steppe, VALLEY);
+      b.ground(G.Steppe, [VALLEY, ...FARMS]);
       b.ground(G.Lake, LAKE);
       b.ground(G.Forest, TIMBER);
       plant(b, TIMBER, 400, 12, (p) => p > 955);
-      b.ground(G.Crop, rect(-412, 514, 74, 132, -0.19));
-      b.ground(G.Crop, rect(-314, 382, 93, 49, -0.19));
-      b.ground(G.Crop, rect(-516, 294, 101, 67, -0.19));
+      for (const field of FARMS) b.ground(G.Crop, field);
+      b.ground(G.Crop, rect(-425, -246, 48, 75, -0.19));
+      b.ground(G.Crop, rect(-229, -154, 46, 86, -0.19));
       greenbelt(b, blob(190, -303, 229, 0.27, 9), 38);
       greenbelt(b, blob(-414, -64, 175, 0.29, 19), 11);
       range(b, [771, -367, 907, -183, 1014, -15, 1176, 122], {
@@ -116,6 +155,7 @@ export const tinysanandreas = metroCity(
         rock: R.redStone,
         floor: G.RedRock,
         seed: 44,
+        ok: (p, q, radius) => nearestOnPath(STATE_HIGHWAY, p, q).dist >= radius + 14,
       });
       bridge(b, [574, -913, 672, -1043], 9);
     },

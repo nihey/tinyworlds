@@ -217,6 +217,8 @@ export interface City {
     street?: { spacing: number; chance: number };
   };
   flora: "temperate" | "tropical" | "subtropical" | "boreal" | "montane";
+  /** Local material colors shared by rendered tiles and Street Walk. */
+  colors?: RampColors;
   /** Local reading of the data's land classes: Overture subtype/class → ground kind (see scene/kinds.ts). */
   ground: {
     landCover?: Record<string, number>;
@@ -274,3 +276,4 @@ export interface City {
     skip?: RegExp;
   };
 }
+import type { RampColors } from "../render/palette.js";

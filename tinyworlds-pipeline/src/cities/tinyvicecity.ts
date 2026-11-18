@@ -1,7 +1,7 @@
 import { R } from "../render/palette.js";
 import { G, Pattern } from "../scene/kinds.js";
 import { blob, disc, plant, rect } from "../scene/medieval.js";
-import { bridge, metroCity } from "./metro.js";
+import { bridge, metroCity, palm } from "./metro.js";
 
 const BEACH = [
   740, 674, 721, 814, 472, 913, 57, 925, -322, 861, -547, 707, -632, 492, -592, 409, -495, 626, -268, 759, 67,
@@ -16,6 +16,20 @@ export const tinyvicecity = metroCity(
     inspiration: "Grand Theft Auto: Vice City",
     accent: "#f59bc8",
     flora: "subtropical",
+    colors: {
+      water: "#237e9d",
+      waterShallow: "#57bbbd",
+      foam: "#ddf5ec",
+      sand: "#f2e1b7",
+      pool: "#61cdd9",
+      rose: "#eea9bd",
+      libertyGreen: "#8ad3bf",
+      roofCopper: "#64b9b6",
+      roofWhite: "#f2ece0",
+      ipePink: "#ed80b5",
+      asphalt: "#7e7785",
+      glassTeal: "#559a9e",
+    },
     start: { p: 0, q: 275, scale: 0.32 },
     card: { p: 40, q: 408, shrink: 4 },
   },
@@ -94,7 +108,8 @@ export const tinyvicecity = metroCity(
         b.line(G.Pier, 7, [-483 + offset, 218 + offset * 0.2, -458 + offset, 131 + offset * 0.12], true);
       }
       b.route("Hibiscus Water Taxi", [-509, 199, -490, 126, -270, 167, -118, 166, -45, 177]);
-      for (let p = -265; p < 512; p += 31) b.tree(p, p < 0 ? 786 + p * 0.08 : 813 - p * 0.11);
+      for (let p = -265; p < 512; p += 31)
+        palm(b, p, p < 0 ? 786 + p * 0.08 : 813 - p * 0.11, 7 + (Math.abs(p) % 5));
     },
     sites: [
       { name: "Hibiscus Causeway", at: [77, 367], district: "Hibiscus Isles", type: "bridge" },

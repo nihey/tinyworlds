@@ -31,6 +31,7 @@ export interface GeneratedCity {
   /** Metres from the generator's limits at which the map starts to dissolve, and where it is gone. */
   fog: { start: number; end: number };
   flora: City["flora"];
+  colors?: City["colors"];
   attribution: string[];
   /**
    * Bearing of the grid's `p` axis (default 0: `p` is north). 45 puts compass north straight up.
@@ -65,6 +66,7 @@ export function generatedCity(spec: GeneratedCity): City {
     walk: spec.walk,
     fog: spec.fog,
     flora: spec.flora,
+    colors: spec.colors,
     flights: [],
     // never consulted for a generated city
     limits: { kind: "built-up" },

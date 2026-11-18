@@ -1,13 +1,14 @@
 import { R } from "../render/palette.js";
 import { hashString, mix, pick, rand } from "../scene/hash.js";
-import { F_FLOATING, G, Pattern, Roof } from "../scene/kinds.js";
+import { F_FLOATING, F_NO_OUTLINE, G, Pattern, Roof } from "../scene/kinds.js";
 import { disc, insideRing, Occupancy, plant, pointAlong, pathLength, rect } from "../scene/medieval.js";
 import type { Look, SyntheticBuilder, SyntheticPlace } from "../scene/synthetic.js";
 import { roughen } from "../scene/worldkit.js";
 import { generatedCity, type GeneratedCity } from "./generated.js";
 
 type Point = [p: number, q: number];
-type BuildingStyle = "brick" | "highrise" | "warehouse" | "deco" | "bungalow" | "resort";
+type BuildingStyle =
+  "brick" | "rowhouse" | "masonry" | "highrise" | "warehouse" | "deco" | "bungalow" | "resort";
 
 interface Buildings {
   walls: number[];
@@ -26,6 +27,20 @@ const BUILDINGS: Record<BuildingStyle, Buildings> = {
     pattern: Pattern.Punched,
     lots: [2, 3],
   },
+  rowhouse: {
+    walls: [R.brownstone, R.brickRed, R.brickDark, R.yellowBrick, R.limestone],
+    roofs: [R.roofTar, R.roofGravel, R.roofBrown],
+    height: [8, 17],
+    pattern: Pattern.Punched,
+    lots: [2, 5],
+  },
+  masonry: {
+    walls: [R.limestone, R.darkStone, R.greyStone, R.cream, R.glassDark, R.steel],
+    roofs: [R.roofTar, R.roofGravel, R.roofCopper, R.roofSlate],
+    height: [28, 134],
+    pattern: Pattern.Tall,
+    lots: [2, 2],
+  },
   highrise: {
     walls: [R.steel, R.glassDark, R.glassBlue, R.glassTeal, R.limestone, R.glassSilver],
     roofs: [R.roofSilver, R.roofTar, R.roofWhite],
@@ -41,10 +56,10 @@ const BUILDINGS: Record<BuildingStyle, Buildings> = {
     lots: [1, 2],
   },
   deco: {
-    walls: [R.rose, R.whiteBrick, R.libertyGreen, R.sidingBlue, R.salmon, R.ipePink],
-    roofs: [R.roofWhite, R.roofCopper, R.ipePink],
+    walls: [R.whiteBrick, R.rose, R.libertyGreen, R.sidingBlue, R.salmon, R.sidingYellow],
+    roofs: [R.roofWhite, R.roofWhite, R.roofCopper, R.roofTerracotta],
     glass: R.glassTeal,
-    height: [9, 26],
+    height: [7, 19],
     pattern: Pattern.Ribbon,
     lots: [2, 2],
   },
@@ -72,6 +87,7 @@ interface District {
   style: BuildingStyle;
   angle?: number;
   greens?: number;
+  heightScale?: number;
 }
 
 interface Way {
@@ -147,6 +163,7 @@ function drawLots(b: SyntheticBuilder, district: District, occ: Occupancy, land:
     angle,
     style,
     greens = 0.1,
+    heightScale = 1,
   } = district;
   const { halfU, halfV, at } = districtGrid(district);
   const palette = BUILDINGS[style];
@@ -187,39 +204,51 @@ function drawLots(b: SyntheticBuilder, district: District, occ: Occupancy, land:
         for (let c = 0; c < lotsV; c++) {
           const lot = mix(seed, 10 + a * lotsV + c);
           const [p, q] = at(u + (a + 0.5) * lotU, v + (c + 0.5) * lotV);
-          const footprint = rect(
-            p,
-            q,
-            lotU * (0.31 + rand(lot, 2) * 0.16),
-            lotV * (0.31 + rand(lot, 3) * 0.16),
-            angle,
-          );
+          const hu = lotU * (0.31 + rand(lot, 2) * 0.16);
+          const hv = lotV * (style === "rowhouse" ? 0.49 : 0.31 + rand(lot, 3) * 0.16);
+          const footprint = rect(p, q, hu, hv, angle);
           if (!fits(footprint)) continue;
           if (rand(lot, 4) < 0.07) {
             if (style !== "warehouse") b.tree(p, q);
             continue;
           }
           const [low, high] = palette.height;
-          const height = low + (high - low) * rand(lot, 5) ** 1.7;
+          const height = heightScale * (low + (high - low) * rand(lot, 5) ** 1.7);
           const look: Look = {
             wall: pick(palette.walls, lot, 6),
             roof: pick(palette.roofs, lot, 7),
             glass: palette.glass,
             pattern: palette.pattern,
           };
-          if (style === "bungalow") {
+          if (style === "bungalow" || (style === "warehouse" && rand(lot, 10) < 0.65)) {
             look.roofShape = Roof.Pitched;
-            look.roofH = 2;
+            look.roofH = style === "bungalow" ? 2.5 : 3.5;
           }
           b.volume(footprint, height, 0, look);
           occ.blockRing(footprint);
-          if (height > 40 && rand(lot, 8) < 0.7)
+          if (style === "deco") {
+            // A thin fascia and a recessed penthouse give the beachfront hotels their stepped profile.
+            const trim = pick([R.ipePink, R.roofCopper, R.whiteBrick, R.sidingBlue], lot, 11);
+            b.volume(footprint, height + 0.8, height, { wall: trim, roof: look.roof });
+            b.volume(rect(p, q, hu * 0.56, hv * 0.69, angle), height + 3.2, height + 0.8, look);
+          } else if (style === "masonry" && height >= 55) {
+            const setback = height * 0.21;
+            b.volume(rect(p, q, hu * 0.73, hv * 0.73, angle), height + setback, height, look);
+            b.volume(rect(p, q, hu * 0.38, hv * 0.39, angle), height + setback * 1.55, height + setback, {
+              ...look,
+              roofShape: Roof.Pyramid,
+              roofH: setback * 0.29,
+            });
+          } else if (height > 40 && rand(lot, 8) < 0.7) {
             b.volume(
               rect(p, q, lotU * 0.24, lotV * 0.23, angle),
               height + 5 + rand(lot, 9) * 15,
               height,
               look,
             );
+          } else if (style === "rowhouse" && rand(lot, 12) < 0.23) {
+            b.prism(p, q, 1.5, 8, height + 2.5, height, { wall: R.timber, roof: R.roofSlate });
+          }
         }
       }
     }
@@ -286,6 +315,32 @@ export function metroCity(
 export function greenbelt(b: SyntheticBuilder, ring: number[], seed: number, kind = G.Forest): void {
   b.ground(kind, ring);
   plant(b, ring, kind === G.Forest ? 280 : 1100, seed);
+}
+
+/** A slender trunk with a crown of tapered fronds, in both the tiles and Street Walk. */
+export function palm(b: SyntheticBuilder, p: number, q: number, height: number): void {
+  b.prism(p, q, 0.38, 6, height, 0, { wall: R.trunk, roof: R.leafDark });
+  for (let i = 0; i < 7; i++) {
+    const angle = (i * Math.PI * 2) / 7 + height / 2;
+    const dp = Math.cos(angle);
+    const dq = Math.sin(angle);
+    const canopy = i % 2 ? R.leaf : R.leafDark;
+    b.volume(
+      [
+        p,
+        q,
+        p + dp * 1.8 - dq * 0.82,
+        q + dq * 1.8 + dp * 0.82,
+        p + dp * (3.7 + (i % 3) * 0.6),
+        q + dq * (3.7 + (i % 3) * 0.6),
+        p + dp * 1.8 + dq * 0.82,
+        q + dq * 1.8 - dp * 0.82,
+      ],
+      height + 0.3 + (i % 2) * 0.6,
+      height - 0.55,
+      { wall: canopy, roof: canopy, flags: F_FLOATING | F_NO_OUTLINE },
+    );
+  }
 }
 
 export function bridge(b: SyntheticBuilder, path: [number, number, number, number], width: number): void {

@@ -1,8 +1,8 @@
 import { R } from "../render/palette.js";
 import { G, Pattern, Roof } from "../scene/kinds.js";
 import { blob, chaikin, disc, plant, rect } from "../scene/medieval.js";
-import { peak, range } from "../scene/worldkit.js";
-import { greenbelt, metroCity } from "./metro.js";
+import { nearestOnPath, peak, range } from "../scene/worldkit.js";
+import { greenbelt, metroCity, palm } from "./metro.js";
 
 const BEACH = [
   -1120, -783, -868, -1046, -480, -1168, -199, -980, -59, -752, 94, -662, -47, -609, -210, -828, -482, -1059,
@@ -10,6 +10,13 @@ const BEACH = [
 ];
 const CHAPARRAL = blob(577, 128, 580, 0.18, 122);
 const SALT_FLATS = blob(520, 704, 396, 0.19, 77);
+const COUNTY_HIGHWAY = chaikin(
+  [
+    -912, -732, -952, -313, -836, 108, -704, 478, -585, 761, -222, 904, 218, 912, 618, 831, 985, 734, 1060,
+    376, 1028, -48, 931, -424, 905, -796,
+  ],
+  2,
+);
 
 export const tinygtav = metroCity(
   {
@@ -18,6 +25,23 @@ export const tinygtav = metroCity(
     inspiration: "Grand Theft Auto V",
     accent: "#9cdc91",
     flora: "subtropical",
+    colors: {
+      water: "#347d9d",
+      waterShallow: "#66aeb9",
+      sand: "#e7cfa4",
+      park: "#9eab73",
+      lawn: "#afb97b",
+      forest: "#686f48",
+      scrub: "#a8a170",
+      rock: "#ad9d83",
+      greyStone: "#b0a499",
+      darkStone: "#928273",
+      steppe: "#c6ae78",
+      terraRoxa: "#ab805d",
+      roofClay: "#c98861",
+      glassBlue: "#739eb7",
+      roofWhite: "#e9dfd0",
+    },
     start: { p: -85, q: 15, scale: 0.24 },
     card: { p: -30, q: -70, shrink: 7 },
   },
@@ -46,6 +70,15 @@ export const tinygtav = metroCity(
         block: [90, 79],
         style: "highrise",
         angle: -0.14,
+      },
+      {
+        name: "Camellia Park",
+        center: [-749, -399],
+        blocks: [6, 5],
+        block: [69, 61],
+        style: "bungalow",
+        angle: -0.12,
+        greens: 0.04,
       },
       {
         name: "Palisade Estates",
@@ -84,13 +117,7 @@ export const tinygtav = metroCity(
       {
         kind: G.Highway,
         width: 20,
-        path: chaikin(
-          [
-            -912, -732, -952, -313, -836, 108, -704, 478, -585, 761, -222, 904, 218, 912, 618, 831, 985, 734,
-            1060, 376, 1028, -48, 931, -424, 905, -796,
-          ],
-          2,
-        ),
+        path: COUNTY_HIGHWAY,
       },
       {
         kind: G.RoadMajor,
@@ -117,14 +144,32 @@ export const tinygtav = metroCity(
       b.ground(G.Steppe, SALT_FLATS);
       b.ground(G.Lake, blob(287, 420, 169, 0.19, 64));
       b.ground(G.Rock, blob(786, -419, 280, 0.14, 56));
+      b.ground(G.Steppe, blob(350, -222, 239, 0.23, 3));
+      b.ground(G.Scrub, blob(759, 392, 220, 0.28, 90));
+      const offHighway = (p: number, q: number, radius: number) =>
+        nearestOnPath(COUNTY_HIGHWAY, p, q).dist >= radius + 14;
       range(b, [910, -495, 762, -410, 575, -365, 488, -215], {
         width: 280,
         height: 178,
         spacing: 97,
         rock: R.rock,
         seed: 25,
+        ok: offHighway,
       });
       peak(b, 762, -410, 125, 203, R.darkStone, 25, R.greyStone);
+      // Lower, rounded ridges connect the chaparral floor to the exposed mountain rock.
+      for (const [p, q, radius, height, seed] of [
+        [453, -338, 112, 39, 5],
+        [555, -276, 119, 54, 8],
+        [660, -224, 116, 38, 24],
+        [800, -246, 101, 46, 39],
+      ])
+        b.volume(blob(p, q, radius, 0.24, seed), height, 0, {
+          wall: R.rock,
+          roof: R.scrub,
+          roofShape: Roof.Dome,
+          roofH: height - 2,
+        });
       range(b, [558, -50, 684, 113, 859, 179, 979, 126], {
         width: 190,
         height: 107,
@@ -132,12 +177,13 @@ export const tinygtav = metroCity(
         rock: R.ochre,
         floor: G.Earth,
         seed: 71,
+        ok: offHighway,
       });
       greenbelt(b, blob(-119, 255, 181, 0.23, 18), 180, G.Scrub);
       greenbelt(b, blob(755, -923, 103, 0.22, 5), 15, G.Scrub);
       plant(b, blob(610, -618, 139, 0.23, 11), 550, 15);
       plant(b, blob(-318, -574, 105, 0.2, 102), 390, 9);
-      for (const p of [-621, -580, -539, -498, -457]) b.tree(p, -908);
+      for (const p of [-621, -580, -539, -498, -457]) palm(b, p, -908, 8 + (Math.abs(p) % 4));
     },
     sites: [
       {
@@ -186,6 +232,24 @@ export const tinygtav = metroCity(
         },
       },
       { name: "Rattlesnake Lake", at: [287, 420], district: "Orchard Junction", type: "park" },
+      {
+        name: "Mesa Airfield",
+        at: [-95, 1058],
+        district: "Orchard Junction",
+        type: "place",
+        draw(b, [p, q]) {
+          b.ground(G.Apron, rect(p, q, 164, 52, 0.05));
+          b.line(G.Runway, 25, [p - 162, q + 4, p + 163, q + 20]);
+          b.line(G.Taxiway, 7, [p - 130, q - 27, p + 100, q - 15, p + 152, q + 18]);
+          for (const offset of [-38, 19, 70])
+            b.volume(rect(p + offset, q - 36, 14, 11, 0.05), 9, 0, {
+              wall: R.steel,
+              roof: R.roofSilver,
+              roofShape: Roof.Pitched,
+              roofH: 2,
+            });
+        },
+      },
       { name: "Coyote Ridge", at: [762, -410], district: "Coyote Range", type: "landmark" },
       {
         name: "Beacon Cove Light",

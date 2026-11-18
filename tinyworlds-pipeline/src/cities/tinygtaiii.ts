@@ -10,6 +10,21 @@ export const tinygtaiii = metroCity(
     inspiration: "Grand Theft Auto III",
     accent: "#abd681",
     flora: "temperate",
+    colors: {
+      water: "#405768",
+      waterShallow: "#596e70",
+      foam: "#b1bdba",
+      pavement: "#b2aba1",
+      asphalt: "#6d7176",
+      asphaltDark: "#55595e",
+      park: "#768360",
+      lawn: "#899570",
+      forest: "#58674f",
+      brickRed: "#9e6152",
+      roofTar: "#4d5157",
+      steel: "#838a90",
+      glassBlue: "#7894a0",
+    },
     start: { p: -35, q: 20, scale: 0.32 },
     card: { p: -130, q: 25, shrink: 6 },
   },
@@ -37,7 +52,7 @@ export const tinygtaiii = metroCity(
         center: [-310, -576],
         blocks: [3, 5],
         block: [58, 70],
-        style: "brick",
+        style: "rowhouse",
         angle: -0.12,
       },
       {
@@ -45,8 +60,9 @@ export const tinygtaiii = metroCity(
         center: [286, 235],
         blocks: [7, 6],
         block: [94, 80],
-        style: "highrise",
+        style: "masonry",
         angle: 0.13,
+        heightScale: 0.72,
       },
       {
         name: "Harrow Point",
@@ -131,6 +147,13 @@ export const tinygtaiii = metroCity(
             b.prism(p + offset, q - 20, 6, 10, 85, 16, { wall: R.brickRed, roof: R.roofTar });
             b.prism(p + offset, q - 20, 7, 10, 85, 80, { wall: R.cream, roof: R.roofTar });
           }
+          for (const offset of [-24, 3, 29])
+            b.prism(p + offset, q + 36, 8, 12, 12, 0, {
+              wall: R.steel,
+              roof: R.roofSilver,
+              roofShape: Roof.Dome,
+              roofH: 2,
+            });
         },
       },
       {

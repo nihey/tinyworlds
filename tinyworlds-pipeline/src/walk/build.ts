@@ -581,7 +581,7 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
   for (const [i, j] of squaresOnDisk(cells))
     if (writes(i, j) && !written.has(cellKey(i, j))) fs.rmSync(path.join(cells, `${cellKey(i, j)}.bin`));
 
-  const { rgb } = buildPalette();
+  const { rgb } = buildPalette(CITY.colors);
   const index = {
     v: 1,
     cell: CELL,

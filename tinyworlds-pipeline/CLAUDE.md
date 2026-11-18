@@ -242,6 +242,8 @@ wealth map) and `standingTree`.
   `G.Meadow`) or everything painted after it disappears under it.
 - These are fan work on invented layouts: only names are borrowed, no map is followed, and
   `attribution` says so. Keep it that way.
+- The shared metro generator gives the GTA-inspired cities different building forms and colors.
+  A city's `colors` overrides a material's base color for both its rendered tiles and Street Walk.
 
 ## Generated worlds (`scene/worldkit.ts`, `cities/tinywesteros*.ts`)
 
