@@ -6,6 +6,7 @@
 import { CELL, cellKey } from "./grid.js";
 
 export type Box = { e0: number; n0: number; e1: number; n1: number };
+export type CellWindow = { i0: number; i1: number; j0: number; j1: number };
 
 type Place = "inside" | "outside" | "across";
 
@@ -87,7 +88,8 @@ const boxOf = (i0: number, i1: number, j0: number, j1: number): Box => ({
  * A polygon cut along the grid of squares i0..i1 × j0..j1: the box is halved along its longer
  * side, the rings clipped to each half, and so on down to single squares. A ring wholly inside a
  * half goes down untouched, so a large polygon (the harbour) costs its vertices once per level,
- * not once per square.
+ * not once per square. An optional window skips disjoint branches without changing the cuts
+ * used to reach any of the retained squares.
  */
 export function splitByCells(
   rings: number[][],
@@ -95,25 +97,29 @@ export function splitByCells(
   i1: number,
   j0: number,
   j1: number,
+  window?: CellWindow,
 ): Map<string, number[][]> {
   const out = new Map<string, number[][]>();
   const walk = (rs: number[][], a0: number, a1: number, b0: number, b1: number): void => {
-    if (rs.length === 0) return;
+    if (rs.length === 0 || (window && (a1 < window.i0 || a0 > window.i1 || b1 < window.j0 || b0 > window.j1)))
+      return;
+    const clipped = clipPolygon(rs, boxOf(a0, a1, b0, b1));
+    if (clipped.length === 0) return;
     if (a0 === a1 && b0 === b1) {
-      out.set(cellKey(a0, b0), rs);
+      out.set(cellKey(a0, b0), clipped);
       return;
     }
     if (a1 - a0 >= b1 - b0) {
       const mid = (a0 + a1) >> 1;
-      walk(clipPolygon(rs, boxOf(a0, mid, b0, b1)), a0, mid, b0, b1);
-      walk(clipPolygon(rs, boxOf(mid + 1, a1, b0, b1)), mid + 1, a1, b0, b1);
+      walk(clipped, a0, mid, b0, b1);
+      walk(clipped, mid + 1, a1, b0, b1);
     } else {
       const mid = (b0 + b1) >> 1;
-      walk(clipPolygon(rs, boxOf(a0, a1, b0, mid)), a0, a1, b0, mid);
-      walk(clipPolygon(rs, boxOf(a0, a1, mid + 1, b1)), a0, a1, mid + 1, b1);
+      walk(clipped, a0, a1, b0, mid);
+      walk(clipped, a0, a1, mid + 1, b1);
     }
   };
-  walk(clipPolygon(rings, boxOf(i0, i1, j0, j1)), i0, i1, j0, j1);
+  walk(rings, i0, i1, j0, j1);
   return out;
 }
 

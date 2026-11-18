@@ -6,7 +6,7 @@
  */
 import { G, L_BRIDGE, PAINT_RANK } from "../scene/kinds.js";
 import type { Arr } from "../scene/store.js";
-import { clipPolyline, splitByCells } from "./clip.js";
+import { clipPolyline, splitByCells, type CellWindow } from "./clip.js";
 import { packed, type CellArrays, type IntType } from "./format.js";
 import { CELL, cellKey, type Geo } from "./grid.js";
 import { maskOf, type MaskPolygon } from "./mask.js";
@@ -52,6 +52,8 @@ export function cutScene(
   geo: Geo,
   keep: (i: number, j: number) => boolean = () => true,
   syntheticPiers?: number[][],
+  splitMainCables = false,
+  onMap?: readonly [number, number][],
 ): Map<string, SceneSquare> {
   const A = scene.arrays;
   const { k, kz } = geo;
@@ -141,51 +143,10 @@ export function cutScene(
     o.seed.push(A["vol.seed"][v]);
   }
 
-  // ---- ground: each polygon cut along the squares it crosses
-  const gRing = A["ground.ringStart"];
-  const gVert = A["ground.vertStart"];
-  const gXY = A["ground.xy"];
-  const polygons = gRing.length - 1;
   const cellsOf = (lo: number, hi: number): [number, number] => {
     const a = Math.floor(lo / CELL);
     return [a, Math.max(a, Math.ceil(hi / CELL) - 1)];
   };
-  const fileGround = ({ kind, order, rings }: MaskPolygon): void => {
-    let e0 = Infinity;
-    let e1 = -Infinity;
-    let n0 = Infinity;
-    let n1 = -Infinity;
-    for (const ring of rings) {
-      for (let p = 0; p < ring.length; p += 2) {
-        e0 = Math.min(e0, ring[p]);
-        e1 = Math.max(e1, ring[p]);
-        n0 = Math.min(n0, ring[p + 1]);
-        n1 = Math.max(n1, ring[p + 1]);
-      }
-    }
-    if (e0 > e1) return;
-    const [i0, i1] = cellsOf(e0, e1);
-    const [j0, j1] = cellsOf(n0, n1);
-    if (i0 === i1 && j0 === j1) {
-      square(i0, j0)?.polys.push({ kind, order, rings });
-      return;
-    }
-    for (const [key, pieces] of splitByCells(rings, i0, i1, j0, j1)) {
-      const [i, j] = key.split("_").map(Number);
-      square(i, j)?.polys.push({ kind, order, rings: pieces });
-    }
-  };
-  for (let g = 0; g < polygons; g++) {
-    const rings: number[][] = [];
-    for (let r = gRing[g]; r < gRing[g + 1]; r++) {
-      const ring: number[] = [];
-      for (let p = gVert[r]; p < gVert[r + 1]; p++)
-        ring.push(east(gXY[p * 2], gXY[p * 2 + 1]), north(gXY[p * 2], gXY[p * 2 + 1]));
-      rings.push(ring);
-    }
-    fileGround({ kind: A["ground.kind"][g], order: g, rings });
-  }
-  syntheticPiers?.forEach((ring, i) => fileGround({ kind: G.Pier, order: polygons + i, rings: [ring] }));
 
   // ---- lines: bridges are left to the elevated ways; the rest is clipped to each square
   // they touch, grown by WAY_MARGIN
@@ -245,25 +206,106 @@ export function cutScene(
   // ---- cables: filed under their middle vertex, in world dm
   const cStart = A["cab.start"];
   const cXYZ = A["cab.xyz"];
-  const cables = A["cab.kind"].length;
-  for (let c = 0; c < cables; c++) {
-    const a = cStart[c];
-    const count = cStart[c + 1] - a;
-    const mid = a + (count >> 1);
-    const i = Math.floor(east(cXYZ[mid * 3], cXYZ[mid * 3 + 1]) / CELL);
-    const j = Math.floor(north(cXYZ[mid * 3], cXYZ[mid * 3 + 1]) / CELL);
+  const cKind = A["cab.kind"];
+  const fileCable = (a: number, b: number, kind: number, i: number, j: number): void => {
     const s = square(i, j);
-    if (!s) continue;
-    s.cab.verts.push(count);
-    s.cab.kind.push(A["cab.kind"][c]);
-    for (let p = a; p < a + count; p++) {
+    if (!s) return;
+    s.cab.verts.push(b - a);
+    s.cab.kind.push(kind);
+    for (let p = a; p < b; p++) {
       s.cab.xyz.push(
         dm(east(cXYZ[p * 3], cXYZ[p * 3 + 1])),
         dm(north(cXYZ[p * 3], cXYZ[p * 3 + 1])),
         dm(cXYZ[p * 3 + 2] / kz),
       );
     }
+  };
+  const cableCell = (a: number, b: number): [number, number] => {
+    const x = (cXYZ[a * 3] + cXYZ[b * 3]) / 2;
+    const y = (cXYZ[a * 3 + 1] + cXYZ[b * 3 + 1]) / 2;
+    return [Math.floor(east(x, y) / CELL), Math.floor(north(x, y) / CELL)];
+  };
+  for (let c = 0; c < cKind.length; c++) {
+    const a = cStart[c];
+    const b = cStart[c + 1];
+    const kind = cKind[c];
+    if (!splitMainCables || (kind !== 0 && kind !== 4)) {
+      const mid = a + ((b - a) >> 1);
+      fileCable(a, b, kind, ...cableCell(mid, mid));
+      continue;
+    }
+    // A long main cable spans more cells than the viewer loads at once. Its short
+    // segments stay with nearby cells, sharing the endpoint where one run joins the next.
+    let first = a;
+    let [i, j] = cableCell(a, a + 1);
+    for (let p = a + 1; p + 1 < b; p++) {
+      const [nextI, nextJ] = cableCell(p, p + 1);
+      if (nextI === i && nextJ === j) continue;
+      fileCable(first, p + 1, kind, i, j);
+      first = p;
+      [i, j] = [nextI, nextJ];
+    }
+    fileCable(first, b, kind, i, j);
   }
+
+  // ---- ground: only squares kept by the fog or holding scene features need ground. Determine
+  // their window before cutting large water and land polygons that extend beyond the city.
+  const groundKeys = onMap ? new Set(onMap.map(([i, j]) => cellKey(i, j))) : null;
+  const window: CellWindow | undefined = onMap
+    ? { i0: Infinity, i1: -Infinity, j0: Infinity, j1: -Infinity }
+    : undefined;
+  if (window) {
+    for (const [i, j] of [...onMap!, ...Array.from(squares.values(), ({ i, j }) => [i, j])]) {
+      window.i0 = Math.min(window.i0, i);
+      window.i1 = Math.max(window.i1, i);
+      window.j0 = Math.min(window.j0, j);
+      window.j1 = Math.max(window.j1, j);
+    }
+  }
+
+  const gRing = A["ground.ringStart"];
+  const gVert = A["ground.vertStart"];
+  const gXY = A["ground.xy"];
+  const polygons = gRing.length - 1;
+  const fileGround = ({ kind, order, rings }: MaskPolygon): void => {
+    let e0 = Infinity;
+    let e1 = -Infinity;
+    let n0 = Infinity;
+    let n1 = -Infinity;
+    for (const ring of rings) {
+      for (let p = 0; p < ring.length; p += 2) {
+        e0 = Math.min(e0, ring[p]);
+        e1 = Math.max(e1, ring[p]);
+        n0 = Math.min(n0, ring[p + 1]);
+        n1 = Math.max(n1, ring[p + 1]);
+      }
+    }
+    if (e0 > e1) return;
+    const [i0, i1] = cellsOf(e0, e1);
+    const [j0, j1] = cellsOf(n0, n1);
+    if (i0 === i1 && j0 === j1) {
+      const key = cellKey(i0, j0);
+      if (!groundKeys || groundKeys.has(key) || squares.has(key))
+        square(i0, j0)?.polys.push({ kind, order, rings });
+      return;
+    }
+    for (const [key, pieces] of splitByCells(rings, i0, i1, j0, j1, window)) {
+      if (groundKeys && !groundKeys.has(key) && !squares.has(key)) continue;
+      const [i, j] = key.split("_").map(Number);
+      square(i, j)?.polys.push({ kind, order, rings: pieces });
+    }
+  };
+  for (let g = 0; g < polygons; g++) {
+    const rings: number[][] = [];
+    for (let r = gRing[g]; r < gRing[g + 1]; r++) {
+      const ring: number[] = [];
+      for (let p = gVert[r]; p < gVert[r + 1]; p++)
+        ring.push(east(gXY[p * 2], gXY[p * 2 + 1]), north(gXY[p * 2], gXY[p * 2 + 1]));
+      rings.push(ring);
+    }
+    fileGround({ kind: A["ground.kind"][g], order: g, rings });
+  }
+  syntheticPiers?.forEach((ring, i) => fileGround({ kind: G.Pier, order: polygons + i, rings: [ring] }));
 
   // ---- finish: localize ground and ways, paint each square's mask
   const out = new Map<string, SceneSquare>();

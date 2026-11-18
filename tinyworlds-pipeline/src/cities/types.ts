@@ -161,7 +161,37 @@ export interface City {
    * height the cables leave them at and how far beyond each they are anchored (default 0.42 of
    * the span), metres. Strung like the data's spans.
    */
-  suspensions?: { a: [number, number]; b: [number, number]; top: number; side?: number }[];
+  suspensions?: {
+    a: [number, number];
+    b: [number, number];
+    top: number;
+    side?: number;
+    /** Overrides the symmetric side span with two measured anchor distances (metres). */
+    sides?: [number, number];
+    /** Metres from the centerline to each cable. */
+    halfWidth?: number;
+    /** The supports at these two towers are accounted for by this explicit span. */
+    mappedTowers?: boolean;
+    /** The styled deck crossing below this span, when it has a surveyed height. */
+    bridge?: string;
+    /** International Orange steel cables (Golden Gate Bridge). */
+    painted?: boolean;
+  }[];
+  /** Named crossings whose Overture ways or tower parts need to be grouped for rendering. */
+  bridgeStyles?: Record<
+    string,
+    {
+      roads: string[];
+      /** Where the data uses the highway's name on both sides of an island, group its west span. */
+      westOf?: number;
+      /** The positive level preserves bridge sections split by gaps in the is_bridge flag. */
+      elevated?: boolean;
+      /** The wall ramp for the deck and the mapped steel tower parts, above their concrete footing. */
+      wall?: number;
+      /** Metres above the water at the towers. The road returns to the usual shoreline profile at the anchors. */
+      towerDeck?: number;
+    }
+  >;
   /**
    * Its bridges cross a river that runs inside the land polygons (the Ohio): count the water
    * polygons as water when decks rise from the shore, not only the sea.
@@ -208,6 +238,8 @@ export interface City {
    * viewer's walk mode loads, from the scene and Overture's segments (`segment.parquet`).
    */
   walk?: boolean;
+  /** Public pedestrian ways classed as cycleways by Overture, by their mapped names. */
+  walkCycleways?: string[];
   /** What stands on a flat roof besides the stair bulkhead. */
   roofs: { waterTanks: boolean };
   trees: {

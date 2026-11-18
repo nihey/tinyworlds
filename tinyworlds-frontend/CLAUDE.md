@@ -5,7 +5,8 @@ The map viewer: a Next.js 16 static export that draws the tiles and indexes writ
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
 (El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), `tinydal`
 (Dallas), `tinycvg` (Cincinnati), `tinypit` (Pittsburgh), `tinyphl` (Philadelphia), `tinycos`
-(Colorado Springs), `tinytkf` (Truckee), `tinyaus` (Austin), and three
+(Colorado Springs), `tinytkf` (Truckee), `tinyaus` (Austin), `tinysfo` (San Francisco),
+`tinymke` (Milwaukee), and three
 places that do not exist, `tinywinterfell`,
 `tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
 lists the worlds. The interface speaks the visitor's language (English, Brazilian
@@ -844,7 +845,7 @@ live engine is also on `window.tinyworld` for the console.
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
-In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee), a building found in the search
+In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee), a building found in the search
 lights up under the mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
 outline cut out), a 2 px line of the accent runs round it, and a sign beside its top says what
 it is (type · context line, name), the opening of its Wikipedia article and "Read on Wikipedia".
@@ -972,7 +973,7 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
 
 ## The street walk (`src/walk/`, `components/walk/`)
 
-In a world with `walk: true` (New York) whose manifest names `walk` (the data has `walk/`), the
+In a world with `walk: true` whose manifest names `walk` (the data has `walk/`), the
 city can be walked at street level, in 3D: on foot, at the wheel and on the water. The root
 `CLAUDE.md` has the data (`walk/walk.json`, `walk/cells/<i>_<j>.bin`) and the design is
 `docs/superpowers/specs/2026-11-16-street-walk-design.md`.
