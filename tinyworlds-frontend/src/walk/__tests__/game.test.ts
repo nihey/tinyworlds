@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { WalkCell, WalkEdge } from "../cell";
 import { defaultBindings } from "../controls";
 import { WalkGame, type GameView, type LifeRoutes, type WalkState } from "../game";
@@ -9,7 +9,7 @@ import { makePalette } from "../render/palette";
 import { PARTICLE_RAMPS } from "../render/particles";
 import { WalkSound } from "../sound";
 import { PAINT_RED, parkedOn, starterCar } from "../traffic";
-import { fireDamage } from "../health";
+import { blastDamage } from "../health";
 import { bodyOf, overlap } from "../collide";
 import { applyDamage, newVehicle, nextVehicleId, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
@@ -529,6 +529,106 @@ describe("going down", () => {
 });
 
 describe("wrecks", () => {
+  it("draws fire as soon as a fuse starts and a larger burst when it expires", () => {
+    const car = sedan(100, 100);
+    const { game, view } = play(area(-1, -1, 1, 1), {
+      start: { e: 112, n: 100 },
+      vehicles: [car],
+    });
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    try {
+      game.sim(0.1);
+      const points = view.scene.children.find((child) => child instanceof THREE.Points)!;
+      expect(points.geometry.drawRange.count).toBe(0);
+      applyDamage(car, 100);
+      game.sim(1 / 30);
+      expect(car.fuse).toBeGreaterThan(7);
+      const ignition = points.geometry.drawRange.count;
+      expect(ignition).toBeGreaterThan(0);
+      game.sim(8);
+      expect(car.fuse).toBeNull();
+      expect(points.geometry.drawRange.count).toBeGreaterThan(ignition);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it("damages closer cars more and gives a chain reaction its own fuse", () => {
+    const car = sedan(100, 100);
+    const critical = sedan(103, 100);
+    const near = sedan(100, 105);
+    const far = sedan(100, 108);
+    const safe = sedan(116, 100);
+    critical.damage = 0.98;
+    const { game } = play(area(-1, -1, 1, 1), {
+      start: { e: 90, n: 90 },
+      vehicles: [car, critical, near, far, safe],
+    });
+    game.sim(0.1);
+    applyDamage(car, 100);
+    game.sim(7.9);
+    expect(critical.damage).toBe(0.98);
+    game.sim(0.2);
+    expect(critical.state).toBe("wrecked");
+    expect(critical.fuse).toBeGreaterThan(7);
+    expect(far.damage).toBeGreaterThan(0);
+    expect(near.damage).toBeGreaterThan(far.damage);
+    expect(safe.damage).toBe(0);
+    game.sim(7.7);
+    expect(critical.fuse).not.toBeNull();
+    game.sim(0.3);
+    expect(critical.fuse).toBeNull();
+    expect(critical.fire).toBeGreaterThan(0);
+  });
+
+  it("hurts the player through a nearby car as well as damaging the car", () => {
+    const source = sedan(100, 100);
+    const driven = sedan(103, 100);
+    const { game, now } = play(area(-1, -1, 1, 1), {
+      start: { e: 104.8, n: 100 },
+      vehicles: [source, driven],
+    });
+    game.sim(0.1);
+    game.press("enter", true);
+    game.press("enter", false);
+    game.sim(0.1);
+    expect(now().mode).toBe("drive");
+    applyDamage(source, 100);
+    game.sim(8.1);
+    expect(now().mode).toBe("drive");
+    expect(now().life).toBeGreaterThan(0);
+    expect(now().life).toBeLessThan(100);
+    expect(driven.damage).toBeGreaterThan(0);
+  });
+
+  it("knocks pedestrians down at the edge of the blast", () => {
+    const walk: WalkEdge = {
+      key: "1-2",
+      a: 1,
+      b: 2,
+      crosswalk: false,
+      phase: 0,
+      elevated: false,
+      pts: Float32Array.of(10, 110, 0, 190, 110, 0),
+      length: 180,
+    };
+    const car = sedan(100, 100);
+    const { game } = play(area(-1, -1, 1, 1, { "0_0": { walks: [walk] } }), {
+      start: { e: 100, n: 100 },
+      vehicles: [car],
+    });
+    game.sim(0.1);
+    applyDamage(car, 100);
+    game.sim(7.9);
+    const person = game["crowd"].people[0];
+    expect(person.state).not.toBe("down");
+    car.e = person.e;
+    car.n = person.n - 9.5;
+    game.sim(0.2);
+    expect(person.state).toBe("down");
+    expect(person.downFor).toBeGreaterThan(3);
+  });
+
   it("damages you once when a nearby wreck explodes", () => {
     // a sedan 3 m east of you, its side 2.1 m from you, about to burn
     const car = sedan(103, 100, 0, "loose");
@@ -539,7 +639,7 @@ describe("wrecks", () => {
     expect(car.state).toBe("wrecked");
     expect(now().life).toBe(100);
     game.sim(0.2);
-    expect(now().life).toBeCloseTo(100 - fireDamage(2.1), 1);
+    expect(now().life).toBeCloseTo(100 - blastDamage(2.1), 1);
     const after = now().life;
     game.sim(3);
     expect(now().life).toBe(after);

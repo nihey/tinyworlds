@@ -1089,10 +1089,12 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   looks. Each gesture keeps its own finger, with no layout reads during a drag. The bottom-right
   controls stay clear of the minimap and the credit. At the wheel, Get out stays below the horn,
   camera, and brake. The HUD fits the safe-area insets and puts messages below the life sign.
-- **Critical vehicle damage** (`walk/vehicles.ts`): a road vehicle loses power and starts an
-  eight-second fuse at full damage. You can bail out while it rolls if a door or end is clear.
-  The explosion still happens after you leave. It hurts nearby players and kills an occupant.
-  A vehicle that starts sinking clears the fuse. Boats sink when critically damaged.
+- **Critical vehicle damage** (`walk/vehicles.ts`): a road vehicle loses power and catches fire
+  for eight seconds at full damage. You can bail out while it rolls if a door or end is clear.
+  The explosion knocks nearby pedestrians down and damages other vehicles and the player, even
+  when driving another vehicle. An occupant of the source vehicle dies. Blast damage falls off
+  from the hull, and secondary wrecks start their own eight-second fuses. Sinking puts out the
+  fire and clears the fuse. Boats sink when critically damaged.
 - **The water** (the rules and their numbers in `walk/water.ts`, the shader in
   `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
   according to" a write-up of layered pixel-art water, whose ideas are re-made here for a

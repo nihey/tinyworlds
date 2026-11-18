@@ -18,9 +18,9 @@ export function hitDamage(closing: number): number {
   return Math.max(0, (closing - 2) * 9);
 }
 
-/** A burning wreck: 80 at its side, 40 at 5 m, nothing beyond. */
-export function fireDamage(distance: number): number {
-  return distance > 5 ? 0 : 80 - 8 * distance;
+/** A vehicle explosion: 80 at the hull, 40 at 5 m, falling to zero at 9 m. */
+export function blastDamage(distance: number): number {
+  return Math.max(0, Math.min(80 - 8 * distance, 90 - 10 * distance));
 }
 
 /** Life after `dt` seconds, `sinceHurt` being the time since the last hurt before this step. */

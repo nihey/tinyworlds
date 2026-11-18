@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fallDamage, fireDamage, hitDamage, LIFE_MAX, regen } from "../health";
+import { blastDamage, fallDamage, hitDamage, LIFE_MAX, regen } from "../health";
 
 describe("damage", () => {
   it("hurts from 4 m, kills at 15 m, never in water", () => {
@@ -16,10 +16,11 @@ describe("damage", () => {
     expect(hitDamage(0)).toBe(0);
   });
 
-  it("burns by distance to a wreck", () => {
-    expect(fireDamage(0)).toBe(80);
-    expect(fireDamage(5)).toBe(40);
-    expect(fireDamage(5.1)).toBe(0);
+  it("reduces blast damage with distance from the wreck", () => {
+    expect(blastDamage(0)).toBe(80);
+    expect(blastDamage(5)).toBe(40);
+    expect(blastDamage(7)).toBe(20);
+    expect(blastDamage(9)).toBe(0);
   });
 });
 

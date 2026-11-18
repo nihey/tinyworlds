@@ -8,7 +8,7 @@ import { EXIT_SPEED, swimOut, toTake, wayOut, type Spot } from "./doors";
 import { Ferries, onRoute, type LifeRoutes } from "./ferries";
 import { Fleet, within } from "./fleet";
 import { CELL } from "./geo";
-import { LIFE_MAX, fireDamage, hitDamage, regen } from "./health";
+import { LIFE_MAX, blastDamage, hitDamage, regen } from "./health";
 import type { BoatKind, CarKind } from "./kinds";
 import { clamp, wrap } from "./math";
 import { Crowd } from "./people";
@@ -31,6 +31,7 @@ import { comeTo } from "./spawn";
 import { RoadNet, Traffic, starterCar, type Blocker, type KerbSpot } from "./traffic";
 import { portalCrossed } from "./tunnels";
 import {
+  applyBlastDamage,
   sizeFor,
   stepBoat,
   stepCar,
@@ -136,8 +137,7 @@ const BOOM_HEAR = 150;
 const CRASH_SCARE = 20;
 const HORN_SCARE = 12;
 const WRECK_SCARE = 40;
-const WRECK_KNOCK = 7;
-const FIRE_REACH = 5;
+const BLAST_HEIGHT = 3;
 // the signs
 const MESSAGE_FOR = 2.5;
 const HURT_FADE = 0.6;
@@ -262,7 +262,8 @@ export class WalkGame {
 
   // what has been seen to happen
   private t = 0;
-  private burnt = new WeakSet<Vehicle>();
+  private ignited = new WeakSet<Vehicle>();
+  private exploded = new WeakSet<Vehicle>();
   private sinkingSeen = new WeakSet<Vehicle>();
   private crunched = new WeakMap<Vehicle, number>();
   private lastSpeed = new WeakMap<Vehicle, number>();
@@ -1222,11 +1223,15 @@ export class WalkGame {
   private watch(): void {
     for (const v of this.traffic.cars)
       if (v.state !== "traffic" && v !== this.yours) this.fleet.keep(v);
-    const all = this.yours ? [this.yours, ...this.fleet.free] : this.fleet.free;
+    const all = this.yours ? [this.yours, ...this.fleet.free] : [...this.fleet.free];
     for (const v of all) {
-      if (v.fire > 0 && !this.burnt.has(v)) {
-        this.burnt.add(v);
-        this.wreck(v);
+      if (v.fuse !== null && !this.ignited.has(v)) {
+        this.ignited.add(v);
+        if (within(v, this.focus(), SMOKE_REACH)) this.particles.ignite(v);
+      }
+      if (v.fire > 0 && !this.exploded.has(v)) {
+        this.exploded.add(v);
+        this.explode(v);
       }
       if (v.state === "sinking" && !this.sinkingSeen.has(v)) {
         this.sinkingSeen.add(v);
@@ -1236,19 +1241,43 @@ export class WalkGame {
     }
   }
 
-  /** The explosion: the boom, the flames, people knocked over and running, you hurt if near. */
-  private wreck(v: Vehicle): void {
+  /** What the blast reaches on this deck, measured from the wreck's hull. */
+  private blastAt(v: Vehicle, at: { e: number; n: number; z: number }): number {
+    if (Math.abs(at.z - v.z) > BLAST_HEIGHT) return 0;
+    return blastDamage(Math.max(0, fromBox(v, at.e, at.n).d));
+  }
+
+  /** The nearest point of the other hull takes the blast. Critical hits start their own fuses. */
+  private blastVehicle(source: Vehicle, target: Vehicle): void {
+    if (target === source || onRoute(target) || (target === this.yours && this.tunnel)) return;
+    const edge = fromBox(target, source.e, source.n);
+    const distance = Math.max(0, edge.d);
+    const damage = this.blastAt(source, {
+      e: source.e - edge.ne * distance,
+      n: source.n - edge.nn * distance,
+      z: target.z,
+    });
+    const parked = target.state === "parked";
+    if (applyBlastDamage(target, damage / LIFE_MAX)) {
+      if (parked) this.fleet.detach(target);
+      if (target !== this.yours) this.fleet.keep(target);
+    }
+  }
+
+  /** The boom and flash, followed by damage to the people and vehicles within reach. */
+  private explode(v: Vehicle): void {
     const f = this.focus();
     const d = Math.hypot(v.e - f.e, v.n - f.n);
     if (d < BOOM_HEAR) this.sound.boom(1 - d / BOOM_HEAR);
-    this.particles.wreck(v.e, v.n, v.z, sizeFor(v).length);
-    for (const q of this.crowd.people)
-      if (
-        q.state !== "down" &&
-        q.state !== "swimming" &&
-        Math.hypot(q.e - v.e, q.n - v.n) < WRECK_KNOCK
-      )
-        this.crowd.knock(q, { ve: (q.e - v.e) * 1.5, vn: (q.n - v.n) * 1.5 });
+    if (d < SMOKE_REACH) this.particles.explode(v);
+    for (const target of new Set(this.nearby)) this.blastVehicle(v, target);
+    for (const q of this.crowd.people) {
+      if (q.state === "down" || q.state === "swimming") continue;
+      const damage = this.blastAt(v, q);
+      if (damage <= 0) continue;
+      const { ne, nn } = fromBox(v, q.e, q.n);
+      this.crowd.knock(q, { ve: ne * damage * 0.15, vn: nn * damage * 0.15 });
+    }
     this.crowd.scare(v.e, v.n, WRECK_SCARE);
     if (v === this.yours) {
       // inside your car when it explodes: the end of you
@@ -1256,10 +1285,10 @@ export class WalkGame {
       this.goDown();
       return;
     }
-    const p = this.player;
-    if (this.yours || this.wasted || this.waiting || this.tunnel || Math.abs(p.z - v.z) > 3) return;
-    const near = Math.max(0, fromBox(v, p.e, p.n).d);
-    if (near <= FIRE_REACH) this.hurtYou(fireDamage(near));
+    if (this.wasted || this.waiting || this.tunnel) return;
+    const damage = this.blastAt(v, this.player);
+    this.hurtYou(damage);
+    if (damage > 0) this.cams.bump(damage * 0.15);
   }
 
   private splash(e: number, n: number, size: number, loud: number): void {

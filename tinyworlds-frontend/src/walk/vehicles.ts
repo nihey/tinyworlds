@@ -357,15 +357,23 @@ export function accelFactor(v: Vehicle): number {
  * it: a car starts its explosion countdown, a boat goes down.
  */
 export function applyDamage(v: Vehicle, impact: number, otherMass?: number): boolean {
-  if (v.state === "wrecked" || v.state === "sinking" || v.state === "sunk") return false;
   const size = SIZES[v.kind];
   const share =
     otherMass === undefined || !Number.isFinite(otherMass)
       ? 2
       : (2 * otherMass) / (size.mass + otherMass);
-  const add = (Math.max(0, impact - HARMLESS) * DAMAGE_PER_MS * share) / size.tough;
-  if (!(add > 0)) return false;
-  v.damage = Math.min(1, v.damage + add);
+  return addDamage(v, (Math.max(0, impact - HARMLESS) * DAMAGE_PER_MS * share) / size.tough);
+}
+
+/** Blast damage is a share of full damage, reduced by the hull's toughness. */
+export function applyBlastDamage(v: Vehicle, strength: number): boolean {
+  return addDamage(v, strength / SIZES[v.kind].tough);
+}
+
+function addDamage(v: Vehicle, amount: number): boolean {
+  if (v.state === "wrecked" || v.state === "sinking" || v.state === "sunk") return false;
+  if (!(amount > 0)) return false;
+  v.damage = Math.min(1, v.damage + amount);
   if (v.damage < 1) return false;
   if (v.boat) {
     v.state = "sinking";
