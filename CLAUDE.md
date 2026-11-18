@@ -118,9 +118,11 @@ Each sub-project has its own `CLAUDE.md`.
   leading to its hall of fame), in the hall's gallery and on the city's own hall.
 - **The hall of fame** (`/hall-of-fame/`, part of the front page's build): what everyone gave
   in three figures, the cities their benefactors brought to the map (each with its picture and
-  plaque), everyone who gave, ranked, with their links, then the other cities; each city leads
-  to **a hall of its own** (`/hall-of-fame/<city's slug>/`): its picture, its foundation, its
-  founders and its benefactors as cards.
+  plaque), everyone who gave, ranked by total donated, with their links and city achievements,
+  then the other cities. Each city leads to **a hall of its own** (`/hall-of-fame/<city's slug>/`)
+  with its picture, its foundation, and its
+  founders and later benefactors in one ranking by total donated. Badge descriptions open on
+  hover, keyboard focus, or tap.
   Unlike `/me/` and `/admin/` these pages are for search engines too. **The links say
   `dofollow`**, never `nofollow` or `sponsored`, and the benefactors are told so, which is why the
   pages are **baked** with what the API says when the front page is built (the names and the

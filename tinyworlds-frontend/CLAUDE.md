@@ -657,21 +657,21 @@ canonical address.
   everyone on the wall, the cities built with their gifts); "Built by benefactors", a gallery
   of the cities their benefactors brought to the map (`BuiltCityCard`: the city's picture,
   name, plaque and first names; the card leads to its hall, "Explore" over it to the map);
-  "Our Benefactors", everyone on the wall as cards, ranked from the largest gift
-  (`PersonCard`: place, name, sum, the cities, each a link to that city's hall, and their
-  links with pictures); then "More cities": a tile for every other city someone gave to
-  (`CityTile`: how many are in its hall, where it stands with a bar while it is funded, the
-  first names). `hallCities` gives each city its people (the API's count when it says, else
+  "Our Benefactors", everyone on the wall as cards, ranked by total donated
+  (`PersonCard`: place, name, sum, the cities with links to their own halls and the founding
+  badges earned in each, and the benefactor's links with pictures); then "More cities", a tile
+  for every other city someone gave to (`CityTile`: how many are in its hall, its funding
+  progress, and the first names). `hallCities` gives each city its people (the API's count when it says, else
   the wall's entries) and its `broughtBy`. Last, "Fund a city" and what the links are.
 - **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): a built city's picture
   (beside the words on a wide screen, kept to its right side so the frame does not cut
   through its wordmark: `MovingPicture`'s `focus`, above them on a narrow one), for a city its
   benefactors brought their plaque in place of "raised of goal", the city's foundation (the
   sign's `StoneGrid` and legend), "Become a benefactor" and "Explore" for a built one, then
-  its founders (`FounderCard`: number, badges, stones, sum, links) and its benefactors
-  (`BenefactorCard`), all of them, as cards.
-- **Cards are set in columns** (`CARDS`: one, two, three, each filled from the top), because
-  a card with pictures is several times as tall as one without: a grid of rows leaves holes.
+  one leaderboard for its founders and later benefactors, ranked together by total donated.
+  A founder's card also shows their founding badges and how many stones they laid.
+- **Ranked cards read across each row** (`LEADERBOARD`, one to three columns). Achievement
+  descriptions are available on hover, keyboard focus, or tap in each supported language.
 - **The pages are baked** (`lib/hall-build.ts`): each is an async page that asks the API when
   the build runs (`hallAtBuild`, `cityAtBuild`; `buildEndpoint`: `NEXT_PUBLIC_API_URL`, on
   `NEXT_PUBLIC_SITE_URL` when it is a path) and hands what it got to its client component as

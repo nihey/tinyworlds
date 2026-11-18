@@ -119,6 +119,7 @@ export function MapApp() {
   // views, and that manifest names its version (north up it is the map's own; turned to the
   // street grid it is read beside the map's)
   const [walkManifest, setWalkManifest] = useState<Manifest | null>(null);
+  const [draggingWalker, setDraggingWalker] = useState(false);
 
   // the street walk: the person put down on the map, the walk over it, and the way back
   const street = useStreetWalk({
@@ -477,6 +478,7 @@ export function MapApp() {
   return (
     <div
       className={cn("map-root", tiltOn && !walking && "tilt-on", walking && "walk-full")}
+      data-walk-dragging={draggingWalker || undefined}
       style={rootStyle}
     >
       <canvas ref={canvasRef} className="map-tiles" tabIndex={0} aria-label={copy.mapLabel} />
@@ -525,7 +527,7 @@ export function MapApp() {
 
       {session && engine && !walking && (
         <>
-          {lit && litSight && !quizRound && (
+          {!draggingWalker && lit && litSight && !quizRound && (
             <SightSign
               engine={engine}
               sight={litSight}
@@ -609,6 +611,7 @@ export function MapApp() {
                   engine={engine}
                   version={street.version}
                   armed={street.armed}
+                  onDraggingChange={setDraggingWalker}
                   onArmedChange={setArmed}
                   onDropAt={street.putDownAtScreen}
                   onCentre={street.putDownAtCentre}

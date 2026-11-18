@@ -1,9 +1,4 @@
-import {
-  parseCityBenefactors,
-  type CityBenefactors,
-  type FounderRow,
-  type BenefactorRow,
-} from "./benefactors";
+import { parseCityBenefactors, type CityBenefactors } from "./benefactors";
 import { broughtBy, type BroughtBy } from "./brought-by";
 import { API_URL, parseMilestones, type CityMilestone } from "./donate";
 import { apiOrigin } from "./links";
@@ -24,14 +19,18 @@ export interface HallData {
 const LINK = "url title description icon image";
 
 export const HALL_QUERY = `query HallOfFame {
-  benefactorWall { name amountCents cities { slug name worldId } links { ${LINK} } }
+  benefactorWall {
+    name amountCents
+    cities { slug name worldId foundation { number firstStone keystone } }
+    links { ${LINK} }
+  }
   cityMilestones { id slug name raisedCents goalCents donations benefactorCount status worldId }
 }`;
 
 export const CITY_HALL_QUERY = `query CityHall($input: CityBenefactorsInput!) {
   cityBenefactors(input: $input) {
     slug name status worldId goalCents raisedCents stones benefactorCount
-    founders { number name amountCents stones firstStone keystone links { ${LINK} } }
+    founders { number name amountCents totalAmountCents stones firstStone keystone links { ${LINK} } }
     benefactors { rank name amountCents links { ${LINK} } }
   }
 }`;
@@ -42,7 +41,8 @@ export const HALL_TIMEOUT_MS = 8000;
 /** The API's answer to `HALL_QUERY`; throws when there is no wall in it. */
 export function parseHall(body: unknown, origin: string | null): HallData {
   const data = (body as { data?: { cityMilestones?: unknown } } | null)?.data;
-  return { wall: parseWall(body, origin), cities: parseMilestones(data?.cityMilestones) };
+  const wall = parseWall(body, origin).sort((a, b) => b.amountCents - a.amountCents);
+  return { wall, cities: parseMilestones(data?.cityMilestones) };
 }
 
 /**
@@ -173,10 +173,11 @@ export function cityAsked(search: string): string | null {
   return slug ? slug : null;
 }
 
-/** Whether a city's hall has anyone in it. */
-export function hasPeople(city: Pick<CityBenefactors, "founders" | "benefactors">): boolean {
-  return city.founders.length + city.benefactors.length > 0;
+/** Both kinds of city benefactor, ordered together by what their public entry gave. */
+export function cityHallPeople(city: Pick<CityBenefactors, "founders" | "benefactors">) {
+  const founders = city.founders.map((founder) => ({
+    ...founder,
+    amountCents: founder.totalAmountCents ?? founder.amountCents,
+  }));
+  return [...founders, ...city.benefactors].sort((a, b) => b.amountCents - a.amountCents);
 }
-
-/** A row of either list, for what both kinds of card share. */
-export type HallRow = FounderRow | BenefactorRow;

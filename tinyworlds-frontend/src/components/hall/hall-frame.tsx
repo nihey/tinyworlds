@@ -6,6 +6,7 @@ import { DonateDialog } from "@/components/donate/donate-dialog";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { Wordmark } from "@/components/map/wordmark";
 import { FOG_LINK } from "@/components/styles";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePrefs } from "@/hooks/use-prefs";
 import { useDocumentLanguage, useDonationReturn, useFunnelVisit } from "@/hooks/use-site-effects";
@@ -60,7 +61,9 @@ export function HallFrame({
         )}
       </div>
 
-      {children(takesDonations ? (city) => setDonate({ city }) : undefined)}
+      <TooltipProvider delayDuration={160}>
+        {children(takesDonations ? (city) => setDonate({ city }) : undefined)}
+      </TooltipProvider>
 
       <footer className="mt-auto flex flex-wrap gap-x-4 gap-y-1.5 text-xs leading-relaxed">
         <LegalLinks className={FOG_LINK} cookies />

@@ -264,6 +264,9 @@ type FounderRow {
 
   """How many stones these gifts laid"""
   stones: Int!
+
+  """All gifts on this row, including named gifts after the goal"""
+  totalAmountCents: Int!
 }
 
 """
@@ -702,11 +705,19 @@ type WallBenefactor {
 
 """A city someone on the wall gave to"""
 type WallCity {
+  foundation: WallFoundation
   name: String!
   slug: String!
 
   """The id of its map once it is built ("tinynyc")"""
   worldId: String
+}
+
+"""Founding achievements earned in a city"""
+type WallFoundation {
+  firstStone: Boolean!
+  keystone: Boolean!
+  number: Int!
 }
 
 """How many visits a world has had, and how many are there now"""

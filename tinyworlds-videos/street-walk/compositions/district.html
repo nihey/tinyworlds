@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #times-square-label {
+      position: absolute;
+      right: 192px;
+      bottom: 145px;
+    }
+    #times-square-name {
+      position: static;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="district"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[{"id":"place","type":"string","label":"Place","default":"Times Square"}]'
+  >
+    <div id="times-square-label" class="clip" data-start="0.74" data-duration="3.8" data-track-index="0">
+      <h2 id="times-square-name" class="sign direction" data-var-text="place">Times Square</h2>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      "#times-square-name",
+      { clipPath: "inset(0 100% 0 0)" },
+      { clipPath: "inset(0 0% 0 0)", duration: 0.3, ease: "power3.out" },
+      0.74,
+    );
+    tl.to("#times-square-name", { clipPath: "inset(0 0% 0 100%)", duration: 0.23, ease: "power2.in" }, 4.31);
+    window.__timelines["district"] = tl;
+  </script>
+</template>

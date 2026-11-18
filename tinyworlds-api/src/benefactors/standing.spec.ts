@@ -34,6 +34,7 @@ describe('cityStanding', () => {
         donorId: 'd1',
         name: 'Marta',
         amountCents: 1200,
+        totalAmountCents: 1200,
         stones: 12,
         firstStone: true,
         keystone: false,
@@ -53,6 +54,7 @@ describe('cityStanding', () => {
       donorId: 'd2',
       name: 'Bia',
       amountCents: 5000,
+      totalAmountCents: 5000,
       stones: 20,
       firstStone: false,
       keystone: true,
@@ -149,6 +151,10 @@ describe('cityStanding', () => {
       ],
       GOAL,
     );
+    expect(s.founders[0]).toMatchObject({
+      amountCents: 10_000,
+      totalAmountCents: 13_000,
+    });
     // unnamed, so the row does not say whose it is, though the gift has a donor
     expect(s.benefactors).toEqual([
       { rank: 1, donorId: null, name: null, amountCents: 1000 },

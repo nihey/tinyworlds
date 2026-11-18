@@ -235,6 +235,13 @@ export const en: Strings = {
     open: "Hall of Fame",
     openCity: "{city}’s Hall of Fame",
     everyone: "Our Benefactors",
+    rankedBy: "Ranked by total donated.",
+    achievements: {
+      founding:
+        "Gave before the city reached its funding goal. The number shows the order of the founding gift.",
+      firstStone: "Completed the first dollar of the city’s funding.",
+      keystone: "Laid the final stone by bringing the city to its funding goal.",
+    },
     byCity: "More cities",
     byCityLine: "Each keeps a hall of its own.",
     builtBy: "Built by benefactors",

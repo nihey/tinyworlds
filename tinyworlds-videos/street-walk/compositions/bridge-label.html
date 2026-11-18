@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #bridge-sign {
+      position: absolute;
+      right: 192px;
+      bottom: 145px;
+    }
+    #bridge-name {
+      position: static;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="bridge-label"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[{"id":"place","type":"string","label":"Place","default":"Brooklyn Bridge"}]'
+  >
+    <div id="bridge-sign" class="clip" data-start="0.3" data-duration="3.4" data-track-index="0">
+      <h2 id="bridge-name" class="sign direction" data-var-text="place">Brooklyn Bridge</h2>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      "#bridge-name",
+      { clipPath: "inset(0 100% 0 0)" },
+      { clipPath: "inset(0 0% 0 0)", duration: 0.3, ease: "power3.out" },
+      0.3,
+    );
+    tl.to("#bridge-name", { clipPath: "inset(0 0% 0 100%)", duration: 0.23, ease: "power2.in" }, 3.47);
+    window.__timelines["bridge-label"] = tl;
+  </script>
+</template>

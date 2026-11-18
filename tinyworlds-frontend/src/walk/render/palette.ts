@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { WalkDataError } from "../format";
 import type { WalkIndex } from "../walk-index";
+export { G, isWaterKind } from "../cell";
 
 /**
  * The map's palette: a few dozen materials, six shades each, and nothing else. The walk draws
@@ -60,33 +61,6 @@ export function makePalette(ix: WalkIndex): Palette {
 
 // ---- ground kinds and their paints, after the tile renderer's (`render/ground.ts`)
 
-/** Ground kinds, as the scene numbers them (`scene/kinds.ts`). */
-export const G = {
-  Water: 0,
-  Land: 1,
-  Scrub: 10,
-  Wetland: 11,
-  Park: 12,
-  Cemetery: 13,
-  Forest: 14,
-  Lawn: 15,
-  Garden: 16,
-  Sand: 17,
-  Rock: 18,
-  Fairway: 19,
-  GolfGreen: 20,
-  Bunker: 21,
-  Lake: 30,
-  Pier: 32,
-  Path: 33,
-  Rail: 34,
-  Road: 36,
-  Highway: 38,
-  Snow: 41,
-  Meadow: 44,
-  RedRock: 45,
-} as const;
-export const isWaterKind = (kind: number) => kind === G.Water || kind === G.Lake;
 /** Added to a ground paint's pattern: no damp band by the water (a pier's deck, whatever paints it). */
 export const PAINT_DRY = 4;
 

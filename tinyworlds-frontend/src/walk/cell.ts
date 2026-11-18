@@ -11,6 +11,35 @@ import { WalkDataError, type CellArrays } from "./format";
 export const ROOF_DECK = 4;
 export const isMapDeck = (v: Volume): boolean => v.roofShape === ROOF_DECK;
 
+/** Ground kinds, as the scene numbers them. */
+export const G = {
+  Water: 0,
+  Land: 1,
+  Scrub: 10,
+  Wetland: 11,
+  Park: 12,
+  Cemetery: 13,
+  Forest: 14,
+  Lawn: 15,
+  Garden: 16,
+  Sand: 17,
+  Rock: 18,
+  Fairway: 19,
+  GolfGreen: 20,
+  Bunker: 21,
+  Plaza: 28,
+  Lake: 30,
+  Pier: 32,
+  Path: 33,
+  Rail: 34,
+  Road: 36,
+  Highway: 38,
+  Snow: 41,
+  Meadow: 44,
+  RedRock: 45,
+} as const;
+export const isWaterKind = (kind: number) => kind === G.Water || kind === G.Lake;
+
 export interface Volume {
   /** [e, n, e, n, …] per ring, outer first, even-odd */
   rings: Float32Array[];

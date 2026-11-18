@@ -90,12 +90,15 @@ export class BenefactorsService {
     const gifts = await this.prisma.donation.findMany({
       where: { currency: COUNTED_CURRENCY, city: { hidden: false } },
       select: {
+        id: true,
         donorId: true,
         amountCents: true,
         createdAt: true,
         listed: true,
         donor: { select: { displayName: true, nameHidden: true } },
-        city: { select: { slug: true, name: true, worldId: true } },
+        city: {
+          select: { slug: true, name: true, worldId: true, goalCents: true },
+        },
       },
     });
     const rows = benefactorWall(
@@ -103,6 +106,7 @@ export class BenefactorsService {
         gift.city
           ? [
               {
+                id: gift.id,
                 donorId: gift.donorId,
                 amountCents: gift.amountCents,
                 at: gift.createdAt,

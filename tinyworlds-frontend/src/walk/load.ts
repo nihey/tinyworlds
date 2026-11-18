@@ -1,6 +1,6 @@
 import { worldDataUrl } from "@/map/data";
 import type { Projection } from "@/map/projection";
-import { readCell, type WalkCell } from "./cell";
+import { G, isMapDeck, readCell, type WalkCell } from "./cell";
 import { REACH, snapDrop, yawAlong, type Drop } from "./drop";
 import { decodeCell, inflate, WalkDataError } from "./format";
 import { enToLonLat, lonLatToEN, type WalkGeo } from "./geo";
@@ -25,6 +25,14 @@ const DECK_REACH = 40;
 const DECK_SLACK = 2;
 
 const RAD = Math.PI / 180;
+const PREVIEW_GREEN = new Set<number>([G.Park, G.Lawn, G.Garden, G.Forest, G.Cemetery, G.Meadow]);
+const PREVIEW_PAVED = new Set<number>([G.Plaza, G.Pier]);
+
+export interface DropGround {
+  footprints: Float32Array[][];
+  green: Float32Array[][];
+  paved: Float32Array[][];
+}
 
 /** A point (e, n) metres from the origin, z up, in map px, as the map draws it (raised by z·kz). */
 export function toMapPx(geo: WalkGeo, e: number, n: number, z: number): { x: number; y: number } {
@@ -235,6 +243,34 @@ export class WalkData {
     if (deck) return deck;
     const [e, n] = frame.fromMap(x, y, 0);
     return snapDrop(cells.map(onTheGround), e, n);
+  }
+
+  /** Ground context for the drag preview, using the same already-loaded cells as the routes. */
+  groundNearMap(frame: MapFrame, x: number, y: number, r: number): DropGround {
+    const [e, n] = frame.fromMap(x, y, 0);
+    const ground: DropGround = { footprints: [], green: [], paved: [] };
+    for (const [i, j] of squaresNear(this.ix, e, n, r)) {
+      const cell = this.ready.get(`${i}_${j}`);
+      if (!cell) continue;
+      for (const v of cell.volumes) {
+        const [left, bottom, right, top] = v.box;
+        if (
+          v.base <= 0.05 &&
+          !isMapDeck(v) &&
+          left <= e + r &&
+          right >= e - r &&
+          bottom <= n + r &&
+          top >= n - r
+        ) {
+          ground.footprints.push(v.rings);
+        }
+      }
+      for (const surface of cell.ground) {
+        if (PREVIEW_GREEN.has(surface.kind)) ground.green.push(surface.rings);
+        else if (PREVIEW_PAVED.has(surface.kind)) ground.paved.push(surface.rings);
+      }
+    }
+    return ground;
   }
 
   /**

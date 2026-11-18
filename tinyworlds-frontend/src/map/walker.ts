@@ -1,70 +1,152 @@
-import type { MapFrame } from "@/walk/load";
+import type { Drop } from "@/walk/drop";
+import type { DropGround, MapFrame } from "@/walk/load";
 import { WORLD } from "@/worlds";
 import type { MapEngine } from "./engine";
 
 /**
- * The street walk on the map: while the person is carried over the map, the ways it can be put
- * down on, lit in the accent. A scene layer drawn whatever "life on the map" says (it is a sign,
- * not life), placed through the engine's own projection (north up or turned to the street grid:
- * the map's, not the walk's). Reached by dynamic import, with the rest of the walk. While you
- * walk the map is covered and still; the walk's own minimap shows where you are.
+ * While the person is carried, the baked map recedes behind the nearby walkable network.
+ * The ways and landing point use the map's projection, including the height of bridge decks.
  */
 
-const highlights = new WeakMap<MapEngine, { ways: Float32Array[]; off: () => void }>();
+type Point = { x: number; y: number };
 
-/**
- * While the person is carried over the map: the ways it can be put down on near the pointer,
- * (e, n, z) polylines in the walk's metres, placed on this map by `frame` (`mapFrame`), lit in
- * the accent over a dark edge. Null takes them away.
- */
-export function dropHighlight(
-  engine: MapEngine,
-  lit: { ways: Float32Array[]; frame: MapFrame } | null,
-): void {
+interface DropPreview {
+  frame: MapFrame;
+  ways: Float32Array[];
+  ground: DropGround;
+  pointer: Point;
+  /** Radius of the street preview in metres. */
+  reach: number;
+  drop: Drop | null;
+}
+
+interface ProjectedPreview {
+  path: Path2D;
+  ground: { paths: Path2D[]; rgb: string; opacity: number }[];
+  pointer: Point;
+  radius: number;
+  landing: Point | null;
+}
+
+const highlights = new WeakMap<MapEngine, { preview: ProjectedPreview | null; off: () => void }>();
+
+const GROUND_INK = [
+  { kind: "green", rgb: "125, 163, 117", opacity: 0.7 },
+  { kind: "paved", rgb: "193, 167, 126", opacity: 0.59 },
+  { kind: "footprints", rgb: "170, 185, 198", opacity: 0.68 },
+] as const;
+
+function areaPath(frame: MapFrame, rings: Float32Array[]): Path2D {
+  const path = new Path2D();
+  for (const ring of rings) {
+    if (ring.length < 6) continue;
+    const first = frame.toMap(ring[0], ring[1], 0);
+    path.moveTo(first.x, first.y);
+    for (let i = 2; i + 1 < ring.length; i += 2) {
+      const p = frame.toMap(ring[i], ring[i + 1], 0);
+      path.lineTo(p.x, p.y);
+    }
+    path.closePath();
+  }
+  return path;
+}
+
+function fadeAt(
+  ctx: CanvasRenderingContext2D,
+  { x, y }: Point,
+  reach: number,
+  rgb: string,
+  opacity: number,
+): CanvasGradient {
+  const fade = ctx.createRadialGradient(x, y, 0, x, y, reach);
+  fade.addColorStop(0, `rgba(${rgb}, ${opacity})`);
+  fade.addColorStop(0.57, `rgba(${rgb}, ${opacity * 0.8})`);
+  fade.addColorStop(1, `rgba(${rgb}, 0)`);
+  return fade;
+}
+
+function project({ frame, ways, ground, pointer, reach, drop }: DropPreview): ProjectedPreview {
+  const path = new Path2D();
+  for (const pts of ways) {
+    if (pts.length < 6) continue;
+    const first = frame.toMap(pts[0], pts[1], pts[2]);
+    path.moveTo(first.x, first.y);
+    for (let i = 3; i + 2 < pts.length; i += 3) {
+      const p = frame.toMap(pts[i], pts[i + 1], pts[i + 2]);
+      path.lineTo(p.x, p.y);
+    }
+  }
+  return {
+    path,
+    ground: GROUND_INK.map(({ kind, rgb, opacity }) => ({
+      paths: ground[kind].map((rings) => areaPath(frame, rings)),
+      rgb,
+      opacity,
+    })),
+    pointer,
+    radius: reach * frame.k,
+    landing: drop && frame.toMap(drop.e, drop.n, drop.z),
+  };
+}
+
+/** A drag can show the dimmed map before its nearby streets have loaded. */
+export function dropHighlight(engine: MapEngine, active: boolean, candidate?: DropPreview): void {
   const had = highlights.get(engine);
-  const ways = lit?.ways;
-  if (!lit || !ways || ways.length === 0) {
+  if (!active) {
     if (had) {
       had.off();
       highlights.delete(engine);
     }
     return;
   }
-  const { frame } = lit;
-  // into map px once: [x, y, x, y, …] per way
-  const lines = ways.map((pts) => {
-    const out = new Float32Array((pts.length / 3) * 2);
-    for (let q = 0, o = 0; q + 2 < pts.length; q += 3, o += 2) {
-      const m = frame.toMap(pts[q], pts[q + 1], pts[q + 2]);
-      out[o] = m.x;
-      out[o + 1] = m.y;
-    }
-    return out;
-  });
+  const preview = candidate ? project(candidate) : null;
   if (had) {
-    had.ways = lines;
+    had.preview = preview;
     engine.invalidate();
     return;
   }
   const entry = {
-    ways: lines,
+    preview,
     off: engine.addSceneLayer(
       (ctx, view) => {
         ctx.save();
+        ctx.fillStyle = "rgba(21, 23, 26, 0.68)";
+        ctx.fillRect(
+          view.left - 1,
+          view.top - 1,
+          view.right - view.left + 2,
+          view.bottom - view.top + 2,
+        );
+        const current = entry.preview;
+        if (!current) {
+          ctx.restore();
+          return;
+        }
+
+        const { path, ground, pointer, radius, landing } = current;
+        const px = 1 / view.scale;
+        const reach = Math.max(84 * px, Math.min(radius, 300 * px));
+        for (const { paths, rgb, opacity } of ground) {
+          if (paths.length === 0) continue;
+          ctx.fillStyle = fadeAt(ctx, pointer, reach, rgb, opacity);
+          for (const area of paths) ctx.fill(area, "evenodd");
+        }
+
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        const path = new Path2D();
-        for (const line of entry.ways) {
-          if (line.length < 4) continue;
-          path.moveTo(line[0], line[1]);
-          for (let o = 2; o < line.length; o += 2) path.lineTo(line[o], line[o + 1]);
+        ctx.lineWidth = 3.5 * px;
+        ctx.strokeStyle = fadeAt(ctx, pointer, reach, "244, 242, 236", 1);
+        ctx.stroke(path);
+
+        if (landing) {
+          ctx.beginPath();
+          ctx.arc(landing.x, landing.y, 7 * px, 0, Math.PI * 2);
+          ctx.fillStyle = "#15171a";
+          ctx.fill();
+          ctx.lineWidth = 3 * px;
+          ctx.strokeStyle = WORLD.accent.color;
+          ctx.stroke();
         }
-        ctx.lineWidth = 6 / view.scale;
-        ctx.strokeStyle = "rgba(21, 23, 26, 0.55)";
-        ctx.stroke(path);
-        ctx.lineWidth = 3 / view.scale;
-        ctx.strokeStyle = WORLD.accent.color;
-        ctx.stroke(path);
         ctx.restore();
       },
       { always: true },

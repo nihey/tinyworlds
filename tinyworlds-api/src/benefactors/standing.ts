@@ -27,6 +27,8 @@ export interface FounderRow {
   donorId: string | null;
   name: string | null;
   amountCents: number;
+  /** All gifts on this public row, including named gifts made after the goal. */
+  totalAmountCents: number;
   stones: number;
   firstStone: boolean;
   keystone: boolean;
@@ -118,6 +120,7 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
           donorId: named ? gift.donorId : null,
           name: gift.name,
           amountCents: 0,
+          totalAmountCents: 0,
           stones: 0,
           firstStone: false,
           keystone: false,
@@ -125,6 +128,7 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
         rows.set(rowNumber, row);
       }
       row.amountCents += gift.amountCents;
+      row.totalAmountCents += gift.amountCents;
       row.stones += p.stones.length;
       if (p.stones.includes(1)) row.firstStone = true;
       if (p.stones.includes(stoneCount)) row.keystone = true;
@@ -153,7 +157,15 @@ export function cityStanding(gifts: Gift[], goalCents: number): Standing {
     if (p.start < goalCents) continue;
     const { gift } = p;
     const named = gift.name !== null && gift.donorId !== null;
-    if (named && rowOfDonor.has(gift.donorId as string)) continue;
+    const founderNumber = named
+      ? rowOfDonor.get(gift.donorId as string)
+      : undefined;
+    const founder =
+      founderNumber === undefined ? undefined : rows.get(founderNumber);
+    if (founder) {
+      founder.totalAmountCents += gift.amountCents;
+      continue;
+    }
     const key = named ? `donor:${gift.donorId}` : `gift:${gift.id}`;
     const group = groups.get(key);
     if (group) group.amountCents += gift.amountCents;

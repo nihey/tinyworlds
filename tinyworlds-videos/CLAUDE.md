@@ -3,10 +3,11 @@
 The moving pictures, made with [HyperFrames](https://hyperframes.heygen.com) (HTML rendered to
 video, frame by frame): the loops the front page plays in its hero and its cards, a flyover of
 each city to share, the showcase film, a tour of tinywesteros for the people who know its
-places, and the recap film (what the project has done, and the invitation to fund the next city). One rule holds everywhere: **a picture of a map is cut from the real tiles or filmed
+places, the recap film (what the project has done, and the invitation to fund the next city),
+and the New York Street Walk announcement. One rule holds everywhere: **a picture of a map is cut from the real tiles or filmed
 from the real viewer**. Nothing is redrawn.
 
-Five HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`, `recap/`: each an `index.html`, its
+The HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`, `recap/`, `street-walk/`: each an `index.html`, its
 `compositions/` and `assets/`) and the TypeScript scripts that feed and render them.
 
 ## Commands
@@ -29,6 +30,7 @@ npm run recap -- plates         # the history's pictures and signs, from the fly
 npm run recap -- sfx            # the recap's tracks of ticks (stones, history, letters), from assets/sfx/
 npm run recap -- captions       # its subtitles, from the narration's word times → recap/compositions/captions.html
 npm run recap -- render [draft|looks|delivery]   # → out/recap/tinyworlds-recap.mp4 (+ a smaller copy to post)
+npm exec -- tsx scripts/street-walk.ts [shot …]   # film the New York announcement (VIEWER_URL)
 npm run context                 # a look round each world's card framing (out/context/), to choose a drift
 npm run probe -- name:lon,lat,scale[,rise][@seconds][+chrome]   # stills of the viewer, to choose a take's framings
 npm run lint | lint:fix | typecheck
@@ -65,6 +67,7 @@ flyover/             # 1920 × 1080, 12 s: a city flyover, and a world's hero (v
 film/                # 1920 × 1080, 31 s: the showcase film (SPEC.md, REVIEW.md)
 westeros/            # 1920 × 1080, 35 s: the tour of tinywesteros (SPEC.md, REVIEW.md)
 recap/               # 1920 × 1080, 57.6 s: the recap film, narrated (STORYLINES.md, SPEC.md, REVIEW.md)
+street-walk/         # 1920 × 1080, 30 s: the New York Street Walk announcement (README.md, SPEC.md, REVIEW.md)
 ```
 
 It imports from the pipeline's source (`../tinyworlds-pipeline/src/`: the cities' card

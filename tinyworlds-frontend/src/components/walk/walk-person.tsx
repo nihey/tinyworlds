@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import type { MapEngine } from "@/map/engine";
 import { PERSON, PERSON_H, PERSON_W, personColours } from "@/map/person";
+import { dropHighlight } from "@/map/walker";
 import type { Drop } from "@/walk/drop";
 import type { MapFrame, WalkData } from "@/walk/load";
 import { WORLD } from "@/worlds";
@@ -17,9 +18,8 @@ import { WORLD } from "@/worlds";
  * map (the ways it can stand on light up near the pointer, and it dangles over the spot), tap
  * it and then tap the map (`armed`: the map's own tap is taken by `useStreetWalk`), or the
  * keyboard (activating the button, like the W key, puts it down in the middle of the map).
- * Nothing of the walk is downloaded until the person is picked up: the squares, the drop and
- * the highlight come through `import()`. A point on the map is a point as the map draws it:
- * a bridge's deck is drawn raised, so it is hit where it is drawn, not at its footprint.
+ * The walk's data is downloaded once the person is picked up. The drop follows the drawn map,
+ * including the height of a bridge deck.
  */
 
 /** The ways within this many metres of the pointer light up while the person is carried. */
@@ -117,6 +117,7 @@ interface WalkPersonProps {
   /** tapped (with a finger, or clicked with a mouse), waiting for the same on the map */
   armed: "touch" | "mouse" | null;
   onArmedChange: (armed: "touch" | "mouse" | null) => void;
+  onDraggingChange: (dragging: boolean) => void;
   /** let go at (x, y) CSS px of the map's canvas (`useStreetWalk`'s `putDownAtScreen`) */
   onDropAt: (x: number, y: number) => void;
   /** activated from the keyboard: put down in the middle of the map */
@@ -130,6 +131,7 @@ interface Carry {
   x0: number;
   y0: number;
   moving: boolean;
+  overMap: boolean;
 }
 
 export function WalkPerson({
@@ -137,6 +139,7 @@ export function WalkPerson({
   version,
   armed,
   onArmedChange,
+  onDraggingChange,
   onDropAt,
   onCentre,
   canDraw,
@@ -163,9 +166,12 @@ export function WalkPerson({
     alive.current = true;
     return () => {
       alive.current = false;
-      void import("@/map/walker").then((m) => m.dropHighlight(engine, null));
+      carry.current = null;
+      wanted.current = null;
+      dropHighlight(engine, false);
+      onDraggingChange(false);
     };
-  }, [engine]);
+  }, [engine, onDraggingChange]);
 
   /** The map canvas's own point under a screen point, or null off the map. */
   const onMap = (clientX: number, clientY: number): { x: number; y: number } | null => {
@@ -181,24 +187,29 @@ export function WalkPerson({
     busy.current = true;
     try {
       // nothing of the walk is fetched, and no "Let go" said, where it cannot be drawn
+      const started = carry.current;
       if (!(await canDraw())) {
-        carry.current = null;
-        clear();
+        if (carry.current === started) {
+          carry.current = null;
+          clear();
+        }
         return;
       }
-      const [{ data, frame }, walker] = await Promise.all([
-        walkOnMap(engine, version),
-        import("@/map/walker"),
-      ]);
+      const { data, frame } = await walkOnMap(engine, version);
       while (wanted.current && alive.current && carry.current?.moving) {
+        const current = carry.current;
         const p = wanted.current;
         wanted.current = null;
         const m = engine.screenToMap(p.x, p.y);
         const drop = await data.dropAtMap(frame, m.x, m.y);
-        if (!carry.current?.moving) break;
-        walker.dropHighlight(engine, {
+        if (!alive.current || carry.current !== current || !current.overMap) continue;
+        dropHighlight(engine, true, {
           ways: data.waysNearMap(frame, m.x, m.y, LIGHT_REACH),
+          ground: data.groundNearMap(frame, m.x, m.y, LIGHT_REACH),
           frame,
+          pointer: m,
+          reach: LIGHT_REACH,
+          drop,
         });
         setVerdict(drop ? "walk" : "none");
       }
@@ -212,18 +223,25 @@ export function WalkPerson({
   const clear = () => {
     setCarried(null);
     setVerdict(null);
+    onDraggingChange(false);
     wanted.current = null;
-    void import("@/map/walker").then((m) => m.dropHighlight(engine, null));
+    dropHighlight(engine, false);
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (carry.current || (e.pointerType === "mouse" && e.button !== 0)) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
       /* the pointer is already gone */
     }
-    carry.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY, moving: false };
+    carry.current = {
+      id: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      moving: false,
+      overMap: false,
+    };
     dragged.current = false;
     pointer.current = e.pointerType === "mouse" ? "mouse" : "touch";
   };
@@ -236,15 +254,23 @@ export function WalkPerson({
       c.moving = true;
       dragged.current = true;
       onArmedChange(null);
+      onDraggingChange(true);
+      dropHighlight(engine, true);
       setCarried({ x: e.clientX, y: e.clientY });
     }
     if (dangle.current)
       dangle.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
     const p = onMap(e.clientX, e.clientY);
     if (!p) {
-      setVerdict(null);
+      if (c.overMap) {
+        c.overMap = false;
+        wanted.current = null;
+        dropHighlight(engine, true);
+        setVerdict(null);
+      }
       return;
     }
+    c.overMap = true;
     wanted.current = p;
     void look();
   };
@@ -255,7 +281,7 @@ export function WalkPerson({
     carry.current = null;
     if (!c.moving) return;
     clear();
-    if (e.type === "pointercancel") return;
+    if (e.type !== "pointerup") return;
     const p = onMap(e.clientX, e.clientY);
     if (p) onDropAt(p.x, p.y);
   };
@@ -292,24 +318,30 @@ export function WalkPerson({
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
+            onLostPointerCapture={onPointerUp}
             onClick={onClick}
           >
             <PersonFigure px={2} className={cn(carrying && "opacity-30")} />
           </button>
         </TooltipTrigger>
-        <TooltipContent
-          side="left"
-          sideOffset={10}
-          className="max-w-56 flex-col items-start gap-0.5"
-        >
-          <span className="flex items-center gap-1">
-            {t.walk.person}
-            <kbd data-slot="kbd" className="ml-1 rounded-sm bg-sign/15 px-1.5 py-0.5 font-semibold">
-              W
-            </kbd>
-          </span>
-          <span className="block font-normal opacity-80">{t.walk.personHint}</span>
-        </TooltipContent>
+        {!carrying && (
+          <TooltipContent
+            side="left"
+            sideOffset={10}
+            className="max-w-56 flex-col items-start gap-0.5"
+          >
+            <span className="flex items-center gap-1">
+              {t.walk.person}
+              <kbd
+                data-slot="kbd"
+                className="ml-1 rounded-sm bg-sign/15 px-1.5 py-0.5 font-semibold"
+              >
+                W
+              </kbd>
+            </span>
+            <span className="block font-normal opacity-80">{t.walk.personHint}</span>
+          </TooltipContent>
+        )}
       </Tooltip>
       {carried &&
         createPortal(

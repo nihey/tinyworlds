@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setMapView } from "@/map/data";
 import { createProjection } from "@/map/projection";
-import type { WalkCell } from "../cell";
+import { G, ROOF_DECK, type WalkCell } from "../cell";
 import {
   fromMapPx,
   geoFrame,
@@ -13,7 +13,7 @@ import {
   WalkData,
 } from "../load";
 import type { WalkIndex } from "../walk-index";
-import { deckWay, fileStreets, makeCell, roadNode, streetEdge } from "./fixtures";
+import { boxVolume, deckWay, fileStreets, makeCell, roadNode, streetEdge } from "./fixtures";
 
 /** An index whose squares exist from (0, 0) over 4 × 4. */
 function indexOf(): WalkIndex {
@@ -215,6 +215,35 @@ describe("WalkData.dropAtMap", () => {
     expect(d).not.toBeNull();
     expect(d!.z).toBe(0);
     expect(d!.n).toBeCloseTo(395 - 6);
+  });
+
+  it("shows nearby ground-level footprints, parks and plazas from the cells the drop already loaded", async () => {
+    const building = boxVolume(98, 98, 118, 130);
+    const upperStorey = boxVolume(98, 98, 118, 130, 4);
+    const mapDeck = { ...building, roofShape: ROOF_DECK };
+    const distant = boxVolume(182, 182, 198, 198);
+    const park = { kind: G.Park, order: 1, rings: boxVolume(120, 90, 140, 106).rings };
+    const plaza = { kind: G.Plaza, order: 2, rings: boxVolume(90, 120, 110, 130).rings };
+    const land = { ...park, kind: G.Land };
+    const fetchCell = vi.fn(async (i: number, j: number) =>
+      i === 0 && j === 0
+        ? makeCell(i, j, {
+            volumes: [building, upperStorey, mapDeck, distant],
+            ground: [land, park, plaza],
+          })
+        : makeCell(i, j),
+    );
+    const data = new WalkData(ixOf(), fetchCell);
+    const at = GRID.toMap(105, 105, 0);
+    await data.dropAtMap(GRID, at.x, at.y);
+    const loaded = fetchCell.mock.calls.length;
+
+    expect(data.groundNearMap(GRID, at.x, at.y, 35)).toEqual({
+      footprints: [building.rings],
+      green: [park.rings],
+      paved: [plaza.rings],
+    });
+    expect(fetchCell).toHaveBeenCalledTimes(loaded);
   });
 });
 

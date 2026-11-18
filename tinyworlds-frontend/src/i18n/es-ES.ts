@@ -239,6 +239,13 @@ export const esES: Strings = {
     open: "Salón de la Fama",
     openCity: "Salón de la Fama de {city}",
     everyone: "Nuestros Benefactores",
+    rankedBy: "En orden de importe total donado.",
+    achievements: {
+      founding:
+        "Donó antes de que la ciudad alcanzara su meta. El número indica el orden de la donación fundadora.",
+      firstStone: "Completó el primer dólar recaudado para la ciudad.",
+      keystone: "Colocó la última piedra al completar la meta de recaudación de la ciudad.",
+    },
     byCity: "Más ciudades",
     byCityLine: "Cada una tiene su propio Salón de la Fama.",
     builtBy: "Construidas por benefactores",

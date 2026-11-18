@@ -314,6 +314,8 @@ export interface Strings {
     openCity: string;
     /** the overall page's two parts */
     everyone: string;
+    rankedBy: string;
+    achievements: { founding: string; firstStone: string; keystone: string };
     byCity: string;
     byCityLine: string;
     /** the cities on the map because people paid for them: the section, and its line */

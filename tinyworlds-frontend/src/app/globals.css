@@ -162,10 +162,10 @@
 .dusk .map-tiles {
   filter: var(--dusk-tint);
 }
-.tilt-on .map-tiles {
+.tilt-on:not([data-walk-dragging]) .map-tiles {
   filter: var(--tilt-lift);
 }
-.dusk .tilt-on .map-tiles {
+.dusk .tilt-on:not([data-walk-dragging]) .map-tiles {
   filter: var(--dusk-tint) var(--tilt-lift);
 }
 /* over a building that lights up: it can be clicked (a drag still grabs) */
@@ -208,6 +208,10 @@
 }
 .tilt-on .tilt-band {
   opacity: 1;
+}
+/* Keep the street preview sharp above the dimmed tiles while placing the walker. */
+.map-root[data-walk-dragging] > :is(.map-marks, .tilt-band) {
+  visibility: hidden;
 }
 .tilt-band[data-edge="top"] {
   top: 0;

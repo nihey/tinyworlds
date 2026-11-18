@@ -275,7 +275,8 @@ only reads the city (never a hidden one) and its gifts.
 
 Three guards on grouping: only a named gift joins others (an unnamed gift is always its own row);
 a donor's founding gifts share their first row; a named founder is not listed again among the
-benefactors.
+benefactors. The Hall of Fame ranks founders by `totalAmountCents`, which also includes their
+later named gifts to that city. `amountCents` on the founder row counts their founding gifts.
 
 `donors` holds one row per lower-case email (`display_name`, `name_hidden`, `links_hidden`,
 `hall_mailed_at`, `note_mailed_at`, `last_login_at`);
@@ -305,7 +306,9 @@ list).
 that is shown, as one list for the front page (`wall.ts`, pure): a named donor **once**, their
 named gifts added up over every city they are named in (the city they gave most to first),
 with their links; every unnamed gift on its own, name `null`, with what it gave and its one
-city, as on a city's own list. Largest first, then the latest; at most `WALL_MAX` (200). Gifts
+city, as on a city's own list. Each city entry can carry a `foundation` with the founding
+number, First Stone, and Keystone from `cityStanding` for the gifts on that entry. Largest
+first, then the latest, with at most `WALL_MAX` (200) entries. Gifts
 to no city, to a hidden city or in another currency are on no list. An unnamed entry says
 nothing of whose it is: a donor named in one city and not in another is two entries.
 

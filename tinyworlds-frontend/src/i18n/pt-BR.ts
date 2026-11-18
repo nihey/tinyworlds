@@ -239,6 +239,13 @@ export const ptBR: Strings = {
     open: "Hall da Fama",
     openCity: "Hall da Fama de {city}",
     everyone: "Nossos Benfeitores",
+    rankedBy: "Em ordem de valor total doado.",
+    achievements: {
+      founding:
+        "Doou antes de a cidade atingir a meta. O número indica a ordem da doação fundadora.",
+      firstStone: "Completou o primeiro dólar arrecadado para a cidade.",
+      keystone: "Colocou a última pedra ao completar a meta de arrecadação da cidade.",
+    },
     byCity: "Mais cidades",
     byCityLine: "Cada uma tem o seu próprio Hall da Fama.",
     builtBy: "Construídas por benfeitores",

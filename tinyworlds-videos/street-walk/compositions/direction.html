@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #drag-instruction {
+      position: absolute;
+      top: 153px;
+      right: 192px;
+    }
+    #drag-line {
+      position: static;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="direction"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[{"id":"instruction","type":"string","label":"Instruction","default":"Drag the walker onto a street"}]'
+  >
+    <div id="drag-instruction" class="clip" data-start="0.58" data-duration="4.44" data-track-index="0">
+      <p id="drag-line" class="sign direction" data-var-text="instruction">Drag the walker onto a street</p>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      "#drag-line",
+      { clipPath: "inset(0 100% 0 0)" },
+      { clipPath: "inset(0 0% 0 0)", duration: 0.31, ease: "power3.out" },
+      0.58,
+    );
+    tl.to("#drag-line", { clipPath: "inset(0 0% 0 100%)", duration: 0.21, ease: "power2.in" }, 4.81);
+    window.__timelines["direction"] = tl;
+  </script>
+</template>
