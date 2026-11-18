@@ -19,13 +19,17 @@ search, every building at its height.
 | --- | --- | --- |
 | ![Downtown Pittsburgh and its rivers](tinyworlds-frontend/public/og/tinypit.jpg) | ![Center City Philadelphia](tinyworlds-frontend/public/og/tinyphl.jpg) | ![Downtown Colorado Springs](tinyworlds-frontend/public/og/tinycos.jpg) |
 
-| tinytkf · Truckee | tinyaus · Austin | tinywinterfell |
+| tinytkf · Truckee | tinyaus · Austin | tinysfo · San Francisco |
 | --- | --- | --- |
-| ![Downtown Truckee, the railroad and the river](tinyworlds-frontend/public/og/tinytkf.jpg) | ![Downtown Austin and Lady Bird Lake](tinyworlds-frontend/public/og/tinyaus.jpg) | ![Winterfell](tinyworlds-frontend/public/og/tinywinterfell.jpg) |
+| ![Downtown Truckee, the railroad and the river](tinyworlds-frontend/public/og/tinytkf.jpg) | ![Downtown Austin and Lady Bird Lake](tinyworlds-frontend/public/og/tinyaus.jpg) | ![The Golden Gate Bridge](tinyworlds-frontend/public/og/tinysfo.jpg) |
 
-| tinykingslanding | tinywesteros |
-| --- | --- |
-| ![King's Landing](tinyworlds-frontend/public/og/tinykingslanding.jpg) | ![Westeros and Essos](tinyworlds-frontend/public/og/tinywesteros.jpg) |
+| tinymke · Milwaukee | tinywinterfell | tinykingslanding |
+| --- | --- | --- |
+| ![Downtown Milwaukee and the Lake Michigan waterfront](tinyworlds-frontend/public/og/tinymke.jpg) | ![Winterfell](tinyworlds-frontend/public/og/tinywinterfell.jpg) | ![King's Landing](tinyworlds-frontend/public/og/tinykingslanding.jpg) |
+
+| tinywesteros |
+| --- |
+| ![Westeros and Essos](tinyworlds-frontend/public/og/tinywesteros.jpg) |
 
 Nothing is drawn by hand and no image model is involved. The maps are rendered procedurally from
 open data by a software rasterizer written for the purpose: building footprints and heights,
@@ -72,8 +76,14 @@ a few minutes to render on a desktop machine.
   South Congress, Barton Springs, Lady Bird Lake and the bridges over it, Lake Austin and the
   airport. Street Walk lets you explore at street level on foot, by car, by motorcycle or by boat.
 
-New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs and Austin light up their famous
-buildings under the pointer, with a line from Wikipedia, and play "Guess the building" with them.
+- **tinysfo** covers San Francisco, California, including the Golden Gate Bridge, the Presidio, Golden Gate Park,
+  downtown and the Embarcadero, and Alcatraz. Street Walk lets you explore at street level.
+- **tinymke** covers Milwaukee, Wisconsin, including City Hall, the Milwaukee River, the Historic Third Ward,
+  and the Art Museum on the Lake Michigan shore. Street Walk follows the streets and waterfront.
+
+New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Austin, San Francisco
+and Milwaukee light up their famous buildings under the pointer, with a line from Wikipedia,
+and play "Guess the building" with them.
 Truckee lights up its own (Commercial Row's hotels, the old jail, the depot, the Pioneer
 Monument), but too few of them are on Wikipedia for the game.
 

@@ -71,6 +71,7 @@ export interface GroundWay {
 }
 
 export interface Cable {
+  /** Main cable, suspender, truss chord, truss member, painted main cable, painted suspender. */
   kind: number;
   /** e, n, z */
   pts: Float32Array;

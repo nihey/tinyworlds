@@ -454,7 +454,9 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
   const synthetic =
     scene.meta.synthetic === true || CITY.synthetic ? syntheticNetwork(scene.arrays, geo, deckAt) : null;
   const segments =
-    opts.segments ?? synthetic?.segments ?? (await readSegments(path.join(DIRS.raw, "segment.parquet"), geo));
+    opts.segments ??
+    synthetic?.segments ??
+    (await readSegments(path.join(DIRS.raw, "segment.parquet"), geo, CITY.walkCycleways));
   lap(`scene and ${segments.length} segments read`);
   const net = networkOf(segments, deckAt, log);
   lap(
@@ -492,8 +494,9 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
     cuts = (i, j) => reached.has(num(i, j));
   }
 
-  const cut = cutScene(scene, geo, cuts, synthetic?.piers);
   const onMap = squaresOnMap(scene, geo, cuts);
+  const splitMainCables = CITY.suspensions?.some((span) => span.mappedTowers);
+  const cut = cutScene(scene, geo, cuts, synthetic?.piers, splitMainCables, [...onMap].map(unnum));
   const squares = new Map<number, SceneSquare>();
   for (const sq of cut.values())
     if (onMap.has(num(sq.i, sq.j)) || holdsSomething(sq)) squares.set(num(sq.i, sq.j), sq);

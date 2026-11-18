@@ -826,9 +826,11 @@ function addCables(
   const pos: number[] = [];
   const colour: number[] = [];
   for (const c of cables) {
-    const truss = c.kind >= 2;
-    const main = c.kind === 0 || c.kind === 2;
-    const idx = (truss ? tan : steel) * SHADES + (main ? DEEP : SHADE);
+    const truss = c.kind === 2 || c.kind === 3;
+    const painted = c.kind === 4 || c.kind === 5;
+    const main = c.kind === 0 || c.kind === 2 || c.kind === 4;
+    const ramp = painted ? ctx.palette.ramp("roofRed") : truss ? tan : steel;
+    const idx = ramp * SHADES + (main ? DEEP : SHADE);
     const p = c.pts;
     for (let q = 3; q < p.length; q += 3) {
       pos.push(p[q - 3] - oe, p[q - 1], -(p[q - 2] - on), p[q] - oe, p[q + 2], -(p[q + 1] - on));

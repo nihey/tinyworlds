@@ -88,19 +88,21 @@ function json<T>(v: DuckDBValue): T[] {
  * Every road of the walk's classes and every rail in the file. The whole file is read: filtering
  * the local Parquet on its bbox struct crashes this DuckDB build.
  */
-export async function readSegments(file: string, geo: Geo): Promise<Segment[]> {
+export async function readSegments(file: string, geo: Geo, walkCycleways: string[] = []): Promise<Segment[]> {
   const db = await DuckDBInstance.create(":memory:");
   const conn = await db.connect();
   try {
     await conn.run("INSTALL spatial; LOAD spatial;");
     const classes = [...CAR_CLASSES, ...WALK_CLASSES].map((c) => `'${c}'`).join(",");
+    const sharedPaths = walkCycleways.map((name) => `'${name.replaceAll("'", "''")}'`).join(",");
+    const walks = sharedPaths ? ` OR class = 'cycleway' AND names."primary" IN (${sharedPaths})` : "";
     const result = await conn.stream(
       `SELECT id, subtype, class, subclass, names."primary", width_rules[1]."value",
               CAST(to_json(road_flags) AS VARCHAR), CAST(to_json(rail_flags) AS VARCHAR),
               CAST(to_json(level_rules) AS VARCHAR), CAST(to_json(access_restrictions) AS VARCHAR),
               CAST(to_json(connectors) AS VARCHAR), ST_AsWKB(geometry)
        FROM '${file.replaceAll("'", "''")}'
-       WHERE (subtype = 'road' AND class IN (${classes})) OR (subtype = 'rail' AND class <> 'unknown')`,
+       WHERE (subtype = 'road' AND (class IN (${classes})${walks})) OR (subtype = 'rail' AND class <> 'unknown')`,
     );
     const out: Segment[] = [];
     for (;;) {
@@ -115,11 +117,12 @@ export async function readSegments(file: string, geo: Geo): Promise<Segment[]> {
         for (let i = 0; i + 1 < ll.length; i += 2) pts.push(...lonLatToEN(geo, ll[i], ll[i + 1]));
         if (pts.length < 4) continue;
         const rail = str(row[1]) === "rail";
+        const cls = str(row[2]) ?? "";
         const width = num(row[5]);
         out.push({
           id: str(row[0]) ?? "",
           subtype: rail ? "rail" : "road",
-          cls: str(row[2]) ?? "",
+          cls: !rail && cls === "cycleway" ? "footway" : cls,
           subclass: str(row[3]),
           name: str(row[4]) ?? "",
           width: !rail && width !== null && width >= 2 && width <= 60 ? width : null,

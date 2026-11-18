@@ -9,11 +9,13 @@ import { tinygtav } from "./tinygtav.js";
 import { tinykingslanding } from "./tinykingslanding.js";
 import { tinylas } from "./tinylas.js";
 import { tinylax } from "./tinylax.js";
+import { tinymke } from "./tinymke.js";
 import { tinynyc } from "./tinynyc.js";
 import { tinyphl } from "./tinyphl.js";
 import { tinypit } from "./tinypit.js";
 import { tinyorl } from "./tinyorl.js";
 import { tinyrao } from "./tinyrao.js";
+import { tinysfo } from "./tinysfo.js";
 import { tinysanandreas } from "./tinysanandreas.js";
 import { tinytkf } from "./tinytkf.js";
 import { tinyvicecity } from "./tinyvicecity.js";
@@ -39,6 +41,8 @@ export const CITIES: Record<string, City> = {
   tinycos,
   tinytkf,
   tinyaus,
+  tinysfo,
+  tinymke,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,

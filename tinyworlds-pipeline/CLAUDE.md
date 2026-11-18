@@ -5,24 +5,26 @@ viewer: a pyramid of isometric pixel-art tiles plus search and overlay indexes. 
 queue; run it by hand when the data or the drawing rules change. One process draws one city,
 chosen with `--city` (default `tinynyc`).
 
-| City               | Full run (20 cores)      | Output                                             |
-| ------------------ | ------------------------ | -------------------------------------------------- |
-| `tinynyc`          | ≈ 5 min (+ walk 3.5 min) | 0.8 GB, 30,000 files (+ walk 118 MB, 37,246 files) |
-| `tinyrao`          | ≈ 2.5 min                | 0.3 GB, 11,000 files                               |
-| `tinyorl`          | ≈ 4 min                  | 1.1 GB, 29,000 files                               |
-| `tinyfte`          | seconds                  | a few MB                                           |
-| `tinyvlc`          | ≈ 1 min                  | 0.2 GB                                             |
-| `tinylas`          | ≈ 1 min                  | 0.2 GB                                             |
-| `tinylax`          | ≈ 4 min                  | 0.7 GB, 23,000 files                               |
-| `tinydal`          | ≈ 1.5 min (+ wiki)       | 0.3 GB, 10,500 files                               |
-| `tinycvg`          | ≈ 1 min (+ wiki)         | 0.2 GB, 6,300 files                                |
-| `tinypit`          | ≈ 1 min (+ wiki)         | 0.2 GB, 5,200 files                                |
-| `tinyphl`          | ≈ 1.5 min (+ wiki)       | 0.1 GB, 5,300 files                                |
-| `tinycos`          | ≈ 2 min (+ wiki)         | 0.4 GB, 11,700 files                               |
-| `tinytkf`          | ≈ 1 min (+ wiki)         | 0.2 GB, 4,200 files                                |
-| `tinywinterfell`   | 3 s (no fetch)           | 4 MB, 230 files                                    |
-| `tinykingslanding` | 8 s (no fetch)           | 21 MB, 730 files                                   |
-| `tinywesteros`     | ≈ 2 min (no fetch)       | 0.2 GB, 14,100 files                               |
+| City               | Full run (20 cores)                          | Output                                                 |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------ |
+| `tinynyc`          | ≈ 5 min (+ walk 3.5 min)                     | 0.8 GB, 30,000 files (+ walk 118 MB, 37,246 files)     |
+| `tinyrao`          | ≈ 2.5 min                                    | 0.3 GB, 11,000 files                                   |
+| `tinyorl`          | ≈ 4 min                                      | 1.1 GB, 29,000 files                                   |
+| `tinyfte`          | seconds                                      | a few MB                                               |
+| `tinyvlc`          | ≈ 1 min                                      | 0.2 GB                                                 |
+| `tinylas`          | ≈ 1 min                                      | 0.2 GB                                                 |
+| `tinylax`          | ≈ 4 min                                      | 0.7 GB, 23,000 files                                   |
+| `tinydal`          | ≈ 1.5 min (+ wiki)                           | 0.3 GB, 10,500 files                                   |
+| `tinycvg`          | ≈ 1 min (+ wiki)                             | 0.2 GB, 6,300 files                                    |
+| `tinypit`          | ≈ 1 min (+ wiki)                             | 0.2 GB, 5,200 files                                    |
+| `tinyphl`          | ≈ 1.5 min (+ wiki)                           | 0.1 GB, 5,300 files                                    |
+| `tinycos`          | ≈ 2 min (+ wiki)                             | 0.4 GB, 11,700 files                                   |
+| `tinytkf`          | ≈ 1 min (+ wiki)                             | 0.2 GB, 4,200 files                                    |
+| `tinysfo`          | 91 s for Street Walk after tiles and indexes | ≈ 343 MB across both views, including 7,630 walk cells |
+| `tinymke`          | 30 s for Street Walk after tiles and indexes | ≈ 215 MB across both views, including 4,841 walk cells |
+| `tinywinterfell`   | 3 s (no fetch)                               | 4 MB, 230 files                                        |
+| `tinykingslanding` | 8 s (no fetch)                               | 21 MB, 730 files                                       |
+| `tinywesteros`     | ≈ 2 min (no fetch)                           | 0.2 GB, 14,100 files                                   |
 
 ## Commands
 
@@ -81,6 +83,8 @@ src/
 │   ├── tinyphl.ts (+ .places.ts)   # Philadelphia: Penn's grid, the Parkway, the city's neighbourhoods
 │   ├── tinycos.ts (+ .places.ts)   # Colorado Springs: parts of town round named points, the Academy, red rocks
 │   ├── tinytkf.ts (+ .places.ts)   # Truckee: the depot, Donner Lake, the Pioneer Monument as a statue
+│   ├── tinysfo.ts (+ .places.ts)   # San Francisco: the Golden Gate, downtown and Alcatraz
+│   ├── tinymke.ts (+ .places.ts)   # Milwaukee: the river, City Hall and the lakefront
 │   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts;
 │   │                  # aroundPoints(): parts of town the data knows only as named points
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
@@ -324,7 +328,7 @@ river, an islet, the Wall).
 
 ## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
 
-A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee) gets `sights.json` from `index` and `sights.<locale>.json` from
+A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee) gets `sights.json` from `index` and `sights.<locale>.json` from
 `wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
 one or more search entries point at.
 
@@ -448,6 +452,11 @@ change to the rules below.
 - Truckee: 6 questions (easy 2, medium 2, hard 2; 5 asked in each language, Truckee station's
   opening being all name), from 8 of its 41 sights on 6 articles: too few for a game, so its
   viewer has `sights` and no `quiz`. The files are written all the same.
+- San Francisco has 659 lit sights north up and 660 on the street grid. Both orientations
+  match 144 Wikipedia articles and offer 139 English, 140 Brazilian Portuguese and 139 Spanish
+  quiz questions.
+- Milwaukee has 387 lit sights and 90 Wikipedia matches in each orientation. The quiz has
+  80 questions in English, 82 in Brazilian Portuguese and 83 in Spanish.
 - **Wikipedia's requests can fail in bulk** ("fetch failed"): failures are not cached, so run
   `wiki` again until it reports none failed.
 
@@ -576,7 +585,8 @@ whose shadows reach it, and margins for both.
   North End at 2.3°, General Palmer's grid, rather than the section-line roads' 0°; Truckee's
   downtown at 71.1°, the grid that follows the railroad, 14% of the core's streets, rather than
   the compass grid that peaks over the whole box (0.3°, 6%: Donner Pass Road, the lake shore,
-  Glenshire). Measure it as the peak of the streets' bearings modulo 90°, weighted by length.
+  Glenshire). San Francisco follows the Financial District and North Beach grid at −9.1°.
+  Milwaukee follows the downtown and Third Ward grid at −4.5°. Measure it as the peak of the streets' bearings modulo 90°, weighted by length.
 - Everything is deterministic: variation comes from hashes of ids and positions, never `Math.random`.
 - Bridge decks rise with distance from the shore (`deckHeight` in `scene/build.ts`); towers come
   from the data; pairs of equal-height towers get cables.
@@ -671,6 +681,8 @@ have no floors mapped (the Academy's halls, the Broadmoor).
 | City of Pittsburgh (WPRDC)          | Pittsburgh's 90 neighbourhoods                                                | CC BY                                               |
 | Abaca Labs (OpenDataPhilly)         | Philadelphia's 159 neighbourhoods                                             | CC BY 4.0                                           |
 | City of Austin Open Data            | Austin's Neighborhood Reporting Areas                                         | City of Austin open data                            |
+| DataSF Analysis Neighborhoods       | San Francisco's census-based neighborhoods                                    | PDDL 1.0                                            |
+| City of Milwaukee Open Data         | Milwaukee Neighborhood Identification Project boundaries                      | CC BY                                               |
 | Wikipedia (en, pt, es)              | the openings of the sights' articles, and their links (`wiki`)                | CC BY-SA 4.0                                        |
 
 `data/` (raw downloads and scenes, per city) is gitignored and reproducible.

@@ -136,6 +136,22 @@ describe("cutScene", () => {
     expect(squares.get("0_0")!.cab.verts).toEqual([]);
   });
 
+  it.each([0, 4])("streams a main cable of kind %i near either anchor, away from the center cell", (kind) => {
+    const spanning = scene();
+    const points = Array.from({ length: 61 }, (_, i) => [...px(150 + i * 5, 20), i * kz]).flat();
+    spanning.arrays["cab.start"] = Uint32Array.of(0, 61);
+    spanning.arrays["cab.xyz"] = Float32Array.from(points);
+    spanning.arrays["cab.kind"] = Uint8Array.of(kind);
+
+    const outer = cutScene(spanning, geo, (i, j) => j === 0 && i !== 1, undefined, true);
+    expect(outer.get("0_0")!.cab.kind).toEqual([kind]);
+    expect(outer.get("0_0")!.cab.verts).toEqual([11]);
+    expect(outer.get("0_0")!.cab.xyz.slice(-3)).toEqual([2000, 200, 100]);
+    expect(outer.get("2_0")!.cab.kind).toEqual([kind]);
+    expect(outer.get("2_0")!.cab.verts).toEqual([11]);
+    expect(outer.get("2_0")!.cab.xyz.slice(0, 3)).toEqual([4000, 200, 500]);
+  });
+
   it("masks each square: land where the polygon is, water elsewhere", () => {
     expect(squares.get("0_0")!.mask[0]).toBe(2);
     expect(squares.get("0_1")!.mask).toEqual(Uint8Array.of(1));
@@ -145,6 +161,27 @@ describe("cutScene", () => {
     const only = cutScene(scene(), geo, (i, j) => i === 1 && j === 0);
     expect([...only.keys()]).toEqual(["1_0"]);
     expect(only.get("1_0")!.vol.rings).toEqual([1]);
+  });
+
+  it("keeps the original ground and holes in visible squares and those holding drawn features", () => {
+    const s = scene();
+    s.arrays["ground.vertStart"] = Uint32Array.of(0, 4, 8);
+    s.arrays["ground.ringStart"] = Uint32Array.of(0, 2);
+    s.arrays["ground.xy"] = Float32Array.from([
+      ...flat(rectEN(-1000, -1000, 3000, 3000)),
+      ...flat(rectEN(550, 50, 630, 250)),
+    ]);
+    const unbounded = cutScene(s, geo);
+    const bounded = cutScene(s, geo, undefined, undefined, false, [
+      [3, 0],
+      [3, 1],
+    ]);
+
+    // The visible square has no feature but must keep its ground including the cut hole.
+    // A street's 30 m margin, the tree and the volumes retain their own ground outside it.
+    expect([...bounded.keys()].sort()).toEqual(["-1_0", "0_0", "0_1", "1_0", "3_0", "3_1"]);
+    for (const [key, square] of bounded)
+      expect(squareArrays(square)).toEqual(squareArrays(unbounded.get(key)!));
   });
 });
 
