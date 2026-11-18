@@ -23,13 +23,13 @@ search, every building at its height.
 | --- | --- | --- |
 | ![Downtown Truckee, the railroad and the river](tinyworlds-frontend/public/og/tinytkf.jpg) | ![Downtown Austin and Lady Bird Lake](tinyworlds-frontend/public/og/tinyaus.jpg) | ![The Golden Gate Bridge](tinyworlds-frontend/public/og/tinysfo.jpg) |
 
-| tinymke · Milwaukee | tinywinterfell | tinykingslanding |
+| tinymke · Milwaukee | tinybeth · Bethlehem | tinywinterfell |
 | --- | --- | --- |
-| ![Downtown Milwaukee and the Lake Michigan waterfront](tinyworlds-frontend/public/og/tinymke.jpg) | ![Winterfell](tinyworlds-frontend/public/og/tinywinterfell.jpg) | ![King's Landing](tinyworlds-frontend/public/og/tinykingslanding.jpg) |
+| ![Downtown Milwaukee and the Lake Michigan waterfront](tinyworlds-frontend/public/og/tinymke.jpg) | ![SteelStacks and the Lehigh River](tinyworlds-frontend/public/og/tinybeth.jpg) | ![Winterfell](tinyworlds-frontend/public/og/tinywinterfell.jpg) |
 
-| tinywesteros |
-| --- |
-| ![Westeros and Essos](tinyworlds-frontend/public/og/tinywesteros.jpg) |
+| tinykingslanding | tinywesteros |
+| --- | --- |
+| ![King's Landing](tinyworlds-frontend/public/og/tinykingslanding.jpg) | ![Westeros and Essos](tinyworlds-frontend/public/og/tinywesteros.jpg) |
 
 Nothing is drawn by hand and no image model is involved. The maps are rendered procedurally from
 open data by a software rasterizer written for the purpose: building footprints and heights,
@@ -80,9 +80,11 @@ a few minutes to render on a desktop machine.
   downtown and the Embarcadero, and Alcatraz. Street Walk lets you explore at street level.
 - **tinymke** covers Milwaukee, Wisconsin, including City Hall, the Milwaukee River, the Historic Third Ward,
   and the Art Museum on the Lake Michigan shore. Street Walk follows the streets and waterfront.
+- **tinybeth** covers Bethlehem, Pennsylvania. Follow the Lehigh River from the historic Moravian
+  settlement to South Bethlehem, SteelStacks and Lehigh University. Street Walk includes the South Bethlehem Greenway.
 
-New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Austin, San Francisco
-and Milwaukee light up their famous buildings under the pointer, with a line from Wikipedia,
+New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Austin, San Francisco,
+Milwaukee and Bethlehem light up their famous buildings under the pointer, with a line from Wikipedia,
 and play "Guess the building" with them.
 Truckee lights up its own (Commercial Row's hotels, the old jail, the depot, the Pioneer
 Monument), but too few of them are on Wikipedia for the game.

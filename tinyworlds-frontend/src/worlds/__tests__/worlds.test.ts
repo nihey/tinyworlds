@@ -32,6 +32,7 @@ describe("resolveWorld", () => {
       "tinyaus",
       "tinysfo",
       "tinymke",
+      "tinybeth",
       "tinywinterfell",
       "tinykingslanding",
     ]) {
@@ -58,6 +59,7 @@ describe("resolveWorld", () => {
       "tinyaus",
       "tinysfo",
       "tinymke",
+      "tinybeth",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
@@ -81,7 +83,7 @@ describe("resolveWorld", () => {
 });
 
 describe("worlds", () => {
-  it.each(["tinyaus", "tinysfo", "tinymke"])(
+  it.each(["tinyaus", "tinysfo", "tinymke", "tinybeth"])(
     "opens Street Walk from both map views and offers the building quiz in %s",
     (id) => {
       expect(resolveWorld(id)).toMatchObject({
@@ -336,6 +338,7 @@ describe("worlds", () => {
       "tinyaus",
       "tinysfo",
       "tinymke",
+      "tinybeth",
     ]);
     // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
     for (const world of Object.values(WORLDS)) {

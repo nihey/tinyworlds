@@ -1,4 +1,5 @@
 import { tinyaus } from "./tinyaus";
+import { tinybeth } from "./tinybeth";
 import { tinycos } from "./tinycos";
 import { tinycvg } from "./tinycvg";
 import { tinydal } from "./tinydal";
@@ -47,6 +48,7 @@ export const WORLDS: Record<string, World> = {
   tinyaus,
   tinysfo,
   tinymke,
+  tinybeth,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,

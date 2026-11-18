@@ -101,6 +101,8 @@ describe("site", () => {
       "San Francisco",
       "São Francisco",
       "Milwaukee",
+      "Bethlehem, Pennsylvania",
+      "Bethlehem",
       "Winterfell",
       "Invernalia",
       "King's Landing",

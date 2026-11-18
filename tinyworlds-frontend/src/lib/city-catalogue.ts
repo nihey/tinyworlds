@@ -30,6 +30,7 @@ export const CITY_CATALOGUE: CatalogueCity[] = [
     "SFO",
   ),
   city("Milwaukee", "US", "Milwaukee, WI", "Milwaukee, Wisconsin", "MKE"),
+  city("Bethlehem, Pennsylvania", "US", "Bethlehem", "Bethlehem, PA"),
   city("Miami", "US"),
   city("Boston", "US"),
   city("Washington, D.C.", "US", "Washington DC"),
