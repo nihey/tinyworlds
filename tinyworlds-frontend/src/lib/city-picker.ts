@@ -31,6 +31,14 @@ function matches(query: string[], names: string[]): boolean {
 
 const namesOf = (city: CatalogueCity): string[] => [city.name, ...(city.alt ?? [])].map(fold);
 
+function catalogueSpellings(catalogue: CatalogueCity[]) {
+  const spellings = new Map(catalogue.map((city) => [fold(city.name), namesOf(city)]));
+  return (name: string): string[] => {
+    const key = fold(name);
+    return spellings.get(key) ?? [key];
+  };
+}
+
 export interface PickerOptions {
   /** The cities already being funded that the search keeps, most funded first (the API's order). */
   funding: CityMilestone[];
@@ -57,8 +65,7 @@ export function pickerOptions(
   const whole = words.join(" ");
   const known = new Set([...milestones.map((city) => fold(city.name)), ...builtNames.map(fold)]);
   // a city being funded is also found by the catalogue's other spellings of it ("Londres")
-  const spellings = new Map(catalogue.map((city) => [fold(city.name), namesOf(city)]));
-  const namesFor = (name: string): string[] => spellings.get(fold(name)) ?? [fold(name)];
+  const namesFor = catalogueSpellings(catalogue);
 
   const funding = milestones
     .filter(selectable)
@@ -210,10 +217,19 @@ export function rankCities(milestones: CityMilestone[]): Ranking {
   };
 }
 
-/** How many of the ranking's cities show before "show all": with the last card, three rows of three. */
-export const RANKING_LIMIT = 8;
-/** How many of the built cities show before their own "show all". */
-export const BUILT_LIMIT = 6;
+/** Search all three rows using the donation picker's spellings and keep each city's original place. */
+export function searchRanking(ranking: Ranking, catalogue: CatalogueCity[], query: string) {
+  const words = fold(query).split(" ").filter(Boolean);
+  const namesFor = catalogueSpellings(catalogue);
+  const found = (city: CityMilestone) => matches(words, namesFor(city.name));
+  return {
+    built: ranking.built.filter(found),
+    funded: ranking.funded.filter(found),
+    ranked: ranking.ranked.flatMap((city, index) =>
+      found(city) ? [{ city, place: index + 1 }] : [],
+    ),
+  };
+}
 
 /** The cities nearest to being built: the funded ones, then the best funded. Never a built one. */
 export function leading(ranking: Ranking, n: number): CityMilestone[] {

@@ -177,9 +177,8 @@ export const esES: Strings = {
     },
     donations: { none: "Aún sin donaciones", one: "{n} donación", other: "{n} donaciones" },
     status: { funded: "Meta alcanzada, en cola", building: "En construcción", built: "Construida" },
-    showAll: "Ver todas las ciudades",
-    showFewer: "Ver menos",
     build: {
+      matches: { one: "{n} ciudad encontrada", other: "{n} ciudades encontradas" },
       steps: {
         pick: {
           title: "Elige una ciudad",

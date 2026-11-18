@@ -10,8 +10,7 @@ import {
   withGoal,
   rankCities,
   leading,
-  BUILT_LIMIT,
-  RANKING_LIMIT,
+  searchRanking,
   regionNames,
   tidyCity,
 } from "../city-picker";
@@ -433,8 +432,25 @@ describe("rankCities", () => {
     expect(rankCities([])).toEqual({ built: [], funded: [], ranked: [], anyRaised: false });
   });
 
-  it("shows eight before asking to show all, and six of the built", () => {
-    expect(RANKING_LIMIT).toBe(8);
-    expect(BUILT_LIMIT).toBe(6);
+  it("searches every group by city name or alias and preserves the original funding rank", () => {
+    const ranking = rankCities([
+      city({ name: "San Francisco", status: "BUILT", raisedCents: 10000 }),
+      city({ name: "San Diego", status: "FUNDED" }),
+      city({ name: "London", raisedCents: 300 }),
+      city({ name: "São Paulo", raisedCents: 200 }),
+      city({ name: "San Antonio", raisedCents: 100 }),
+    ]);
+    const results = searchRanking(ranking, CATALOGUE, "san");
+    expect(results.built.map((entry) => entry.name)).toEqual(["San Francisco"]);
+    expect(results.funded.map((entry) => entry.name)).toEqual(["San Diego"]);
+    expect(results.ranked).toEqual([{ city: ranking.ranked[2], place: 3 }]);
+    expect(searchRanking(ranking, CATALOGUE, "londres").ranked[0].place).toBe(1);
+    expect(searchRanking(ranking, CATALOGUE, "SAO").ranked[0].place).toBe(2);
+    expect(searchRanking(ranking, CATALOGUE, "missing")).toEqual({
+      built: [],
+      funded: [],
+      ranked: [],
+    });
+    expect(searchRanking(ranking, CATALOGUE, "").ranked).toHaveLength(3);
   });
 });

@@ -478,19 +478,19 @@ Optional, and never in the way: with nothing configured there is no heart, no di
 - **"Build the next city"** (`components/donate/build-next.tsx`, `rankCities`): the front
   page's ranking, and a short form of it on "Your cities". Three steps say how it works (pick
   a city, give from US$1, at the goal it is built), each under one of the badges' pictures.
-  Then every city is a card (`city-fund-card.tsx`) in three groups:
+  Visitors can drag, swipe or page through each group, search all three by name or alternate spelling,
+  or open the donation picker with “Name a city”. Each city has a card (`city-fund-card.tsx`).
   - **Built**: `BUILT` with `raisedCents >= goalCents`, most raised first. A city never leaves
     the ranking: once built it stays here, lit in the accent, with its share card as a band,
     every stone laid, "Funded in full", and two actions, Benefactors and Explore. No Donate
     (see Benefactors). The rule is the whole rule: one of the worlds built without funding
     joins the group if its gifts ever reach its goal, which is why the card never says
-    "built by". Six before a "show all" of their own (`BUILT_LIMIT`).
+    "built by".
   - **Funded** (`FUNDED` and `BUILDING`), as before.
   - **Being funded**, most funded first and, among equals, the most people waiting for it
-    (`waiting`: "Tell me" is the free vote), eight before "show all" (`RANKING_LIMIT`), and
-    last an empty lot, "A city that is not here?", which opens the donate sign with no city
-    chosen. **Only a city with money has a number**: a place among cities at nothing would mean
-    nothing. A city nobody has given to shows its goal ("$30 goal"), not "$0 of $30"; while
+    (`waiting`: "Tell me" is the free vote). A search keeps the original funding rank.
+    **Only a city with money has a number**: a place among cities at nothing would mean nothing.
+    A city nobody has given to shows its goal ("$30 goal"), not "$0 of $30"; while
     nobody has given to any, a line says the order is how many are waiting (when some are) and
     that the first donation puts its city at the top.
 - **A city's card** shows its bar as **its foundation, a stone per dollar** (`StoneWall`,

@@ -231,13 +231,12 @@ export interface Strings {
     };
     donations: { none: string; one: string; other: string };
     status: { funded: string; building: string; built: string };
-    showAll: string;
-    showFewer: string;
     /**
      * "Build the next city": the three steps, a city's card and the last card. "{amount}" and
      * "{goal}" are sums; "{laid}" and "{total}" count stones.
      */
     build: {
+      matches: { one: string; other: string };
       steps: {
         pick: { title: string; body: string };
         give: { title: string; body: string };
