@@ -20,6 +20,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep both leaderboards in descending order by total donated, with ranks following the visual reading order. A city's leaderboard includes founders and later benefactors in the same list.
 - Show founding badges beside the city where they were earned, with localized descriptions available on hover, keyboard focus, and tap. Keep anonymous gifts independent of named entries.
 
+## Map benefactors
+
+- Real built cities show a small plaque above the map credits using live `cityBenefactors` data. Use the city's Hall of Fame ranking to show up to two distinct public names. A city without public names shows a support invitation.
+- The plaque opens the existing benefactors sign and its city-specific donation flow. Keep the plaque clear of the minimap and hide it during walker drags, Street Walk, and the narrow quiz sheet. Hide it when the API has no matching built city or the request fails.
+
 ## Street walk
 
 - New York and Austin use the same walk controls and physics. Each world has one walk data set that either map orientation can open. Set billboard areas in the world's config.

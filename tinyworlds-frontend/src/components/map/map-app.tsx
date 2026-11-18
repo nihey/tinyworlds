@@ -44,6 +44,7 @@ import { WORLD } from "@/worlds";
 import { AboutDialog } from "./about-dialog";
 import { CreditStrip } from "./credit-strip";
 import { LoadErrorDialog } from "./load-error-dialog";
+import { MapBenefactors } from "./map-benefactors";
 import { Minimap } from "./minimap";
 import { placeMeta } from "./place-types";
 import { QuizBanner } from "./quiz-banner";
@@ -88,8 +89,13 @@ export function MapApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
-  // the city the donate sign opens with chosen (from About's benefactors), if any
+  // the city the donate sign opens with chosen, if any
   const [donateCity, setDonateCity] = useState<string | null>(null);
+  const openCityDonation = (city: string) => {
+    setAboutOpen(false);
+    setDonateCity(city);
+    setDonateOpen(true);
+  };
 
   const [prefs, setPrefs] = usePrefs();
   useTheme(prefs.theme);
@@ -630,12 +636,21 @@ export function MapApp() {
               style={delay(220, 8)}
             />
           )}
-          <CreditStrip
-            engine={engine}
-            onAbout={() => setAboutOpen(true)}
-            className="sign-in fixed right-(--edge-r) bottom-(--edge-b)"
-            style={delay(300, 8)}
-          />
+          <div className="pointer-events-none fixed right-(--edge-r) bottom-(--edge-b) z-10 flex flex-col items-end gap-1.5">
+            {API_URL !== "" && !WORLD.fictional && (
+              <MapBenefactors
+                world={WORLD.id}
+                hidden={draggingWalker || (quizOn && quizSheet)}
+                onSupport={openCityDonation}
+              />
+            )}
+            <CreditStrip
+              engine={engine}
+              onAbout={() => setAboutOpen(true)}
+              className="sign-in pointer-events-auto"
+              style={delay(300, 8)}
+            />
+          </div>
         </>
       )}
 
@@ -655,15 +670,7 @@ export function MapApp() {
               }
             : undefined
         }
-        onBecome={
-          takesDonations
-            ? (cityName) => {
-                setAboutOpen(false);
-                setDonateCity(cityName);
-                setDonateOpen(true);
-              }
-            : undefined
-        }
+        onBecome={takesDonations ? openCityDonation : undefined}
       />
       {takesDonations && (
         <DonateDialog open={donateOpen} onOpenChange={setDonateOpen} city={donateCity} />

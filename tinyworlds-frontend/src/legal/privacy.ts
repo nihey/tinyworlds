@@ -116,7 +116,7 @@ export const PRIVACY: LegalDocs = {
         id: "public",
         title: "What is public",
         blocks: [
-          "A gift's amount and stones are shown on its city's list without saying who gave them, unless you ask to be named: then your name is shown there, on the front page and in the Hall of Fame, with the links you add. You can stop being named, change your name or remove your links at any time on [Your cities](me). We may hide a name or links that break our [Terms of Service](terms).",
+          "A gift's amount and stones are shown on its city's list without saying who gave them, unless you ask to be named: then your name is shown there, on the front page and in the Hall of Fame, with the links you add. Your name can also appear in the corner of the city map. You can stop being named, change your name or remove your links at any time on [Your cities](me). We may hide a name or links that break our [Terms of Service](terms).",
           "To show a link, our server reads the linked page once (and again whenever you ask) and keeps its title, its description and small copies of its icon and picture, so that visitors' browsers never contact the linked site.",
         ],
       },
@@ -327,7 +327,7 @@ export const PRIVACY: LegalDocs = {
         id: "public",
         title: "O que é público",
         blocks: [
-          "O valor e as pedras de uma doação aparecem na lista da cidade sem dizer quem doou, a menos que você peça para ter seu nome: aí seu nome aparece ali, na página inicial e no Hall da Fama, com os links que você adicionar. Você pode deixar de aparecer, mudar seu nome ou remover seus links a qualquer momento em [Suas cidades](me). Podemos ocultar um nome ou links que desrespeitem nossos [Termos de Uso](terms).",
+          "O valor e as pedras de uma doação aparecem na lista da cidade sem dizer quem doou, a menos que você peça para ter seu nome: aí seu nome aparece ali, na página inicial e no Hall da Fama, com os links que você adicionar. Seu nome também pode aparecer no canto do mapa da cidade. Você pode deixar de aparecer, mudar seu nome ou remover seus links a qualquer momento em [Suas cidades](me). Podemos ocultar um nome ou links que desrespeitem nossos [Termos de Uso](terms).",
           "Para mostrar um link, nosso servidor lê a página indicada uma vez (e de novo sempre que você pedir) e guarda o título, a descrição e pequenas cópias do ícone e da imagem dela, para que os navegadores dos visitantes nunca contatem o site indicado.",
         ],
       },
@@ -538,7 +538,7 @@ export const PRIVACY: LegalDocs = {
         id: "public",
         title: "Lo que es público",
         blocks: [
-          "El importe y las piedras de una donación se muestran en la lista de su ciudad sin decir quién donó, salvo que pidas aparecer con tu nombre: entonces tu nombre aparece ahí, en la página principal y en el Salón de la Fama, con los enlaces que añadas. Puedes dejar de aparecer, cambiar tu nombre o quitar tus enlaces cuando quieras en [Tus ciudades](me). Podemos ocultar un nombre o unos enlaces que incumplan nuestras [Condiciones de uso](terms).",
+          "El importe y las piedras de una donación se muestran en la lista de su ciudad sin decir quién donó, salvo que pidas aparecer con tu nombre: entonces tu nombre aparece ahí, en la página principal y en el Salón de la Fama, con los enlaces que añadas. Tu nombre también puede aparecer en una esquina del mapa de la ciudad. Puedes dejar de aparecer, cambiar tu nombre o quitar tus enlaces cuando quieras en [Tus ciudades](me). Podemos ocultar un nombre o unos enlaces que incumplan nuestras [Condiciones de uso](terms).",
           "Para mostrar un enlace, nuestro servidor lee la página enlazada una vez (y otra vez cuando lo pidas) y guarda su título, su descripción y copias pequeñas de su icono y su imagen, para que los navegadores de los visitantes nunca contacten con el sitio enlazado.",
         ],
       },

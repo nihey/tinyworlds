@@ -97,8 +97,9 @@ Each sub-project has its own `CLAUDE.md`.
   or a 6-digit code sent by email, `purpose: "donor"`) and read their own page, "Your cities" at `/me/` of the front page's build:
   what they gave, the badges they earned (founding number, first stone, keystone) and whether
   they are named. Each city's public benefactors (`cityBenefactors`: founders, then benefactors
-  by amount, one stone per US$1) are shown on a sign from the front page and from About in a map; a built
-  city, which the Donate sign does not offer, reaches Donate only through that sign. Names are the donor's choice, per city; admins can hide one on `/admin/`. Emails never
+  by amount, one stone per US$1) are shown on a sign from the front page, About and the map's
+  corner plaque. The sign opens Donate with the built city selected. Names are the donor's choice
+  per city, and admins can hide one on `/admin/`. Emails never
   appear in the API's answers, and no answer says whether an address has donated.
 - **Benefactors' links, and everyone on the front page.** A donor who has given may add up to
   three links to their own pages on "Your cities". The API reads each page once, when it is

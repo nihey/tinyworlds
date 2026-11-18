@@ -265,6 +265,7 @@ export interface Strings {
     heading: string;
     founders: string;
     benefactors: string;
+    supportCity: string;
     keepingRunning: string;
     anonymous: string;
     more: { one: string; other: string };

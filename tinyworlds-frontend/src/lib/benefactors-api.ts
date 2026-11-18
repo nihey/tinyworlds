@@ -12,8 +12,8 @@ import { apiOrigin, parseMyLink, parseMyLinks, type MyLink } from "./links";
 import { SignInError } from "./sign-in-api";
 
 /**
- * A city's stones, founders and benefactors, through Apollo Client. Only ever imported
- * dynamically, by the benefactors sign when it opens, like `donate-api.ts`.
+ * Public city benefactors and the signed-in donor's own giving, through Apollo Client.
+ * Loaded dynamically by the map plaque, benefactors sign and donor page.
  */
 
 let client: ApolloClient | null = null;
@@ -48,6 +48,7 @@ const CITY_BENEFACTORS = gql`
         number
         name
         amountCents
+        totalAmountCents
         stones
         firstStone
         keystone

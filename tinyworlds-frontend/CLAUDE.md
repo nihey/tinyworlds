@@ -573,10 +573,14 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
 
 - **Where the sign opens.** `BenefactorsSign` (a city's founders, benefactors and stone grid, from
   `cityBenefactors`) opens from the front page (a world's card, a city's card in the ranking),
-  from "Your cities" and, in a map,
-  from About (`BenefactorsPanel`, drawn only for a city the API knows and that is built). The
+  from "Your cities" and from the map's corner plaque. About embeds `BenefactorsPanel` for a
+  real city the API knows. The
   panel is mounted only while open, so each opening fetches afresh. A card offers it only for
   worlds the API lists a city for.
+- **Map plaque.** `MapBenefactors` reads the live public city data once the map is available.
+  Above the credits it shows up to two distinct names in Hall of Fame order, or a support
+  invitation if nobody is named. The plaque opens the city's sign and appears on real maps whose
+  API city is built.
 - **Built cities reach the Donate sign only through it.** The picker never offers a built city
   (nothing to fund); the benefactors' sign has a button that closes that sign and opens
   Donate with the city chosen (one sign at a time).
