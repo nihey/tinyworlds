@@ -21,6 +21,7 @@ import { WalkSound } from "@/walk/sound";
 import { canDrawWalk } from "@/walk/webgl";
 import { WORLD } from "@/worlds";
 import { ControlsMenu } from "./controls-menu";
+import { PunchView } from "./punch-view";
 import { StreetMinimap } from "./street-minimap";
 import { TouchPad } from "./touch-pad";
 import { WalkHud } from "./walk-hud";
@@ -427,7 +428,12 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
     const canvas = canvasRef.current;
     // the sounds may start only from a gesture: this click is one
     soundRef.current?.wake();
-    if (!canvas || touch || document.pointerLockElement === canvas) return;
+    if (!canvas || touch || menuOpen) return;
+    if (document.pointerLockElement === canvas) {
+      game?.press("punch", true);
+      game?.press("punch", false);
+      return;
+    }
     try {
       const asked = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
       asked?.catch?.(() => {});
@@ -461,6 +467,7 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
 
       {game && phase === "ready" && (
         <>
+          {streets && !menuOpen && <PunchView game={game} />}
           <StreetMinimap game={game} reducedMotion={reducedMotion} />
           {touch && streets && !menuOpen && <TouchPad game={game} />}
           <WalkHud

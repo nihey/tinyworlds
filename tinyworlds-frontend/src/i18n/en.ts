@@ -684,6 +684,7 @@ export const en: Strings = {
       turnRight: "Turn right",
       sprint: "Run",
       jump: "Jump",
+      punch: "Punch",
       enter: "Get in",
       accelerate: "Accelerate",
       brake: "Brake or reverse",
@@ -717,7 +718,7 @@ export const en: Strings = {
       capsLock: "Caps Lock",
     },
     hints: {
-      foot: "{forward}{left}{back}{right} walk · {sprint} run · {jump} jump · {enter} get in · {map} map · {menu} keys",
+      foot: "{forward}{left}{back}{right} walk · {sprint} run · {jump} jump · Click / {punch} punch · {enter} get in · {map} map · {menu} keys",
       swim: "{forward}{left}{back}{right} swim · {sprint} faster · {map} map · {menu} keys",
       drive:
         "{accelerate}{steerLeft}{brake}{steerRight} drive · {handbrake} handbrake · {horn} horn · {camera} camera · {exit} get out · {menu} keys",
@@ -756,6 +757,7 @@ export const en: Strings = {
       noRoom: "No room to get out here",
       tunnelClosed: "This tunnel is closed",
       sinking: "It's sinking!",
+      thrownOff: "Thrown off the motorcycle",
       edge: "That's the edge of the map",
     },
     wasted: "WASTED",
@@ -766,6 +768,7 @@ export const en: Strings = {
     minimap: "Map of the streets around you",
     touch: {
       jump: "Jump",
+      punch: "Punch",
       enter: "Get in",
       exit: "Get out",
       mount: "Get on",

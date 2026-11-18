@@ -700,6 +700,7 @@ export const ptBR: Strings = {
       turnRight: "Virar à direita",
       sprint: "Correr",
       jump: "Pular",
+      punch: "Soco",
       enter: "Entrar",
       accelerate: "Acelerar",
       brake: "Frear ou dar ré",
@@ -733,7 +734,7 @@ export const ptBR: Strings = {
       capsLock: "Caps Lock",
     },
     hints: {
-      foot: "{forward}{left}{back}{right} andar · {sprint} correr · {jump} pular · {enter} entrar · {map} mapa · {menu} teclas",
+      foot: "{forward}{left}{back}{right} andar · {sprint} correr · {jump} pular · Clique / {punch} soco · {enter} entrar · {map} mapa · {menu} teclas",
       swim: "{forward}{left}{back}{right} nadar · {sprint} mais rápido · {map} mapa · {menu} teclas",
       drive:
         "{accelerate}{steerLeft}{brake}{steerRight} dirigir · {handbrake} freio de mão · {horn} buzina · {camera} câmera · {exit} sair · {menu} teclas",
@@ -772,6 +773,7 @@ export const ptBR: Strings = {
       noRoom: "Não há espaço para sair aqui",
       tunnelClosed: "Este túnel está fechado",
       sinking: "Está afundando!",
+      thrownOff: "Você caiu da moto",
       edge: "Este é o limite do mapa",
     },
     wasted: "DETONADO",
@@ -782,6 +784,7 @@ export const ptBR: Strings = {
     minimap: "Mapa das ruas ao seu redor",
     touch: {
       jump: "Pular",
+      punch: "Soco",
       enter: "Entrar",
       exit: "Sair",
       mount: "Subir",

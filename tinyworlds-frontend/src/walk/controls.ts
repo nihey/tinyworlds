@@ -9,6 +9,7 @@ export type ActionId =
   | "turnRight"
   | "sprint"
   | "jump"
+  | "punch"
   | "enter"
   | "accelerate"
   | "brake"
@@ -37,6 +38,7 @@ export const ACTIONS: readonly { id: ActionId; group: Group }[] = [
   { id: "turnRight", group: "foot" },
   { id: "sprint", group: "foot" },
   { id: "jump", group: "foot" },
+  { id: "punch", group: "foot" },
   { id: "enter", group: "foot" },
   { id: "accelerate", group: "drive" },
   { id: "brake", group: "drive" },
@@ -59,6 +61,7 @@ export type Bindings = Record<ActionId, [string | null, string | null]>;
 export const STORAGE_KEY = "tinyworlds.walk.controls.v1";
 
 const GROUP_OF = Object.fromEntries(ACTIONS.map((a) => [a.id, a.group])) as Record<ActionId, Group>;
+const PUNCH_KEY = "KeyE";
 
 export function defaultBindings(): Bindings {
   return {
@@ -70,6 +73,7 @@ export function defaultBindings(): Bindings {
     turnRight: ["ArrowRight", null],
     sprint: ["ShiftLeft", "ShiftRight"],
     jump: ["Space", null],
+    punch: [PUNCH_KEY, null],
     enter: ["KeyF", null],
     accelerate: ["KeyW", "ArrowUp"],
     brake: ["KeyS", "ArrowDown"],
@@ -131,6 +135,8 @@ export function loadBindings(storage: Pick<Storage, "getItem"> | null): Bindings
     if (!raw) return kept;
     const saved: unknown = JSON.parse(raw);
     if (typeof saved !== "object" || saved === null || Array.isArray(saved)) return kept;
+    const oldBindings = !Object.hasOwn(saved, "punch");
+    if (oldBindings) kept.punch = [null, null];
     const slotOf = (v: unknown) => (typeof v === "string" && v ? v : null);
     for (const { id } of ACTIONS) {
       const pair = (saved as Record<string, unknown>)[id];
@@ -142,6 +148,8 @@ export function loadBindings(storage: Pick<Storage, "getItem"> | null): Bindings
         const code = kept[id][slot];
         if (code && !(slot === 1 && code === kept[id][0])) out = rebind(out, id, slot, code);
       }
+    if (oldBindings && actionsOf(out, PUNCH_KEY, "foot").length === 0)
+      out.punch = [PUNCH_KEY, null];
     return out;
   } catch {
     return defaultBindings();

@@ -8,7 +8,7 @@ import { EXIT_SPEED, swimOut, toTake, wayOut, type Spot } from "./doors";
 import { Ferries, onRoute, type LifeRoutes } from "./ferries";
 import { Fleet, within } from "./fleet";
 import { CELL } from "./geo";
-import { LIFE_MAX, blastDamage, hitDamage, regen } from "./health";
+import { LIFE_MAX, blastDamage, hitDamage, motorcycleCrashDamage, regen } from "./health";
 import type { BoatKind, CarKind } from "./kinds";
 import { clamp, wrap } from "./math";
 import { Crowd } from "./people";
@@ -21,6 +21,7 @@ import {
   type FootInput,
   type Player,
 } from "./player";
+import { CONTACT_SECONDS, punchTarget, SWING_SECONDS } from "./punch";
 import { FOG_FAR } from "./render/materials";
 import { WalkModels } from "./render/models";
 import { makePalette, type Palette } from "./render/palette";
@@ -88,6 +89,8 @@ export interface WalkState {
   message: WalkMessage | null;
   /** 0 to 1: the flash of being hurt, fading */
   hurt: number;
+  /** The current fist swing, and its result once the fist reaches its target. */
+  punch: { sequence: number; hit: boolean | null } | null;
   wasted: ReturnType<typeof wastedAt> | null;
   camera: "chase" | "wheel";
   /** 0 to 1: the screen goes dark while you pass through a tunnel */
@@ -259,6 +262,9 @@ export class WalkGame {
   private msg: WalkMessage | null = null;
   private msgFor = 0;
   private hurtFlash = 0;
+  private punch: WalkState["punch"] = null;
+  private punchSequence = 0;
+  private punchedAt = -Infinity;
 
   // what has been seen to happen
   private t = 0;
@@ -528,6 +534,7 @@ export class WalkGame {
       this.wants();
       if (!this.yours) this.footStep(h);
     }
+    this.stepPunch();
     this.closeSteps(h, playing);
     if (playing) {
       this.portals(h);
@@ -603,6 +610,37 @@ export class WalkGame {
     else if (a === "enter") this.wantEnter = true;
     else if (a === "exit") this.wantExit = true;
     else if (a === "camera") this.cams.toggle();
+    else if (a === "punch") this.startPunch();
+  }
+
+  private canPunch(): boolean {
+    return (
+      this.player.mode === "foot" && !this.yours && !this.tunnel && !this.waiting && !this.wasted
+    );
+  }
+
+  private startPunch(): void {
+    if (!this.canPunch() || this.t - this.punchedAt < SWING_SECONDS) return;
+    this.punchedAt = this.t;
+    this.punch = { sequence: ++this.punchSequence, hit: null };
+    this.sound.swing();
+  }
+
+  private stepPunch(): void {
+    if (!this.punch) return;
+    const elapsed = this.t - this.punchedAt;
+    if (!this.canPunch() || elapsed >= SWING_SECONDS) {
+      this.punch = null;
+      return;
+    }
+    if (elapsed < CONTACT_SECONDS || this.punch.hit !== null) return;
+    const eye = this.cams.onFoot(this.player, this.t);
+    const target = punchTarget(eye, this.crowd.people, this.world);
+    if (target) {
+      this.crowd.knock(target, { ve: Math.sin(eye.yaw) * 2.6, vn: Math.cos(eye.yaw) * 2.6 });
+      this.sound.punch();
+    }
+    this.punch = { sequence: this.punch.sequence, hit: target !== null };
   }
 
   private say(m: WalkMessage): void {
@@ -817,11 +855,14 @@ export class WalkGame {
 
   private driveStep(h: number): void {
     const v = this.yours!;
+    const bike = v.kind === "motorcycle";
+    const before = bike ? this.vehicleMotion(v) : null;
     const ev = v.boat
       ? stepBoat(v, this.driveInput(), this.world, h, this.t, { calm: this.reduced })
       : stepCar(v, this.driveInput(), this.world, h);
     this.events(v, ev);
     this.follow();
+    if (before && this.crashRider(v, Math.max(ev.impact, ev.fell), before)) return;
     if (v.state === "sunk" || (v.state === "sinking" && v.sink >= 1)) {
       // it has floated its moment: out you come, swimming
       const spot = swimOut(v, this.world);
@@ -894,6 +935,36 @@ export class WalkGame {
     p.yaw = yaw;
     p.pitch = 0;
     p.mode = spot.swim ? "swim" : "foot";
+  }
+
+  private vehicleMotion(v: Vehicle): { e: number; n: number } {
+    const sin = Math.sin(v.yaw);
+    const cos = Math.cos(v.yaw);
+    return { e: v.v * sin + v.vs * cos, n: v.v * cos - v.vs * sin };
+  }
+
+  /** Detach an exposed rider once, place them beside the bike, then reuse the downed slide. */
+  private crashRider(v: Vehicle, impact: number, before: { e: number; n: number }): boolean {
+    if (v !== this.yours || v.kind !== "motorcycle") return false;
+    const damage = motorcycleCrashDamage(impact);
+    if (!(damage > 0)) return false;
+
+    const exit = wayOut(v, this.world, this.nearby, true);
+    const spot = exit && exit !== "slower" ? exit : { e: v.e, n: v.n, z: v.z, swim: false };
+    this.leaveVehicle(v);
+    this.stand(spot, v.yaw);
+    this.player.on = v.on;
+    this.hitCool = HIT_COOL;
+    this.hurtYou(damage);
+    this.say("thrownOff");
+    if (!spot.swim) {
+      const motion = Math.hypot(before.e, before.n) > 1 ? before : this.vehicleMotion(v);
+      const scale = Math.min(1, impact / Math.max(1, Math.hypot(motion.e, motion.n))) * THROWN;
+      this.player.mode = "down";
+      this.downFor = KNOCKED;
+      this.knock = { e: motion.e * scale, n: motion.n * scale };
+    }
+    return true;
   }
 
   /** Bumped by a car or a boat: pushed out of it, and hurt by how fast it closed on you. */
@@ -1191,6 +1262,10 @@ export class WalkGame {
       loosen: (v) => this.fleet.loosen(v),
       keep: (v) => this.fleet.keep(v),
       crunch: (v, e, n, z, speed) => this.crunch(v, e, n, z, speed),
+      impact:
+        this.yours?.kind === "motorcycle"
+          ? (v, speed, before) => this.crashRider(v, speed, before)
+          : undefined,
     });
   }
 
@@ -1379,6 +1454,7 @@ export class WalkGame {
       near: near ? { kind: near.kind } : null,
       message: this.msg,
       hurt: this.hurtFlash,
+      punch: this.canPunch() ? this.punch : null,
       wasted: this.wasted ? wastedAt(this.wastedT, this.reduced) : null,
       camera: this.cams.mode,
       dark: this.tunnel ? 1 : 0,
@@ -1405,6 +1481,7 @@ export class WalkGame {
       s.near?.kind ?? "",
       s.message ?? "",
       twentieths(s.hurt),
+      s.punch ? `${s.punch.sequence}:${s.punch.hit}` : "",
       w
         ? `${twentieths(w.word)}:${twentieths(w.grey)}:${twentieths(w.lift)}:${w.timeRate}:${w.skippable}`
         : "",

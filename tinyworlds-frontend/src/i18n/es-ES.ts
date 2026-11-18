@@ -696,6 +696,7 @@ export const esES: Strings = {
       turnRight: "Girar a la derecha",
       sprint: "Correr",
       jump: "Saltar",
+      punch: "Puñetazo",
       enter: "Entrar",
       accelerate: "Acelerar",
       brake: "Frenar o marcha atrás",
@@ -729,7 +730,7 @@ export const esES: Strings = {
       capsLock: "Bloq Mayús",
     },
     hints: {
-      foot: "{forward}{left}{back}{right} andar · {sprint} correr · {jump} saltar · {enter} entrar · {map} mapa · {menu} teclas",
+      foot: "{forward}{left}{back}{right} andar · {sprint} correr · {jump} saltar · Clic / {punch} puñetazo · {enter} entrar · {map} mapa · {menu} teclas",
       swim: "{forward}{left}{back}{right} nadar · {sprint} más rápido · {map} mapa · {menu} teclas",
       drive:
         "{accelerate}{steerLeft}{brake}{steerRight} conducir · {handbrake} freno de mano · {horn} claxon · {camera} cámara · {exit} salir · {menu} teclas",
@@ -768,6 +769,7 @@ export const esES: Strings = {
       noRoom: "No hay sitio para salir aquí",
       tunnelClosed: "Este túnel está cerrado",
       sinking: "¡Se hunde!",
+      thrownOff: "Te caíste de la moto",
       edge: "Este es el límite del mapa",
     },
     wasted: "ACABADO",
@@ -778,6 +780,7 @@ export const esES: Strings = {
     minimap: "Mapa de las calles a tu alrededor",
     touch: {
       jump: "Saltar",
+      punch: "Puñetazo",
       enter: "Entrar",
       exit: "Salir",
       mount: "Subir",

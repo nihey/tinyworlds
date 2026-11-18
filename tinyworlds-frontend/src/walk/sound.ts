@@ -1,7 +1,7 @@
 /**
  * The walk's few sounds, made with WebAudio as they are needed, from noise and two tones (no
  * files): a horn, a crash (louder and brighter the harder the hit), the dull boom of a wreck
- * catching fire, and a splash. Nothing else. The audio context is made on the first key or tap
+ * catching fire, a fist swish and impact, and a splash. The audio context is made on the first key or tap
  * (`wake`, which the game calls on each): browsers keep audio off until a gesture. Where there is
  * no WebAudio (an old browser, a test) every call does nothing.
  */
@@ -151,6 +151,18 @@ export class WalkSound {
     if (!a || s <= 0.01) return;
     this.burst(a, 1.4, 0.6 * s, "lowpass", 260);
     this.thump(a, 0.9, 0.5 * s, 70, 32);
+  }
+
+  swing(): void {
+    const a = this.live();
+    if (a) this.burst(a, 0.09, 0.07, "bandpass", 920, 0.65);
+  }
+
+  punch(): void {
+    const a = this.live();
+    if (!a) return;
+    this.burst(a, 0.08, 0.13, "lowpass", 780);
+    this.thump(a, 0.09, 0.16, 158, 68);
   }
 
   /** Something going into the water. */

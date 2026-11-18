@@ -135,6 +135,27 @@ describe("the kinds", () => {
 });
 
 describe("driving", () => {
+  it("lets a motorcycle turn tightly at low speed and carve a wider line at speed", () => {
+    const w = worldOf(...strip(5));
+    const slow = car("motorcycle", 300, 100, EAST, 6);
+    const fast = car("motorcycle", 300, 100, EAST, 30);
+    const steer = { ...idle, throttle: 0.04, steer: 1 };
+    run(slow, steer, w, 0.4);
+    run(fast, steer, w, 0.4);
+    expect(slow.w).toBeGreaterThan(1);
+    expect(fast.w).toBeGreaterThan(0.25);
+    expect(fast.w).toBeLessThan(0.65);
+  });
+
+  it("keeps fine analog steering at speed", () => {
+    const w = worldOf(...strip(5));
+    const full = car("motorcycle", 300, 100, EAST, 30);
+    const half = car("motorcycle", 300, 100, EAST, 30);
+    run(full, { ...gas, steer: 1 }, w, 0.4);
+    run(half, { ...gas, steer: 0.5 }, w, 0.4);
+    expect(half.w / full.w).toBeCloseTo(0.5, 2);
+  });
+
   it("lets a motorcycle back up at walking speed after braking", () => {
     const bike = car("motorcycle", 300, 100, EAST, 10);
     run(bike, { ...idle, brake: 1 }, worldOf(...strip(3)), 4);

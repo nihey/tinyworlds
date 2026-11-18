@@ -238,6 +238,11 @@ const REVERSE = 4.5;
 const REVERSE_TOP = 9;
 /** A rider can walk the motorcycle backwards, at walking speed. */
 const MOTORCYCLE_REVERSE_TOP = 1.4;
+const MOTORCYCLE_BRAKE = 13.5;
+const MOTORCYCLE_REAR_BRAKE = 7;
+const MOTORCYCLE_TURN = 1.95;
+const MOTORCYCLE_GRIP = 12;
+const MOTORCYCLE_HELM = 9;
 const ROLLING = 0.7;
 const AIR_DRAG = 0.008;
 const HANDBRAKE = 5;
@@ -712,27 +717,41 @@ function drive(
   vl: number,
   h: number,
 ) {
+  const bike = v.kind === "motorcycle";
+  const brake = bike ? MOTORCYCLE_BRAKE : BRAKE;
   const thr = clamp(input.throttle - input.brake, -1, 1);
   if (thr > 0.05) {
-    if (vf < -0.5) vf = Math.min(0, vf + BRAKE * thr * h);
+    if (vf < -0.5) vf = Math.min(0, vf + brake * thr * h);
     else vf += s.accel * accelFactor(v) * thr * Math.max(0, 1 - vf / s.vmax) * h;
   } else if (thr < -0.05) {
-    if (vf > 0.5) vf = Math.max(0, vf + BRAKE * thr * h);
+    if (vf > 0.5) vf = Math.max(0, vf + brake * thr * h);
     else {
-      const top =
-        v.kind === "motorcycle" ? MOTORCYCLE_REVERSE_TOP : Math.min(REVERSE_TOP, s.vmax / 4);
+      const top = bike ? MOTORCYCLE_REVERSE_TOP : Math.min(REVERSE_TOP, s.vmax / 4);
       vf = Math.max(-top, vf + REVERSE * thr * h);
     }
   } else vf = toward0(vf, (ROLLING + AIR_DRAG * vf * vf) * h);
-  if (input.handbrake) vf = toward0(vf, HANDBRAKE * h);
+  if (input.handbrake) vf = toward0(vf, (bike ? MOTORCYCLE_REAR_BRAKE : HANDBRAKE) * h);
   vl *= Math.exp(-(skid ? HANDBRAKE_GRIP : s.grip) * h);
   // the faster, the less lock: steering tightens at speed
-  const lock = STEER / (1 + Math.abs(vf) / STEER_FADE);
-  const turn =
-    (vf / (s.length * WHEELBASE)) *
-    Math.tan(clamp(input.steer, -1, 1) * lock) *
-    (skid ? HANDBRAKE_TURN : 1);
-  v.w += (turn - v.w) * Math.min(1, (skid ? HELM_HANDBRAKE : HELM) * h);
+  const speed = Math.abs(vf);
+  const lock = STEER / (1 + speed / STEER_FADE);
+  const baseTurn = vf / (s.length * WHEELBASE);
+  const steer = clamp(input.steer, -1, 1);
+  if (bike) {
+    // Limit the full-stick lean by lateral grip, then scale it for fine analog inputs.
+    const turn =
+      Math.min(
+        Math.abs(baseTurn * Math.tan(lock)),
+        MOTORCYCLE_TURN,
+        MOTORCYCLE_GRIP / Math.max(1, speed),
+      ) *
+      Math.sign(vf) *
+      steer;
+    v.w += (turn - v.w) * -Math.expm1(-MOTORCYCLE_HELM * h);
+  } else {
+    const turn = baseTurn * Math.tan(steer * lock) * (skid ? HANDBRAKE_TURN : 1);
+    v.w += (turn - v.w) * Math.min(1, (skid ? HELM_HANDBRAKE : HELM) * h);
+  }
   return [vf, vl];
 }
 

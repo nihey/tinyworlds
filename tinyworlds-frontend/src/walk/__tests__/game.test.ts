@@ -320,6 +320,70 @@ it("lets you find, ride and dismount a motorcycle parked at the kerb", () => {
   expect(game.vehicles()).toContain(bike);
 });
 
+describe("motorcycle crashes", () => {
+  function ride(cells: WalkCell[], vehicles: Vehicle[] = []) {
+    const bike = newVehicle(nextVehicleId(), "motorcycle", 100, 100, Math.PI / 2);
+    const played = play(cells, { start: { e: 100, n: 101.5 }, vehicles: [bike, ...vehicles] });
+    played.game.sim(0.1);
+    played.game.keyDown("KeyF");
+    played.game.keyUp("KeyF");
+    played.game.sim(0.1);
+    expect(played.now().vehicle?.kind).toBe("motorcycle");
+    return { ...played, bike };
+  }
+
+  const wall = () => area(-1, -1, 1, 1, { "0_0": { volumes: [boxVolume(104, 90, 120, 110)] } });
+
+  it("throws and hurts the rider on a hard wall hit, then lets them get up", () => {
+    const { game, bike, now, simUntil } = ride(wall());
+    bike.v = 13;
+    expect(simUntil(() => now().mode === "down", 1)).toBe(true);
+    expect(now().vehicle).toBeNull();
+    expect(now().life).toBeGreaterThan(0);
+    expect(now().life).toBeLessThan(100);
+    expect(now().message).toBe("thrownOff");
+    expect(bike.state).toBe("loose");
+    const lifeAfterCrash = now().life;
+    game.sim(2);
+    expect(now().mode).toBe("foot");
+    expect(now().life).toBe(lifeAfterCrash);
+  });
+
+  it("keeps the rider mounted on a slow bump", () => {
+    const { game, bike, now } = ride(wall());
+    bike.v = 5;
+    game.sim(1);
+    expect(bike.damage).toBeGreaterThan(0);
+    expect(now().vehicle?.kind).toBe("motorcycle");
+    expect(now().life).toBe(100);
+  });
+
+  it("throws the rider when another vehicle hits the bike", () => {
+    const car = sedan(88, 100, Math.PI / 2, "loose");
+    const { bike, now, simUntil } = ride(area(-1, -1, 1, 1), [car]);
+    car.v = 12;
+    expect(simUntil(() => now().mode === "down", 1)).toBe(true);
+    expect(now().vehicle).toBeNull();
+    expect(now().life).toBeLessThan(100);
+    expect(bike.damage).toBeGreaterThan(0);
+  });
+
+  it("throws the rider on a hard landing", () => {
+    const { bike, now, simUntil } = ride(area(-1, -1, 1, 1));
+    bike.z = 6;
+    expect(simUntil(() => now().mode === "down", 2)).toBe(true);
+    expect(now().life).toBeLessThan(100);
+  });
+
+  it("uses the wasted sequence when the crash takes all the rider's life", () => {
+    const { bike, now, simUntil } = ride(wall());
+    bike.v = 28;
+    expect(simUntil(() => now().wasted !== null, 1)).toBe(true);
+    expect(now().vehicle).toBeNull();
+    expect(now().life).toBe(0);
+  });
+});
+
 it("draws empty motorcycles at the kerb and riders on occupied ones", () => {
   const ix = indexOf([makeCell(0, 0)]);
   const palette = makePalette(ix);
@@ -425,6 +489,49 @@ function streetWorld(): WalkCell[] {
     "0_0": { nodes, streets: [street], walks: [walk("s", 91), walk("n", 109)] },
   });
 }
+
+describe("punching", () => {
+  it("swings once, hits the closest pedestrian in front, and gives them time to get up", () => {
+    const { game, now } = play(streetWorld(), { start: { e: 100, n: 109 } });
+    const crowd = game["crowd"];
+    const target = crowd.addAt("n", 90)!;
+    const farther = crowd.addAt("n", 91)!;
+    game.teleport(target.e - 1.35, target.n, target.z, Math.PI / 2);
+    game.sim(0.1);
+
+    expect(game.keyDown("KeyE")).toContain("punch");
+    game.keyUp("KeyE");
+    game.sim(0.04);
+    expect(now().punch).toMatchObject({ hit: null });
+    expect(target.state).not.toBe("down");
+    game.sim(0.1);
+    expect(now().punch).toMatchObject({ hit: true });
+    expect(target.state).toBe("down");
+    expect(farther.state).not.toBe("down");
+    const swing = now().punch?.sequence;
+    game.press("punch", true);
+    game.press("punch", false);
+    game.sim(0.04);
+    expect(now().punch?.sequence).toBe(swing);
+
+    game.sim(6);
+    expect(target.state).not.toBe("down");
+  });
+
+  it("swings without hitting a pedestrian through a wall", () => {
+    const cells = streetWorld();
+    cells.find(({ key }) => key === "0_0")!.volumes.push(boxVolume(99.25, 106, 99.45, 112));
+    const { game, now } = play(cells, { start: { e: 98.6, n: 109 } });
+    const target = game["crowd"].addAt("n", 90)!;
+    game.teleport(target.e - 1.5, target.n, target.z, Math.PI / 2);
+    game.sim(0.1);
+    game.press("punch", true);
+    game.press("punch", false);
+    game.sim(0.15);
+    expect(now().punch).toMatchObject({ hit: false });
+    expect(target.state).not.toBe("down");
+  });
+});
 
 describe("going down", () => {
   it("a fall of 20 m runs the wasted sequence, and you come to on a sidewalk 20 to 60 m away", () => {

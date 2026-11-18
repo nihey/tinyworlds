@@ -31,6 +31,8 @@ const LOOK_RETURN = 1.4;
 const LOOK_PITCH = -0.1;
 /** How fast the chase camera follows the heading, per second. */
 const FOLLOW = 3.2;
+const BIKE_FOLLOW = 6;
+const BIKE_LEAD = 0.09;
 /** Pointer movement to radians (looking round on foot, and at the wheel). */
 export const MOUSE = 0.0021;
 /** The boom from what you drive to the chase camera is looked along in this many steps, the last at the camera. */
@@ -137,7 +139,10 @@ export class Cameras {
       this.lookYaw *= Math.exp(-3 * real);
       this.lookPitch += (LOOK_PITCH - this.lookPitch) * Math.min(1, 3 * real);
     }
-    this.camYaw += wrap(v.yaw - this.camYaw) * Math.min(1, real * FOLLOW);
+    const bike = v.kind === "motorcycle";
+    const heading = v.yaw + (bike ? v.w * BIKE_LEAD : 0);
+    const follow = bike ? -Math.expm1(-real * BIKE_FOLLOW) : Math.min(1, real * FOLLOW);
+    this.camYaw += wrap(heading - this.camYaw) * follow;
     const speed = Math.abs(v.v);
     const fov = this.reduced ? FOV : FOV + clamp((speed - 12) * 0.45, 0, 18);
     this.fov += (fov - this.fov) * Math.min(1, real * 3);
@@ -149,7 +154,7 @@ export class Cameras {
       const longer = s.length / sizeOf(v.kind).length;
       const eh = EYES[v.kind][0] * longer;
       const ef = EYES[v.kind][1] * longer;
-      const side = v.boat || v.kind === "motorcycle" ? 0 : -0.36;
+      const side = v.boat || bike ? 0 : -0.36;
       const sy = Math.sin(v.yaw);
       const cy = Math.cos(v.yaw);
       return (this.eye = {
@@ -162,7 +167,7 @@ export class Cameras {
       });
     }
     const yaw = this.camYaw + this.lookYaw + back;
-    const dist = 4.5 + s.length * 0.8 + clamp(speed * 0.05, 0, 2);
+    const dist = (bike ? 4.8 : 4.5 + s.length * 0.8) + clamp(speed * 0.05, 0, 2);
     const flat = Math.cos(this.lookPitch) * dist;
     let ce = v.e - Math.sin(yaw) * flat;
     let cn = v.n - Math.cos(yaw) * flat;
@@ -179,8 +184,9 @@ export class Cameras {
       cn = v.n + (cn - v.n) * f;
       break;
     }
-    const te = v.e + Math.sin(yaw) * 4;
-    const tn = v.n + Math.cos(yaw) * 4;
+    const ahead = bike ? 4 + clamp(speed * 0.075, 0, 2) : 4;
+    const te = v.e + Math.sin(yaw) * ahead;
+    const tn = v.n + Math.cos(yaw) * ahead;
     const tz = v.z + 1 + s.height * 0.45;
     return (this.eye = {
       e: ce + jig(),

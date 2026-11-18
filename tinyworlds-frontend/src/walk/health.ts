@@ -23,6 +23,11 @@ export function blastDamage(distance: number): number {
   return Math.max(0, Math.min(80 - 8 * distance, 90 - 10 * distance));
 }
 
+/** An exposed rider comes off above a 6 m/s impact. Harder crashes take more life. */
+export function motorcycleCrashDamage(impact: number): number {
+  return Math.max(0, (impact - 6) * 6);
+}
+
 /** Life after `dt` seconds, `sinceHurt` being the time since the last hurt before this step. */
 export function regen(life: number, sinceHurt: number, dt: number): number {
   if (life >= LIFE_MAX) return LIFE_MAX;

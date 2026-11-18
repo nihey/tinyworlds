@@ -55,7 +55,7 @@ describe("hintText", () => {
   it("names the current keys", () => {
     const d = defaultBindings();
     expect(hintText("foot", d, en.walk)).toBe(
-      "WASD walk · Left Shift run · Space jump · F get in · M map · P keys",
+      "WASD walk · Left Shift run · Space jump · Click / E punch · F get in · M map · P keys",
     );
     expect(hintText("drive", d, en.walk)).toContain("Space handbrake");
   });

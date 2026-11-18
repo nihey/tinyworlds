@@ -822,6 +822,7 @@ export interface Strings {
       noRoom: string;
       tunnelClosed: string;
       sinking: string;
+      thrownOff: string;
       edge: string;
     };
     /** the wasted screen's word, and what a screen reader hears */
@@ -837,6 +838,7 @@ export interface Strings {
     /** the touch buttons */
     touch: {
       jump: string;
+      punch: string;
       enter: string;
       exit: string;
       mount: string;

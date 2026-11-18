@@ -69,6 +69,8 @@ export interface CrashHooks {
   keep(v: Vehicle): void;
   /** a hit worth hearing: the crunch, the sparks, people running */
   crunch(v: Vehicle, e: number, n: number, z: number, speed: number): void;
+  /** The change in each vehicle's speed vector, with its movement before the crash. */
+  impact?(v: Vehicle, speed: number, before: { e: number; n: number }): void;
 }
 
 const cellsOf = (v: Vehicle) => {
@@ -128,6 +130,10 @@ function hit(a: Vehicle, b: Vehicle, hooks: CrashHooks): void {
     applyDamage(b, closing, ba.mass);
   }
   if (closing > CRUNCH) hooks.crunch(a, touch.pe, touch.pn, Math.max(a.z, b.z), closing);
+  if (closing > 0 && hooks.impact) {
+    hooks.impact(a, Math.hypot(ba.ve - va.e, ba.vn - va.n), va);
+    hooks.impact(b, Math.hypot(bb.ve - vb.e, bb.vn - vb.n), vb);
+  }
 }
 
 /** Puts a hit's outcome on a vehicle: traffic stops or goes loose, a parked car goes loose. */

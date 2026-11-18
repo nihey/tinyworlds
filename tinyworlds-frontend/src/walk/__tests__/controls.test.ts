@@ -18,6 +18,7 @@ describe("default bindings", () => {
     expect(d.turnLeft).toEqual(["ArrowLeft", null]);
     expect(d.sprint).toEqual(["ShiftLeft", "ShiftRight"]);
     expect(d.jump).toEqual(["Space", null]);
+    expect(d.punch).toEqual(["KeyE", null]);
     expect(d.enter).toEqual(["KeyF", null]);
     expect(d.accelerate).toEqual(["KeyW", "ArrowUp"]);
     expect(d.steerLeft).toEqual(["KeyA", "ArrowLeft"]);
@@ -62,6 +63,13 @@ describe("rebind", () => {
 });
 
 describe("loadBindings", () => {
+  it("preserves a saved E binding when upgrading a setup without punch", () => {
+    const b = loadBindings({ getItem: () => JSON.stringify({ jump: ["KeyE", null] }) });
+    expect(b.jump).toEqual(["KeyE", null]);
+    expect(b.punch).toEqual([null, null]);
+    expect(b.horn).toEqual(["KeyE", null]);
+  });
+
   it("falls back to the defaults when storage throws, is empty or is garbage", () => {
     const d = defaultBindings();
     expect(
@@ -148,7 +156,8 @@ describe("actionsOf", () => {
     expect(actionsOf(d, "Space", "foot")).toEqual(["jump"]);
     expect(actionsOf(d, "KeyW", "drive")).toEqual(["accelerate"]);
     expect(actionsOf(d, "KeyM", "foot")).toEqual(["map"]);
-    expect(actionsOf(d, "KeyE", "foot")).toEqual([]);
+    expect(actionsOf(d, "KeyE", "foot")).toEqual(["punch"]);
+    expect(actionsOf(d, "KeyE", "drive")).toEqual(["horn"]);
   });
 });
 

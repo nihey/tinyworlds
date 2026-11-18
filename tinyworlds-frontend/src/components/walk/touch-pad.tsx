@@ -226,7 +226,12 @@ export function TouchPad({ game }: { game: WalkGame }) {
                 primary
               />
             )}
-            {mode === "foot" && <TouchButton game={game} action="jump" label={w.jump} hold />}
+            {mode === "foot" && (
+              <>
+                <TouchButton game={game} action="jump" label={w.jump} hold />
+                <TouchButton game={game} action="punch" label={w.punch} />
+              </>
+            )}
           </div>
         )}
       </div>

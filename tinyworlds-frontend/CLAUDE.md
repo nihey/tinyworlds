@@ -1082,9 +1082,11 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   the sound switch. Defaults are GTA's keyboard plus turning on the arrows and M for the map
   (`walk/controls.ts`).
 - **Motorcycles** share the road-vehicle simulation, traffic and kerb parking (`TRAFFIC_MIX`).
-  Use the vehicle interaction key to mount or dismount. They accelerate quickly, lean in turns,
-  use the rear brake while turning and back up at walking speed. The chase camera shows the
-  rider, and the first-person camera sits over the centre of the bike.
+  Use the vehicle interaction key to mount or dismount. The bike leans into tight turns at low
+  speed and follows wider arcs at speed. Analog steering scales the available turn, and the
+  chase camera anticipates curves. The front and rear brakes slow the bike while it turns, and
+  it backs up at walking speed. Hard impacts and landings throw the rider off and deal damage
+  based on the impact. Survivors slide to a stop and get back up.
 - **Touch** (`touch-pad.tsx`): the left half moves (including over the minimap) and the right half
   looks. Each gesture keeps its own finger, with no layout reads during a drag. The bottom-right
   controls stay clear of the minimap and the credit. At the wheel, Get out stays below the horn,
@@ -1095,6 +1097,11 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   when driving another vehicle. An occupant of the source vehicle dies. Blast damage falls off
   from the hull, and secondary wrecks start their own eight-second fuses. Sinking puts out the
   fire and clears the fuse. Boats sink when critically damaged.
+- **Punching**: left-click while the pointer is locked, press E on foot (rebindable), or tap
+  Punch. The fist swings toward the reticle (`punch-view.tsx`) and the game checks the nearest
+  upright pedestrian along the view (`walk/punch.ts`). A hit requires a clear path and briefly
+  knocks the pedestrian down. The overlay gives a hit marker and uses a still fist under
+  reduced motion. Existing custom E bindings take priority when loading older settings.
 - **The water** (the rules and their numbers in `walk/water.ts`, the shader in
   `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
   according to" a write-up of layered pixel-art water, whose ideas are re-made here for a
