@@ -2,7 +2,7 @@
 import { isLocale, type LocalePref } from "@/i18n/locale";
 import { SITE_ID } from "@/site";
 
-export type ThemePref = "system" | "light" | "dark";
+export type ThemePref = "system" | "light" | "dark" | "cycle";
 
 export interface Prefs {
   minimap: boolean;
@@ -31,7 +31,7 @@ export const DEFAULT_PREFS: Prefs = {
   hoods: false,
   tilt: true,
   tiltStrength: 50,
-  theme: "system",
+  theme: "cycle",
   life: true,
   lang: "auto",
   view: "north",
@@ -48,7 +48,8 @@ export function sanitizePrefs(value: unknown): Prefs {
   if (typeof v.life === "boolean") out.life = v.life;
   if (typeof v.tiltStrength === "number" && Number.isFinite(v.tiltStrength))
     out.tiltStrength = Math.min(100, Math.max(0, Math.round(v.tiltStrength)));
-  if (v.theme === "system" || v.theme === "light" || v.theme === "dark") out.theme = v.theme;
+  if (v.theme === "cycle" || v.theme === "system" || v.theme === "light" || v.theme === "dark")
+    out.theme = v.theme;
   if (v.lang === "auto" || isLocale(v.lang)) out.lang = v.lang;
   if (v.view === "north" || v.view === "grid") out.view = v.view;
   return out;

@@ -36,7 +36,7 @@ function Row({ label, hint, checked, onChange, children }: RowProps) {
   );
 }
 
-const THEMES: ThemePref[] = ["system", "light", "dark"];
+const THEMES: ThemePref[] = ["cycle", "light", "dark", "system"];
 const LANGUAGES: LocalePref[] = ["auto", ...LOCALES];
 
 const PILL =
@@ -105,8 +105,8 @@ export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps
       </Row>
       <Row label={t.settings.life} checked={prefs.life} onChange={(life) => onChange({ life })} />
 
-      <div className="flex items-center gap-2 px-3.5 pt-2 pb-2.5">
-        <span id={`${strengthId}-theme`} className="flex-1 text-sm font-medium">
+      <div className="px-3.5 pt-2 pb-2.5">
+        <span id={`${strengthId}-theme`} className="block pb-1.5 text-sm font-medium">
           {t.settings.timeOfDay}
         </span>
         <ToggleGroup
@@ -119,10 +119,10 @@ export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps
             // a single-choice group reports "" when the chosen one is pressed again: keep it
             if (theme) onChange({ theme: theme as ThemePref });
           }}
-          className="rounded-full bg-sign-raised p-0.5"
+          className="w-full rounded-full bg-sign-raised p-0.5"
         >
           {THEMES.map((theme) => (
-            <ToggleGroupItem key={theme} value={theme} className={PILL}>
+            <ToggleGroupItem key={theme} value={theme} className={`${PILL} flex-1 px-1.5`}>
               {t.settings.themes[theme]}
             </ToggleGroupItem>
           ))}

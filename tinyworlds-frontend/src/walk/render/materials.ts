@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CITY_GRADE, StreetLighting } from "./city-light";
 import type { WalkIndex } from "../walk-index";
 import { WATER_Z } from "../world";
 import {
@@ -138,7 +139,10 @@ vec3 drained(vec3 c) {
 export const FOG = /* glsl */ `
 uniform vec3 fogColor; uniform float fogNear, fogFar;
 ${DRAIN}
-vec3 fogged(vec3 c, float d) { return drained(mix(c, fogColor, smoothstep(fogNear, fogFar, d))); }
+${CITY_GRADE}
+vec3 withFog(vec3 lit, float d) { return drained(mix(lit, graded(fogColor), smoothstep(fogNear, fogFar, d))); }
+vec3 fogged(vec3 c, float d) { return withFog(graded(c), d); }
+vec3 emissive(vec3 c, float d) { return withFog(mix(graded(c), c, gradeOn ? lamps : 0.0), d); }
 `;
 
 const PALETTE = /* glsl */ `
@@ -203,6 +207,23 @@ void main() {
   int bi = inBay ? u / B : -1;
   int ub = inBay ? u - bi * B : -1;
   bool tallEnough = wallH >= 3 * F;
+  wallC = graded(wallC); wallHi = graded(wallHi); wallLo = graded(wallLo);
+  winC = graded(winC); winHi = graded(winHi);
+  // A room keeps its lamp as the camera moves and when its cell is streamed back in.
+  float glow = 0.0;
+  vec3 bulb = vec3(1.0, 0.79, 0.49);
+  if (gradeOn && lamps > 0.0 && inBay && pattern > 0 && pattern < 7) {
+    uint room = mixh(seed + uint(bi), uint(vv / F));
+    if ((room & 7u) < 3u) {
+      glow = lamps * (0.72 + 0.28 * float((room >> 8) & 15u) / 15.0);
+      uint tint = (room >> 4) & 7u;
+      if (tint == 0u) bulb = vec3(0.76, 0.87, 0.93);
+      else if (tint < 3u) bulb = vec3(1.0, 0.90, 0.72);
+      else if (tint < 5u) bulb = vec3(0.97, 0.68, 0.38);
+    }
+  }
+  vec3 plainGlass = winC;
+  winC = mix(winC, bulb, glow); winHi = mix(winHi, bulb, glow);
   vec3 col = wallC;
   int vf = vv % F;
   if (pattern == ${STONE_BLOCKS}) {
@@ -231,21 +252,22 @@ void main() {
       uint pane = mixh(seed ^ uint(bi * 131), uint(fi)) & 15u;
       if ((bi + fi * 2 + int(seed & 63u)) % 19 < 4 || pane == 0u) col = wallHi;
       else if (pane == 1u) col = wallLo;
+      col = mix(col, bulb, glow);
     }
   } else if (pattern == 4) {          // sparse openings
     if (ub >= 2 && ub < B - 2 && vf >= 3 && vf < F - 1 && (mixh(seed + uint(bi * 7), uint(vv / F)) & 3u) == 0u) col = winC;
   } else if (pattern == 5) {          // a house: windows and its door
-    if (bi == 0 && vv < 5 && ub >= 2 && ub < 4) col = P(doorRamp, tone - 1);
+    if (bi == 0 && vv < 5 && ub >= 2 && ub < 4) col = graded(P(doorRamp, tone - 1));
     else if (ub >= 2 && ub < B - 2 && vf >= 3 && vf < F - 1 && !(bi == 0 && vv < F)) col = winC;
   } else if (pattern == 6) {          // tall windows between piers
     if (ub >= 2 && ub < B - 2 && vv >= 3 && vv < wallH - 4) col = (vv & 7) == 7 ? wallLo : winC;
   }
   // far away a texel is smaller than a pixel: settle on the wall's average instead of shimmering
   float fw = max(fwidth(vUV.x * kz), fwidth(vUV.y * kz));
-  vec3 average = pattern == 0 || pattern >= ${SHORE_FACE} ? wallC : mix(wallC, winC, 0.28);
+  vec3 average = pattern == 0 || pattern >= ${SHORE_FACE} ? wallC : mix(wallC, mix(plainGlass, vec3(0.96, 0.81, 0.59), gradeOn ? 0.33 * lamps : 0.0), 0.28);
   col = mix(col, average, smoothstep(0.55, 1.4, fw));
   // the shore's own face says so in the alpha, which only the water's mirror keeps
-  gl_FragColor = vec4(fogged(col, length(vMV)), pattern == ${SHORE_FACE} ? 0.5 : 1.0);
+  gl_FragColor = vec4(withFog(col, length(vMV)), pattern == ${SHORE_FACE} ? 0.5 : 1.0);
 }`;
 
 /**
@@ -632,7 +654,7 @@ void main() {
  * The edge of the data: a wall that shows what the far fog shows, the haze below the horizon
  * and the sky above it, so the city ends in fog.
  */
-const EDGE_VERTEX = /* glsl */ `
+const SKY_VERTEX = /* glsl */ `
 varying vec3 vW;
 void main() {
   vec4 w = modelMatrix * vec4(position, 1.0);
@@ -640,22 +662,22 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
 
-const EDGE_FRAGMENT = /* glsl */ `
-precision highp float;
-uniform vec3 fogColor; uniform vec3 skyColor;
-${DRAIN}
-varying vec3 vW;
-void main() { gl_FragColor = vec4(drained(vW.y < cameraPosition.y ? fogColor : skyColor), 1.0); }`;
-
-/** The sky: a dome round the camera in the sky's colour, drained like everything else. */
-const SKY_VERTEX = /* glsl */ `
-void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-
+// The dome and the edge sample the same horizon so a distant cell ends in haze.
 const SKY_FRAGMENT = /* glsl */ `
 precision highp float;
-uniform vec3 skyColor;
-${DRAIN}
-void main() { gl_FragColor = vec4(drained(skyColor), 1.0); }`;
+uniform vec3 fogColor; uniform vec3 skyColor;
+${DRAIN} ${CITY_GRADE}
+varying vec3 vW;
+void main() {
+  float elevation = normalize(vW - cameraPosition).y;
+  vec3 haze = graded(fogColor), sky = graded(skyColor);
+  float band = gradeOn ? smoothstep(0.0, 0.32, elevation) : 1.0;
+  vec3 colour = mix(haze, sky, mix(1.0, band, lamps));
+  #ifdef CITY_EDGE
+    if (elevation < 0.0) colour = haze;
+  #endif
+  gl_FragColor = vec4(drained(colour), 1.0);
+}`;
 
 /** The mirror's picture: its colours and depths, its projection's inverse and its camera's place. */
 export interface Mirror {
@@ -758,9 +780,14 @@ function treeAtlas(palette: Palette): THREE.DataTexture {
   return t;
 }
 
-export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
+export function makeMaterials(
+  palette: Palette,
+  ix: WalkIndex,
+  lighting = new StreetLighting(),
+): WalkMaterials {
   const grid = (ix.gridDeg * Math.PI) / 180;
   const shared = {
+    ...lighting.uniforms,
     pal: { value: palette.texture },
     kz: { value: ix.geo.kz },
     gridRot: { value: new THREE.Vector2(Math.cos(grid), Math.sin(grid)) },
@@ -857,18 +884,20 @@ export function makeMaterials(palette: Palette, ix: WalkIndex): WalkMaterials {
     });
   const water = waterMaterial(open, false);
   const edge = new THREE.ShaderMaterial({
+    defines: { CITY_EDGE: 1 },
     uniforms: {
+      ...lighting.uniforms,
       fogColor: shared.fogColor,
       skyColor: { value: SKY },
       grey: shared.grey,
       greys: shared.greys,
     },
-    vertexShader: EDGE_VERTEX,
-    fragmentShader: EDGE_FRAGMENT,
+    vertexShader: SKY_VERTEX,
+    fragmentShader: SKY_FRAGMENT,
     side: THREE.DoubleSide,
   });
   const sky = new THREE.ShaderMaterial({
-    uniforms: { skyColor: { value: SKY }, grey: shared.grey, greys: shared.greys },
+    uniforms: edge.uniforms,
     vertexShader: SKY_VERTEX,
     fragmentShader: SKY_FRAGMENT,
     side: THREE.BackSide,

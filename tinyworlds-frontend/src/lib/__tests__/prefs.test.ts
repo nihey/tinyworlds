@@ -22,6 +22,13 @@ describe("sanitizePrefs", () => {
     });
   });
 
+  it("starts new visits in Cycle and preserves previously saved lighting choices", () => {
+    expect(sanitizePrefs({}).theme).toBe("cycle");
+    for (const theme of ["cycle", "system", "light", "dark"]) {
+      expect(sanitizePrefs({ theme }).theme).toBe(theme);
+    }
+  });
+
   it("opens the map north up until the visitor turns it to the street grid", () => {
     expect(DEFAULT_PREFS.view).toBe("north");
     expect(sanitizePrefs({ view: "grid" }).view).toBe("grid");

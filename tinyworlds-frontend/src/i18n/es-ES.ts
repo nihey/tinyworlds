@@ -32,7 +32,7 @@ export const esES: Strings = {
     tiltStrengthLabel: "Intensidad del efecto maqueta",
     life: "Vida en el mapa",
     timeOfDay: "Hora del día",
-    themes: { system: "Auto", light: "Día", dark: "Noche" },
+    themes: { cycle: "Ciclo", system: "Sistema", light: "Día", dark: "Noche" },
     language: "Idioma",
     languageAuto: "Auto",
     keys: { search: "buscar", zoom: "zoom", wholeMap: "mapa completo", move: "mover" },

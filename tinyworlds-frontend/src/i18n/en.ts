@@ -32,7 +32,7 @@ export const en: Strings = {
     tiltStrengthLabel: "Miniature blur strength",
     life: "Life on the map",
     timeOfDay: "Time of day",
-    themes: { system: "Auto", light: "Day", dark: "Dusk" },
+    themes: { cycle: "Cycle", system: "System", light: "Day", dark: "Night" },
     language: "Language",
     languageAuto: "Auto",
     keys: { search: "search", zoom: "zoom", wholeMap: "whole map", move: "move" },

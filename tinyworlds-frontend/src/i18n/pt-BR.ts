@@ -32,7 +32,7 @@ export const ptBR: Strings = {
     tiltStrengthLabel: "Intensidade do desfoque de miniatura",
     life: "Vida no mapa",
     timeOfDay: "Hora do dia",
-    themes: { system: "Auto", light: "Dia", dark: "Noite" },
+    themes: { cycle: "Ciclo", system: "Sistema", light: "Dia", dark: "Noite" },
     language: "Idioma",
     languageAuto: "Auto",
     keys: { search: "buscar", zoom: "zoom", wholeMap: "mapa inteiro", move: "mover" },

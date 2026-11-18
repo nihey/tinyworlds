@@ -86,6 +86,11 @@ a few minutes to render on a desktop machine.
 Every real city has Street Walk in both map orientations. Drop the walker onto a street to
 explore on foot or by vehicle.
 
+Every world cycles from daylight through sunset, night and dawn in six minutes. Apartment and office
+windows glow amber and soft white across the map as evening sets in. Street Walk keeps the same time as the map, with lit windows, headlights and signals after dark. Choose
+**Settings → Time of day** to hold a city at Day or Night, or to follow the system appearance.
+Cycle follows the system appearance when reduced motion is enabled.
+
 Every real city also highlights landmarks and offers "Guess the building" in both map
 orientations. The quiz uses Wikipedia excerpts and original clues backed by local sources.
 Question counts vary by city.

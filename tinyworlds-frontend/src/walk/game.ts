@@ -23,6 +23,7 @@ import {
 } from "./player";
 import { CONTACT_SECONDS, punchTarget, SWING_SECONDS } from "./punch";
 import { FOG_FAR } from "./render/materials";
+import type { StreetLighting } from "./render/city-light";
 import { WalkModels } from "./render/models";
 import { makePalette, type Palette } from "./render/palette";
 import { WalkParticles } from "./render/particles";
@@ -61,6 +62,7 @@ export type { LifeRoutes } from "./ferries";
 export interface GameView {
   readonly world: WalkWorld;
   readonly scene: THREE.Scene;
+  readonly lighting: StreetLighting;
   setCamera(e: number, n: number, z: number, yaw: number, pitch: number, fov: number): void;
   /** Drains the colours to the palette's greys, 0 to 1. */
   setGrey(amount: number): void;
@@ -290,8 +292,8 @@ export class WalkGame {
     this.bindings = opts.bindings;
     this.random = opts.random ?? Math.random;
     this.palette = makePalette(opts.ix);
-    this.models = new WalkModels(opts.view.scene, this.palette, opts.ix);
-    this.particles = new WalkParticles(opts.view.scene, this.palette);
+    this.models = new WalkModels(opts.view.scene, this.palette, opts.ix, opts.view.lighting);
+    this.particles = new WalkParticles(opts.view.scene, this.palette, opts.view.lighting);
     this.traffic = new Traffic(this.net, this.world, opts.ix.tunnels, this.random);
     this.crowd = new Crowd(this.world, this.random);
     this.fleet = new Fleet(this.world);

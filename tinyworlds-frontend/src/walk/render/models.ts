@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { StreetLighting } from "./city-light";
 import type { BoatKind, CarKind } from "../kinds";
 import { clamp } from "../math";
 import type { Person } from "../people";
@@ -734,7 +735,10 @@ void main() {
   else if (p == ${HOUSING}) c = P(${r("taxi")}, t - 1);
   else if (p == ${METAL}) c = P(${r("steel")}, t);
   else c = P(${r("taxi")}, t - 1);
-  gl_FragColor = vec4(fogged(c, length(vMV)), 1.0);
+  bool lamp = !wrecked && (p == ${HEAD} || (p == ${TAIL} && vLit == 1) ||
+    (p == ${BAR_RED} && flash) || (p == ${BAR_BLUE} && !flash));
+  lamp = lamp || (p == ${LAMP_RED} && vLit == 0) || (p == ${LAMP_YELLOW} && vLit == 1) || (p == ${LAMP_GREEN} && vLit == 2);
+  gl_FragColor = vec4(lamp ? emissive(c, length(vMV)) : fogged(c, length(vMV)), 1.0);
 }`;
 }
 
@@ -878,10 +882,12 @@ export class WalkModels {
     private readonly scene: THREE.Scene,
     palette: Palette,
     ix: WalkIndex,
+    lighting = new StreetLighting(),
   ) {
     this.ramp = (name) => palette.ramp(name);
     const sun = (ix.sunDeg * Math.PI) / 180;
     const shared = {
+      ...lighting.uniforms,
       pal: { value: palette.texture },
       sun: { value: new THREE.Vector2(Math.sin(sun), Math.cos(sun)) },
       fogColor: { value: HORIZON },

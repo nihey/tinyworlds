@@ -42,6 +42,7 @@ import type { Manifest, Place } from "@/map/manifest";
 import { createSearchIndex } from "@/map/search";
 import { WORLD } from "@/worlds";
 import { AboutDialog } from "./about-dialog";
+import { CityLightFilter } from "./city-light-filter";
 import { CreditStrip } from "./credit-strip";
 import { LoadErrorDialog } from "./load-error-dialog";
 import { MapBenefactors } from "./map-benefactors";
@@ -70,6 +71,7 @@ const PAN_STEP = 160; // CSS px per arrow key press
 /** The whole page: the map's two canvases, and the signs floating over them. */
 export function MapApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const windowsRef = useRef<HTMLCanvasElement>(null);
   const marksRef = useRef<HTMLCanvasElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -98,7 +100,7 @@ export function MapApp() {
   };
 
   const [prefs, setPrefs] = usePrefs();
-  useTheme(prefs.theme);
+  const fixedLight = useTheme(prefs.theme);
   const { t, locale, copy } = useI18n();
   useDocumentLanguage(locale, copy.title);
   useDonationReturn();
@@ -107,6 +109,7 @@ export function MapApp() {
   // donations are taken when the build names an API or a checkout for this language
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, WORLD.id) !== null;
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const lightMode = prefs.theme === "cycle" && !reducedMotion ? "cycle" : fixedLight;
   const compact = useMediaQuery("(max-width: 639px)");
   // Guess the building's card is a sheet at the foot of the screen until it fits beside the search
   const quizSheet = useMediaQuery("(max-width: 895.98px)");
@@ -168,6 +171,7 @@ export function MapApp() {
         const live = new MapEngine({
           canvas,
           marks,
+          windows: windowsRef.current ?? undefined,
           manifest,
           tileUrl: (z, tx, ty) => dataUrl(`tiles/${z}/${tx}_${ty}.webp`, manifest.build),
           fileUrl: (path) => dataUrl(path, manifest.indexes),
@@ -484,11 +488,13 @@ export function MapApp() {
   return (
     <div
       className={cn("map-root", tiltOn && !walking && "tilt-on", walking && "walk-full")}
+      data-city-light={(lightMode !== "light" && !walking) || undefined}
       data-walk-dragging={draggingWalker || undefined}
       style={rootStyle}
     >
       <canvas ref={canvasRef} className="map-tiles" tabIndex={0} aria-label={copy.mapLabel} />
-      <div aria-hidden className="dusk-wash" />
+      <canvas ref={windowsRef} className="map-windows" aria-hidden />
+      {lightMode !== "light" && !walking && <CityLightFilter mode={lightMode} engine={engine} />}
       <div aria-hidden className="tilt-band" data-edge="top" data-depth="near" />
       <div aria-hidden className="tilt-band" data-edge="top" data-depth="far" />
       <div aria-hidden className="tilt-band" data-edge="bottom" data-depth="near" />
@@ -501,7 +507,7 @@ export function MapApp() {
       {session && walking && (
         <div className="walk-area">
           {street.Screen && street.screenProps ? (
-            <street.Screen {...street.screenProps} />
+            <street.Screen {...street.screenProps} lightMode={lightMode} />
           ) : (
             <div className="flex h-full items-center justify-center bg-sign p-4">
               <div className="sign flex flex-col items-center gap-3 px-5 py-4 text-sm">

@@ -796,7 +796,7 @@ frame: components call methods and subscribe with `engine.on("view" | "settle" |
 `requestAnimationFrame` only runs while something is moving, fading or animated.
 
 - **Tiles canvas** (`.map-tiles`): the pixel-art tiles, then _scene layers_. Sits under the
-  tilt-shift blur and the dusk tint.
+  tilt-shift blur and the time-of-day grade.
 - **Marks canvas** (`.map-marks`): neighbourhood lines, name plates, the building spotlight, the
   search pin. Above the blur, always sharp.
 - View = centre in map px + `scale` (CSS px per map px). `scale ≥ 1` draws level 0 with smoothing
@@ -868,7 +868,7 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 - **The whole building.** The tiles are flat, so a lower tower in front still hides the lit one;
   each sight's picture (`sprite` in `sights.json`: the pipeline draws it alone, nothing in front)
   goes over the tiles on the tiles canvas, under the dim's cut-out, placed and smoothed exactly
-  like a tile so it lines up and takes the blur and the dusk like the map. It is fetched the
+  like a tile so it lines up and takes the blur and the lighting of the map. It is fetched the
   first time the sight lights up (`fileUrl`), fades in with the spotlight (or as it arrives),
   and the last few stay, up to `PICTURE_BUDGET` px (`picturesToDrop`). A sight without one, or
   whose picture fails, lights up as before.
@@ -1228,10 +1228,9 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
 
 Every panel is a black enamel "sign" (`sign` utility) with paper-white lettering and the world's
 accent (the `taxi` token: taxi yellow in New York) for whatever is on; buttons are round `bullet`s. Signs are dark in **both** themes, so shadcn's
-`dark:` variant is always on (see the `@custom-variant` at the top of `globals.css`). The theme
-setting (Auto / Day / Dusk) only changes the fog behind the map and tints the map: it is the
-`dusk` class on `<html>`, set before paint by the script in `layout.tsx` and kept in sync by
-`useTheme`. Fonts: Archivo (UI) and Tiny5 (the wordmark), via `next/font/google`.
+`dark:` variant is always on (see the `@custom-variant` at the top of `globals.css`). The time-of-day setting defaults to a six-minute cycle. Day, Night and System hold a fixed
+grade. The map and Street Walk use the same clock and lookup tables in `src/map/daylight.ts`.
+The `dusk` class on `<html>` controls the interface colours. Fonts: Archivo (UI) and Tiny5 (the wordmark), via `next/font/google`.
 
 Tokens live in `:root` in `globals.css` (`--fog`, `--sign`, `--paper`, `--taxi`, …) and are
 exposed to Tailwind as `bg-sign`, `text-paper-dim`, `bg-taxi`, etc.

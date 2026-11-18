@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { StreetLighting } from "./city-light";
 import { sizeFor, type Vehicle } from "../vehicles";
 import { WATER_Z } from "../world";
 import { FOG, FOG_FAR, FOG_NEAR, HASH, HORIZON, greysOf, NOT_MIRRORED } from "./materials";
@@ -126,7 +127,7 @@ void main() {
   } else if (length(gl_PointCoord - 0.5) > 0.5) discard;
   ivec2 q = ivec2(mod(gl_FragCoord.xy, 4.0));
   if (vAlpha < (B[q.x + q.y * 4] + 0.5) / 16.0) discard;
-  gl_FragColor = vec4(fogged(vColour, length(vMV)), 1.0);
+  gl_FragColor = vec4(vFlame > 0.5 ? emissive(vColour, length(vMV)) : fogged(vColour, length(vMV)), 1.0);
 }`;
 
 export class WalkParticles {
@@ -157,6 +158,7 @@ export class WalkParticles {
   constructor(
     private readonly scene: THREE.Scene,
     palette: Palette,
+    lighting: StreetLighting,
   ) {
     const c = (ramp: string, shade: number): Colour =>
       palette.rgb(palette.ramp(ramp), shade).map((v) => v / 255) as Colour;
@@ -179,6 +181,7 @@ export class WalkParticles {
     this.mat = new THREE.ShaderMaterial({
       uniforms: {
         pscale: { value: 300 },
+        ...lighting.uniforms,
         fogColor: { value: HORIZON },
         fogNear: { value: FOG_NEAR },
         fogFar: { value: FOG_FAR },
@@ -224,6 +227,7 @@ export class WalkParticles {
       uniforms: {
         now: { value: 0 },
         shades: { value: [shade("foam", HIGH), shade("foam", LIT), shade("waterShallow", HIGH)] },
+        ...lighting.uniforms,
         fogColor: { value: HORIZON },
         fogNear: { value: FOG_NEAR },
         fogFar: { value: FOG_FAR },

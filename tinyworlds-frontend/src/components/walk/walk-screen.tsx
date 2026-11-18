@@ -17,6 +17,7 @@ import { walkData } from "@/walk/load";
 import { billboardAreas } from "@/walk/render/billboards";
 import { PIXEL_DEFAULT, PIXEL_MAX, PIXEL_MIN, WalkView } from "@/walk/render/view";
 import { QualityLadder } from "@/walk/quality";
+import { watchCityLight, type LightMode } from "@/map/daylight";
 import { WalkSound } from "@/walk/sound";
 import { canDrawWalk } from "@/walk/webgl";
 import { WORLD } from "@/worlds";
@@ -58,6 +59,7 @@ export interface WalkAt {
 }
 
 export interface WalkScreenProps {
+  lightMode: LightMode;
   /** the world's own manifest (north up), whichever way the map underneath is turned: the walk's
    * version, its origin (`geo`), the first view (`start`) and the ferries' version */
   manifest: Manifest;
@@ -112,7 +114,14 @@ function loseContext(canvas: HTMLCanvasElement): void {
   }
 }
 
-export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: WalkScreenProps) {
+export default function WalkScreen({
+  manifest,
+  start,
+  goTo,
+  onOpen,
+  onExit,
+  lightMode,
+}: WalkScreenProps) {
   const { t } = useI18n();
   const touch = useMediaQuery(TOUCH_QUERY);
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -260,6 +269,10 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
   }, [attempt]);
 
   // the settings: the keys (kept in the browser), the pixels and the sound (for the visit)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && game) return watchCityLight(lightMode, (light) => view.lighting.set(light));
+  }, [game, lightMode]);
   useEffect(() => game?.setBindings(bindings), [game, bindings]);
   useEffect(() => {
     viewRef.current?.setPixel(pixel);

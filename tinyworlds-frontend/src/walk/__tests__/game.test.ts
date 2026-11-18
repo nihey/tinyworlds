@@ -4,6 +4,7 @@ import type { WalkCell, WalkEdge } from "../cell";
 import { defaultBindings } from "../controls";
 import { WalkGame, type GameView, type LifeRoutes, type WalkState } from "../game";
 import { enToLonLat } from "../geo";
+import { StreetLighting } from "../render/city-light";
 import { MODEL_RAMPS, WalkModels } from "../render/models";
 import { makePalette } from "../render/palette";
 import { PARTICLE_RAMPS } from "../render/particles";
@@ -78,6 +79,7 @@ function fakeView(world: WalkWorld): GameView & { cameras: number[][]; greys: nu
   return {
     world,
     scene: new THREE.Scene(),
+    lighting: new StreetLighting(),
     cameras,
     greys,
     setCamera: (...pose: number[]) => void cameras.push(pose),

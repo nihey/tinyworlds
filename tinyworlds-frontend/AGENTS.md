@@ -21,6 +21,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep both leaderboards in descending order by total donated, with ranks following the visual reading order. A city's leaderboard includes founders and later benefactors in the same list.
 - Show founding badges beside the city where they were earned, with localized descriptions available on hover, keyboard focus, and tap. Keep anonymous gifts independent of named entries.
 
+## City lighting
+
+- Every world uses the six-minute clock and sRGB lookup tables in `src/map/daylight.ts`. Sample page elapsed time so both map orientations and Street Walk stay in phase. Settings also offers fixed daylight, fixed night and system appearance. With reduced motion, Cycle follows system appearance.
+- Apply the map LUT to the tiles, sprites and edge fog. Keep navigation and marks legible. Street Walk shares the LUT uniforms across streamed cells, vehicles and effects. Grade surfaces before fog and the wasted sequence. Keep the reflection classification pass in its original palette.
+- The overhead map extracts small window panes from its existing tile artwork in a worker. Full-detail tiles use the glass palette, and compressed zoom levels also check for surrounding wall bands. Keep lamp selection in map coordinates, fade it with the shared lamp strength, and count masks against the tile cache. Street Walk uses its building seed, bay and floor for its room lights.
+
 ## Map benefactors
 
 - Real built cities show a small plaque above the map credits using live `cityBenefactors` data. Cycle through the city's publicly named donors in Hall of Fame order, one at a time with their public links. A city without public names shows a support invitation.

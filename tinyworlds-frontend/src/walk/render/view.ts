@@ -12,6 +12,7 @@ import {
   WATER_SURFACE,
   type MeshContext,
 } from "./cell-mesh";
+import { StreetLighting } from "./city-light";
 import { makeMaterials, NOT_MIRRORED, SKY, type Mirror, type WalkMaterials } from "./materials";
 import { makePalette, type Palette } from "./palette";
 
@@ -389,6 +390,7 @@ export class WalkView {
   readonly world: WalkWorld;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly camera = new THREE.PerspectiveCamera(70, 1, 0.1, 1500);
+  readonly lighting = new StreetLighting();
   private readonly palette: Palette;
   private readonly materials: WalkMaterials;
   private readonly stream: SquareStream<THREE.Group>;
@@ -440,7 +442,7 @@ export class WalkView {
     canvas.style.imageRendering = "pixelated";
 
     this.palette = makePalette(ix);
-    this.materials = makeMaterials(this.palette, ix);
+    this.materials = makeMaterials(this.palette, ix, this.lighting);
     this.scene.background = SKY;
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 16, 8), this.materials.sky);
     this.sky.renderOrder = ORDER_SKY;
@@ -725,9 +727,15 @@ export class WalkView {
     m.updateMatrixWorld();
     m.updateProjectionMatrix();
     clipAbove(m, WATER_SURFACE);
+    // Water classifies reflected surfaces by their original palette brightness, then
+    // shades the water itself for the current hour.
+    const { gradeOn } = this.lighting.uniforms;
+    const wasGraded = gradeOn.value;
+    gradeOn.value = false;
     this.renderer.setRenderTarget(this.target);
     this.renderer.render(this.scene, m);
     this.renderer.setRenderTarget(null);
+    gradeOn.value = wasGraded;
     return {
       colour: this.target.texture,
       depth: this.target.depthTexture!,

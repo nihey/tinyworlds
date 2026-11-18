@@ -164,7 +164,7 @@ void main() {
   int B = 1 << clamp(int(floor(log2(max(fw, 1.0)))), 0, 4);
   if (B > 1) q = min((q / B) * B + B / 2, ivec2(W - 1, H - 1));
   float t = mod((still > 0.5 ? 0.0 : clock) + vLook.w, ${f(SCREEN_LOOP)});
-  gl_FragColor = vec4(fogged(C(screen(q, W, H, t)), dist), 1.0);
+  gl_FragColor = vec4(emissive(C(screen(q, W, H, t)), dist), 1.0);
 }`;
 }
 

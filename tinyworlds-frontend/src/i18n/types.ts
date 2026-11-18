@@ -65,7 +65,7 @@ export interface Strings {
     tiltStrengthLabel: string;
     life: string;
     timeOfDay: string;
-    themes: { system: string; light: string; dark: string };
+    themes: { cycle: string; system: string; light: string; dark: string };
     language: string;
     /** the choice that follows the browser's language */
     languageAuto: string;
