@@ -742,6 +742,7 @@ export const en: Strings = {
     damage: "Damage",
     damageLabel: "Damage {n}%",
     wrecked: "Wrecked",
+    explosionWarning: "Get out! Vehicle will explode.",
     messages: {
       slowDown: "Slow down to get out",
       noRoom: "No room to get out here",

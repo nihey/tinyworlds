@@ -758,6 +758,7 @@ export const ptBR: Strings = {
     damage: "Danos",
     damageLabel: "Danos: {n}%",
     wrecked: "Destruído",
+    explosionWarning: "Saia! O veículo vai explodir.",
     messages: {
       slowDown: "Reduza a velocidade para sair",
       noRoom: "Não há espaço para sair aqui",

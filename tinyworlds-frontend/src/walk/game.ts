@@ -78,6 +78,8 @@ export interface WalkState {
     speed: number;
     damage: number;
     wrecked: boolean;
+    /** Whole seconds left, rounded up so a live fuse never shows zero. */
+    explodesIn: number | null;
     boat: boolean;
   } | null;
   /** what you could get into from here */
@@ -863,8 +865,9 @@ export class WalkGame {
 
   private tryExit(): void {
     const v = this.yours!;
-    if (Math.hypot(v.v, v.vs) >= EXIT_SPEED) return this.say("slowDown");
-    const spot = wayOut(v, this.world, this.nearby);
+    const emergency = v.fuse !== null;
+    if (!emergency && Math.hypot(v.v, v.vs) >= EXIT_SPEED) return this.say("slowDown");
+    const spot = wayOut(v, this.world, this.nearby, emergency);
     if (spot === "slower") return this.say("slowDown");
     if (!spot) return this.say("noRoom");
     this.leaveVehicle(v);
@@ -1215,13 +1218,13 @@ export class WalkGame {
     if (ev.fell > CRUNCH) this.crunch(v, v.e, v.n, v.z, ev.fell);
   }
 
-  /** What became of everything this step: traffic the game must keep, wrecks catching fire, what goes into the water. */
+  /** What became of everything this step: traffic the game must keep, explosions and sinking. */
   private watch(): void {
     for (const v of this.traffic.cars)
       if (v.state !== "traffic" && v !== this.yours) this.fleet.keep(v);
     const all = this.yours ? [this.yours, ...this.fleet.free] : this.fleet.free;
     for (const v of all) {
-      if (v.state === "wrecked" && !this.burnt.has(v)) {
+      if (v.fire > 0 && !this.burnt.has(v)) {
         this.burnt.add(v);
         this.wreck(v);
       }
@@ -1233,7 +1236,7 @@ export class WalkGame {
     }
   }
 
-  /** A car catching fire: the boom, the flames, people knocked over and running, you hurt if near. */
+  /** The explosion: the boom, the flames, people knocked over and running, you hurt if near. */
   private wreck(v: Vehicle): void {
     const f = this.focus();
     const d = Math.hypot(v.e - f.e, v.n - f.n);
@@ -1248,7 +1251,7 @@ export class WalkGame {
         this.crowd.knock(q, { ve: (q.e - v.e) * 1.5, vn: (q.n - v.n) * 1.5 });
     this.crowd.scare(v.e, v.n, WRECK_SCARE);
     if (v === this.yours) {
-      // inside your car when it is wrecked: the end of you
+      // inside your car when it explodes: the end of you
       this.hurtYou(LIFE_MAX);
       this.goDown();
       return;
@@ -1340,6 +1343,7 @@ export class WalkGame {
             speed: Math.abs(v.v),
             damage: v.damage,
             wrecked: v.state === "wrecked",
+            explodesIn: v.fuse === null ? null : Math.ceil(v.fuse - 1e-9),
             boat: v.boat,
           }
         : null,
@@ -1366,7 +1370,9 @@ export class WalkGame {
       s.mode,
       Math.floor(s.life * 2),
       s.life >= LIFE_MAX,
-      v ? `${v.kind}:${Math.round(v.speed * 2)}:${Math.round(v.damage * 100)}:${v.wrecked}` : "",
+      v
+        ? `${v.kind}:${Math.round(v.speed * 2)}:${Math.round(v.damage * 100)}:${v.wrecked}:${v.explodesIn}`
+        : "",
       s.near?.kind ?? "",
       s.message ?? "",
       twentieths(s.hurt),

@@ -77,6 +77,7 @@ const SETTLE = 0.6;
 /** Ms after the first squares are shown before the frame rate counts. */
 const WARM_UP = 3000;
 const UNITS = WORLD.units === "imperial" ? "imperial" : "metric";
+const TOUCH_QUERY = "(pointer: coarse)";
 
 // kept for the visit, never stored: what the walk was left with
 let walked = false;
@@ -84,6 +85,11 @@ let keptPixel: number | null = null;
 let pixelChosen = false;
 let keptSound = true;
 let keptCrowd = 0;
+
+/** Phones start with fewer moving actors while the automatic quality ladder measures frames. */
+function crowdLadder(): QualityLadder {
+  return new QualityLadder(Math.max(keptCrowd, window.matchMedia(TOUCH_QUERY).matches ? 1 : 0));
+}
 
 const storage = (): Storage | null => {
   try {
@@ -107,7 +113,7 @@ function loseContext(canvas: HTMLCanvasElement): void {
 
 export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: WalkScreenProps) {
   const { t } = useI18n();
-  const touch = useMediaQuery("(pointer: coarse)");
+  const touch = useMediaQuery(TOUCH_QUERY);
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const darkRef = useRef<HTMLDivElement>(null);
@@ -222,7 +228,7 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
           statenIslandFerry: WORLD.id === "tinynyc",
         });
         // the crowd an earlier walk of the visit had to lower
-        const crowd = new QualityLadder(keptCrowd).crowd;
+        const crowd = crowdLadder().crowd;
         made.setCrowd(crowd.people, crowd.cars);
         viewRef.current = view;
         soundRef.current = sound;
@@ -299,7 +305,7 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
     let before = performance.now();
     let shown = false;
     let shownAt = 0;
-    const ladder = new QualityLadder(keptCrowd);
+    const ladder = crowdLadder();
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const dt = (now - before) / 1000;
@@ -431,7 +437,10 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
   };
 
   return (
-    <div className="walk-pane relative h-full w-full overflow-hidden bg-sign">
+    <div
+      className="walk-pane relative h-full w-full overflow-hidden bg-sign"
+      onPointerDownCapture={touch ? () => soundRef.current?.wake() : undefined}
+    >
       {/* a new canvas for each attempt: one whose context was lost cannot give another */}
       <canvas
         key={attempt}
@@ -453,7 +462,7 @@ export default function WalkScreen({ manifest, start, goTo, onOpen, onExit }: Wa
       {game && phase === "ready" && (
         <>
           <StreetMinimap game={game} reducedMotion={reducedMotion} />
-          {touch && <TouchPad game={game} />}
+          {touch && streets && !menuOpen && <TouchPad game={game} />}
           <WalkHud
             game={game}
             bindings={bindings}

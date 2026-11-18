@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { useI18n } from "@/hooks/use-i18n";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import type { WalkGame } from "@/walk/game";
 import {
   easeSpan,
@@ -21,11 +20,6 @@ import { WORLD } from "@/worlds";
  * once, and no target for a touch (the thumb stick under it takes it).
  */
 
-/** The smaller one: phones, and any screen short of room. As `.walk-pane`'s `--walk-mm` has it. */
-export const MINIMAP_COMPACT = "(max-width: 639.98px), (max-height: 499.98px)";
-/** About this many CSS px across: on a phone, and elsewhere. */
-const CSS_SMALL = 128;
-const CSS_LARGE = 176;
 /** About this many CSS px a pixel. */
 const PIXEL = 2;
 /** Ms between two drawings. */
@@ -35,7 +29,7 @@ const EVERY = 50;
  * pixels (so you stand in the middle one), each a whole number of device pixels. */
 function sizing(css: number, dpr: number): { pixels: number; cssPx: number } {
   const unit = Math.max(1, Math.round(PIXEL * dpr)) / dpr;
-  let pixels = Math.round(css / unit);
+  let pixels = Math.max(1, Math.floor(css / unit));
   if (pixels % 2 === 0) pixels -= 1;
   return { pixels, cssPx: pixels * unit };
 }
@@ -60,7 +54,6 @@ function tonesFor(game: WalkGame, canvas: HTMLCanvasElement): MinimapTones {
 
 export function StreetMinimap({ game, reducedMotion }: { game: WalkGame; reducedMotion: boolean }) {
   const { t } = useI18n();
-  const compact = useMediaQuery(MINIMAP_COMPACT);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -79,13 +72,19 @@ export function StreetMinimap({ game, reducedMotion }: { game: WalkGame; reduced
     let dpr = 0;
     const fit = () => {
       dpr = window.devicePixelRatio || 1;
-      const { pixels, cssPx } = sizing(compact ? CSS_SMALL : CSS_LARGE, dpr);
-      canvas.width = pixels;
-      canvas.height = pixels;
-      box.style.width = `${cssPx}px`;
-      box.style.height = `${cssPx}px`;
+      const { pixels, cssPx } = sizing(box.clientWidth, dpr);
+      if (canvas.width !== pixels || canvas.height !== pixels) {
+        canvas.width = pixels;
+        canvas.height = pixels;
+      }
+      canvas.style.width = `${cssPx}px`;
+      canvas.style.height = `${cssPx}px`;
     };
-    fit();
+    let needsFit = true;
+    const observer = new ResizeObserver(() => {
+      needsFit = true;
+    });
+    observer.observe(box);
     let raf = 0;
     let last = -Infinity;
     let span = Number.NaN;
@@ -94,23 +93,30 @@ export function StreetMinimap({ game, reducedMotion }: { game: WalkGame; reduced
       if (now - last < EVERY) return;
       const dt = (now - last) / 1000;
       last = now;
-      if ((window.devicePixelRatio || 1) !== dpr) fit();
+      // Resizing clears the canvas, so resize only on the frame that redraws it.
+      if (needsFit || (window.devicePixelRatio || 1) !== dpr) {
+        fit();
+        needsFit = false;
+      }
       const v = game.state.vehicle;
       span = easeSpan(span, minimapSpan(v ? v.speed : 0), dt, reducedMotion);
       drawer.draw(game.position(), span);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, [game, compact, reducedMotion]);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [game, reducedMotion]);
 
   return (
     <div
       ref={boxRef}
       role="img"
       aria-label={t.walk.minimap}
-      className="walk-minimap sign pointer-events-none absolute z-[4] overflow-hidden"
+      className="walk-minimap sign pointer-events-none absolute z-[4] grid place-items-center overflow-hidden"
     >
-      <canvas ref={canvasRef} aria-hidden className="block size-full [image-rendering:pixelated]" />
+      <canvas ref={canvasRef} aria-hidden className="block [image-rendering:pixelated]" />
     </div>
   );
 }

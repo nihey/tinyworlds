@@ -119,7 +119,9 @@ export interface Vehicle {
   /** 0 to 1; at 1 a car is a wreck and a boat goes down */
   damage: number;
   state: VehicleState;
-  /** seconds of fire left: a wreck burns for 9 s */
+  /** Seconds until a critical wreck explodes, or null when there is no active fuse. */
+  fuse: number | null;
+  /** seconds of fire left after an explosion */
   fire: number;
   /** seconds since it went into the water: afloat for the first 1, going under over the next 4 */
   sink: number;
@@ -153,7 +155,7 @@ export interface VehicleEvents {
   fell: number;
   /** it went into the water this step (a splash; whoever is in it comes out swimming) */
   sank: boolean;
-  /** it was wrecked this step (a car catches fire, a boat goes down) */
+  /** it was wrecked this step (a car starts its fuse, a boat goes down) */
   wrecked: boolean;
 }
 
@@ -264,6 +266,7 @@ const HARMLESS = 3;
  * spike's 0.022 when the owner asked to "increase the level of damage cars can sustain". */
 export const DAMAGE_PER_MS = 0.011;
 const DAMAGE_SLOWS = 0.45;
+const EXPLOSION_DELAY = 8;
 const FIRE = 9;
 
 // sinking
@@ -328,6 +331,7 @@ export function newVehicle(
     w: 0,
     damage: 0,
     state,
+    fuse: null,
     fire: 0,
     sink: 0,
     stopFor: 0,
@@ -350,7 +354,7 @@ export function accelFactor(v: Vehicle): number {
  * one, less against a lighter one; against what does not give (a wall, the ground: no
  * `otherMass`) it is 2. So a hatchback hitting a wall at 30 m/s is left at about 60% (smoking) and
  * is wrecked from about 48 m/s, and a bus at 30 m/s takes a fifth. Answers whether this hit wrecked
- * it: a car then burns for 9 s, a boat goes down.
+ * it: a car starts its explosion countdown, a boat goes down.
  */
 export function applyDamage(v: Vehicle, impact: number, otherMass?: number): boolean {
   if (v.state === "wrecked" || v.state === "sinking" || v.state === "sunk") return false;
@@ -368,7 +372,7 @@ export function applyDamage(v: Vehicle, impact: number, otherMass?: number): boo
     v.sink = 0;
   } else {
     v.state = "wrecked";
-    v.fire = FIRE;
+    v.fuse = EXPLOSION_DELAY;
   }
   return true;
 }
@@ -655,6 +659,7 @@ function startSinking(v: Vehicle, out: VehicleEvents) {
   v.sink = 0;
   v.z = WATER_Z;
   v.vz = 0;
+  v.fuse = null;
   v.fire = 0;
   out.sank = true;
 }
@@ -844,7 +849,15 @@ export function stepCar(
   if (v.boat || v.state === "sunk") return out;
   const total = Math.min(Math.max(dt, 0), MAX_DT);
   if (total <= 0) return out;
-  v.fire = Math.max(0, v.fire - total);
+  if (v.fuse !== null) {
+    v.fuse -= total;
+    if (v.fuse <= 1e-9) {
+      v.fuse = null;
+      v.fire = FIRE;
+    }
+  } else {
+    v.fire = Math.max(0, v.fire - total);
+  }
   const driver = v.state === "wrecked" || v.state === "sinking" ? null : input;
   if (!driver && v.state !== "sinking" && v.v === 0 && v.vs === 0 && v.w === 0 && v.vz === 0) {
     // at rest: nothing to do while the ground stays where it was

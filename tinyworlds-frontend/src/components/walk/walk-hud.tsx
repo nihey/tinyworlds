@@ -69,26 +69,35 @@ function PixelBar({
 function HudButton({
   label,
   hint,
+  touch,
   onClick,
   children,
 }: {
   label: string;
   hint: string;
+  touch: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button type="button" className="bullet" aria-label={label} onClick={onClick}>
+        <button
+          type="button"
+          className={cn("bullet", touch && "min-h-11 min-w-11")}
+          aria-label={label}
+          onClick={onClick}
+        >
           {children}
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         {label}
-        <kbd data-slot="kbd" className="ml-1 rounded-sm bg-sign/15 px-1.5 py-0.5 font-semibold">
-          {hint}
-        </kbd>
+        {!touch && (
+          <kbd data-slot="kbd" className="ml-1 rounded-sm bg-sign/15 px-1.5 py-0.5 font-semibold">
+            {hint}
+          </kbd>
+        )}
       </TooltipContent>
     </Tooltip>
   );
@@ -101,7 +110,7 @@ function signature(s: WalkState, speed: string): string {
     s.mode,
     Math.ceil(s.life / (100 / CELLS)),
     Math.round(s.life),
-    v ? `${v.kind}:${speed}:${Math.round(v.damage * CELLS)}:${v.wrecked}` : "",
+    v ? `${v.kind}:${speed}:${Math.round(v.damage * CELLS)}:${v.wrecked}:${v.explodesIn}` : "",
     s.near?.kind ?? "",
     s.message ?? "",
     s.hurt > 0,
@@ -132,7 +141,7 @@ export function WalkHud({
   onMenu,
   onBack,
 }: WalkHudProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const w = t.walk;
   const [s, setS] = useState<WalkState>(game.state);
   const edge = useRef<HTMLDivElement>(null);
@@ -151,6 +160,7 @@ export function WalkHud({
   }, [game, units, w, reducedMotion]);
 
   const v = s.vehicle;
+  const explodesIn = v?.explodesIn;
   const tone = lifeTone(s.life);
   const keyOf = (id: keyof Bindings) => {
     const [a, b] = bindings[id];
@@ -176,80 +186,95 @@ export function WalkHud({
         )}
       />
 
-      {/* the life bar is always there, even through the wasted screen */}
-      <div className="sign absolute top-3 left-3 flex max-w-[calc(100%-6.5rem)] flex-col gap-1.5 px-3 py-2.5 text-xs">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className="text-[10.5px] font-semibold tracking-[0.12em] text-paper-dim uppercase"
-            >
-              {w.life}
-            </span>
-            <PixelBar
-              lit={Math.ceil(Math.max(0, s.life) / (100 / CELLS))}
-              colour={TONE[tone]}
-              label={lifeText(s.life, w)}
-              value={s.life}
-              flash={s.hurt > 0 && !reducedMotion}
-            />
-          </span>
-          {v && (
-            <span className="flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className="text-[10.5px] font-semibold tracking-[0.12em] text-paper-dim uppercase"
-              >
-                {w.damage}
-              </span>
-              {v.wrecked ? (
-                <span className="font-semibold text-[#c8473c]">{w.wrecked}</span>
-              ) : (
+      <div className="absolute top-(--edge-t) right-(--edge-r) left-(--edge-l) flex flex-col items-center gap-2">
+        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+          {/* the life bar is always there, even through the wasted screen */}
+          <div className="sign flex w-fit max-w-full min-w-0 flex-col gap-1.5 px-2.5 py-2 text-xs sm:px-3 sm:py-2.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="text-[10.5px] font-semibold tracking-[0.12em] text-paper-dim uppercase"
+                >
+                  {w.life}
+                </span>
                 <PixelBar
-                  lit={Math.round(v.damage * CELLS)}
-                  colour={DAMAGE}
-                  label={damageText(v.damage, w)}
-                  value={v.damage * 100}
+                  lit={Math.ceil(Math.max(0, s.life) / (100 / CELLS))}
+                  colour={TONE[tone]}
+                  label={lifeText(s.life, w)}
+                  value={s.life}
+                  flash={s.hurt > 0 && !reducedMotion}
                 />
+              </span>
+              {v && (
+                <span className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="text-[10.5px] font-semibold tracking-[0.12em] text-paper-dim uppercase"
+                  >
+                    {w.damage}
+                  </span>
+                  {v.wrecked ? (
+                    <span className="font-semibold text-[#c8473c]">{w.wrecked}</span>
+                  ) : (
+                    <PixelBar
+                      lit={Math.round(v.damage * CELLS)}
+                      colour={DAMAGE}
+                      label={damageText(v.damage, w)}
+                      value={v.damage * 100}
+                    />
+                  )}
+                </span>
               )}
+            </div>
+            {v && (
+              <div className="flex items-baseline gap-2">
+                <span className="text-base font-semibold tabular-nums">
+                  {speedText(v.speed, units, w)}
+                </span>
+                <span className="text-paper-dim">{w.vehicles[v.kind]}</span>
+              </div>
+            )}
+            {!touch && (
+              <p className="leading-snug text-paper-dim">
+                {hintText(hintMode(s.mode, v?.kind), bindings, w)}
+              </p>
+            )}
+          </div>
+
+          {/* the buttons stay reachable even on the wasted screen */}
+          <div className="sign pointer-events-auto flex items-center gap-0.5 p-0.5 sm:p-1">
+            <HudButton label={w.controls} hint={keyOf("menu")} touch={touch} onClick={onMenu}>
+              <Keyboard className="size-[18px]" strokeWidth={2.25} />
+            </HudButton>
+            <HudButton label={w.back} hint={keyOf("map")} touch={touch} onClick={onBack}>
+              <MapIcon className="size-[18px]" strokeWidth={2.25} />
+            </HudButton>
+          </div>
+        </div>
+
+        {explodesIn != null && (
+          <div className="flex max-w-full items-center gap-2 rounded-lg bg-[#7f2925] px-3 py-1.5 text-sm font-semibold text-white shadow-md">
+            <span role="alert">{w.explosionWarning}</span>
+            <span
+              role="timer"
+              className="shrink-0 rounded-sm bg-black/30 px-1.5 py-0.5 tabular-nums"
+            >
+              {new Intl.NumberFormat(locale, {
+                style: "unit",
+                unit: "second",
+                unitDisplay: "short",
+              }).format(explodesIn)}
+            </span>
+          </div>
+        )}
+        <div role="status" className="flex max-w-full justify-center text-center">
+          {s.message && !s.wasted && (
+            <span className="sign rounded-lg px-3.5 py-1.5 text-sm font-semibold">
+              {w.messages[s.message]}
             </span>
           )}
         </div>
-        {v && (
-          <div className="flex items-baseline gap-2">
-            <span className="text-base font-semibold tabular-nums">
-              {speedText(v.speed, units, w)}
-            </span>
-            <span className="text-paper-dim">{w.vehicles[v.kind]}</span>
-          </div>
-        )}
-        {!touch && (
-          <p className="leading-snug text-paper-dim">
-            {hintText(hintMode(s.mode, v?.kind), bindings, w)}
-          </p>
-        )}
-      </div>
-
-      {/* the buttons: the controls, and back to the map, one press away even on the wasted screen */}
-      <div className="sign pointer-events-auto absolute top-3 right-3 flex items-center gap-0.5 p-1">
-        <HudButton label={w.controls} hint={keyOf("menu")} onClick={onMenu}>
-          <Keyboard className="size-[18px]" strokeWidth={2.25} />
-        </HudButton>
-        <HudButton label={w.back} hint={keyOf("map")} onClick={onBack}>
-          <MapIcon className="size-[18px]" strokeWidth={2.25} />
-        </HudButton>
-      </div>
-
-      <div
-        role="status"
-        aria-live="polite"
-        className="absolute top-16 left-1/2 flex -translate-x-1/2 justify-center"
-      >
-        {s.message && !s.wasted && (
-          <span className="sign rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap">
-            {w.messages[s.message]}
-          </span>
-        )}
       </div>
 
       {near && !s.wasted && (

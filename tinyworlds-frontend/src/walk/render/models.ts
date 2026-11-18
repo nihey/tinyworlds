@@ -994,7 +994,7 @@ export class WalkModels {
     const i = this.place(pool, v.e, v.z + v.heave, v.n, v.yaw, 0, -roll, scale);
     pool.attrs.ramp.array[i] = this.paint(v);
     pool.attrs.lit.array[i] = brake ? 1 : 0;
-    pool.attrs.dmg.array[i] = v.state === "wrecked" ? 1 : v.damage;
+    pool.attrs.dmg.array[i] = v.fuse !== null ? 0.99 : v.state === "wrecked" ? 1 : v.damage;
     if (occupied && !hideRider) this.motorcyclist(v, roll);
   }
 

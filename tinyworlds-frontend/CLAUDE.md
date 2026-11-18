@@ -1022,8 +1022,8 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   after it fails. A walk link followed while walking takes you there (`goTo`, the game's
   `teleport`); the map itself is not a way to move you any more.
 - **The minimap** (`street-minimap.tsx`, drawn by `walk/minimap.ts`): a small square sign in the
-  bottom-left corner (about 176 CSS px, 128 on a phone or a short screen: `--walk-mm` on
-  `.walk-pane`, 16 px from the edges and the notches), just the streets, centred on you and
+  bottom-left corner (176 CSS px, scaling from 96 to 128 on narrow or short screens via
+  `--walk-mm` on `.walk-pane`, clear of the safe-area insets), just the streets, centred on you and
   turned with you (the way you face is up; your heading: on foot where you look, at the wheel
   the car's), zoomed out with your speed (`minimapSpan`: 150 m across standing, on foot or
   swimming, out to 450 m at 30 m/s and over, eased over about half a second; at once under
@@ -1056,7 +1056,7 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
 - **Automatic quality** (`walk/quality.ts`, `QualityLadder`): under 30 fps for 3 s (counted a
   few seconds after the first squares are in, while the page is in view), one step down, then
   3 s more to see: the water's reflections, then fewer people and cars (150 → 90 → 60 people,
-  70 → 45 → 30 cars: `setCrowd`; the crowd lets the farthest out of sight go), then the pixels a
+  70 → 45 → 30 cars: `setCrowd`; a touch screen starts at 90 people and 45 cars), then the pixels a
   size bigger, up to 5, unless the visitor chose one. It never steps back up in a walk (quality
   that comes and goes reads as a bug, and a phone slow in one street is slow in the next); the
   crowd and the pixel size it reached stay for the visit's next walk.
@@ -1064,7 +1064,8 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   bar, always (20 pixel cells of 5, green, amber under 50, red under 25, flashing on a hit,
   "Life 64 of 100" for a screen reader), the damage bar beside it at the wheel or "Wrecked",
   the speed in the world's units (`units: "imperial"` is mph, else km/h) and the vehicle's
-  name, the line of keys built from the current bindings (not on touch), "F get in the taxi",
+  name, the explosion warning and countdown, the line of keys built from the current bindings
+  (not on touch), "F get in the taxi",
   the messages, and the buttons (controls, back to the map: above even the wasted screen). A
   hit reddens the view's edges (a plain red frame under reduced motion). React hears the game
   only when what the signs say changes; what fades every frame goes to the DOM through refs.
@@ -1082,11 +1083,14 @@ city can be walked at street level, in 3D: on foot, at the wheel and on the wate
   Use the vehicle interaction key to mount or dismount. They accelerate quickly, lean in turns,
   use the rear brake while turning and back up at walking speed. The chase camera shows the
   rider, and the first-person camera sits over the centre of the bike.
-- **Touch** (`touch-pad.tsx`): a thumb stick wherever a finger comes down on the left half (the
-  minimap lets touches through), dragging the right half looks, buttons for jump and get in on
-  foot, horn, camera, brake and get out at the wheel, in the bottom-right corner over the credit,
-  wrapping into rows before they reach the minimap. Off touch, "F get in the taxi" rises over the
-  minimap on a narrow screen.
+- **Touch** (`touch-pad.tsx`): the left half moves (including over the minimap) and the right half
+  looks. Each gesture keeps its own finger, with no layout reads during a drag. The bottom-right
+  controls stay clear of the minimap and the credit. At the wheel, Get out stays below the horn,
+  camera, and brake. The HUD fits the safe-area insets and puts messages below the life sign.
+- **Critical vehicle damage** (`walk/vehicles.ts`): a road vehicle loses power and starts an
+  eight-second fuse at full damage. You can bail out while it rolls if a door or end is clear.
+  The explosion still happens after you leave. It hurts nearby players and kills an occupant.
+  A vehicle that starts sinking clears the fuse. Boats sink when critically damaged.
 - **The water** (the rules and their numbers in `walk/water.ts`, the shader in
   `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
   according to" a write-up of layered pixel-art water, whose ideas are re-made here for a

@@ -814,6 +814,7 @@ export interface Strings {
     /** "Damage {n}%", for screen readers */
     damageLabel: string;
     wrecked: string;
+    explosionWarning: string;
     /** brief messages */
     messages: {
       slowDown: string;

@@ -32,4 +32,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - While the walker is dragged, `src/map/walker.ts` dims the baked tiles and draws the nearby building footprints, parks, plazas, walkable routes and snapped landing point. The preview reuses loaded walk cells and clears when the drag ends.
 - `src/walk/world.ts` resolves which deck supports each player. On foot, a nearby footway can take over from an overlapping roadway when both decks are level, as on the Brooklyn Bridge's Brooklyn approach. Keep the height tolerance and roadway preference for drivers when changing this logic.
 - Motorcycles use the shared road vehicle physics and spawn mix in `src/walk/vehicles.ts`. Keep the model, camera and localized riding prompts in sync when adding vehicle kinds.
+- Keep the touch HUD and action buttons within the safe-area insets and clear of the minimap. Capture movement and camera fingers independently and release held input on pointer cancellation.
+- Critical damage starts an eight-second fuse on road vehicles. The driver can bail out while rolling. Leaving keeps the fuse running, and sinking clears it.
 - The Brooklyn Bridge's landmark geometry in `src/walk/render/brooklyn-bridge.ts` uses the surveyed tower locations and existing walk cells. Keep its openings aligned with the roadway and promenade.

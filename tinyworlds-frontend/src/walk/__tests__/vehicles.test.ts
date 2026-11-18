@@ -228,15 +228,22 @@ describe("driving", () => {
     expect(accelFactor(hurt)).toBeCloseTo(1 - 0.45 * 0.6, 9);
 
     const wreck = car("sedan", 300, 100, EAST);
-    applyDamage(wreck, 100);
+    expect(applyDamage(wreck, 100)).toBe(true);
     expect(wreck.state).toBe("wrecked");
-    expect(wreck.fire).toBe(9);
+    expect(wreck.fire).toBe(0);
+    expect(wreck.fuse).toBe(8);
     expect(accelFactor(wreck)).toBe(0);
     run(wreck, gas, w, 3);
     expect(wreck.v).toBe(0);
     expect(wreck.e).toBe(300);
-    expect(wreck.fire).toBeCloseTo(6, 6);
-    run(wreck, gas, w, 7);
+    expect(wreck.fuse).toBeCloseTo(5, 6);
+    expect(applyDamage(wreck, 100)).toBe(false);
+    expect(wreck.fuse).toBeCloseTo(5, 6);
+    expect(wreck.fire).toBe(0);
+    run(wreck, gas, w, 5.1);
+    expect(wreck.fuse).toBeNull();
+    expect(wreck.fire).toBeGreaterThan(8.8);
+    run(wreck, gas, w, 9.1);
     expect(wreck.fire).toBe(0);
     expect(wreck.state).toBe("wrecked");
   });
@@ -324,7 +331,8 @@ describe("walls and damage", () => {
     expect(f.wrecked).toBe(true);
     expect(fast.state).toBe("wrecked");
     expect(fast.damage).toBe(1);
-    expect(fast.fire).toBeGreaterThan(8);
+    expect(fast.fire).toBe(0);
+    expect(fast.fuse).toBeGreaterThan(7);
 
     const bus = car("bus", 60 - CARS.bus.length / 2 - 0.5, 100, EAST, 30);
     const b = run(bus, gas, w, 0.5);
@@ -784,6 +792,16 @@ describe("forks", () => {
 });
 
 describe("water", () => {
+  it("clears a wreck's fuse when it starts sinking", () => {
+    const w = worldOf(makeCell(0, 0, water));
+    const v = car("sedan", 100, 100, EAST);
+    applyDamage(v, 100);
+    expect(v.fuse).not.toBeNull();
+    expect(run(v, null, w, 1).sank).toBe(1);
+    expect(v.fuse).toBeNull();
+    expect(v.fire).toBe(0);
+  });
+
   it("a car pushed over the water sinks and is gone after about 5 s", () => {
     const w = worldOf(makeCell(0, 0, { mask: waterRect(0, 0, 100, 0, 200, 200) }));
     const v = car("sedan", 95, 100, EAST, 6);

@@ -510,7 +510,7 @@ export class WalkParticles {
         for (let k = 0; k < 3; k++) if (Math.random() < h * 30) this.flame(fe, fn, z, s.width);
       const wrecked = v.state === "wrecked";
       if (Math.random() < (wrecked ? 10 : (v.damage - 0.5) * 14) * h)
-        this.smoke(fe, fn, z, wrecked);
+        this.smoke(fe, fn, z, wrecked && v.fuse === null);
     }
     if (v.boat && Math.abs(v.v) > 2 && Math.random() < h * Math.abs(v.v) * 1.5)
       this.wake(v.e - sy * (s.length / 2), v.n - cy * (s.length / 2), v.yaw, s.width);

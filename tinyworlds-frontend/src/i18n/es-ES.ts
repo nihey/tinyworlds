@@ -754,6 +754,7 @@ export const esES: Strings = {
     damage: "Daños",
     damageLabel: "Daños: {n}%",
     wrecked: "Destrozado",
+    explosionWarning: "¡Sal! El vehículo va a explotar.",
     messages: {
       slowDown: "Reduce la velocidad para salir",
       noRoom: "No hay sitio para salir aquí",

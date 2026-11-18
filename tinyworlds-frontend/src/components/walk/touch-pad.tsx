@@ -1,43 +1,105 @@
 "use client";
 
+import { Camera, CircleStop, Volume2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useI18n } from "@/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 import type { ActionId } from "@/walk/controls";
-import type { WalkGame, WalkState } from "@/walk/game";
+import type { WalkGame } from "@/walk/game";
 
-/**
- * The walk on a touch screen: a thumb stick wherever a finger comes down on the left half
- * (it walks, swims, drives or sails), dragging on the right half looks round, and buttons do
- * what the keys would: jump and get in on foot, the horn, the camera, the brake and getting out
- * at the wheel, in the bottom-right corner (above the credit, clear of the minimap across from
- * it, which lets touches through to the stick). Back to the map is the signs' own button, which
- * stays above even the wasted screen, so it is one tap away whatever happens.
- */
-
-/** How far the stick's knob goes from where the thumb came down, CSS px. */
-const STICK = 48;
-/** Touch moves look this much more than the mouse's. */
+/** How far the stick must move for full input, in CSS pixels. */
+const STICK = 40;
 const LOOK = 2.2;
 
-interface Finger {
-  id: number;
-  stick: boolean;
-  x0: number;
-  y0: number;
-  x: number;
-  y: number;
+type Finger = { id: number; x: number; y: number };
+
+function capture(event: ReactPointerEvent): boolean {
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
+/** Held controls capture their finger. One-shot actions also work with keyboard activation. */
+function TouchButton({
+  game,
+  action,
+  label,
+  icon: Icon,
+  primary,
+  urgent,
+  hold,
+}: {
+  game: WalkGame;
+  action: ActionId;
+  label: string;
+  icon?: LucideIcon;
+  primary?: boolean;
+  urgent?: boolean;
+  hold?: boolean;
+}) {
+  const finger = useRef<number | null>(null);
+  const tap = () => {
+    game.press(action, true);
+    game.press(action, false);
+  };
+  const release = (event: ReactPointerEvent) => {
+    if (finger.current !== event.pointerId) return;
+    finger.current = null;
+    game.press(action, false);
+  };
+
+  useEffect(
+    () => () => {
+      if (finger.current !== null) game.press(action, false);
+    },
+    [action, game],
+  );
+
+  return (
+    <button
+      type="button"
+      aria-label={Icon ? label : undefined}
+      className={cn(
+        "sign pointer-events-auto flex min-h-11 min-w-11 touch-none items-center justify-center rounded-full text-xs font-semibold select-none active:brightness-125 focus-visible:ring-2 focus-visible:ring-taxi focus-visible:outline-none",
+        !Icon && "px-4",
+        primary && "min-h-12 bg-taxi text-taxi-ink",
+        urgent && "bg-[#c8473c] text-white ring-2 ring-paper",
+      )}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        if (!hold) tap();
+        else if (finger.current === null && capture(event)) {
+          finger.current = event.pointerId;
+          game.press(action, true);
+        }
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={release}
+      onClick={(event) => {
+        if (event.detail === 0) tap();
+      }}
+    >
+      {Icon ? <Icon aria-hidden className="size-5" strokeWidth={2.25} /> : label}
+    </button>
+  );
+}
+
+/** The left half moves. The right half looks. Action buttons sit above the gesture surface. */
 export function TouchPad({ game }: { game: WalkGame }) {
   const { t } = useI18n();
-  const pad = useRef<HTMLDivElement>(null);
+  const w = t.walk.touch;
   const base = useRef<HTMLDivElement>(null);
   const knob = useRef<HTMLDivElement>(null);
-  const fingers = useRef(new Map<number, Finger>());
-  const [mode, setMode] = useState<WalkState["mode"]>(game.state.mode);
+  const move = useRef<Finger | null>(null);
+  const look = useRef<Finger | null>(null);
+  const [mode, setMode] = useState(game.state.mode);
   const [near, setNear] = useState(game.state.near?.kind);
   const [riding, setRiding] = useState(game.state.vehicle?.kind === "motorcycle");
+  const [urgent, setUrgent] = useState(game.state.vehicle?.explodesIn != null);
 
   useEffect(
     () =>
@@ -45,160 +107,128 @@ export function TouchPad({ game }: { game: WalkGame }) {
         setMode(s.mode);
         setNear(s.near?.kind);
         setRiding(s.vehicle?.kind === "motorcycle");
+        setUrgent(s.vehicle?.explodesIn != null);
       }),
     [game],
   );
 
-  const showStick = (x: number, y: number, dx: number, dy: number, on: boolean) => {
-    const b = base.current;
-    const k = knob.current;
-    if (!b || !k) return;
-    b.style.display = on ? "block" : "none";
-    b.style.transform = `translate(${x - STICK}px, ${y - STICK}px)`;
-    k.style.transform = `translate(${dx}px, ${dy}px)`;
-  };
-
-  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const r = pad.current?.getBoundingClientRect();
-    if (!r) return;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      /* gone already */
-    }
-    const x = e.clientX - r.left;
-    const y = e.clientY - r.top;
-    const stick = x < r.width / 2 && ![...fingers.current.values()].some((f) => f.stick);
-    fingers.current.set(e.pointerId, { id: e.pointerId, stick, x0: x, y0: y, x, y });
-    if (stick) showStick(x, y, 0, 0, true);
-  };
-
-  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const f = fingers.current.get(e.pointerId);
-    const r = pad.current?.getBoundingClientRect();
-    if (!f || !r) return;
-    const x = e.clientX - r.left;
-    const y = e.clientY - r.top;
-    if (f.stick) {
-      let dx = x - f.x0;
-      let dy = y - f.y0;
-      const len = Math.hypot(dx, dy);
-      if (len > STICK) {
-        dx = (dx / len) * STICK;
-        dy = (dy / len) * STICK;
-      }
-      game.stick(dx / STICK, dy / STICK);
-      showStick(f.x0, f.y0, dx, dy, true);
-    } else {
-      game.look((x - f.x) * LOOK, (y - f.y) * LOOK);
-    }
-    f.x = x;
-    f.y = y;
-  };
-
-  const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const f = fingers.current.get(e.pointerId);
-    fingers.current.delete(e.pointerId);
-    if (f?.stick) {
+  useEffect(() => {
+    const clear = () => {
+      move.current = null;
+      look.current = null;
       game.stick(0, 0);
-      showStick(0, 0, 0, 0, false);
+      if (base.current) base.current.style.display = "none";
+    };
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("blur", clear);
+      clear();
+    };
+  }, [game]);
+
+  const onDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const left = event.clientX < bounds.left + bounds.width / 2;
+    const slot = left ? move : look;
+    if (slot.current || !capture(event)) return;
+    slot.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    if (left && base.current && knob.current) {
+      base.current.style.display = "grid";
+      base.current.style.transform = `translate3d(${event.clientX - bounds.left - STICK}px, ${event.clientY - bounds.top - STICK}px, 0)`;
+      knob.current.style.transform = "none";
     }
   };
 
-  // a button held down is the key held down; it never starts a stick or a look
-  const hold = (action: ActionId) => ({
-    onPointerDown: (e: ReactPointerEvent) => {
-      e.stopPropagation();
-      game.press(action, true);
-    },
-    onPointerUp: (e: ReactPointerEvent) => {
-      e.stopPropagation();
-      game.press(action, false);
-    },
-    onPointerCancel: () => game.press(action, false),
-    onPointerLeave: () => game.press(action, false),
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  });
+  const onMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const stick = move.current;
+    if (stick?.id === event.pointerId) {
+      const x = event.clientX - stick.x;
+      const y = event.clientY - stick.y;
+      const length = Math.max(STICK, Math.hypot(x, y));
+      const dx = x / length;
+      const dy = y / length;
+      game.stick(dx, dy);
+      if (knob.current)
+        knob.current.style.transform = `translate3d(${dx * STICK}px, ${dy * STICK}px, 0)`;
+    }
+    const camera = look.current;
+    if (camera?.id === event.pointerId) {
+      game.look((event.clientX - camera.x) * LOOK, (event.clientY - camera.y) * LOOK);
+      camera.x = event.clientX;
+      camera.y = event.clientY;
+    }
+  };
 
-  // Mounting and dismounting replace the button before the finger may lift.
-  const tap = (action: "enter" | "exit") => ({
-    onPointerDown: (e: ReactPointerEvent) => {
-      e.stopPropagation();
-      game.press(action, true);
-      game.press(action, false);
-    },
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  });
+  const onUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (look.current?.id === event.pointerId) look.current = null;
+    if (move.current?.id !== event.pointerId) return;
+    move.current = null;
+    game.stick(0, 0);
+    if (base.current) base.current.style.display = "none";
+  };
 
   const driving = mode === "drive" || mode === "boat";
-  const button =
-    "sign pointer-events-auto flex h-14 min-w-14 items-center justify-center rounded-full px-3 text-xs font-semibold select-none active:bg-sign-raised";
 
   return (
     <div
-      ref={pad}
-      className="absolute inset-0 z-[5] touch-none select-none"
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={onUp}
-      onPointerCancel={onUp}
+      className="pointer-events-none absolute inset-0 z-[5] select-none"
+      onContextMenu={(event) => event.preventDefault()}
     >
       <div
-        ref={base}
-        aria-hidden
-        className="pointer-events-none absolute top-0 left-0 hidden size-24 rounded-full border-2 border-paper/50 bg-sign/25"
+        className="pointer-events-auto absolute inset-0 touch-none"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerCancel={onUp}
+        onLostPointerCapture={onUp}
       >
         <div
-          ref={knob}
-          className="absolute top-1/2 left-1/2 -mt-[18px] -ml-[18px] size-9 rounded-full bg-taxi/85"
-        />
+          ref={base}
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-0 hidden size-20 place-items-center rounded-full border-2 border-paper/50 bg-sign/25"
+        >
+          <div ref={knob} className="size-8 rounded-full bg-taxi/85" />
+        </div>
       </div>
 
-      {/* in the bottom-right corner over the credit, wrapping before they reach the minimap */}
-      <div className="pointer-events-none absolute right-(--edge-r) bottom-[calc(var(--edge-b)+2.25rem)] flex max-w-[calc(100%-var(--walk-mm)-2.75rem)] flex-col items-end gap-2">
-        <div className="flex flex-wrap justify-end gap-2">
-          {driving ? (
-            <>
-              <button type="button" className={button} {...hold("horn")}>
-                {t.walk.touch.horn}
-              </button>
-              <button type="button" className={button} {...hold("camera")}>
-                {t.walk.touch.camera}
-              </button>
+      <div className="absolute right-(--edge-r) bottom-[calc(var(--edge-b)+2.25rem)] grid max-w-[calc(100%-var(--edge-l)-var(--edge-r)-var(--walk-mm)-0.5rem)] justify-items-end gap-2">
+        {driving ? (
+          <>
+            <div className="flex flex-wrap justify-end gap-1.5">
+              <TouchButton game={game} action="horn" label={w.horn} icon={Volume2} hold />
+              <TouchButton game={game} action="camera" label={w.camera} icon={Camera} />
               {mode === "drive" && (
-                <button type="button" className={button} {...hold("handbrake")}>
-                  {t.walk.touch.brake}
-                </button>
+                <TouchButton
+                  game={game}
+                  action="handbrake"
+                  label={w.brake}
+                  icon={CircleStop}
+                  hold
+                />
               )}
-              <button
-                key="exit"
-                type="button"
-                className={cn(button, "bg-taxi text-taxi-ink")}
-                {...tap("exit")}
-              >
-                {riding ? t.walk.touch.dismount : t.walk.touch.exit}
-              </button>
-            </>
-          ) : (
-            <>
-              {near && (
-                <button
-                  key="enter"
-                  type="button"
-                  className={cn(button, "bg-taxi text-taxi-ink")}
-                  {...tap("enter")}
-                >
-                  {near === "motorcycle" ? t.walk.touch.mount : t.walk.touch.enter}
-                </button>
-              )}
-              {mode === "foot" && (
-                <button type="button" className={button} {...hold("jump")}>
-                  {t.walk.touch.jump}
-                </button>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+            <TouchButton
+              game={game}
+              action="exit"
+              label={riding ? w.dismount : w.exit}
+              primary
+              urgent={urgent}
+            />
+          </>
+        ) : (
+          <div className="flex flex-wrap justify-end gap-2">
+            {near && (
+              <TouchButton
+                game={game}
+                action="enter"
+                label={near === "motorcycle" ? w.mount : w.enter}
+                primary
+              />
+            )}
+            {mode === "foot" && <TouchButton game={game} action="jump" label={w.jump} hold />}
+          </div>
+        )}
       </div>
     </div>
   );

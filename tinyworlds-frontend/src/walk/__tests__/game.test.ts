@@ -498,7 +498,7 @@ describe("going down", () => {
     expect(now().mode).toBe("foot");
   });
 
-  it("a car wrecked with you inside is the end of you", () => {
+  it("warns you when your car is wrecked and kills you at the end of the countdown", () => {
     // a building across the way 30 m east
     const cells = area(-1, -1, 1, 1, { "0_0": { volumes: [boxVolume(130, 40, 170, 160)] } });
     const car = sedan(100, 100, Math.PI / 2);
@@ -510,25 +510,65 @@ describe("going down", () => {
     game.sim(0.1);
     expect(now().mode).toBe("drive");
     game.keyDown("KeyW");
-    expect(simUntil(() => now().wasted !== null, 6)).toBe(true);
+    expect(simUntil(() => now().vehicle?.explodesIn != null, 6)).toBe(true);
     expect(car.state).toBe("wrecked");
+    expect(now().vehicle?.explodesIn).toBe(8);
+    expect(now().life).toBe(100);
+    const countdown = new Set<number>();
+    const unsubscribe = game.subscribe(({ vehicle }) => {
+      if (vehicle?.explodesIn != null) countdown.add(vehicle.explodesIn);
+    });
+    game.sim(7);
+    expect(now().vehicle?.explodesIn).toBe(1);
+    expect([...countdown]).toEqual([8, 7, 6, 5, 4, 3, 2, 1]);
+    unsubscribe();
+    expect(now().wasted).toBeNull();
+    expect(simUntil(() => now().wasted !== null, 1.1)).toBe(true);
     expect(now().vehicle).toBeNull();
   });
 });
 
 describe("wrecks", () => {
-  it("catching fire within 5 m of you hurt you once, nearer worse", () => {
+  it("damages you once when a nearby wreck explodes", () => {
     // a sedan 3 m east of you, its side 2.1 m from you, about to burn
     const car = sedan(103, 100, 0, "loose");
     const { game, now } = play(area(-1, -1, 1, 1), { start: { e: 100, n: 100 }, vehicles: [car] });
     game.sim(0.1);
     applyDamage(car, 100);
-    game.sim(0.1);
+    game.sim(7.9);
     expect(car.state).toBe("wrecked");
+    expect(now().life).toBe(100);
+    game.sim(0.2);
     expect(now().life).toBeCloseTo(100 - fireDamage(2.1), 1);
     const after = now().life;
     game.sim(3);
     expect(now().life).toBe(after);
+  });
+
+  it("lets a touch player bail out while rolling and leave the wreck to explode", () => {
+    const car = sedan(100, 100);
+    const { game, now } = play(area(-1, -1, 1, 1), {
+      start: { e: 101.8, n: 100 },
+      vehicles: [car],
+    });
+    game.sim(0.1);
+    game.press("enter", true);
+    game.press("enter", false);
+    game.sim(0.1);
+    expect(now().mode).toBe("drive");
+    car.v = 8;
+    applyDamage(car, 100);
+    game.sim(0.03);
+    game.press("exit", true);
+    game.press("exit", false);
+    game.sim(0.1);
+    expect(now().mode).toBe("foot");
+    expect(car.fuse).toBeGreaterThan(7);
+    game.stick(-1, 0);
+    game.sim(8);
+    expect(car.fire).toBeGreaterThan(0);
+    expect(now().life).toBe(100);
+    expect(now().wasted).toBeNull();
   });
 });
 
