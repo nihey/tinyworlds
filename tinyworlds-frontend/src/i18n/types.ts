@@ -681,6 +681,7 @@ export interface Strings {
     building: string;
     /** the link to its Wikipedia article */
     readOn: string;
+    readSource: string;
   };
   /** Guess the building: the sign that starts it and the card a round is played on */
   quiz: {

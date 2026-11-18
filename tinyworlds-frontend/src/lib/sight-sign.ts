@@ -71,7 +71,7 @@ export function signContent(sight: Sight, text: SightText | undefined, t: String
   if (text) {
     content.text = text.text;
     content.lang = text.lang;
-    content.link = { href: text.url, label: t.sight.readOn };
+    content.link = { href: text.url, label: text.reference ? t.sight.readSource : t.sight.readOn };
   }
   return content;
 }

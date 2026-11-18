@@ -7,6 +7,7 @@ export const tinytkf: World = {
   homeLocale: "en-US",
   turn: "grid",
   walk: true,
+  quiz: true,
   units: "imperial",
   // the map's one district is the Town of Truckee: Overture has no neighborhood outlines here
   copy: {

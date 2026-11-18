@@ -79,6 +79,10 @@ export const tinylax: City = {
   // the hills: chaparral, and grass that is gold, not green, most of the year
   ground: { landCover: { barren: G.Steppe, shrub: G.Scrub, grass: G.Steppe } },
 
+  sights: {
+    placeWords: ["Los Angeles", "California", "Hollywood", "Santa Monica", "Beverly Hills"],
+    areaByDistrict: true,
+  },
   curated: CURATED,
   flights: [
     // landing from the east on the outer runways, over Inglewood

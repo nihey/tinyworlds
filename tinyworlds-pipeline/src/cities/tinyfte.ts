@@ -68,6 +68,10 @@ export const tinyfte: City = {
   // the steppe: shrubland as dry tussock grass, the bare plateau as dirt
   ground: { landCover: { shrub: G.Steppe, barren: G.Construction, crop: G.Steppe } },
 
+  sights: {
+    placeWords: ["El Calafate", "Calafate", "Santa Cruz", "Patagonia", "Argentina"],
+    areaByDistrict: true,
+  },
   curated: CURATED,
   flights: [],
   search: { districtOnly: false, bridge: /^puente\b/i, stationSuffix: null, districtRank: 80 },

@@ -78,6 +78,16 @@ describe("signContent", () => {
     );
   });
 
+  it("links original landmark descriptions to their source", () => {
+    const url = "https://example.org/history";
+    const content = signContent(
+      sight,
+      { title: sight.n, url, text: "Uma descrição.", lang: "pt", reference: true },
+      ptBR,
+    );
+    expect(content.link).toEqual({ href: url, label: "Consultar a fonte" });
+  });
+
   it("shows no words and no link without an article", () => {
     const content = signContent(sight, undefined, en);
     expect(content.text).toBeUndefined();

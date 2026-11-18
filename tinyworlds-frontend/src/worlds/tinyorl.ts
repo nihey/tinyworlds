@@ -7,6 +7,8 @@ export const tinyorl: World = {
   homeLocale: "en-US",
   turn: "grid",
   walk: true,
+  sights: true,
+  quiz: true,
   units: "imperial",
   // the map's districts are the municipalities of the metro area: Orlando, Winter Park, Kissimmee…
   copy: {

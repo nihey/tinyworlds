@@ -45,6 +45,8 @@ export type StatuePiece = {
  * exist under the name people actually use. `s` is the zoom to arrive at (screen px per map px).
  */
 export interface Curated {
+  /** Original descriptions of a sight, with their supporting source, for the three interface languages. */
+  reference?: { url: string; en: string; pt: string; es: string };
   n: string;
   t: "landmark" | "park" | "bridge" | "museum" | "station" | "place";
   lon: number;

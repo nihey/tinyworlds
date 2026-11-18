@@ -12,6 +12,11 @@ it("generates Street Walk data in the standard build for every real city", () =>
   expect(disabled).toEqual([]);
 });
 
+it("generates the landmark and quiz indexes in the standard build for every real city", () => {
+  const disabled = Object.values(CITIES).filter((city) => !city.synthetic && !city.sights);
+  expect(disabled.map((city) => city.id)).toEqual([]);
+});
+
 describe("pickView", () => {
   it("draws a city its own way unless asked otherwise", () => {
     expect(pickView([], {}, real)).toBe("north");

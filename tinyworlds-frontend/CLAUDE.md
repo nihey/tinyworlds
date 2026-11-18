@@ -887,8 +887,7 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 
 ### Guess the building (`hooks/use-quiz.ts`, `components/map/quiz-*.tsx`, `lib/quiz*.ts`)
 
-In a world with `quiz: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs; it needs `sights`, and
-Truckee's, with six Wikipedia articles among them, are too few for a game), a sign under
+In every real city, `quiz: true` and `sights: true` enable the game. A sign under
 "more cities and worlds" (`QuizBanner`, class `quiz-invite`) opens the game once the buildings are in. The card
 first asks what to play (`choosing`): a difficulty (easy, medium, hard), a borough or all
 (the areas the questions have, most first; the row is named by the world's `borough` word) and
@@ -897,7 +896,7 @@ a kind or all (buildings, museums, landmarks, stations), and says how many build
 emptied by another change lets go of the kind, then the borough (`fixChoice`). The choice is
 remembered (`<world>.quiz.choice`; easy, all, all the first time). A game is every matching
 building once, in a random order, those played before last (`gameOrder`): a building is lit,
-its Wikipedia opening shown with the name blanked, the visitor picks its name out of four, and
+its sourced clue shown with the name blanked, the visitor picks its name out of four, and
 sees how everyone else answered on that difficulty. The header shows the choice and "round r
 of N · k right", with a gear back to choosing; after the last building the card says how many
 were right (`finished`) and offers Play again, Change and Stop. Stop, the close button or Esc

@@ -383,8 +383,11 @@ one or more search entries point at.
 
 ## Guess the building (`index/quiz.ts`, `index/write-quiz.ts`)
 
-The `quiz` step (run by `all` after `wiki`, where a city has sights) writes `quiz.<locale>.json`
-(root `CLAUDE.md`): one question per sight with an English article, in the three languages.
+The `quiz` step runs after `wiki` for each real city and writes `quiz.<locale>.json` in the three
+interface languages. It uses Wikipedia openings and original localized descriptions from
+curated landmarks. The `wiki` step writes those descriptions and their source URLs into
+`sights.<locale>.json` with `reference: true`. Give each curated clue enough text to read after
+the name is blanked.
 Offline and deterministic; `--list` prints every blanked text, to read them through after a
 change to the rules below.
 
@@ -450,9 +453,7 @@ change to the rules below.
   its articles are on buildings the data names otherwise or not at all (historic houses,
   churches): they were found by listing every article with coordinates in the box (the
   `geosearch` API), matching each to the footprint at its point, and curating those.
-- Truckee: 6 questions (easy 2, medium 2, hard 2; 5 asked in each language, Truckee station's
-  opening being all name), from 8 of its 41 sights on 6 articles: too few for a game, so its
-  viewer has `sights` and no `quiz`. The files are written all the same.
+- Truckee has five playable questions in each language, drawn from its local landmarks.
 - San Francisco has 659 lit sights north up and 660 on the street grid. Both orientations
   match 144 Wikipedia articles and offer 139 English, 140 Brazilian Portuguese and 139 Spanish
   quiz questions.

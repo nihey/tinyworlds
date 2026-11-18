@@ -80,6 +80,7 @@ export const tinyorl: City = {
   flora: "subtropical",
   ground: { landCover: { barren: G.Sand } },
 
+  sights: { placeWords: ["Orlando", "Florida", "Bay Lake", "Winter Park"], areaByDistrict: true },
   curated: CURATED,
   flights: [
     // Orlando International: landing from the south on the west runway, the rollout north

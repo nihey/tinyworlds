@@ -7,6 +7,8 @@ export const tinyfte: World = {
   homeLocale: "es-ES",
   turn: "grid",
   walk: true,
+  sights: true,
+  quiz: true,
   // a small town: its "districts" are just parts of it, and it may have no outlines to draw at all
   copy: {
     "es-ES": {

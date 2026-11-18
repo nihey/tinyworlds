@@ -81,8 +81,8 @@ Each sub-project has its own `CLAUDE.md`.
   the donor chose; a Stripe webhook records what was paid. If
   the API is unreachable the viewer falls back to static payment links, so donating never
   depends on it.
-- **Guess the building** (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Austin, San Francisco, Milwaukee, Bethlehem): a lit building, its Wikipedia opening with the name
-  blanked, four names to pick from (`quiz.<locale>.json`, made by the pipeline). Each answer
+- **Guess the building** is available in every real city. The map lights up a landmark, blanks its
+  name in a sourced description and offers four answers (`quiz.<locale>.json`). Each answer
   goes to `answerQuiz`, once per visit and building, which answers how everyone has answered
   that building; without the API the game plays on without the shares.
 - **The funnel is the site's own.** Every page says to the API that a visit opened it, and
@@ -367,9 +367,9 @@ outlined as the map draws it, and what Wikipedia says of them. Only for a world 
 //                          // the structure, drawn as the tiles draw it (shadows and all) with
 //                          // nothing in front of it; x, y, w, h place it in map px
 // }[] }
-// sights.<locale>.json: { [id]: { title: string; url: string; text: string; lang: string } }
-//   text: the article's opening (≤ 220 characters); lang: the article's own language, "en" where
-//   the visitor's has none
+// sights.<locale>.json: { [id]: { title: string; url: string; text: string; lang: string; reference?: true } }
+//   text: a Wikipedia opening (≤ 220 characters) or an original clue with a linked source
+//   lang: the text's language; reference marks original clues
 ```
 
 Optional for the viewer: without them nothing lights up; without a sight's picture it still
@@ -378,8 +378,8 @@ lights up, as far as the map shows it.
 ### quiz.<locale>.json
 
 The questions of "Guess the building", one file per interface language, made by the
-pipeline's `quiz` step from `sights.json` and `sights.<locale>.json`: each sight with an article,
-its opening with the name blanked out, and three other sights to offer beside it (of the same
+pipeline's `quiz` step from `sights.json` and `sights.<locale>.json`: a sourced clue with its
+name blanked out, and three other sights to offer beside it (of the same
 kind, nearest first; the same three in every language, so a building's tallies mean the same
 thing everywhere).
 
@@ -394,6 +394,7 @@ thing everywhere).
 //   group: "buildings" | "museums" | "landmarks" | "stations";
 //   area?: string;                       // its borough ("Bronx"), as the data names it
 //   parts: string[];                     // the text in pieces; the odd ones (1, 3, …) are blanked.
+//   reference?: true;                    // original description with a linked source
 //                                        // parts.join("") is the text as sights.<locale>.json has it
 //   lang: string;                        // the text's own language ("en" where the visitor's has none)
 // }[] }

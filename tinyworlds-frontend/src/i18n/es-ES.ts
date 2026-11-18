@@ -605,7 +605,7 @@ export const esES: Strings = {
     },
     footerLink: "Administración",
   },
-  sight: { building: "Edificio", readOn: "Leer en Wikipedia" },
+  sight: { building: "Edificio", readOn: "Leer en Wikipedia", readSource: "Consultar la fuente" },
   quiz: {
     invite: "Adivina el edificio: ¿sabes el nombre de lo que ves?",
     title: "Adivina el edificio",

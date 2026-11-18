@@ -608,7 +608,7 @@ export const ptBR: Strings = {
     },
     footerLink: "Administração",
   },
-  sight: { building: "Edifício", readOn: "Ler na Wikipédia" },
+  sight: { building: "Edifício", readOn: "Ler na Wikipédia", readSource: "Consultar a fonte" },
   quiz: {
     invite: "Adivinhe o prédio: você sabe o nome do que está vendo?",
     title: "Adivinhe o prédio",

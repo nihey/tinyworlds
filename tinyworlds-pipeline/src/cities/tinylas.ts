@@ -82,6 +82,11 @@ export const tinylas: City = {
   // the desert: bare ground and scrub as dry, tussocky steppe
   ground: { landCover: { barren: G.Steppe, shrub: G.Steppe } },
 
+  sights: {
+    placeWords: ["Las Vegas", "Nevada", "Paradise", "The Strip"],
+    areaByDistrict: true,
+    wikipedia: { "w las vegas": "W Las Vegas" },
+  },
   curated: CURATED,
   flights: [
     // landing from the east on the long runway

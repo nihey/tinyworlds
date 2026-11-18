@@ -103,6 +103,7 @@ export const tinyrao: City = {
     dirtTracks: true,
   },
 
+  sights: { placeWords: ["Ribeirão Preto", "São Paulo", "Brasil", "Brazil"], areaByDistrict: true },
   curated: CURATED,
   flights: [
     // landing from the south: down a three-degree slope to the numbers, then the rollout

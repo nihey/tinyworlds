@@ -7,6 +7,8 @@ export const tinyvlc: World = {
   homeLocale: "es-ES",
   turn: "grid",
   walk: true,
+  sights: true,
+  quiz: true,
   // the map's names are mostly in Valencian; the search reads Spanish and Valencian alike
   copy: {
     "es-ES": {

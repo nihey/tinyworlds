@@ -4,6 +4,8 @@ See [CLAUDE.md](CLAUDE.md) for build and preview commands.
 
 Enable Street Walk in every real city's pipeline and viewer configs. Generate one data set per city from its north-up scene and Overture segments. Both map orientations use the north-up manifest's walk version.
 
+Generate sight outlines, localized landmark descriptions and Guess the Building questions for both orientations of every real city. Where Wikipedia coverage is sparse, attach original localized clues and source URLs to the curated landmarks.
+
 Bridge tower openings use mapped footprints and deck heights. Brooklyn's Gothic arches are in `src/scene/brooklyn-arches.ts`, the steel suspension profiles are in `src/scene/suspension-tower.ts`, and Cincinnati's round masonry crowns are in `src/scene/roebling-tower.ts`. Rebuild the north-up and street-grid scenes, tiles, and sight indexes together when changing this geometry.
 
 Austin combines Overture with the City of Austin's Neighborhood Reporting Areas. Build both orientations and the localized sights and quiz for each. Generate the shared Street Walk from the north-up scene and package it with the north-up manifest.

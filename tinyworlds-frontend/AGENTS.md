@@ -40,3 +40,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Punching on foot uses the center of the view and the world's collision geometry. The original fist overlay follows the simulated swing and respects reduced motion. Keep saved keybindings intact when adding controls.
 - The Golden Gate Bridge uses the map palette’s red ramp for its main cables and suspenders. Keep the cable kinds in sync with the pipeline when changing their rendering.
 - The Brooklyn Bridge's landmark geometry in `src/walk/render/brooklyn-bridge.ts` uses the surveyed tower locations and existing walk cells. Keep its openings aligned with the roadway and promenade.
+
+## Guess the Building
+
+- Enable landmark highlights and the quiz in every real city's viewer. Both map orientations use their own sight and localized quiz indexes.
+- Cite Wikipedia excerpts and label original landmark clues with their own source links. Reveal the source link after the player answers.

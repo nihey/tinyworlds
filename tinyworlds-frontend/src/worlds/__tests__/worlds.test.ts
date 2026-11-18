@@ -332,28 +332,11 @@ describe("worlds", () => {
     expect(WORLDS.tinytkf.copy["en-US"].about.notes[0]).toMatch(/not measured/);
   });
 
-  it("light up their buildings, and play Guess the building only where they do", () => {
-    const lit = Object.values(WORLDS).filter((world) => world.sights);
-    expect(lit.map((world) => world.id)).toEqual([
-      "tinynyc",
-      "tinydal",
-      "tinycvg",
-      "tinypit",
-      "tinyphl",
-      "tinycos",
-      "tinytkf",
-      "tinyaus",
-      "tinysfo",
-      "tinymke",
-      "tinybeth",
-    ]);
-    // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
+  it("offers landmark highlights and Guess the Building across real cities", () => {
     for (const world of Object.values(WORLDS)) {
-      if (world.quiz) expect(world.sights, world.id).toBe(true);
-      if (world.fictional) expect(world.sights ?? false, world.id).toBe(false);
+      expect(world.sights ?? false, world.id).toBe(!world.fictional);
+      expect(world.quiz ?? false, world.id).toBe(!world.fictional);
     }
-    // every lit city plays but Truckee: a small town with six Wikipedia articles is no game
-    expect(lit.filter((world) => !world.quiz).map((world) => world.id)).toEqual(["tinytkf"]);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {

@@ -593,7 +593,7 @@ export const en: Strings = {
     },
     footerLink: "Admin",
   },
-  sight: { building: "Building", readOn: "Read on Wikipedia" },
+  sight: { building: "Building", readOn: "Read on Wikipedia", readSource: "Read the source" },
   quiz: {
     invite: "Guess the building: can you name what you see?",
     title: "Guess the building",
