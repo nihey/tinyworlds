@@ -62,10 +62,26 @@ function volumes(): Record<string, Arr> {
  * boats to the tenth); a street drawn by the map; the fog's grid keeps p and q within ±487 m, and
  * past q = 300 m it is where the map fades (2,000 m from the city: past fog.start, short of its end).
  */
-function writeTestScene(dir: string): void {
+function writeTestScene(dir: string, synthetic = false): void {
   const f32 = (a: number[]) => Float32Array.from(a);
   const piers = Array.from({ length: 10 }, (_, p) => rectEN(320, -200 + 40 * p, 360, -190 + 40 * p));
-  const rings = [rectEN(-300, -300, 300, 300), ...piers];
+  const land = synthetic
+    ? [rectEN(-300, -300, 388, 300), rectEN(600, -300, 700, 300)]
+    : [rectEN(-300, -300, 300, 300)];
+  const rings = [...land, ...piers];
+  const streets: [number, number][] = synthetic
+    ? [
+        [-150, 50],
+        [750, 50],
+        [60, -100],
+        [60, 100],
+        [-40, 20],
+        [40, 20],
+      ]
+    : [
+        [-150, 50],
+        [150, 50],
+      ];
   const fogSide = 40;
   const fog = new Float32Array(fogSide * fogSide);
   for (let y = 0; y < fogSide; y++)
@@ -77,17 +93,12 @@ function writeTestScene(dir: string): void {
       "ground.ringStart": Uint32Array.from(rings.map((_, r) => r).concat(rings.length)),
       "ground.vertStart": Uint32Array.from(rings.map((_, r) => r * 4).concat(rings.length * 4)),
       "ground.xy": f32(rings.flatMap(flat)),
-      "ground.kind": Uint8Array.from([G.Land, ...piers.map(() => G.Pier)]),
-      "lines.vertStart": Uint32Array.of(0, 2),
-      "lines.xy": f32(
-        flat([
-          [-150, 50],
-          [150, 50],
-        ]),
-      ),
-      "lines.kind": Uint8Array.of(G.Road),
-      "lines.flags": Uint8Array.of(0),
-      "lines.width": f32([10]),
+      "ground.kind": Uint8Array.from([...land.map(() => G.Land), ...piers.map(() => G.Pier)]),
+      "lines.vertStart": synthetic ? Uint32Array.of(0, 2, 4, 6) : Uint32Array.of(0, 2),
+      "lines.xy": f32(flat(streets)),
+      "lines.kind": synthetic ? Uint8Array.of(G.Road, G.RoadMajor, G.Path) : Uint8Array.of(G.Road),
+      "lines.flags": synthetic ? Uint8Array.of(0, 0, 0) : Uint8Array.of(0),
+      "lines.width": f32(synthetic ? [10, 14, 2] : [10]),
       "trees.xy": f32(px(50, 20)),
       "trees.kind": Uint8Array.of(1),
       "cab.start": Uint32Array.of(0),
@@ -97,6 +108,7 @@ function writeTestScene(dir: string): void {
     },
     {
       geo,
+      synthetic,
       fog: { p0: -500, q0: -500, cell: 25, cols: fogSide, rows: fogSide, start: 1500, end: 2700 },
     },
   );
@@ -220,6 +232,43 @@ const square = (out: string, i: number, j: number) =>
   decodeCell(new Uint8Array(gunzipSync(fs.readFileSync(path.join(out, "walk", "cells", `${i}_${j}.bin`)))));
 
 describe("buildWalk", () => {
+  it("connects a generated intersection, raises the drawn bridge and stops at the far shore", async () => {
+    const scene = path.join(root, "synthetic");
+    writeTestScene(scene, true);
+    const out = freshOut("generated");
+    await buildWalk({ out, scene, log: quiet });
+
+    const cross = square(out, 0, 0).arrays;
+    const at = Array.from(cross["node.xyz"]!).findIndex(
+      (e, i, xyz) => i % 3 === 0 && e === 600 && xyz[i + 1] === 500,
+    );
+    expect(at).toBeGreaterThanOrEqual(0);
+    const id = cross["node.id"]![at / 3];
+    expect([...cross["st.a"]!, ...cross["st.b"]!].filter((node) => node === id)).toHaveLength(4);
+    const sidewalk = Array.from(cross["wk.xyz"]!);
+    expect(sidewalk.some((e, i) => e >= 75 && e <= 95 && i % 3 === 0 && sidewalk[i + 1] === 200)).toBe(true);
+    expect(sidewalk.some((e, i) => e >= 305 && e <= 325 && i % 3 === 0 && sidewalk[i + 1] === 200)).toBe(
+      true,
+    );
+    const approach = square(out, 1, 0).arrays;
+    const nodes = new Map(
+      Array.from(approach["node.id"]!, (id, i) => [
+        id,
+        Array.from(approach["node.xyz"]!.slice(i * 3, i * 3 + 3)),
+      ]),
+    );
+    expect(
+      Array.from(approach["st.a"]!, (id, i) => [nodes.get(id), nodes.get(approach["st.b"]![i])]),
+    ).toContainEqual([
+      [3880, 500, expect.any(Number)],
+      [4000, 500, 200],
+    ]);
+    const span = square(out, 2, 0).arrays;
+    expect(Math.max(...span["elev.xyz"]!.filter((_, i) => i % 3 === 2))).toBe(200);
+    const shore = square(out, 3, 0).arrays;
+    expect(Math.max(...shore["st.xyz"]!.filter((_, i) => i % 3 === 0))).toBe(7000);
+  });
+
   it("writes an index the viewer reads, a file for every square it names, and squares that decode", async () => {
     const out = freshOut("one");
     await buildWalk({ out, scene: sceneDir, segments: segments(), log: quiet });

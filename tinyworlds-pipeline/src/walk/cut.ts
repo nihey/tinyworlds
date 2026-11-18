@@ -4,12 +4,13 @@
  * square, world dm (i32 from the projection origin) for cables, which cross squares. `cutScene`
  * keeps plain JS arrays per square; `squareArrays` turns one into what the encoder takes.
  */
-import { L_BRIDGE, PAINT_RANK } from "../scene/kinds.js";
+import { G, L_BRIDGE, PAINT_RANK } from "../scene/kinds.js";
 import type { Arr } from "../scene/store.js";
 import { clipPolyline, splitByCells } from "./clip.js";
 import { packed, type CellArrays, type IntType } from "./format.js";
 import { CELL, cellKey, type Geo } from "./grid.js";
 import { maskOf, type MaskPolygon } from "./mask.js";
+import { definesSyntheticShore } from "./synthetic.js";
 
 /** How far a way runs past its square's edge, so the viewer can draw a street's width across it. */
 const WAY_MARGIN = 30;
@@ -50,6 +51,7 @@ export function cutScene(
   scene: { arrays: Record<string, Arr>; meta: Record<string, unknown> },
   geo: Geo,
   keep: (i: number, j: number) => boolean = () => true,
+  syntheticPiers?: number[][],
 ): Map<string, SceneSquare> {
   const A = scene.arrays;
   const { k, kz } = geo;
@@ -148,38 +150,42 @@ export function cutScene(
     const a = Math.floor(lo / CELL);
     return [a, Math.max(a, Math.ceil(hi / CELL) - 1)];
   };
-  for (let g = 0; g < polygons; g++) {
-    const rings: number[][] = [];
+  const fileGround = ({ kind, order, rings }: MaskPolygon): void => {
     let e0 = Infinity;
     let e1 = -Infinity;
     let n0 = Infinity;
     let n1 = -Infinity;
-    for (let r = gRing[g]; r < gRing[g + 1]; r++) {
-      const ring: number[] = [];
-      for (let p = gVert[r]; p < gVert[r + 1]; p++) {
-        const e = east(gXY[p * 2], gXY[p * 2 + 1]);
-        const n = north(gXY[p * 2], gXY[p * 2 + 1]);
-        ring.push(e, n);
-        if (e < e0) e0 = e;
-        if (e > e1) e1 = e;
-        if (n < n0) n0 = n;
-        if (n > n1) n1 = n;
+    for (const ring of rings) {
+      for (let p = 0; p < ring.length; p += 2) {
+        e0 = Math.min(e0, ring[p]);
+        e1 = Math.max(e1, ring[p]);
+        n0 = Math.min(n0, ring[p + 1]);
+        n1 = Math.max(n1, ring[p + 1]);
       }
-      rings.push(ring);
     }
-    if (rings.length === 0) continue;
+    if (e0 > e1) return;
     const [i0, i1] = cellsOf(e0, e1);
     const [j0, j1] = cellsOf(n0, n1);
-    const kind = A["ground.kind"][g];
     if (i0 === i1 && j0 === j1) {
-      square(i0, j0)?.polys.push({ kind, order: g, rings });
-      continue;
+      square(i0, j0)?.polys.push({ kind, order, rings });
+      return;
     }
     for (const [key, pieces] of splitByCells(rings, i0, i1, j0, j1)) {
       const [i, j] = key.split("_").map(Number);
-      square(i, j)?.polys.push({ kind, order: g, rings: pieces });
+      square(i, j)?.polys.push({ kind, order, rings: pieces });
     }
+  };
+  for (let g = 0; g < polygons; g++) {
+    const rings: number[][] = [];
+    for (let r = gRing[g]; r < gRing[g + 1]; r++) {
+      const ring: number[] = [];
+      for (let p = gVert[r]; p < gVert[r + 1]; p++)
+        ring.push(east(gXY[p * 2], gXY[p * 2 + 1]), north(gXY[p * 2], gXY[p * 2 + 1]));
+      rings.push(ring);
+    }
+    fileGround({ kind: A["ground.kind"][g], order: g, rings });
   }
+  syntheticPiers?.forEach((ring, i) => fileGround({ kind: G.Pier, order: polygons + i, rings: [ring] }));
 
   // ---- lines: bridges are left to the elevated ways; the rest is clipped to each square
   // they touch, grown by WAY_MARGIN
@@ -188,7 +194,7 @@ export function cutScene(
   const lines = A["lines.kind"].length;
   const touched = new Set<number>();
   for (let l = 0; l < lines; l++) {
-    if (A["lines.flags"][l] & L_BRIDGE) continue;
+    if (A["lines.flags"][l] & L_BRIDGE || (syntheticPiers && A["lines.kind"][l] === G.Pier)) continue;
     const pts: number[] = [];
     for (let p = lVert[l]; p < lVert[l + 1]; p++)
       pts.push(east(lXY[p * 2], lXY[p * 2 + 1]), north(lXY[p * 2], lXY[p * 2 + 1]));
@@ -280,7 +286,8 @@ export function cutScene(
       s.way.verts.push(run.pts.length / 2);
       for (let p = 0; p < run.pts.length; p += 2) s.way.xy.push(dm(run.pts[p] - oe), dm(run.pts[p + 1] - on));
     }
-    s.mask = maskOf(s.polys, s.i, s.j, PAINT_RANK);
+    const shore = syntheticPiers ? s.polys.filter((poly) => definesSyntheticShore(poly.kind)) : s.polys;
+    s.mask = maskOf(shore, s.i, s.j, PAINT_RANK);
     out.set(key, {
       i: s.i,
       j: s.j,

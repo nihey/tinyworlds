@@ -92,6 +92,8 @@ Five original pixel-art maps take inspiration from Rockstar Games' Grand Theft A
 | `tinygtaiv` | GTA IV | Granite Ward's towers and the brick neighborhoods across the river |
 | `tinygtav` | GTA V | Crescent Strand, Sunward Studios and the roads through Coyote Ridge |
 
+All five maps have Street Walk. Drop the walker on a street to explore it on foot or by vehicle.
+
 ## Layout
 
 | Path | What |

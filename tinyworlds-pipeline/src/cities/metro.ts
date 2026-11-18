@@ -234,6 +234,7 @@ export function metroCity(
   return generatedCity({
     ...city,
     framed: true,
+    walk: true,
     fog: { start: 50, end: 240 },
     attribution: [
       "Unofficial fan-made map with an original layout",

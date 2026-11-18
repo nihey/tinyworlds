@@ -64,6 +64,7 @@ export function gtaWorld(
     wordmark,
     homeLocale: "en-US",
     fictional: true,
+    units: "imperial",
     copy: { "en-US": copy("en-US"), "pt-BR": copy("pt-BR"), "es-ES": copy("es-ES") },
     credit: "Fan-made · original map inspired by Rockstar Games",
     accent: { color, ink: "#15171a" },

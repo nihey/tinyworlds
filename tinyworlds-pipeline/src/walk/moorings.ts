@@ -25,10 +25,14 @@ const PIER_IN = 1;
  * given boats when its index passes a hash; along each edge of its outer ring as many as fit 12 m
  * apart, centred on the edge, each 2.5 m out on whichever side is water.
  */
-export function mooringsOf(piers: number[][][], isWater: (e: number, n: number) => boolean): Mooring[] {
+export function mooringsOf(
+  piers: number[][][],
+  isWater: (e: number, n: number) => boolean,
+  everyPier = false,
+): Mooring[] {
   const out: Mooring[] = [];
   piers.forEach((rings, index) => {
-    if (mix(index, 77) % 3 !== 0) return;
+    if (!everyPier && mix(index, 77) % 3 !== 0) return;
     const ring = rings[0];
     if (!ring || ring.length < 6) return;
     const count = ring.length / 2;

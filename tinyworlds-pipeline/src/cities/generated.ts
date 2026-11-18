@@ -39,6 +39,7 @@ export interface GeneratedCity {
   gridDeg?: number;
   /** End the map at the bounding rectangle of its limits, with a clean edge and no dissolve. */
   framed?: boolean;
+  walk?: boolean;
   generate: (builder: SyntheticBuilder) => void;
 }
 
@@ -61,6 +62,7 @@ export function generatedCity(spec: GeneratedCity): City {
     card: { ...lonLatOf(spec.card.p, spec.card.q, betaDeg), shrink: spec.card.shrink },
     synthetic: spec.generate,
     framed: spec.framed,
+    walk: spec.walk,
     fog: spec.fog,
     flora: spec.flora,
     flights: [],

@@ -56,7 +56,7 @@ Each sub-project has its own `CLAUDE.md`.
 
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
-- **New York and Austin can be walked.** The street walk is the city at street level, in 3D: on foot, at
+- **New York, Austin and the five GTA-inspired worlds can be walked.** Street Walk shows the city at street level, in 3D: on foot, at
   the wheel and in the water. It is static too: the pipeline's `walk` step (for a world whose
   file says `walk: true`) cuts the map's own scene and Overture's streets into squares of 200 m
   (`walk/`, below): the buildings, ground and trees the map draws, its bridges on the map's
@@ -70,6 +70,7 @@ Each sub-project has its own `CLAUDE.md`.
   streets round you in its corner, loads the squares round you as you go, and nothing of it loads
   until one opens. It sends nothing anywhere (the page analytics hear `walk_start`) and keeps
   only the keys a visitor chose, in the browser.
+  The generated worlds derive their street network from the scene's own roads and bridge decks.
 - **The API exists for donations** (and keeps the answers of "Guess the building", below). Each proposed city is built when donations for it reach
   its goal (US$30); what comes in above the goal pays for servers and upkeep, and the most
   funded cities are built first. The Donate dialog and the front page read `cityMilestones` (the

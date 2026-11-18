@@ -30,6 +30,7 @@ import { buildNetwork, type NetNode, type Network, type Tunnel } from "./network
 import { piecesOf } from "./pieces.js";
 import { readSegments, type Segment } from "./segments.js";
 import { SHORE_SQUARES, shoreDistances } from "./shore.js";
+import { syntheticNetwork } from "./synthetic.js";
 
 type Scene = { arrays: Record<string, Arr>; meta: Record<string, unknown> };
 
@@ -450,7 +451,10 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
   const geo = scene.meta.geo as Geo;
   const fog = fogOf(scene, geo);
   const deckAt = deckAtFromScene(scene, geo);
-  const segments = opts.segments ?? (await readSegments(path.join(DIRS.raw, "segment.parquet"), geo));
+  const synthetic =
+    scene.meta.synthetic === true || CITY.synthetic ? syntheticNetwork(scene.arrays, geo, deckAt) : null;
+  const segments =
+    opts.segments ?? synthetic?.segments ?? (await readSegments(path.join(DIRS.raw, "segment.parquet"), geo));
   lap(`scene and ${segments.length} segments read`);
   const net = networkOf(segments, deckAt, log);
   lap(
@@ -488,7 +492,7 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
     cuts = (i, j) => reached.has(num(i, j));
   }
 
-  const cut = cutScene(scene, geo, cuts);
+  const cut = cutScene(scene, geo, cuts, synthetic?.piers);
   const onMap = squaresOnMap(scene, geo, cuts);
   const squares = new Map<number, SceneSquare>();
   for (const sq of cut.values())
@@ -528,12 +532,17 @@ export async function buildWalk(opts: WalkOptions = {}): Promise<void> {
   net.streets.forEach((s, x) => file(s.pts, s.width / 2, (f) => f.st.push(x)));
   net.walks.forEach((w, x) => file(w.pts, 0, (f) => f.wk.push(x)));
   net.elevated.forEach((el, x) => file(el.pts, el.width / 2, (f) => f.el.push(x)));
-  const boats = mooringsOf(piersOf(scene, geo), (e, n) => {
-    const i = Math.floor(e / CELL);
-    const j = Math.floor(n / CELL);
-    const mask = masks.get(cellKey(i, j));
-    return mask !== undefined && waterAt(mask, e - i * CELL, n - j * CELL);
-  });
+  const piers = [...piersOf(scene, geo), ...(synthetic?.piers.map((ring) => [ring]) ?? [])];
+  const boats = mooringsOf(
+    piers,
+    (e, n) => {
+      const i = Math.floor(e / CELL);
+      const j = Math.floor(n / CELL);
+      const mask = masks.get(cellKey(i, j));
+      return mask !== undefined && waterAt(mask, e - i * CELL, n - j * CELL);
+    },
+    synthetic !== null,
+  );
   for (const b of boats) filed.get(num(Math.floor(b.e / CELL), Math.floor(b.n / CELL)))?.moor.push(b);
   const nodes: NetNode[] = [];
   for (const node of net.nodes.values()) nodes[node.id] = node;

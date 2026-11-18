@@ -451,12 +451,14 @@ change to the rules below.
 
 ## Street walk (`walk/`)
 
-The `walk` step (run last by `all` for a city whose file says `walk: true`: New York and Austin) writes the
+The `walk` step (run last by `all` for each city with `walk: true`) writes the
 viewer's street walk into `walk/` of the world's data folder: the city in squares of 200 m of
 metres east and north of the projection's origin, one gzipped file of typed arrays each
 (`walk/cells/<i>_<j>.bin`), the index (`walk/walk.json`) and their version in the manifest
-(`walk`). The contract is in the root `CLAUDE.md`. It reads the scene and `raw/segment.parquet`
-and fetches nothing. **One walk per world, from its own view** (north up for a real city): the
+(`walk`). The contract is in the root `CLAUDE.md`. It reads the scene and, for a real city, `raw/segment.parquet`.
+The GTA-inspired worlds use the generated scene's lines. They join street intersections, add sidewalks
+along the street grids, and use the drawn land, piers and bridge decks for the walk's shoreline and ramps.
+**One walk per world, from its own view** (north up for a real city): the
 walk is in metres, so the viewer walks the same one whichever way the map is turned. `walk`
 refuses `--view` for the other view, `all --view grid` leaves it out, and the other view's
 manifest names no walk. Its paving follows the street grid's own bearing (`gridDeg` in
