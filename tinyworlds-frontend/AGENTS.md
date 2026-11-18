@@ -23,8 +23,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Map benefactors
 
-- Real built cities show a small plaque above the map credits using live `cityBenefactors` data. Use the city's Hall of Fame ranking to show up to two distinct public names. A city without public names shows a support invitation.
-- The plaque opens the existing benefactors sign and its city-specific donation flow. Keep the plaque clear of the minimap and hide it during walker drags, Street Walk, and the narrow quiz sheet. Hide it when the API has no matching built city or the request fails.
+- Real built cities show a small plaque above the map credits using live `cityBenefactors` data. Cycle through the city's publicly named donors in Hall of Fame order, one at a time with their public links. A city without public names shows a support invitation.
+- Give visitors next and pause controls. While the plaque is hovered or focused, the benefactor dialog is open, or the tab is hidden, hold the current benefactor. Under reduced motion use manual navigation.
+- The displayed name opens the benefactors sign. The invitation opens Donate with the city selected, and the public-name switch explains the carousel spot for a real built city.
+- Keep the plaque clear of the minimap and hide it during walker drags, Street Walk, and the narrow quiz sheet. Hide it when the API has no matching built city or the request fails.
 
 ## Street walk
 

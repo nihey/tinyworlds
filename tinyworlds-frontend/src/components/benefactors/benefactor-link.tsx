@@ -73,7 +73,7 @@ export function LinkPicture({
   );
 }
 
-type LinkLook = "card" | "row" | "strip";
+type LinkLook = "card" | "row" | "strip" | "compact";
 
 /** Picture, title and destination share one link. The card has room for a larger picture. */
 export function BenefactorLinkItem({
@@ -89,14 +89,34 @@ export function BenefactorLinkItem({
   const host = hostOf(link.url);
   const title =
     host === "youtube.com" && link.title.startsWith(`${host}/`) ? "YouTube" : link.title;
+  const destination = {
+    href: link.url,
+    target: "_blank",
+    rel: LINK_REL,
+    "aria-label": t.benefactors.linkLabel.replace("{title}", title).replace("{host}", host),
+  };
+
+  if (look === "compact") {
+    return (
+      <a
+        {...destination}
+        title={`${title} · ${host}`}
+        className={cn(
+          "flex h-7 min-w-0 items-center gap-1 rounded-md bg-white/[0.06] px-1.5 text-[11px] font-medium text-paper-dim outline-none ring-inset hover:text-taxi focus-visible:ring-2 focus-visible:ring-taxi",
+          className,
+        )}
+      >
+        <span className="truncate">{title}</span>
+        <ArrowUpRight aria-hidden className="size-3 shrink-0" />
+      </a>
+    );
+  }
+
   const icon = <LinkIcon src={link.icon} />;
   return (
     <a
-      href={link.url}
-      target="_blank"
-      rel={LINK_REL}
+      {...destination}
       title={link.description ?? undefined}
-      aria-label={t.benefactors.linkLabel.replace("{title}", title).replace("{host}", host)}
       className={cn(
         "group/link block rounded-md border border-sign-line bg-white/[0.025] p-1.5 outline-none transition-colors hover:border-taxi/45 hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-taxi",
         look !== "card" && "flex min-h-11 items-center gap-2",
@@ -129,7 +149,7 @@ export function BenefactorLinkItem({
   );
 }
 
-/** A named benefactor's links, one under the other. Draws nothing for none. */
+/** A named benefactor's links. Draws nothing for none. */
 export function BenefactorLinks({
   links,
   look,
@@ -141,9 +161,22 @@ export function BenefactorLinks({
 }) {
   if (links.length === 0) return null;
   return (
-    <ul className={cn(look === "strip" ? "flex gap-2" : "space-y-1.5", className)}>
+    <ul
+      className={cn(
+        look === "compact" && "flex gap-1 overflow-x-auto [scrollbar-width:thin]",
+        look === "strip" && "flex gap-2",
+        (look === "card" || look === "row") && "space-y-1.5",
+        className,
+      )}
+    >
       {links.map((link) => (
-        <li key={link.url} className={look === "strip" ? "w-52 shrink-0" : undefined}>
+        <li
+          key={link.url}
+          className={cn(
+            look === "strip" && "w-52 shrink-0",
+            look === "compact" && "max-w-[min(9rem,100%)] min-w-0 shrink-0",
+          )}
+        >
           <BenefactorLinkItem link={link} look={look} />
         </li>
       ))}

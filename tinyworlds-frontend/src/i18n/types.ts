@@ -216,6 +216,7 @@ export interface Strings {
      */
     join: {
       label: string;
+      mapSpot: string;
       name: string;
       namePlaceholder: string;
       counter: string;
@@ -265,7 +266,7 @@ export interface Strings {
     heading: string;
     founders: string;
     benefactors: string;
-    supportCity: string;
+    map: { heading: string; join: string; pause: string; resume: string; next: string };
     keepingRunning: string;
     anonymous: string;
     more: { one: string; other: string };

@@ -581,12 +581,14 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   panel is mounted only while open, so each opening fetches afresh. A card offers it only for
   worlds the API lists a city for.
 - **Map plaque.** `MapBenefactors` reads the live public city data once the map is available.
-  Above the credits it shows up to two distinct names in Hall of Fame order, or a support
-  invitation if nobody is named. The plaque opens the city's sign and appears on real maps whose
-  API city is built.
-- **Built cities reach the Donate sign only through it.** The picker never offers a built city
-  (nothing to fund); the benefactors' sign has a button that closes that sign and opens
-  Donate with the city chosen (one sign at a time).
+  Above the credits it cycles through the publicly named donors in Hall of Fame order, showing
+  one name and its links at a time. The name opens the city's sign. Visitors can pause or advance
+  the carousel. It stands still on hover, keyboard focus, and under reduced motion. The
+  invitation opens Donate with the city already chosen, including on a map with no public names.
+  The public-name switch explains how a donation earns a spot on the map. The plaque appears on
+  real maps whose API city is built.
+- **Giving to a built city.** The map's invitation and the benefactors' sign open Donate with the
+  city chosen. The picker lists cities still being funded.
 - **The join block** (`components/donate/join-block.tsx`) is "Put my name on {city}": off by
   default, a name field (40 code points, `cleanName`) when on, and Donate disabled until a name
   is left, saying why in a hint under the field (`donate.join.needsName`, tied to the field and the button with `aria-describedby`). The checkout carries `benefactorName`, null when off. The email's existing name is kept.
