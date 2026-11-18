@@ -79,7 +79,7 @@ export interface StreetWalk {
   setArmed: (armed: "touch" | "mouse" | null) => void;
   /** the walk's screen and what it is given, once its code is in */
   Screen: ComponentType<WalkScreenProps> | null;
-  screenProps: Omit<WalkScreenProps, "lightMode"> | null;
+  screenProps: Omit<WalkScreenProps, "lightMode" | "weather"> | null;
   openWalk: (drop: PlacedDrop, heading?: number) => void;
   /** back to the map, centred where you are (or where the walk was opening) */
   leave: () => void;
@@ -363,7 +363,7 @@ export function useStreetWalk({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [walking, Screen, leave]);
 
-  const screenProps: Omit<WalkScreenProps, "lightMode"> | null =
+  const screenProps: StreetWalk["screenProps"] =
     manifest && walk ? { manifest, start: walk, goTo, onOpen: opened, onExit: exitWalk } : null;
 
   return {

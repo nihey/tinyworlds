@@ -1,3 +1,4 @@
+import type { WeatherPref } from "@/map/weather";
 import type { PlaceType } from "@/map/manifest";
 import type { ActionId } from "@/walk/controls";
 import type { BoatKind, CarKind } from "@/walk/kinds";
@@ -64,6 +65,10 @@ export interface Strings {
     strength: string;
     tiltStrengthLabel: string;
     life: string;
+    weather: string;
+    conditions: Record<WeatherPref, string>;
+    weatherLoading: string;
+    weatherUnavailable: string;
     timeOfDay: string;
     themes: { cycle: string; system: string; light: string; dark: string };
     language: string;

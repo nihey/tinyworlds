@@ -27,6 +27,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Apply the map LUT to the tiles, sprites and edge fog. Keep navigation and marks legible. Street Walk shares the LUT uniforms across streamed cells, vehicles and effects. Grade surfaces before fog and the wasted sequence. Keep the reflection classification pass in its original palette.
 - The overhead map extracts small window panes from its existing tile artwork in a worker. Full-detail tiles use the glass palette, and compressed zoom levels also check for surrounding wall bands. Keep lamp selection in map coordinates, fade it with the shared lamp strength, and count masks against the tile cache. Street Walk uses its building seed, bay and floor for its room lights.
 
+## City weather
+
+- Real maps default to the public `cityWeather(world)` GraphQL query. Poll while visible in Live mode, share the report with Street Walk, and keep the weather choice in the existing per-world preferences. Imagined worlds use their configured sky or clear skies.
+- Apply the weather tint before the day/night curve. Keep signs and marks above the map weather layer. Street Walk shares fog distance across scenery, vehicles and effects, and excludes precipitation from reflections. Reduced motion keeps the atmosphere and omits falling particles.
+
 ## Map benefactors
 
 - Real built cities show a small plaque above the map credits using live `cityBenefactors` data. Cycle through the city's publicly named donors in Hall of Fame order, one at a time with their public links. A city without public names shows a support invitation.

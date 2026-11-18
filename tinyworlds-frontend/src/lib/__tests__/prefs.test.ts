@@ -29,6 +29,12 @@ describe("sanitizePrefs", () => {
     }
   });
 
+  it("starts old real-city settings in Live and remembers manual weather", () => {
+    expect(sanitizePrefs({ theme: "dark" }).weather).toBe("live");
+    expect(sanitizePrefs({ weather: "snow" }).weather).toBe("snow");
+    expect(sanitizePrefs({ weather: "invalid" }).weather).toBe("live");
+  });
+
   it("opens the map north up until the visitor turns it to the street grid", () => {
     expect(DEFAULT_PREFS.view).toBe("north");
     expect(sanitizePrefs({ view: "grid" }).view).toBe("grid");

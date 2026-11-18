@@ -198,6 +198,27 @@
 .tilt-on[data-city-light]:not([data-walk-dragging]) .map-tiles {
   filter: url(#city-light) var(--tilt-lift);
 }
+.map-weather {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+.map-weather[data-weather="fog"] {
+  background:
+    linear-gradient(158deg, rgb(212 227 230 / 0.38), transparent 57%),
+    radial-gradient(ellipse at 95% 90%, rgb(210 225 233 / 0.25), transparent 58%);
+}
+.map-weather[data-weather="cloudy"] {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgb(52 67 86 / 0.17), transparent 55%),
+    radial-gradient(ellipse at 90% 74%, rgb(52 67 86 / 0.14), transparent 48%);
+}
+.map-root[data-city-light] .map-weather {
+  filter: url(#city-light);
+}
 /* over a building that lights up: it can be clicked (a drag still grabs) */
 .map-tiles.over-sight {
   cursor: pointer;

@@ -1,11 +1,17 @@
 import { DAY, type CityLight } from "@/map/daylight";
 
+/** Visibility on a clear day, metres. */
+export const FOG_NEAR = 140;
+export const FOG_FAR = 560;
+
 /** Every street material, including streamed cells, reads the same uniform objects. */
 export class StreetLighting {
   readonly uniforms = {
     gradeOn: { value: false },
     cityCurve: { value: new Float32Array(DAY.curve) },
     lamps: { value: 0 },
+    fogNear: { value: FOG_NEAR },
+    fogFar: { value: FOG_FAR },
   };
 
   set(light: CityLight): void {

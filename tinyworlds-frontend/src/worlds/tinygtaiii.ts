@@ -15,5 +15,6 @@ export const tinygtaiii = {
       cardAlt: "Puerto isométrico con rascacielos, muelles industriales y puentes",
     },
   }),
+  weather: "fog" as const,
   walk: true,
 };

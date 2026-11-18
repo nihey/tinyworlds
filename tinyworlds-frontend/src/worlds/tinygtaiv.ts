@@ -17,5 +17,6 @@ export const tinygtaiv = {
         "Metrópoli isométrica con torres de acero en una orilla y barrios de ladrillo en la otra",
     },
   }),
+  weather: "cloudy" as const,
   walk: true,
 };

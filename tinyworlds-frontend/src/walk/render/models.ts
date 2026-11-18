@@ -7,7 +7,7 @@ import { GRAVITY } from "../player";
 import type { SignalPost } from "../signals";
 import { sizeOf, type Vehicle } from "../vehicles";
 import type { WalkIndex } from "../walk-index";
-import { FOG, FOG_FAR, FOG_NEAR, GREY_RAMPS, HORIZON, greysOf } from "./materials";
+import { FOG, GREY_RAMPS, HORIZON, greysOf } from "./materials";
 import { SHADES, type Palette } from "./palette";
 
 /**
@@ -891,8 +891,6 @@ export class WalkModels {
       pal: { value: palette.texture },
       sun: { value: new THREE.Vector2(Math.sin(sun), Math.cos(sun)) },
       fogColor: { value: HORIZON },
-      fogNear: { value: FOG_NEAR },
-      fogFar: { value: FOG_FAR },
       grey: this.grey,
       greys: { value: greysOf(palette) },
     };

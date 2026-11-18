@@ -1,3 +1,4 @@
+import type { WeatherCondition } from "@/map/weather";
 import type { Locale } from "@/i18n/locale";
 import type { SearchRules } from "@/map/search-rules";
 
@@ -63,6 +64,8 @@ export interface World {
    * front page lists it apart from the real cities.
    */
   fictional?: boolean;
+  /** Initial sky in an imagined world. Real cities start with a live observation. */
+  weather?: WeatherCondition;
   /**
    * Its data has sights (sights.json): buildings found in the search light up under the pointer,
    * with a line from Wikipedia. Without it the viewer never asks for the file.

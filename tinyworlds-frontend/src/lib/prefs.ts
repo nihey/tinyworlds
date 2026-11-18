@@ -1,5 +1,7 @@
 /** Settings that stay between visits, per browser. The page works the same without storage. */
 import { isLocale, type LocalePref } from "@/i18n/locale";
+import { WORLD } from "@/worlds";
+import { isCondition, type WeatherPref } from "@/map/weather";
 import { SITE_ID } from "@/site";
 
 export type ThemePref = "system" | "light" | "dark" | "cycle";
@@ -12,6 +14,7 @@ export interface Prefs {
   /** 0–100 */
   tiltStrength: number;
   theme: ThemePref;
+  weather: WeatherPref;
   /** moving things on the map */
   life: boolean;
   /** the interface's language; "auto" follows the browser */
@@ -32,6 +35,7 @@ export const DEFAULT_PREFS: Prefs = {
   tilt: true,
   tiltStrength: 50,
   theme: "cycle",
+  weather: WORLD.fictional ? (WORLD.weather ?? "clear") : "live",
   life: true,
   lang: "auto",
   view: "north",
@@ -50,6 +54,7 @@ export function sanitizePrefs(value: unknown): Prefs {
     out.tiltStrength = Math.min(100, Math.max(0, Math.round(v.tiltStrength)));
   if (v.theme === "cycle" || v.theme === "system" || v.theme === "light" || v.theme === "dark")
     out.theme = v.theme;
+  if (isCondition(v.weather) || (v.weather === "live" && !WORLD.fictional)) out.weather = v.weather;
   if (v.lang === "auto" || isLocale(v.lang)) out.lang = v.lang;
   if (v.view === "north" || v.view === "grid") out.view = v.view;
   return out;

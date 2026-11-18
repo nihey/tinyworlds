@@ -12,8 +12,17 @@ import {
   WATER_SURFACE,
   type MeshContext,
 } from "./cell-mesh";
-import { StreetLighting } from "./city-light";
-import { makeMaterials, NOT_MIRRORED, SKY, type Mirror, type WalkMaterials } from "./materials";
+import { ATMOSPHERE, type WeatherCondition } from "@/map/weather";
+import { makePrecipitation } from "./precipitation";
+import { FOG_NEAR, FOG_FAR, StreetLighting } from "./city-light";
+import {
+  HORIZON,
+  makeMaterials,
+  NOT_MIRRORED,
+  SKY,
+  type Mirror,
+  type WalkMaterials,
+} from "./materials";
 import { makePalette, type Palette } from "./palette";
 
 /**
@@ -391,6 +400,7 @@ export class WalkView {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly camera = new THREE.PerspectiveCamera(70, 1, 0.1, 1500);
   readonly lighting = new StreetLighting();
+  private readonly precipitation: ReturnType<typeof makePrecipitation>;
   private readonly palette: Palette;
   private readonly materials: WalkMaterials;
   private readonly stream: SquareStream<THREE.Group>;
@@ -443,6 +453,8 @@ export class WalkView {
 
     this.palette = makePalette(ix);
     this.materials = makeMaterials(this.palette, ix, this.lighting);
+    this.precipitation = makePrecipitation(this.lighting, this.materials.roof.uniforms.grey);
+    this.scene.add(this.precipitation.points);
     this.scene.background = SKY;
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 16, 8), this.materials.sky);
     this.sky.renderOrder = ORDER_SKY;
@@ -527,6 +539,15 @@ export class WalkView {
   /** Drains the colours to the palette's greys, 0 (none) to 1 (all): the wasted sequence. */
   setGrey(amount: number): void {
     this.materials.setGrey(amount);
+  }
+
+  setWeather(condition: WeatherCondition, reduced: boolean): void {
+    const { visibility } = ATMOSPHERE[condition];
+    this.lighting.uniforms.fogNear.value = FOG_NEAR * visibility;
+    this.lighting.uniforms.fogFar.value = FOG_FAR * visibility;
+    const sky = this.materials.sky.uniforms.skyColor.value as THREE.Color;
+    sky.copy(SKY).lerp(HORIZON, condition === "clear" ? 0 : 1 - visibility * 0.25);
+    this.precipitation.set(condition, reduced);
   }
 
   /** Whether the water mirrors the city: on unless set off, or let go because frames were slow. */
@@ -638,6 +659,7 @@ export class WalkView {
     this.openWater();
     this.camera.updateMatrixWorld();
     const buffer = this.renderer.getDrawingBufferSize(this.buffer);
+    this.precipitation.frame(this.time, buffer.y);
     this.materials.frame(this.time, this.camera, buffer.x, buffer.y);
     const mirrored = this.mirror(buffer);
     this.watchFrames(mirrored !== null);
@@ -729,13 +751,19 @@ export class WalkView {
     clipAbove(m, WATER_SURFACE);
     // Water classifies reflected surfaces by their original palette brightness, then
     // shades the water itself for the current hour.
-    const { gradeOn } = this.lighting.uniforms;
+    const { gradeOn, fogNear, fogFar } = this.lighting.uniforms;
+    const near = fogNear.value;
+    const far = fogFar.value;
+    fogNear.value = FOG_NEAR;
+    fogFar.value = FOG_FAR;
     const wasGraded = gradeOn.value;
     gradeOn.value = false;
     this.renderer.setRenderTarget(this.target);
     this.renderer.render(this.scene, m);
     this.renderer.setRenderTarget(null);
     gradeOn.value = wasGraded;
+    fogNear.value = near;
+    fogFar.value = far;
     return {
       colour: this.target.texture,
       depth: this.target.depthTexture!,
@@ -751,7 +779,8 @@ export class WalkView {
 
   dispose(): void {
     this.stream.dispose();
-    this.scene.remove(this.water, this.sky);
+    this.scene.remove(this.water, this.sky, this.precipitation.points);
+    this.precipitation.dispose();
     this.sky.geometry.dispose();
     this.water.geometry.dispose();
     this.fogBox.dispose();

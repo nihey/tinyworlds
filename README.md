@@ -91,6 +91,13 @@ windows glow amber and soft white across the map as evening sets in. Street Walk
 **Settings → Time of day** to hold a city at Day or Night, or to follow the system appearance.
 Cycle follows the system appearance when reduced motion is enabled.
 
+Real cities show the latest weather from a nearby reporting station on the map and in Street Walk.
+Open **Settings → Weather** to see the station and observation time, choose clear skies, clouds,
+fog, rain, snow or a thunderstorm, or switch back to **Live weather**. Each world remembers its
+setting. Imagined places start with a sky that fits their setting, including snow in Winterfell.
+Live weather uses the existing GraphQL API and [Aviation Weather Center observations](https://aviationweather.gov/data/api/).
+If a recent report is unavailable, Settings says so and the map shows clear skies.
+
 Every real city also highlights landmarks and offers "Guess the building" in both map
 orientations. The quiz uses Wikipedia excerpts and original clues backed by local sources.
 Question counts vary by city.
@@ -209,7 +216,7 @@ variables:
 | `OVERTURE_RELEASE` | pipeline | `2026-10-21.0` | Overture Maps release to read |
 | `NEXT_PUBLIC_WORLD` | frontend | `tinynyc` | which world to build, or `home` for the front page |
 | `NEXT_PUBLIC_BASE_PATH` | frontend | empty | sub-path the build is served under (`/tinynyc`) |
-| `NEXT_PUBLIC_API_URL` | frontend | unset | the API's GraphQL endpoint; unset = no milestones |
+| `NEXT_PUBLIC_API_URL` | frontend | unset | the API's GraphQL endpoint for live weather and milestones |
 | `DATABASE_URL`, `STRIPE_*` | api | — | see `tinyworlds-api/.env.example` |
 | `ADMIN_EMAILS` | api | empty | who may sign in to the admin pages |
 | `JWT_SECRET`, `SMTP_*`, `MAIL_FROM` | api | empty | the sessions' secret and the mail server that sends the mails (sign-in links, thank-yous, a city is built); `JWT_SECRET`, `SMTP_HOST` and `MAIL_FROM` are required in production |

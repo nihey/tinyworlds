@@ -16,6 +16,8 @@ import {
   useFunnelVisit,
   usePresence,
 } from "@/hooks/use-site-effects";
+import { useCityWeather } from "@/hooks/use-city-weather";
+import { MapWeather } from "./map-weather";
 import { useTheme } from "@/hooks/use-theme";
 import { API_URL, paymentLinkFor } from "@/lib/donate";
 import { prefsStore, type MapView } from "@/lib/prefs";
@@ -100,6 +102,7 @@ export function MapApp() {
   };
 
   const [prefs, setPrefs] = usePrefs();
+  const weather = useCityWeather(prefs.weather);
   const fixedLight = useTheme(prefs.theme);
   const { t, locale, copy } = useI18n();
   useDocumentLanguage(locale, copy.title);
@@ -477,6 +480,7 @@ export function MapApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [engine, hasHoods, walkingRef, setArmed]);
 
+  const gradeMap = !walking && (lightMode !== "light" || weather.condition !== "clear");
   const tiltOn = prefs.tilt && prefs.tiltStrength > 0;
   const rootStyle = {
     "--tilt-blur": `${(1.5 + prefs.tiltStrength * 0.085).toFixed(2)}px`,
@@ -488,13 +492,16 @@ export function MapApp() {
   return (
     <div
       className={cn("map-root", tiltOn && !walking && "tilt-on", walking && "walk-full")}
-      data-city-light={(lightMode !== "light" && !walking) || undefined}
+      data-city-light={gradeMap || undefined}
       data-walk-dragging={draggingWalker || undefined}
       style={rootStyle}
     >
       <canvas ref={canvasRef} className="map-tiles" tabIndex={0} aria-label={copy.mapLabel} />
       <canvas ref={windowsRef} className="map-windows" aria-hidden />
-      {lightMode !== "light" && !walking && <CityLightFilter mode={lightMode} engine={engine} />}
+      {gradeMap && <CityLightFilter mode={lightMode} engine={engine} weather={weather.condition} />}
+      {session && !walking && !draggingWalker && (
+        <MapWeather condition={weather.condition} reduced={reducedMotion} />
+      )}
       <div aria-hidden className="tilt-band" data-edge="top" data-depth="near" />
       <div aria-hidden className="tilt-band" data-edge="top" data-depth="far" />
       <div aria-hidden className="tilt-band" data-edge="bottom" data-depth="near" />
@@ -507,7 +514,11 @@ export function MapApp() {
       {session && walking && (
         <div className="walk-area">
           {street.Screen && street.screenProps ? (
-            <street.Screen {...street.screenProps} lightMode={lightMode} />
+            <street.Screen
+              {...street.screenProps}
+              lightMode={lightMode}
+              weather={weather.condition}
+            />
           ) : (
             <div className="flex h-full items-center justify-center bg-sign p-4">
               <div className="sign flex flex-col items-center gap-3 px-5 py-4 text-sm">
@@ -616,7 +627,14 @@ export function MapApp() {
             }
             settingsOpen={settingsOpen}
             onSettingsOpenChange={setSettingsOpen}
-            settings={<SettingsPanel prefs={prefs} onChange={setPrefs} hoodLines={hasHoods} />}
+            settings={
+              <SettingsPanel
+                prefs={prefs}
+                onChange={setPrefs}
+                hoodLines={hasHoods}
+                report={weather.report}
+              />
+            }
             person={
               street.canWalk ? (
                 <WalkPerson

@@ -143,7 +143,7 @@ export function ToolColumn({
           align="start"
           sideOffset={12}
           collisionPadding={12}
-          className="sign w-[min(19rem,calc(100vw-5.5rem))] gap-0 overflow-hidden p-0 ring-0"
+          className="sign w-[min(19rem,calc(100vw-5.5rem))] max-h-(--radix-popover-content-available-height) gap-0 overflow-y-auto p-0 ring-0"
         >
           {settings}
         </PopoverContent>

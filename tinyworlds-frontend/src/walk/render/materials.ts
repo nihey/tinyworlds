@@ -56,9 +56,7 @@ import { DEEP, HALF, HIGH, LIT, OUTLINE, PAINT_DRY, SHADE, SHADES, type Palette 
  * The palette goes out exactly as it is: no lighting, no tone mapping, a linear output.
  */
 
-/** The fog: none nearer than this, nothing but fog beyond that, metres. */
-export const FOG_NEAR = 140;
-export const FOG_FAR = 560;
+export { FOG_FAR } from "./city-light";
 
 /** Bytes as they go out (the output is linear: what is set is what is shown). */
 const out = (r: number, g: number, b: number) =>
@@ -792,8 +790,6 @@ export function makeMaterials(
     kz: { value: ix.geo.kz },
     gridRot: { value: new THREE.Vector2(Math.cos(grid), Math.sin(grid)) },
     fogColor: { value: HORIZON },
-    fogNear: { value: FOG_NEAR },
-    fogFar: { value: FOG_FAR },
     laneColour: { value: palette.ramp("markingWhite") * SHADES + LIT },
     grey: { value: 0 },
     greys: { value: greysOf(palette) },
@@ -888,7 +884,7 @@ export function makeMaterials(
     uniforms: {
       ...lighting.uniforms,
       fogColor: shared.fogColor,
-      skyColor: { value: SKY },
+      skyColor: { value: SKY.clone() },
       grey: shared.grey,
       greys: shared.greys,
     },

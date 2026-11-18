@@ -7,6 +7,7 @@ export const tinywinterfell: World = {
   wordmark: "winterfell",
   homeLocale: "en-US",
   fictional: true,
+  weather: "snow",
   copy: {
     "en-US": {
       city: "Winterfell",

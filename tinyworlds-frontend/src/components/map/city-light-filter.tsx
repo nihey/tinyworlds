@@ -1,9 +1,18 @@
 import { useEffect, useState } from "react";
 import type { MapEngine } from "@/map/engine";
 import { DAY, NIGHT, watchCityLight, type LightMode } from "@/map/daylight";
+import { weatherLight, type WeatherCondition } from "@/map/weather";
 
 /** Grade the composed tiles and sprites in place, including the fog at the map's edges. */
-export function CityLightFilter({ mode, engine }: { mode: LightMode; engine: MapEngine | null }) {
+export function CityLightFilter({
+  mode,
+  engine,
+  weather,
+}: {
+  mode: LightMode;
+  engine: MapEngine | null;
+  weather: WeatherCondition;
+}) {
   const [light, setLight] = useState(mode === "dark" ? NIGHT : DAY);
   useEffect(() => {
     const stop = watchCityLight(mode, (sample) => {
@@ -15,7 +24,8 @@ export function CityLightFilter({ mode, engine }: { mode: LightMode; engine: Map
       engine?.setWindowLight(0);
     };
   }, [mode, engine]);
-  const channel = (n: number) => light.curve.filter((_, i) => i % 3 === n).join(" ");
+  const { curve } = weatherLight(light, weather);
+  const channel = (n: number) => curve.filter((_, i) => i % 3 === n).join(" ");
   return (
     <svg width="0" height="0" className="absolute pointer-events-none" aria-hidden>
       <defs>

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { StreetLighting } from "./city-light";
 import { sizeFor, type Vehicle } from "../vehicles";
 import { WATER_Z } from "../world";
-import { FOG, FOG_FAR, FOG_NEAR, HASH, HORIZON, greysOf, NOT_MIRRORED } from "./materials";
+import { FOG, HASH, HORIZON, greysOf, NOT_MIRRORED } from "./materials";
 import { HALF, HIGH, LIT, SHADE, type Palette } from "./palette";
 
 /**
@@ -183,8 +183,6 @@ export class WalkParticles {
         pscale: { value: 300 },
         ...lighting.uniforms,
         fogColor: { value: HORIZON },
-        fogNear: { value: FOG_NEAR },
-        fogFar: { value: FOG_FAR },
         grey: { value: 0 },
         greys: { value: greysOf(palette) },
       },
@@ -229,8 +227,6 @@ export class WalkParticles {
         shades: { value: [shade("foam", HIGH), shade("foam", LIT), shade("waterShallow", HIGH)] },
         ...lighting.uniforms,
         fogColor: { value: HORIZON },
-        fogNear: { value: FOG_NEAR },
-        fogFar: { value: FOG_FAR },
         grey: this.mat.uniforms.grey,
         greys: this.mat.uniforms.greys,
       },
