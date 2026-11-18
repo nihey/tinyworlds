@@ -6,6 +6,7 @@ export const tinyfte: World = {
   wordmark: "fte",
   homeLocale: "es-ES",
   turn: "grid",
+  walk: true,
   // a small town: its "districts" are just parts of it, and it may have no outlines to draw at all
   copy: {
     "es-ES": {

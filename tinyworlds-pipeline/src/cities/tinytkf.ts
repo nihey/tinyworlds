@@ -62,6 +62,7 @@ const PIONEER_MONUMENT: Statue = {
  */
 export const tinytkf: City = {
   id: "tinytkf",
+  walk: true,
   title: "Truckee",
   // the town's point in Overture's divisions: Commercial Row
   origin: { lon: -120.18358, lat: 39.32795 },

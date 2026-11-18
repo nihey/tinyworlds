@@ -71,6 +71,7 @@ const RWY_31R: [number, number] = [-96.83916, 32.84205];
  */
 export const tinydal: City = {
   id: "tinydal",
+  walk: true,
   title: "Dallas",
   // Dealey Plaza, where the city began
   origin: { lon: -96.80857, lat: 32.77852 },

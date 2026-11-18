@@ -59,7 +59,7 @@ Each sub-project has its own `CLAUDE.md`.
 
 - **The maps are static.** Tiles and JSON indexes are generated offline by the pipeline and
   served as files; the viewer needs nothing else to show a city.
-- **New York, Austin, San Francisco, Milwaukee, Bethlehem and the five GTA-inspired worlds can be walked.** Street Walk shows the city at street level, in 3D: on foot, at
+- **Every real city and the five GTA-inspired worlds can be walked.** Street Walk shows the city at street level, in 3D: on foot, at
   the wheel and in the water. It is static too: the pipeline's `walk` step (for a world whose
   file says `walk: true`) cuts the map's own scene and Overture's streets into squares of 200 m
   (`walk/`, below): the buildings, ground and trees the map draws, its bridges on the map's

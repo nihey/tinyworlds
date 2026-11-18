@@ -31,6 +31,7 @@ function areas(rawDir: string): Areas {
  */
 export const tinyfte: City = {
   id: "tinyfte",
+  walk: true,
   title: "El Calafate",
   // the middle of Avenida del Libertador
   origin: { lon: -72.2648, lat: -50.3379 },

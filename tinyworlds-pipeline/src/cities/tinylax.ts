@@ -35,6 +35,7 @@ const HELI = 95;
  */
 export const tinylax: City = {
   id: "tinylax",
+  walk: true,
   title: "Los Angeles",
   // City Hall, where the city's street numbers start
   origin: { lon: -118.24276, lat: 34.05368 },

@@ -83,6 +83,13 @@ describe("resolveWorld", () => {
 });
 
 describe("worlds", () => {
+  it("enables Street Walk in every real city", () => {
+    const disabled = Object.values(WORLDS)
+      .filter((world) => !world.fictional && world.walk !== true)
+      .map((world) => world.id);
+    expect(disabled).toEqual([]);
+  });
+
   it.each(["tinyaus", "tinysfo", "tinymke", "tinybeth"])(
     "opens Street Walk from both map views and offers the building quiz in %s",
     (id) => {

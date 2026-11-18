@@ -41,6 +41,7 @@ const along = (km: number, alt: number): [number, number, number] => [
  */
 export const tinyvlc: City = {
   id: "tinyvlc",
+  walk: true,
   title: "València",
   // Plaça de l'Ajuntament
   origin: { lon: -0.37643, lat: 39.47019 },

@@ -31,7 +31,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Street walk
 
 - The five GTA-inspired worlds use the shared walk controls, with one data set in each world's own view and speeds in miles per hour.
-- New York, Austin, San Francisco, Milwaukee and Bethlehem use the same walk controls and physics. Each world has one walk data set that either map orientation can open. Worlds with animated billboards define their locations in the world config.
+- Every real city uses the shared walk controls and physics. Each city has one walk data set that either map orientation can open. Show speeds in miles per hour for U.S. cities and kilometres per hour elsewhere. Worlds with animated billboards define their locations in the world config.
 - While the walker is dragged, `src/map/walker.ts` dims the baked tiles and draws the nearby building footprints, parks, plazas, walkable routes and snapped landing point. The preview reuses loaded walk cells and clears when the drag ends.
 - `src/walk/world.ts` resolves which deck supports each player. On foot, a nearby footway can take over from an overlapping roadway when both decks are level, as on the Brooklyn Bridge's Brooklyn approach. Keep the height tolerance and roadway preference for drivers when changing this logic.
 - Motorcycles use the shared road vehicle physics and spawn mix in `src/walk/vehicles.ts`, with speed-limited steering and a dedicated chase camera. Hard impacts and landings throw the rider off and take life. Keep ordinary nudges rideable.

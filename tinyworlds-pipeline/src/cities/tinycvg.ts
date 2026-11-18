@@ -63,6 +63,7 @@ const GENIUS_OF_WATER: Statue = {
  */
 export const tinycvg: City = {
   id: "tinycvg",
+  walk: true,
   title: "Cincinnati",
   // the Genius of Water in Fountain Square
   origin: { lon: -84.51246, lat: 39.10162 },

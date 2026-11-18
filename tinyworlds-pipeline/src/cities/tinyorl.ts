@@ -35,6 +35,7 @@ const KM = 1 / 111.19;
  */
 export const tinyorl: City = {
   id: "tinyorl",
+  walk: true,
   title: "Orlando",
   // the fountain of Lake Eola
   origin: { lon: -81.3725, lat: 28.54388 },

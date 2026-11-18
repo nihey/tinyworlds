@@ -6,6 +6,7 @@ export const tinyrao: World = {
   wordmark: "rao",
   homeLocale: "pt-BR",
   turn: "grid",
+  walk: true,
   // the city has no official bairro outlines: what the map can draw are its planning sub-sectors
   copy: {
     "pt-BR": {

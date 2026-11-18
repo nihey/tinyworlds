@@ -40,6 +40,7 @@ const along = (km: number, alt: number): [number, number, number] => [
 /** Ribeirão Preto, São Paulo: the built-up city, turned so the downtown grid runs along the pixels. */
 export const tinyrao: City = {
   id: "tinyrao",
+  walk: true,
   title: "Ribeirão Preto",
   // Praça XV de Novembro
   origin: { lon: -47.80872, lat: -21.17516 },

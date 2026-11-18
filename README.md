@@ -83,6 +83,9 @@ a few minutes to render on a desktop machine.
 - **tinybeth** covers Bethlehem, Pennsylvania. Follow the Lehigh River from the historic Moravian
   settlement to South Bethlehem, SteelStacks and Lehigh University. Street Walk includes the South Bethlehem Greenway.
 
+Every real city has Street Walk in both map orientations. Drop the walker onto a street to
+explore on foot or by vehicle.
+
 New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Austin, San Francisco,
 Milwaukee and Bethlehem light up their famous buildings under the pointer, with a line from Wikipedia,
 and play "Guess the building" with them.

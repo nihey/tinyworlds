@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { CITIES } from "./cities/index.js";
 import { dataDirs, pickView } from "./config.js";
 
 const real = { id: "tinylas" };
 const generated = { id: "tinywinterfell", view: "grid" as const, synthetic: () => {} };
+
+it("generates Street Walk data in the standard build for every real city", () => {
+  const disabled = Object.values(CITIES)
+    .filter((city) => !city.synthetic && city.walk !== true)
+    .map((city) => city.id);
+  expect(disabled).toEqual([]);
+});
 
 describe("pickView", () => {
   it("draws a city its own way unless asked otherwise", () => {

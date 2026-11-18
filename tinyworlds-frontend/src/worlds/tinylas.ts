@@ -6,6 +6,8 @@ export const tinylas: World = {
   wordmark: "las",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  units: "imperial",
   // the map's districts are the municipalities of the valley: Las Vegas, Paradise, Henderson…
   copy: {
     "en-US": {

@@ -140,6 +140,7 @@ export function areas(rawDir: string): Areas {
  */
 export const tinyphl: City = {
   id: "tinyphl",
+  walk: true,
   title: "Philadelphia",
   origin: { lon: -75.16352, lat: 39.95234 },
   gridDeg: -8.1,
