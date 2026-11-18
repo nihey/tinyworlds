@@ -85,6 +85,7 @@ src/
 │   ├── tinytkf.ts (+ .places.ts)   # Truckee: the depot, Donner Lake, the Pioneer Monument as a statue
 │   ├── tinysfo.ts (+ .places.ts)   # San Francisco: the Golden Gate, downtown and Alcatraz
 │   ├── tinymke.ts (+ .places.ts)   # Milwaukee: the river, City Hall and the lakefront
+│   ├── tinybeth.ts (+ .landmarks.ts, .places.ts)   # Bethlehem: city GIS districts and SteelStacks
 │   ├── sections.ts    # a city's published neighbourhoods as outlines, its parts of town as districts;
 │   │                  # aroundPoints(): parts of town the data knows only as named points
 │   ├── generated.ts   # generatedCity(): a City with no data behind it (see "Generated cities")
@@ -328,7 +329,7 @@ river, an islet, the Wall).
 
 ## Sights: what lights up under the pointer (`index/sights.ts`, `index/wiki.ts`)
 
-A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee) gets `sights.json` from `index` and `sights.<locale>.json` from
+A city with `sights` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee, Bethlehem) gets `sights.json` from `index` and `sights.<locale>.json` from
 `wiki` (see the root `CLAUDE.md` for both files). A **sight** is one structure on the map that
 one or more search entries point at.
 

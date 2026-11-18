@@ -6,7 +6,7 @@ One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `t
 (El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), `tinydal`
 (Dallas), `tinycvg` (Cincinnati), `tinypit` (Pittsburgh), `tinyphl` (Philadelphia), `tinycos`
 (Colorado Springs), `tinytkf` (Truckee), `tinyaus` (Austin), `tinysfo` (San Francisco),
-`tinymke` (Milwaukee), and three
+`tinymke` (Milwaukee), `tinybeth` (Bethlehem, Pennsylvania), and three
 places that do not exist, `tinywinterfell`,
 `tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
 lists the worlds. The interface speaks the visitor's language (English, Brazilian
@@ -845,7 +845,7 @@ live engine is also on `window.tinyworld` for the console.
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
-In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee), a building found in the search
+In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee, Bethlehem), a building found in the search
 lights up under the mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
 outline cut out), a 2 px line of the accent runs round it, and a sign beside its top says what
 it is (type · context line, name), the opening of its Wikipedia article and "Read on Wikipedia".

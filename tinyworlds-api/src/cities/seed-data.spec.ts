@@ -50,30 +50,36 @@ describe('seeding', () => {
     }
   });
 
-  it('marks Orlando built when donors had already put it on the list, keeping what it raised', async () => {
-    const db = new FakePrisma();
-    const orlando = db.seedCity({
-      slug: 'orlando',
-      name: 'orlando fl',
-      status: 'FUNDED',
-      goalCents: 15_000,
-      raisedCents: 18_200,
-      donationCount: 7,
-    });
-    await seedCities(db, 10_000);
-    expect(db.cities.filter((city) => city.slug === 'orlando')).toEqual([
-      {
-        ...orlando,
-        status: 'BUILT',
-        worldId: 'tinyorl',
-        // untouched: the name its first donor typed, its own goal, and every cent
-        name: 'orlando fl',
+  it.each([
+    ['orlando', 'orlando fl', 'tinyorl'],
+    ['bethlehem-pennsylvania', 'Bethlehem Pennsylvania', 'tinybeth'],
+  ])(
+    'marks %s built and preserves its funding',
+    async (slug, name, worldId) => {
+      const db = new FakePrisma();
+      const proposal = db.seedCity({
+        slug,
+        name,
+        status: 'FUNDED',
         goalCents: 15_000,
         raisedCents: 18_200,
         donationCount: 7,
-      },
-    ]);
-  });
+      });
+      await seedCities(db, 10_000);
+      expect(db.cities.filter((city) => city.slug === slug)).toEqual([
+        {
+          ...proposal,
+          status: 'BUILT',
+          worldId,
+          // untouched: the name its first donor typed, its own goal, and every cent
+          name,
+          goalCents: 15_000,
+          raisedCents: 18_200,
+          donationCount: 7,
+        },
+      ]);
+    },
+  );
 
   it('changes nothing when run again, and leaves a suggestion that has moved on alone', async () => {
     const db = new FakePrisma();

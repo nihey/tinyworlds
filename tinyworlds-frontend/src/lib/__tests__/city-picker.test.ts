@@ -133,6 +133,9 @@ describe("pickerOptions", () => {
       "Milwaukee, WI",
       "Milwaukee, Wisconsin",
       "MKE",
+      "Bethlehem",
+      "Bethlehem, PA",
+      "Bethlehem, Pennsylvania",
     ]) {
       const options = pickerOptions([], CITY_CATALOGUE, name, BUILT_CITIES);
       expect(options.more, name).toEqual([]);

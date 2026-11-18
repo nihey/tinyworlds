@@ -30,6 +30,7 @@ export const SHOTS: Record<string, Shot> = {
   tinyaus: { flyover: { shrink: 2.5 } },
   tinysfo: { flyover: { shrink: 2 } },
   tinymke: { flyover: { shrink: 2 } },
+  tinybeth: { flyover: { shrink: 2 } },
   tinywesteros: { dir: 1 },
 };
 
@@ -79,6 +80,7 @@ export const HEROES: Record<string, HeroShot> = {
   tinyaus: { shrink: 2.5, ...LAP, dx: 240 },
   tinysfo: { lon: -122.397, lat: 37.7963, shrink: 2.5, ...LAP, dx: 0 },
   tinymke: { shrink: 2.5, ...LAP, dx: 0 },
+  tinybeth: { shrink: 2, ...LAP, dx: 0 },
   tinywinterfell: { shrink: 2, ...LAP },
   tinykingslanding: { shrink: 2, ...LAP },
   // the whole known world, from as far as its card; moved less, to keep the frame's edge out
