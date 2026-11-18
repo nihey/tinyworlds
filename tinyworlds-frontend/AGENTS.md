@@ -14,6 +14,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `MovingPicture` only starts a loop once its still has settled and at least 40% of its active frame is visible. Respect reduced motion and Save-Data.
 - Home entrance animations live in `src/app/globals.css`. The world grids animate each card once near the viewport, with visible static content available before hydration.
 - Benefactor plaques use shared link previews. Keep the artwork proportional and pair it with the title and destination in one anchor. The narrow wall uses native horizontal scrolling.
+- List the GTA-inspired maps under Imagined places. Each world keeps its own route and localized card copy, with the shared attribution in `src/worlds/gta.ts`.
 
 ## Hall of Fame
 

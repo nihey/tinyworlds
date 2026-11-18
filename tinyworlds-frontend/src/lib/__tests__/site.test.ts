@@ -105,6 +105,11 @@ describe("site", () => {
       "Desembarco del Rey",
       "Westeros",
       "Poniente",
+      "GTA III",
+      "GTA: Vice City",
+      "GTA: San Andreas",
+      "GTA IV",
+      "GTA V",
     ]);
   });
 

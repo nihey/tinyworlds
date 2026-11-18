@@ -57,6 +57,11 @@ describe("resolveWorld", () => {
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
+      "tinygtaiii",
+      "tinyvicecity",
+      "tinysanandreas",
+      "tinygtaiv",
+      "tinygtav",
     ]);
   });
 
@@ -238,21 +243,24 @@ describe("worlds", () => {
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
+      "tinygtaiii",
+      "tinyvicecity",
+      "tinysanandreas",
+      "tinygtaiv",
+      "tinygtav",
     ]);
     for (const world of imagined) {
       for (const locale of LOCALES) {
         const { about, description } = world.copy[locale];
         const said = [about.intro, ...about.notes].join(" ");
-        // whose story it is, and that neither its author nor the series stands behind this map
-        expect(said, `${world.id} ${locale}`).toMatch(/George R\. R\. Martin/);
-        expect(said, `${world.id} ${locale}`).toMatch(/HBO/);
+        expect(said, `${world.id} ${locale}`).toMatch(/George R\. R\. Martin.*HBO|Rockstar Games/);
         // nothing here comes from open data, and nothing may claim it does
         expect(`${said} ${description}`, `${world.id} ${locale}`).not.toMatch(
           /open data|dados abertos|datos abiertos|OpenStreetMap/i,
         );
       }
       expect(world.copy["en-US"].about.notes[0]).toMatch(/unofficial, fan-made/);
-      expect(world.copy["en-US"].about.notes[1]).toMatch(/invented for this map/);
+      expect(world.copy["en-US"].about.notes.join(" ")).toMatch(/invented for this map/);
       expect(world.credit).not.toMatch(/OpenStreetMap|Overture/);
     }
     // and every other world is a real place drawn from real data

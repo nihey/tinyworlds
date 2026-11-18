@@ -369,6 +369,9 @@ src/
   never claims open data); and the front page lists them in their own group ("Imagined places")
   after the cities. They are worlds like any other for everything else (share links, search,
   donations), and the donate picker never offers them as cities to fund.
+- The GTA-inspired fictional worlds are `tinygtaiii`, `tinyvicecity`, `tinysanandreas`,
+  `tinygtaiv` and `tinygtav`. Their entries use the shared localized copy in `worlds/gta.ts`
+  and still cards from the pipeline.
 - **Long wordmarks.** `tinykingslanding` is sixteen letters where an airport code makes seven:
   `Wordmark` sets a name longer than ten letters smaller in proportion (`wordmarkScale` in
   `lib/wordmark.ts`), so the search sign, the cards and the splash need no special case.
