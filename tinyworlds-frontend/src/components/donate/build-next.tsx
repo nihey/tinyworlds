@@ -1,8 +1,9 @@
 "use client";
 
 import { BadgeCheck, Heart, Plus, Search, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { PixelIcon, type PixelArtName } from "@/components/benefactors/pixel-badge";
+import { NewCitiesButton } from "@/components/lists/new-cities-button";
 import { ACTION, PILL_GHOST } from "@/components/styles";
 import type { Milestones } from "@/hooks/use-milestones";
 import { useI18n } from "@/hooks/use-i18n";
@@ -82,7 +83,7 @@ function Steps({ goalCents }: { goalCents: number }) {
     },
   ];
   return (
-    <ol className="grid rounded-lg shadow-[inset_0_0_0_1px_var(--sign-line)] sm:grid-cols-3">
+    <ol className="mt-5 grid rounded-lg shadow-[inset_0_0_0_1px_var(--sign-line)] sm:grid-cols-3">
       {steps.map((step, i) => (
         <li
           key={step.art}
@@ -104,17 +105,16 @@ function Steps({ goalCents }: { goalCents: number }) {
 }
 
 /**
- * "Build the next city", whole: how it works, then every city in three groups. The ones built
- * with their goal reached stay, lit, at the top; then the ones that reached it and wait; then
- * the ones still collecting, numbered. Visitors can search all three rows or name a city. Without a
- * list of cities it is a sentence and a Donate button.
+ * The cities built by their benefactors, those awaiting a build, and those still collecting.
+ * Visitors can search all three groups, name a city, or sign up for new-city updates.
  */
 export function BuildNext({
   milestones,
   onDonate,
   onBenefactors,
   lists,
-}: { milestones: Milestones } & Handlers) {
+  newCities,
+}: { milestones: Milestones; newCities?: ComponentProps<typeof NewCitiesButton> } & Handlers) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const searchInput = useRef<HTMLInputElement>(null);
@@ -126,27 +126,31 @@ export function BuildNext({
   );
   const total = built.length + funded.length + ranked.length;
   const hasCities = ranking.built.length + ranking.funded.length + ranking.ranked.length > 0;
+  const subscription = newCities && (
+    <div className="mt-4">
+      <NewCitiesButton {...newCities} />
+    </div>
+  );
 
   if (!listed(milestones))
     return (
       <div className="sign px-5 py-5 sm:px-6">
         <Pitch onDonate={onDonate} />
+        {subscription}
       </div>
     );
 
   return (
     <div className="sign px-4 py-4 sm:px-6 sm:py-5">
-      <Steps goalCents={defaultGoal(milestones.cities)} />
-
       {milestones.state === "loading" && (
-        <p role="status" className="pt-4 text-sm text-paper-dim">
+        <p role="status" className="text-sm text-paper-dim">
           {t.donate.loading}
         </p>
       )}
 
       {milestones.state === "ready" && hasCities && (
         <>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex h-11 min-w-0 flex-[1_1_12rem] items-center gap-2.5 rounded-lg border border-sign-line bg-white/[0.04] pl-3.5 focus-within:border-taxi">
               <Search aria-hidden className="size-4 shrink-0 text-paper-dim" />
               <input
@@ -200,6 +204,7 @@ export function BuildNext({
           title={t.donate.build.groupBuilt}
           icon={<PixelIcon art="keystone" />}
           query={search}
+          autoplay
         >
           {built.map((city) => (
             <li key={city.id}>
@@ -255,10 +260,12 @@ export function BuildNext({
       )}
 
       {milestones.state === "ready" && !hasCities && (
-        <div className="mt-5 sm:max-w-sm">
+        <div className="sm:max-w-sm">
           <OtherCityCard onDonate={() => onDonate(null)} />
         </div>
       )}
+      <Steps goalCents={defaultGoal(milestones.cities)} />
+      {subscription}
     </div>
   );
 }

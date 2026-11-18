@@ -72,12 +72,20 @@ export const esES: Strings = {
       "Ciudades enteras en miniatura, en pixel art isométrico, generadas por un programa a partir de datos abiertos. Es gratis: arrastra, haz zoom y busca cualquier calle.",
     cardAlt:
       "Seis ciudades dibujadas en pixel art isométrico, una al lado de otra, bajo la marca tinyworlds",
-    tagline: "Ciudades enteras, en miniatura",
-    pitch:
-      "Cada ciudad es una miniatura isométrica de pixel art generada por un programa a partir de datos abiertos, y explorarla es gratis.",
+    tagline: { lead: "Ciudades enteras,", accent: "en miniatura." },
+    pitch: "Explora ciudades reales y mundos imaginarios en pixel art isométrico.",
     explore: "Explorar {city}",
-    cities: "Ciudades",
-    imagined: "Lugares imaginarios",
+    catalogue: {
+      title: "Encuentra tu próximo mundo.",
+      ranked: "Los más visitados primero",
+      search: "Busca una ciudad o un mundo",
+      filters: "Tipo de mundo",
+      all: "Todos los mundos",
+      real: "Ciudades reales",
+      imagined: "Lugares imaginarios",
+      count: { one: "{n} mundo", other: "{n} mundos" },
+      empty: "No hay mundos que coincidan con tu búsqueda.",
+    },
     ranking: "Construye la próxima ciudad",
     funded: "Meta alcanzada",
     rankingEmpty: "Todavía no hay donaciones: la primera pone su ciudad en cabeza.",
@@ -89,30 +97,20 @@ export const esES: Strings = {
     exploringNow: "{n} explorando ahora",
     yourCities: "Tus ciudades",
     navLabel: "Secciones",
-    citiesLine: "Lugares reales, dibujados por un programa a partir de datos abiertos.",
-    imaginedLine:
-      "Mapas hechos por fans de lugares de ficción, con trazados inventados para ellos.",
     rankingLine: "Elige la ciudad que quieres ver, o propón la tuya.",
     exploreShort: "Explorar",
-    fundNext: "Apoya la próxima ciudad",
     carousel: {
       label: "Mundos por explorar",
       previous: "Anterior",
       next: "Siguiente",
-      show: "Mostrar {city}",
+      play: "Reproducir carrusel",
+      pause: "Pausar carrusel",
     },
     numbers: {
       worlds: { one: "ciudad o mundo", other: "ciudades y mundos" },
       visits: { one: "visita hasta ahora", other: "visitas hasta ahora" },
       live: "explorando ahora",
       funding: { one: "ciudad recaudando", other: "ciudades recaudando" },
-    },
-    next: {
-      kicker: "A continuación",
-      title: "¿Qué ciudad construyo a continuación?",
-      body: "Cada una cuesta unos {goal}. La que tenga más apoyo se construye primero.",
-      action: "Apoyar una ciudad",
-      ranking: "Ver el ranking",
     },
     nextPitch:
       "Las donaciones pagan los servidores y las horas de trabajo que lleva construir cada ciudad. ¿Quieres ver la tuya? Escribe su nombre en la donación.",
@@ -199,6 +197,8 @@ export const esES: Strings = {
       raised: "{amount} recaudados",
       fundedInFull: "Meta alcanzada",
       groupBuilt: "Construidas · financiadas por sus benefactores",
+      publicRecognition:
+        "Dona a tu nombre y aparecerás entre los benefactores de esta ciudad mientras siga en el mapa.",
       other: {
         title: "¿Tu ciudad no está aquí?",
         body: "Di el nombre de cualquier ciudad del mundo y entra en el ranking.",

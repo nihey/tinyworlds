@@ -151,7 +151,7 @@ src/
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
 ├── components/styles.ts # the buttons the front page and "Your cities" share, as class lists
 ├── components/home/     # the front page: landing.tsx and its pieces (section-head,
-│                        # world-card, site-numbers, next-city-tile), moving-picture.tsx
+│                        # world-catalogue, world-card, site-numbers), moving-picture.tsx
 │                        # (a still that comes alive: the hero and the cards),
 │                        # benefactor-wall.tsx (everyone who gave: columns down the sides,
 │                        # or a strip) and drift.tsx (a list that drifts by)
@@ -224,13 +224,10 @@ src/
 - **`src/site.ts`** answers "what is this build" for code that is not about a map (settings,
   language, analytics, donations): `SITE_ID` is the world id or `"home"`. On the front page
   `WORLD` is only a stand-in (the default world) that nothing shows: use `site.ts` there.
-- **The front page, top to bottom** (`components/home/landing.tsx`): links to its own sections
-  (`#cities`, `#imagined`, `#ranking`, `#open-source`; hidden below `sm`) and "Your cities" as a
-  button; the hero; a strip of figures; the benefactors as a strip (only where the screen has
-  no room for them beside the page: below); the cities, then the imagined places, as cards; "Build
-  the next city" (Donations, below); open source as one strip; the footer. Each section's title
-  (`section-head.tsx`) sits on the fog with a line saying what the section is, and carries the
-  section's id.
+- **The front page** (`components/home/landing.tsx`) opens with a wordmark and links to the
+  catalogue and funding. The split panorama leads to the site figures, funding list, searchable
+  catalogue (`world-catalogue.tsx`), benefactors, open source, and the footer. `#cities` opens the
+  catalogue and `#imagined` selects its imagined-places filter.
 - **A world's card** (`world-card.tsx`) is one link to the world, another build (`/<id>/`): the
   link is the card's name, stretched over the whole card, and the Benefactors button lies over
   it as its sibling, never inside it. Its picture is the world's share card, served from the
@@ -261,15 +258,15 @@ src/
   by name, then "+2 more"), and a named benefactor's links (below). An unnamed gift is
   "Anonymous" with what it gave and where. Last comes an empty lot, "Your name here", which
   opens the donate sign (only where donations are taken).
-  - **From 90rem wide** (`WallColumns`): a column fixed down each side of the page, beside its
-    64rem column (10.5 to 15.5rem wide, a little into the page's own margin), the wall dealt
+  - **From 110rem wide** (`WallColumns`): a column fixed down each side of the page, beside its
+    84rem column (10.5 to 15.5rem wide), the wall dealt
     left and right in turn (`wallSides`). A link is a card: its picture, when it has one to
     show, across the plaque, then icon, title and host. Over the left column, "Our
     Benefactors"; over the right one, across the page from it, the way to the hall of fame.
     Both stand level with the page's own links and the plaques begin level with the hero, so
     the columns read as part of the page.
   - **Narrower** (`WallStrip`): "Our Benefactors", what the list is and the way to the hall
-    of fame on one line, then a horizontally scrollable row under the figures. Every plaque is
+    of fame on one line, then a horizontally scrollable row below funding. Every plaque is
     116 px high, with compact link previews beneath the name and cities. Empty plaques reserve
     the row's height during loading. A failed answer leaves the invitation alone.
   - **The side columns drift** (`drift.tsx`, `.drift` in `globals.css`) when there is more than fits:
@@ -279,12 +276,6 @@ src/
     mask). It stands still under the pointer and while anything in it has the focus, and
     never moves under `prefers-reduced-motion`: there it is one list, scrolled by hand. The
     columns are not scroll containers otherwise, so the wheel over them scrolls the page.
-- **"Which city should I build next?"** (`next-city-tile.tsx`, where donations are taken): a
-  tile after the cities' cards, in what is left of their last row or in a row of its own
-  (`tileSpan` in `lib/home.ts`, at each breakpoint), with the three cities nearest to being
-  built (`leading`), a button that opens the donate sign and a link to the ranking. Most
-  visitors look at the worlds and never reach the ranking otherwise. While the list is on its
-  way three empty bars hold their place.
 - **The front page's pictures move** (`components/home/moving-picture.tsx`). Each card plays
   its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
   the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
@@ -295,48 +286,21 @@ src/
   cannot play, the still stays. The loops are the front page's own files (`LOOPS_BASE` in
   `site.ts`), unlike the share cards: `deploy/deploy.sh home` is all they need, and a world's
   folder does not carry them.
-- **The hero goes round the worlds** (`components/home/hero-carousel.tsx`): a slide for every
-  world that has a hero film (`heroSlides`: the registry's order, New York first), the same
-  idea at the page's width. A film is a slow lap with no sign on it, `/loops/hero.{mp4,jpg}`
-  for New York and `/loops/hero-<id>.{mp4,jpg}` for the others (`worldHero`), framed by
-  `tinyworlds-videos` to keep what is worth seeing clear of the page's sign. Which worlds
-  have one is what the build finds in `public/loops/` (`next.config.ts` →
-  `NEXT_PUBLIC_HERO_FILMS` → `HERO_FILMS`), so a world added without a film is simply not in
-  the hero, and with one film listed the hero is a picture and a sign, with no controls.
-  - **The sign** stays over the picture's lower left (below `lg` it hangs from the picture's
-    bottom edge instead): the wordmark, the tagline, the pitch, then the world being shown
-    (its wordmark in its colour, its city on one line, so the sign is as tall whatever the
-    world), "Explore" (the link to that world, named "Explore {city}") and, where donations
-    are taken, "Fund the next city" (`#ranking`). The buttons share a row from `sm` and stack
-    below it: they never wrap.
-  - **It moves on by itself** after `SLIDE_MS` (8 s), once the next still has decoded or its
-    fallback is ready. The new picture fades in over the old (`FADE_MS`, the `hero-in` keyframes)
-    only while `mayAdvance` (`lib/home.ts`) says so:
-    more than one slide, the hero on screen, the page in view, no pointer on it, no keyboard
-    focus in it, and never under `prefers-reduced-motion` or `Save-Data` (then it stands
-    still and only the stills are fetched). Choosing a slide stops it for good: the hero is the visitor's from then on, which is
-    how a finger (it has no hover) or a screen reader holds it. A tab opened behind another
-    is hidden from the start (`watchHidden`), and of an observer's delivery the last word
-    is the one believed (`lastSeen`).
-  - **Choosing**: a pill at the picture's lower right from `lg`, at its top right below (where
-    the sign would cover it): previous, a dot per world (the current one in that world's
-    colour; a count instead on a phone, where dots are too small to press), next; the arrow
-    keys work inside it. Each slide chosen by hand is said to a screen reader, through a
-    polite region that is there from the start; one the timer brought is not.
-  - **What is fetched**: the first still at once; each other still a second before its turn
-    (`AHEAD_MS`); a film only when its slide is the one showing. Only the current slide and
-    the one it is fading in over are in the page.
+- **The split hero** (`hero-carousel.tsx`) keeps the headline beside the panorama on large
+  screens and below it on narrow screens. Its Explore link and city caption follow the
+  visible slide. The carousel walks the visit-ranked worlds that have hero films
+  (`heroSlides` and `worldHero`). It waits 8 seconds before preparing the next still and
+  crossfades after decode. The first still is eager. Previous and next, arrow keys within the
+  control group, and pause/play allow manual control. Autoplay holds while hovered, focused,
+  hidden, or off-screen. Reduced motion and Save-Data keep it manual.
 - **Each card says how visited its world is** (with an API): "41,203 visits" under the card's
   text, and "● 23 exploring now" beside it once more than ten (`LIVE_SHOWN_ABOVE`) have that
   map open (`visitsLine` in `lib/visits.ts`, numbers in the visitor's way of writing them).
   `useWorldVisits` asks `worldVisits` for every world in the registry with a plain `fetch`
   (5 s timeout), at once and then every 30 s while the page is in view; a failed answer leaves
-  the last numbers. Each group of cards comes **most visited first** (`byVisits`; ties and
-  worlds with no count keep the registry's order), ordered by the **first** answer only: later
-  ones change the numbers, never the order, so nothing moves under the pointer. Before that
-  answer, and for good without one, the cards keep the registry's order and say nothing; the
-  line's height is there from the start (`box-content`: a `min-h` would otherwise swallow the
-  line's padding), so the cards do not grow when the numbers come.
+  the last numbers. The catalogue and carousel share the **first** answer's
+  total-visit ranking (`byVisits`). The registry supplies the fallback order and breaks ties.
+  Later answers update the numbers while keeping the order stable.
 - **The front page's share card** is its own picture, `public/og/tinyworlds.jpg`
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
@@ -367,8 +331,8 @@ src/
   "fan-made" in the visitor's language instead of crediting map data; About sets the world's
   notes apart as a disclaimer (unofficial, invented layout, not affiliated with the author or
   the series — `worlds.test.ts` checks every fictional world says so in every language and
-  never claims open data); and the front page lists them in their own group ("Imagined places")
-  after the cities. They are worlds like any other for everything else (share links, search,
+  never claims open data); and the front page includes them in the "Imagined places" filter.
+  They are worlds like any other for everything else (share links, search,
   donations), and the donate picker never offers them as cities to fund.
 - The GTA-inspired fictional worlds are `tinygtaiii`, `tinyvicecity`, `tinysanandreas`,
   `tinygtaiv` and `tinygtav`. Their entries use the shared localized copy in `worlds/gta.ts`
@@ -476,16 +440,12 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   - It says, in every language: cities with the most funding are built first, and what is given
     beyond a city's goal pays for the servers and keeps the project improving.
 - **"Build the next city"** (`components/donate/build-next.tsx`, `rankCities`): the front
-  page's ranking, and a short form of it on "Your cities". Three steps say how it works (pick
-  a city, give from US$1, at the goal it is built), each under one of the badges' pictures.
-  Visitors can drag, swipe or page through each group, search all three by name or alternate spelling,
-  or open the donation picker with “Name a city”. Each city has a card (`city-fund-card.tsx`).
-  - **Built**: `BUILT` with `raisedCents >= goalCents`, most raised first. A city never leaves
-    the ranking: once built it stays here, lit in the accent, with its share card as a band,
-    every stone laid, "Funded in full", and two actions, Benefactors and Explore. No Donate
-    (see Benefactors). The rule is the whole rule: one of the worlds built without funding
-    joins the group if its gifts ever reach its goal, which is why the card never says
-    "built by".
+  page's ranking, and a short form of it on "Your cities". Visitors can drag, swipe or page
+  through each group, search by name or alternate spelling, or open the donation picker
+  with “Name a city”. The funding steps and new-city signup follow the list.
+  - **Built**: cities that reached their goal and are on the map. This first row scrolls
+    back and forth while visible, with pause/play controls. Searching, hover, focus, and
+    reduced motion hold it still. Each card explains how public gifts earn lasting recognition.
   - **Funded** (`FUNDED` and `BUILDING`), as before.
   - **Being funded**, most funded first and, among equals, the most people waiting for it
     (`waiting`: "Tell me" is the free vote). A search keeps the original funding rank.
@@ -711,11 +671,12 @@ Anyone may ask to hear when a city is built, or when any new one is (root `CLAUD
 lists' bullet). Only with an API (`withApi`); `lib/lists.ts` is the pure part, `lib/lists-api.ts`
 (Apollo, lazy) the calls, `useLists` (`hooks/use-lists.ts`) the donor's lists.
 
-- **On the front page**: each city being funded (the "Build the next city" tile and the
-  ranking's cards, `CityFundCard`) has a **"Tell me"** button (`TellMeButton`; "You'll be told"
+- **On the front page**: each city being funded (`CityFundCard`) has a
+  **"Tell me"** button (`TellMeButton`; "You'll be told"
   once on the list, and pressing it leaves: its label for screen readers starts with those
-  words, `leaveAria`; a donor of the city is told without a list, and the button says so) and shows **"N waiting"** (`waiting` of `cityMilestones`). The tile (`NextCityTile`)
-  also has **"Tell me when new cities are built"** (`NewCitiesButton`).
+  words, `leaveAria`; a donor of the city is told without a list, and the button says so)
+  and shows **"N waiting"** (`waiting` of `cityMilestones`). Below the funding rows is
+  **"Tell me when new cities are built"** (`NewCitiesButton`).
 - **The join sign** (`JoinSign`): a signed-in donor joins at once; anyone else is asked for an
   address and confirms it with the sign-in link or code (`SignIn purpose="donor"`, the list
   carried in `magic-link`'s `list`, so the link joins server side wherever it is opened).

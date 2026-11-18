@@ -1,6 +1,8 @@
+import { fold } from "@/lib/city-picker";
+import type { World } from "@/worlds";
+
 /**
- * The front page's small rules, without the page: how its hero goes round the worlds and when
- * it may move by itself, and how wide the "which city next?" tile is. Pure.
+ * The front page's carousel and catalogue rules.
  */
 
 /** How long the hero stays on a world before it moves on. */
@@ -8,20 +10,25 @@ export const SLIDE_MS = 8000;
 /** How long one world's picture takes to give way to the next. */
 export const FADE_MS = 600;
 
+export type WorldFilter = "all" | "real" | "imagined";
+
+/** Search the localized city names and world ID without changing the supplied visit order. */
+export function filterWorlds(worlds: World[], filter: WorldFilter, query: string): World[] {
+  const needle = fold(query);
+  return worlds.filter((world) => {
+    if (filter !== "all" && Boolean(world.fictional) !== (filter === "imagined")) return false;
+    return (
+      !needle ||
+      fold(world.id).includes(needle) ||
+      Object.values(world.copy).some(({ city }) => fold(city).includes(needle))
+    );
+  });
+}
+
 /** The slide `by` steps from `current`, going round at either end. */
 export function stepSlide(current: number, by: number, count: number): number {
   if (!(count > 0)) return 0;
   return (((current + by) % count) + count) % count;
-}
-
-/**
- * How many columns the tile after a grid's cards takes: what is left of the last row, or a
- * whole row of its own when the cards fill theirs.
- */
-export function tileSpan(cards: number, columns: number): number {
-  if (!(columns > 1)) return 1;
-  const over = cards % columns;
-  return over === 0 ? columns : columns - over;
 }
 
 /** What the hero knows of the moment. */

@@ -10,13 +10,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Front page
 
-- “Build the next city” keeps one draggable row per funding group, with native touch scrolling and manual navigation. Search all three with the donation picker’s city spellings, preserve the full funding rank on filtered cards, and keep the action to name a city beside the search.
+- Put the site stats under the hero, followed by “Build the next city” and the catalogue. Lead funding with the built-city carousel, followed by funded cities awaiting a build and cities still collecting. Search all three groups using the donation picker’s spellings, preserve the funding rank on filtered cards, and keep the action to name a city beside the search.
+- Autoscroll the built-city cards when the row overflows and is visible. Reverse at each end to keep one card per city. Pause for search, hover, focus and reduced motion. Offer pause/play and manual navigation. Explain on each built card that donors who give in their name are remembered among that city's benefactors.
 
-- Keep the first hero still eager and high priority. The carousel keeps the current slide visible until the requested still has decoded or its fallback is ready.
-- `MovingPicture` only starts a loop once its still has settled and at least 40% of its active frame is visible. Respect reduced motion and Save-Data.
-- Home entrance animations live in `src/app/globals.css`. The world grids animate each card once near the viewport, with visible static content available before hydration.
-- Benefactor plaques use shared link previews. Keep the artwork proportional and pair it with the title and destination in one anchor. The narrow wall uses native horizontal scrolling.
-- List the GTA-inspired maps under Imagined places. Each world keeps its own route and localized card copy, with the shared attribution in `src/worlds/gta.ts`.
+- The split hero keeps the headline in its own panel. The panorama, city caption, and Explore destination advance together. Put the panorama above the headline on narrow screens.
+- Keep the first hero still eager and high priority. Hold the current slide until the requested still has decoded or its fallback is ready. Offer previous, next, and a pause control when the carousel can autoplay. `MovingPicture` starts a loop after its still settles and at least 40% is visible. Respect reduced motion and Save-Data.
+- List each world once in the searchable catalogue. Recognize built cities' donors on their catalogue cards and in the Hall of Fame. Use the first `worldVisits` response to rank worlds by total visits and retain the order during polling, search and filtering. The `#cities` anchor opens the catalogue, and `#imagined` applies the imagined-places filter, including the GTA-inspired worlds.
+- Benefactor plaques use shared link previews. Keep the artwork proportional and pair it with the title and destination in one anchor. Use a native scrolling strip below funding until there is room for columns beside the wider page.
 
 ## Hall of Fame
 
