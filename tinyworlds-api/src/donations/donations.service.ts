@@ -21,6 +21,7 @@ import {
 import { COUNTED_CURRENCY } from './currency.js';
 import type { CreateDonationCheckoutInput } from './dto/create-donation-checkout.input.js';
 import { LOCALE_FACTS, type Locale } from './locales.js';
+import { OwnerAlertsService, type FundedCity } from './owner-alerts.service.js';
 import { acceptReturnUrl } from './return-url.js';
 import { STRIPE, type StripeClient } from './stripe.provider.js';
 import { ThanksService } from './thanks.service.js';
@@ -52,6 +53,7 @@ export class DonationsService {
     private readonly config: ConfigService<Env, true>,
     private readonly funnel: FunnelService,
     private readonly thanks: ThanksService,
+    private readonly ownerAlerts: OwnerAlertsService,
   ) {}
 
   private productOf(locale: Locale): Promise<string> {
@@ -268,7 +270,7 @@ export class DonationsService {
                 goalCents: this.config.get('CITY_GOAL_CENTS', { infer: true }),
               },
               update: {},
-              select: { id: true },
+              select: { id: true, name: true },
             })
           : null;
 
@@ -306,6 +308,7 @@ export class DonationsService {
         },
       });
 
+      let funded: FundedCity | null = null;
       if (city && facts.currency === COUNTED_CURRENCY) {
         const after = await tx.city.update({
           where: { id: city.id },
@@ -315,12 +318,22 @@ export class DonationsService {
           },
           select: { status: true, raisedCents: true, goalCents: true },
         });
-        if (after.status === 'PROPOSED' && after.raisedCents >= after.goalCents)
+        if (
+          after.status === 'PROPOSED' &&
+          after.raisedCents >= after.goalCents
+        ) {
           await tx.city.update({
             where: { id: city.id },
             data: { status: 'FUNDED' },
           });
+          funded = {
+            name: city.name,
+            raisedCents: after.raisedCents,
+            goalCents: after.goalCents,
+          };
+        }
       }
+      await this.ownerAlerts.enqueue(tx, facts, city?.name ?? null, funded);
       return donation;
     });
   }
