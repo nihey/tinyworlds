@@ -224,6 +224,25 @@ variables:
 | `OWNER_NAME`, `OWNER_MAIL_FROM`, `OWNER_WHATSAPP` | api | empty | the site's owner, for the note they send each donor once (`npm run owner:note`): how they sign, the address it comes from, their WhatsApp number with its country code |
 | `ANNOUNCE_HOST`, `API_SERVICE` | deploy | empty | how `deploy.sh` announces a built city: an ssh target whose key may only announce, or the API's container (or Swarm service) on the server, reached with a shell |
 
+### Owner alerts
+
+The API can notify the owner by email and Telegram when Stripe confirms a new Tiny Worlds
+payment. When a payment meets a city's funding goal for the first time, the API also sends a
+**Ready to build** alert with the city, the amount raised and its goal. Alerts cover payments
+recorded after setup.
+
+Set these in the API's environment and deploy or restart the API. Enable either or both channels.
+
+- **Email** uses the existing `SMTP_*` and `MAIL_FROM` settings. Set `OWNER_ALERT_EMAIL` to
+  the address that should receive alerts. In local development without SMTP, email goes to the log.
+- **Telegram** uses `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Create a bot with BotFather,
+  open a private chat with it and press **Start**. Get `message.chat.id` from the bot's
+  `getUpdates` response and keep the token in the API environment. [Telegram bot setup](https://core.telegram.org/bots/tutorial), [getUpdates](https://core.telegram.org/bots/api#getupdates)
+
+The API checks for pending alerts every five seconds and retries each failed channel independently.
+Stripe webhook replays reuse the existing payment record. A provider that accepts a message
+without returning a confirmation can deliver the alert again on retry.
+
 ## Adding a city
 
 A city is one definition file in the pipeline (`src/cities/<id>.ts`: where it is, which way its
