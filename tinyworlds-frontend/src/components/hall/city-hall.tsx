@@ -14,7 +14,7 @@ import { broughtBy } from "@/lib/brought-by";
 import { API_URL, formatUsd } from "@/lib/donate";
 import { cityHallPeople, fetchCityHall } from "@/lib/hall";
 import { cn } from "@/lib/utils";
-import { HALL_URL, SITE_ID, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { HALL_URL, SITE_ID, worldCardSrcSet, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
 import { AchievementBadges } from "./achievement-badges";
 import { LEADERBOARD, PersonCard } from "./hall-cards";
 import { HallFrame } from "./hall-frame";
@@ -108,6 +108,8 @@ export function CityHall({ slug, initial }: { slug: string; initial: CityBenefac
                     // beside the words where there is room, above them where there is not
                     <MovingPicture
                       still={worldCardUrl(city.worldId)}
+                      srcSet={worldCardSrcSet(city.worldId)}
+                      sizes="(min-width: 64rem) 40rem, 100vw"
                       loop={worldLoopUrl(city.worldId)}
                       alt=""
                       eager

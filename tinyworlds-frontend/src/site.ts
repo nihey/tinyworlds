@@ -70,6 +70,31 @@ export const LOOPS_BASE = `${BASE_PATH}/loops`;
 /** A world's card loop: its share card's picture, drifting. Silent, a few hundred kB. */
 export const worldLoopUrl = (id: string, base = LOOPS_BASE): string => `${base}/${id}.mp4`;
 
+/**
+ * The front page's pictures that have smaller copies of themselves in its loops (`npm run
+ * stills`): "card-tinynyc" (400 and 800 px wide), "hero-tinyrao" (960 and 1280). The build lists
+ * the ones with every size (next.config.ts); one without keeps its original alone.
+ */
+export const STILLS: ReadonlySet<string> = new Set(
+  (process.env.NEXT_PUBLIC_STILLS ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean),
+);
+
+/**
+ * A world's card picture at the sizes there are, for an `<img srcset>`: the small copies, and
+ * the share card itself for the densest screens. Undefined without copies: the card alone.
+ */
+export const worldCardSrcSet = (
+  id: string,
+  stills: ReadonlySet<string> = STILLS,
+  base = LOOPS_BASE,
+): string | undefined =>
+  stills.has(`card-${id}`)
+    ? `${base}/card-${id}-400.webp 400w, ${base}/card-${id}-800.webp 800w, ${worldCardUrl(id)} 1200w`
+    : undefined;
+
 /** The admin pages: part of the front page's build, linked only for an admin who is signed in. */
 export const ADMIN_PATH = `${BASE_PATH}/admin/`;
 
@@ -131,12 +156,24 @@ export const HERO_FILMS: string[] = (process.env.NEXT_PUBLIC_HERO_FILMS ?? "")
   .filter(Boolean);
 
 /**
- * A world's hero film and its first frame. The first world's keeps the name it had when the
- * hero showed one city only (the showcase film still takes it by that name).
+ * A world's hero film and its first frame (and that frame's smaller copies, when it has them).
+ * The first world's keeps the name it had when the hero showed one city only (the showcase
+ * film still takes it by that name).
  */
-export const worldHero = (id: string, base = LOOPS_BASE): { loop: string; still: string } => {
+export const worldHero = (
+  id: string,
+  base = LOOPS_BASE,
+  stills: ReadonlySet<string> = STILLS,
+): { loop: string; still: string; srcSet?: string } => {
   const name = id === HERO.world ? "hero" : `hero-${id}`;
-  return { loop: `${base}/${name}.mp4`, still: `${base}/${name}.jpg` };
+  return {
+    loop: `${base}/${name}.mp4`,
+    still: `${base}/${name}.jpg`,
+    // the still as WebP, at the hero's own width and at the film's; the JPEG is the fallback
+    ...(stills.has(name) && {
+      srcSet: `${base}/${name}-960.webp 960w, ${base}/${name}-1280.webp 1280w`,
+    }),
+  };
 };
 
 /**

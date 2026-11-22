@@ -7,6 +7,7 @@
     "build": "next build",
     "preview": "node scripts/preview.mjs",
     "email-images": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/email-images.mjs",
+    "stills": "node scripts/stills.mjs",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix && prettier --write .",
     "typecheck": "next typegen && tsc --noEmit",
@@ -39,6 +40,7 @@
     "eslint-config-next": "16.4.6",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.10",
+    "sharp": "^0.35.5",
     "tailwindcss": "4.3.3",
     "typescript": "^5",
     "vitest": "^5.1.0"

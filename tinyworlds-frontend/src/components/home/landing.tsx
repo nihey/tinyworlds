@@ -31,6 +31,8 @@ import { broughtByWorld } from "@/lib/brought-by";
 import { rankCities } from "@/lib/city-picker";
 import { API_URL, paymentLinkFor, type CityMilestone } from "@/lib/donate";
 import { type ListKey } from "@/lib/lists";
+import { heroOrder } from "@/lib/home";
+import type { HomeAtBuild } from "@/lib/home-build";
 import { cn } from "@/lib/utils";
 import { byVisits, siteTotals } from "@/lib/visits";
 import {
@@ -39,10 +41,8 @@ import {
   CONTACT_URL,
   GITHUB_URL,
   HALL_URL,
-  HERO_FILMS,
   ME_PATH,
   SITE_ID,
-  heroSlides,
 } from "@/site";
 import { WORLDS } from "@/worlds";
 
@@ -58,8 +58,12 @@ const TOP_LINK =
 const WORLD_LIST = Object.values(WORLDS);
 const WORLD_IDS = WORLD_LIST.map((world) => world.id);
 
-/** The front page: what this is, the cities there are, the ones people are funding, and where the code lives. */
-export function Landing() {
+/**
+ * The front page: what this is, the cities there are, the ones people are funding, and where the
+ * code lives. `initial` is what the API said when the page was built (`home-build.ts`): the page
+ * opens on it, in its final order, and asks again at once.
+ */
+export function Landing({ initial }: { initial?: HomeAtBuild }) {
   const { t, locale } = useI18n();
   const [prefs] = usePrefs();
   useTheme(prefs.theme);
@@ -85,7 +89,7 @@ export function Landing() {
     list: null,
   });
   const [listsVersion, setListsVersion] = useState(0);
-  const milestones = useMilestones(listsVersion);
+  const milestones = useMilestones(listsVersion, initial?.cities ?? null);
   const donor = useDonorSession();
   const { lists, join: joinList, leave: leaveList } = useLists();
   const joinReturn = useJoinReturn();
@@ -114,20 +118,13 @@ export function Landing() {
     name: city.name,
   });
   const takesDonations = API_URL !== "" || paymentLinkFor(locale, SITE_ID) !== null;
-  const visits = useWorldVisits(WORLD_IDS);
+  const visits = useWorldVisits(WORLD_IDS, initial?.visits ?? null);
   const shownVisits = API_URL !== "" ? visits.counts : undefined;
   const worlds = useMemo(() => byVisits(WORLD_LIST, visits.ranked), [visits.ranked]);
-  const carouselOrder = useMemo(
-    () =>
-      heroSlides(
-        worlds.map((world) => world.id),
-        HERO_FILMS,
-      ),
-    [worlds],
-  );
+  const carouselOrder = useMemo(() => heroOrder(visits.ranked), [visits.ranked]);
   const openFor = (city: string) => setDonate({ city });
   // everyone who gave to a city: down the page's sides where there is room, a strip otherwise
-  const wall = useWall();
+  const wall = useWall(initial?.wall ?? null);
   const wallProps = {
     load: wall,
     onCity: (slug: string) => openBenefactors({ slug }),
@@ -199,7 +196,7 @@ export function Landing() {
             )}
           </ul>
         </nav>
-        <HeroCarousel order={carouselOrder} />
+        <HeroCarousel order={carouselOrder} preview={initial?.preview} />
         {withApi && (
           <SiteNumbers
             worlds={WORLD_IDS.length}

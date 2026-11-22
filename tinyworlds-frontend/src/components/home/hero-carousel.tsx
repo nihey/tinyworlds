@@ -21,8 +21,17 @@ interface Slides {
   pending: { id: string; reason: "timer" | "manual" | "ranking" } | null;
 }
 
-/** A fixed introduction beside a rotating, linked city panorama. */
-export function HeroCarousel({ order }: { order: string[] }) {
+/**
+ * How wide the panorama is shown: 61% of the page's column beside the words on a wide screen,
+ * the column's whole width above them on a narrow one.
+ */
+const PANORAMA_SIZES = "(min-width: 48rem) min(49rem, 58vw), calc(100vw - 2rem)";
+
+/**
+ * A fixed introduction beside a rotating, linked city panorama. `preview` is the first
+ * picture's, shown blurred while it loads (the build bakes it in: `home-build.ts`).
+ */
+export function HeroCarousel({ order, preview }: { order: string[]; preview?: string | null }) {
   const { t, locale } = useI18n();
   const [first] = useState(order[0]);
   const [lead, setLead] = useState(first);
@@ -176,6 +185,9 @@ export function HeroCarousel({ order }: { order: string[] }) {
             <MovingPicture
               key={id}
               still={film.still}
+              srcSet={film.srcSet}
+              sizes={PANORAMA_SIZES}
+              preview={id === first ? (preview ?? undefined) : undefined}
               loop={film.loop}
               alt=""
               focus="right"

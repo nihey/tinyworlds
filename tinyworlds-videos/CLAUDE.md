@@ -16,6 +16,7 @@ The HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`, `recap/`, `
 npm run plates [-- tinynyc …]   # cut the map plates and wordmark sheets from the tiles → */assets/plates/, */batch/
 npm run loops [-- tinylax …]    # render the card loops (every one, or the worlds named) → ../tinyworlds-frontend/public/loops/<world>.mp4 (committed)
 npm run flyovers [-- hero [world …]|cities]   # the heroes → …/public/loops/hero.{mp4,jpg}, hero-<world>.{mp4,jpg} (committed); city flyovers → out/flyovers/
+# after new loops or heroes: `npm run stills` in ../tinyworlds-frontend (the front page's smaller copies)
 npm run takes -- main [--until 8.4]   # film the New York map for the film (VIEWER_URL, a dev server of the viewer)
 npm run takes -- page           # capture the front page for the film (HOME_URL, a dev server of the front page)
 ELEVENLABS_API_KEY=… npm run sound [-- --for film|westeros]   # compose a NEW music bed → <film>/assets/music/bed.mp3 (replaces the committed one)

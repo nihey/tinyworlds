@@ -10,10 +10,13 @@ export type WallLoad = { state: "loading" } | { state: "ready"; entries: WallEnt
 /**
  * Everyone who gave to a city, for the front page's sides: asked once, when the page opens.
  * Without an API there is nothing to ask; a failed answer is an empty wall, which still has
- * its invitation.
+ * its invitation. `baked` is the wall as the build found it: shown from the first paint, asked
+ * again at once, and kept if that fails.
  */
-export function useWall(): WallLoad {
-  const [load, setLoad] = useState<WallLoad>({ state: "loading" });
+export function useWall(baked: WallEntry[] | null = null): WallLoad {
+  const [load, setLoad] = useState<WallLoad>(() =>
+    baked ? { state: "ready", entries: baked } : { state: "loading" },
+  );
   useEffect(() => {
     if (!API_URL) return;
     let live = true;
@@ -22,7 +25,7 @@ export function useWall(): WallLoad {
         if (live) setLoad({ state: "ready", entries });
       },
       () => {
-        if (live) setLoad({ state: "ready", entries: [] });
+        if (live) setLoad((was) => (was.state === "ready" ? was : { state: "ready", entries: [] }));
       },
     );
     return () => {

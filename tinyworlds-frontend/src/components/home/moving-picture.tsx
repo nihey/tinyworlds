@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -17,6 +18,14 @@ const IN_VIEW = 0.4;
 interface MovingPictureProps {
   /** the still: shown first, and all there is for visitors who asked for less motion or less data */
   still: string;
+  /** the still at other sizes, and how wide it is shown: the browser takes the one it needs */
+  srcSet?: string;
+  sizes?: string;
+  /**
+   * The still in a few hundred bytes (a data: URL), shown blurred until the still is there: the
+   * frame opens on the picture's shapes and colours, never on an empty plate.
+   */
+  preview?: string;
   /** a silent loop that opens on the still's own picture, so one takes over from the other unseen */
   loop: string;
   alt: string;
@@ -41,14 +50,29 @@ interface MovingPictureProps {
   style?: CSSProperties;
 }
 
+/** Whether the page has finished loading (its `load` event): what a film waits for. */
+function usePageLoaded(): boolean {
+  return useSyncExternalStore(
+    (changed) => {
+      window.addEventListener("load", changed);
+      return () => window.removeEventListener("load", changed);
+    },
+    () => document.readyState === "complete",
+    () => false,
+  );
+}
+
 /**
- * A still that comes alive. The loop waits until the still is ready and the picture is on screen
- * (and is the one being shown), plays while it stays there and stops when it leaves; it is never fetched
+ * A still that comes alive. The loop waits until the still is ready, the page has loaded and the
+ * picture is on screen (and is the one being shown), plays while it stays there and stops when it leaves; it is never fetched
  * under `prefers-reduced-motion` or a data-saving connection, and if it cannot play the still
  * simply stays.
  */
 export function MovingPicture({
   still,
+  srcSet,
+  sizes,
+  preview,
   loop,
   alt,
   fallback,
@@ -60,6 +84,7 @@ export function MovingPicture({
   focus = "center",
 }: MovingPictureProps) {
   const fit = focus === "right" ? "object-cover object-right" : "object-cover";
+  const bgFit = focus === "right" ? "bg-right" : "bg-center";
   const frame = useRef<HTMLDivElement>(null);
   const picture = useRef<HTMLImageElement>(null);
   const film = useRef<HTMLVideoElement>(null);
@@ -67,6 +92,7 @@ export function MovingPicture({
   const [playing, setPlaying] = useState<string | null>(null);
   const settled = loaded?.still === still;
   const calm = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const pageLoaded = usePageLoaded();
 
   const finishStill = useCallback(
     (img: HTMLImageElement) => {
@@ -92,7 +118,8 @@ export function MovingPicture({
   useEffect(() => {
     const box = frame.current;
     const video = film.current;
-    if (!box || !video || calm || !active || !settled) return;
+    // a film waits for the page: until it has loaded, the stills and the code come first
+    if (!box || !video || calm || !active || !settled || !pageLoaded) return;
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } })
       .connection;
     if (connection?.saveData || typeof IntersectionObserver === "undefined") return;
@@ -115,7 +142,7 @@ export function MovingPicture({
       watcher.disconnect();
       video.pause();
     };
-  }, [calm, active, loop, settled]);
+  }, [calm, active, loop, settled, pageLoaded]);
 
   return (
     <div
@@ -123,12 +150,22 @@ export function MovingPicture({
       className={cn("relative overflow-hidden bg-sign-raised", className)}
       style={style}
     >
+      {preview && !settled && (
+        // under the still, blurred, and grown a little so the blur keeps a clean edge
+        <div
+          aria-hidden
+          className={cn("absolute inset-0 scale-110 bg-cover blur-xl", bgFit)}
+          style={{ backgroundImage: `url("${preview}")` }}
+        />
+      )}
       {!(settled && loaded.missing) ? (
         // eslint-disable-next-line @next/next/no-img-element -- a plain file, no optimizer in a static export
         <img
           key={still}
           ref={picture}
           src={still}
+          srcSet={srcSet}
+          sizes={srcSet ? sizes : undefined}
           alt={alt}
           loading={eager || onStillReady ? "eager" : "lazy"}
           decoding="async"

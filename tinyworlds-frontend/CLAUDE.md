@@ -11,7 +11,7 @@ places that do not exist, `tinywinterfell`,
 `tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
 lists the worlds. The interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
-`tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
+`tinyworlds-api` is deployed, a list of cities being funded (GraphQL; Apollo Client for the checkout).
 With the API, every page also reports the steps of the donation funnel, and the front page's
 build carries the admin pages (`/admin/`) where signed-in admins read it.
 
@@ -29,6 +29,7 @@ npm run lint         # eslint + prettier --check      (lint:fix to fix)
 npm run typecheck    # next typegen (route types such as LayoutProps) + tsc
 npm test             # vitest
 npm run email-images # public/email/: the API's mails' pictures (the wordmark, the three badges)
+npm run stills       # public/loops/: the front page's pictures at its sizes, and the hero's previews
 ```
 
 ### Environment (all inlined at build time)
@@ -48,6 +49,7 @@ npm run email-images # public/email/: the API's mails' pictures (the wordmark, t
 | `NEXT_PUBLIC_WORLDS_BASE`                                     | empty                      | what the worlds' folders hang from on the front page (`""` → `/tinynyc/`)                                                 |
 | `NEXT_PUBLIC_CARDS_BASE`                                      | unset                      | **dev only**: take the front page's card pictures from one folder (`/og`)                                                 |
 | `NEXT_PUBLIC_HERO_FILMS`                                      | what is in `public/loops/` | the worlds the front page's hero shows, comma-separated; set by `next.config.ts`, by hand only to try the hero with fewer |
+| `NEXT_PUBLIC_STILLS`                                          | what is in `public/loops/` | the front page's pictures that have smaller copies (`card-tinynyc`, `hero-tinyrao`); set by `next.config.ts`              |
 
 Production builds:
 
@@ -103,7 +105,13 @@ front page's build serves them. `wordmark.png` (Tiny5's letters, "tiny" paper wh
 cannot leave white on white; 2×) and `founding.png`, `first-stone.png`, `keystone.png`
 (the badges' maps of `pixel-art.ts` at 3×, nearest neighbour) are made by
 `scripts/email-images.mjs` (`npm run email-images`, Node 22.18+: it imports the `.ts` maps);
-run it after changing the art, and commit what it writes.
+run it after changing the art, and commit what it writes. **The front page's pictures at its
+own sizes** are committed too, made by `scripts/stills.mjs` (`npm run stills`, sharp) from the
+originals, smaller and as WebP, never redrawn: `public/loops/card-<world>-{400,800}.webp` (a
+world's share card, for its card), `public/loops/hero[-<world>]-{960,1280}.webp` (a hero
+still) and `src/lib/hero-previews.json` (each hero still in a few hundred bytes, read only by
+the build). Run it after a share card, a hero film or a world changes, and commit what it
+writes; a picture without its copies keeps its original (`NEXT_PUBLIC_STILLS`).
 
 ## Layout
 
@@ -185,8 +193,10 @@ src/
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
-                         # city-catalogue.ts (well-known cities to pick from), donate-api.ts
-                         # (Apollo Client; imported lazily), funnel.ts (the visit and the
+                         # city-catalogue.ts (well-known cities to pick from), milestones.ts
+                         # (the cities being funded, plain fetch), donate-api.ts (the
+                         # checkout: Apollo Client; imported lazily), home-build.ts (what
+                         # the front page's build bakes in), funnel.ts (the visit and the
                          # steps it reports), visits.ts (each world's visits: the cards'
                          # words and order, the map's "still here"), admin.ts (pure: the
                          # session, the funnel's arithmetic), sign-in-api.ts (REST sign-in:
@@ -228,6 +238,19 @@ src/
   catalogue and funding. The split panorama leads to the site figures, funding list, searchable
   catalogue (`world-catalogue.tsx`), benefactors, open source, and the footer. `#cities` opens the
   catalogue and `#imagined` selects its imagined-places filter.
+- **The front page is baked, then asks again** (`lib/home-build.ts`, as the hall of fame is):
+  `page.home.tsx` is an async page that asks the API when the build runs (every world's visits,
+  the cities being funded, the wall) and hands it to `Landing` as `initial`. So the page opens
+  whole and **in its final order**: the hero's first city, the catalogue's cards, the figures,
+  the funding list and the benefactors are in the HTML, and nothing moves or changes places
+  when the API answers. Once open, each part asks again at once (`useWorldVisits`,
+  `useMilestones`, `useWall` take what was baked as their first state) and shows what is true
+  now; a failed answer keeps what was baked. Who was exploring is never baked (it would be a
+  day old): the live figures wait for the page's own answer. The build never fails for it: an
+  API that does not answer leaves that part to load as it always did. The daily run
+  (`deploy.sh release --fresh-home`) keeps what is baked a day old at most. The build also
+  bakes the hero's first picture's preview (`hero-previews.json`): it lies blurred under that
+  picture until the picture is there, so the hero never opens on an empty frame.
 - **A world's card** (`world-card.tsx`) is one link to the world, another build (`/<id>/`): the
   link is the card's name, stretched over the whole card, and the Benefactors button lies over
   it as its sibling, never inside it. Its picture is the world's share card, served from the
@@ -279,7 +302,11 @@ src/
 - **The front page's pictures move** (`components/home/moving-picture.tsx`). Each card plays
   its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
   the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
-  to it, so the still hands over to the film unseen and the film loops unseen.
+  to it, so the still hands over to the film unseen and the film loops unseen. The still comes
+  in the size the card is shown at (`srcset`, `worldCardSrcSet`: 400 or 800 px of WebP, the
+  share card itself for the densest screens), so the catalogue costs a few hundred kB rather
+  than a dozen MB. No film is fetched before the page's `load` event: the stills and the code
+  come first.
   A loop is fetched only once the still or its fallback is ready, at least 40% of its frame
   is on screen (`IntersectionObserver`), and it is the one being shown (`active`). It plays while it stays there
   and is never fetched under `prefers-reduced-motion` or `Save-Data`; if it is missing or
@@ -290,7 +317,8 @@ src/
   screens and below it on narrow screens. Its Explore link and city caption follow the
   visible slide. The carousel walks the visit-ranked worlds that have hero films
   (`heroSlides` and `worldHero`). It waits 8 seconds before preparing the next still and
-  crossfades after decode. The first still is eager. Previous and next, arrow keys within the
+  crossfades after decode. The first still is eager and high priority, in WebP at the size the
+  panorama is shown (`worldHero(id).srcSet`: 960 or 1280 px; the JPEG is the fallback). Previous and next, arrow keys within the
   control group, and pause/play allow manual control. Autoplay holds while hovered, focused,
   hidden, or off-screen. Reduced motion and Save-Data keep it manual.
 - **Each card says how visited its world is** (with an API): "41,203 visits" under the card's
@@ -298,9 +326,10 @@ src/
   map open (`visitsLine` in `lib/visits.ts`, numbers in the visitor's way of writing them).
   `useWorldVisits` asks `worldVisits` for every world in the registry with a plain `fetch`
   (5 s timeout), at once and then every 30 s while the page is in view; a failed answer leaves
-  the last numbers. The catalogue and carousel share the **first** answer's
-  total-visit ranking (`byVisits`). The registry supplies the fallback order and breaks ties.
-  Later answers update the numbers while keeping the order stable.
+  the last numbers. The catalogue and carousel share one total-visit ranking (`byVisits`,
+  `heroOrder`): the visits baked into the page, or, when the build had none, the **first**
+  answer's. The registry supplies the fallback order and breaks ties. Later answers update the
+  numbers while keeping the order stable.
 - **The front page's share card** is its own picture, `public/og/tinyworlds.jpg`
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
@@ -466,7 +495,8 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   the sign back to the payment link (`donateMode` in `lib/donate.ts` is the whole rule), where
   the amount and the city are set on the checkout page instead.
 - `lib/donate-api.ts` (Apollo Client 4, core API, no provider) is only ever imported dynamically
-  (`useMilestones`, the checkout button), so Apollo is not in the bundle the map starts with.
+  (the checkout button), so Apollo is not in the bundle a page starts with. The list of cities
+  (`useMilestones`, `lib/milestones.ts`) is a plain `fetch`: the front page shows it at once.
 - The heart in the tool column, the link in About and the front page's ranking all open the
   same sign.
 - **What the page analytics hear** (`lib/site-events.ts`): `donate_open`, `donate_checkout`,
@@ -1191,7 +1221,14 @@ Every panel is a black enamel "sign" (`sign` utility) with paper-white lettering
 accent (the `taxi` token: taxi yellow in New York) for whatever is on; buttons are round `bullet`s. Signs are dark in **both** themes, so shadcn's
 `dark:` variant is always on (see the `@custom-variant` at the top of `globals.css`). The time-of-day setting defaults to a six-minute cycle. Day, Night and System hold a fixed
 grade. The map and Street Walk use the same clock and lookup tables in `src/map/daylight.ts`.
-The `dusk` class on `<html>` controls the interface colours. Fonts: Archivo (UI) and Tiny5 (the wordmark), via `next/font/google`.
+The `dusk` class on `<html>` controls the interface colours. Fonts: Archivo (UI, weights only) and Tiny5 (the wordmark), via `next/font/google`.
+Tiny5 is preloaded, Archivo is not (its fallback has the same measure; on a slow connection it
+would hold up the stylesheet and the hero). next/font does not write the preload tag for our
+pages, because it looks them up as `page.home`/`page.map` while its manifest says `page`, so the
+layout writes it from that manifest (`lib/font-preloads.ts`); without it the wordmark showed in
+a fallback font first. The badges' pixel art (`PixelIcon`) is one SVG path per colour
+(`lib/pixel-paths.ts`) and a wall's stones one short class (`stone` in `globals.css`): the front
+page bakes hundreds of both into its HTML.
 
 Tokens live in `:root` in `globals.css` (`--fog`, `--sign`, `--paper`, `--taxi`, …) and are
 exposed to Tailwind as `bg-sign`, `text-paper-dim`, `bg-taxi`, etc.

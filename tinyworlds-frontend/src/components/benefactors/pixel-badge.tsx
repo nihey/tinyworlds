@@ -1,10 +1,22 @@
+import { pixelPaths } from "@/lib/pixel-paths";
 import { PIXEL_ART, type PixelArt } from "./pixel-art";
 
 export type PixelArtName = keyof typeof PIXEL_ART;
 
-/** A pixel picture as an inline SVG, one rect per pixel, drawn at a whole-number scale so it stays crisp. */
+/** Each picture's paths, worked out once. */
+const PATHS = new Map<PixelArtName, ReturnType<typeof pixelPaths>>();
+
+/**
+ * A pixel picture as an inline SVG, one path per colour (`pixelPaths`), drawn at a whole-number
+ * scale so it stays crisp.
+ */
 export function PixelIcon({ art, scale = 1 }: { art: PixelArtName; scale?: number }) {
   const { palette, rows }: PixelArt = PIXEL_ART[art];
+  let paths = PATHS.get(art);
+  if (!paths) {
+    paths = pixelPaths(rows, palette);
+    PATHS.set(art, paths);
+  }
   const width = rows[0].length;
   const height = rows.length;
   return (
@@ -16,13 +28,9 @@ export function PixelIcon({ art, scale = 1 }: { art: PixelArtName; scale?: numbe
       shapeRendering="crispEdges"
       className="block shrink-0"
     >
-      {rows.flatMap((row, y) =>
-        Array.from(row).flatMap((c, x) =>
-          palette[c]
-            ? [<rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={palette[c]} />]
-            : [],
-        ),
-      )}
+      {paths.map(({ fill, d }) => (
+        <path key={fill} d={d} fill={fill} />
+      ))}
     </svg>
   );
 }

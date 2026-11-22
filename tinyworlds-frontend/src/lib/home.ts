@@ -1,5 +1,7 @@
 import { fold } from "@/lib/city-picker";
-import type { World } from "@/worlds";
+import { byVisits, type WorldCounts } from "@/lib/visits";
+import { HERO_FILMS, heroSlides } from "@/site";
+import { WORLDS, type World } from "@/worlds";
 
 /**
  * The front page's carousel and catalogue rules.
@@ -11,6 +13,22 @@ export const SLIDE_MS = 8000;
 export const FADE_MS = 600;
 
 export type WorldFilter = "all" | "real" | "imagined";
+
+/**
+ * The worlds the hero goes round, in the page's order: those with a film, most visited first
+ * by `ranked` (the registry's order without it). The page and its build ask the same, so the
+ * picture the build gives a preview is the one the page opens on.
+ */
+export function heroOrder(
+  ranked: WorldCounts | null,
+  worlds: World[] = Object.values(WORLDS),
+  films: string[] = HERO_FILMS,
+): string[] {
+  return heroSlides(
+    byVisits(worlds, ranked).map((world) => world.id),
+    films,
+  );
+}
 
 /** Search the localized city names and world ID without changing the supplied visit order. */
 export function filterWorlds(worlds: World[], filter: WorldFilter, query: string): World[] {
