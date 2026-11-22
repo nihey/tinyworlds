@@ -10,7 +10,7 @@ import { donationsLabel, formatUsd, type CityMilestone } from "@/lib/donate";
 import { waitingLine } from "@/lib/lists";
 import { cityStones } from "@/lib/stones";
 import { cn } from "@/lib/utils";
-import { SITE_ID, worldCardUrl, worldUrl } from "@/site";
+import { SITE_ID, worldCardSrcSet, worldCardUrl, worldUrl } from "@/site";
 import { statusLabel } from "./milestone-bar";
 import { StoneWall } from "./stone-wall";
 
@@ -189,6 +189,9 @@ export function BuiltCityCard({
           {/* eslint-disable-next-line @next/next/no-img-element -- a plain file, no optimizer in a static export */}
           <img
             src={worldCardUrl(city.worldId)}
+            srcSet={worldCardSrcSet(city.worldId)}
+            // the funding carousel's columns (city-carousel.tsx): one, two, then three across
+            sizes="(min-width: 64rem) 27rem, (min-width: 40rem) 47vw, 90vw"
             alt=""
             loading="lazy"
             decoding="async"

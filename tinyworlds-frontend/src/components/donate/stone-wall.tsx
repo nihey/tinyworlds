@@ -66,11 +66,7 @@ export function StoneWall({
         <span
           key={i}
           aria-hidden
-          className={cn(
-            "relative aspect-square rounded-[2px] shadow-[inset_0_-2px_0_rgb(0_0_0/0.25)]",
-            look[stone],
-            (i === 0 || i === last) && MARK,
-          )}
+          className={cn("stone", look[stone], (i === 0 || i === last) && MARK)}
         />
       ))}
     </div>

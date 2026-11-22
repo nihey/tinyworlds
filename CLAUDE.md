@@ -173,6 +173,11 @@ Each sub-project has its own `CLAUDE.md`.
   card plays a short silent loop; all are made by `tinyworlds-videos` from the world's own
   tiles and play over a still. They are the front page's own files, so nothing but its build
   needs deploying for them.
+- **The front page opens whole.** Its build bakes in what the API says then (every world's
+  visits, the cities being funded, the benefactors), as the hall of fame's does, so it opens in
+  its final order with nothing left to pop in, and asks again once open. Its pictures come in
+  the sizes it shows them (smaller WebP copies, `npm run stills`), the hero over a blurred
+  preview, and no film is fetched before the page has loaded.
 - **Google's tags wait for consent.** Google Tag Manager (and the Google Analytics in it) is the
   one thing on the site that sets cookies: visitors in Europe are asked first, and nothing from
   Google loads before they say yes (`tinyworlds-frontend/CLAUDE.md`, Analytics).
@@ -211,7 +216,9 @@ Each sub-project has its own `CLAUDE.md`.
    card loop on the front page (`tinyworlds-frontend/public/loops/<id>.mp4`); without one its
    card simply stays still. A framing in `HEROES` (`scripts/worlds.ts`), then
    `npm run flyovers -- hero <id>`, give it its slide in the front page's hero
-   (`loops/hero-<id>.{mp4,jpg}`); without one the hero simply leaves it out.
+   (`loops/hero-<id>.{mp4,jpg}`); without one the hero simply leaves it out. Then
+   `npm run stills` in `tinyworlds-frontend` makes the front page's smaller copies of its card
+   and hero still (and the hero's preview); without them it shows the originals, only heavier.
 5. `deploy/deploy.sh check` (every world in the registry has its data, card, pipeline city and
    docs, this one included), then send its data, `deploy/deploy.sh <id> --data`, **before** the
    merge to main: the push deploys the API (whose seed marks the city `BUILT`), then every
@@ -592,7 +599,8 @@ it does not know, and the site then falls back to its payment link. Details in
 - Raw downloads and generated tiles are never committed (`tinyworlds-pipeline/data/`,
   `tinyworlds-frontend/public/data/`). The share cards in `tinyworlds-frontend/public/og/`, the
   mails' pictures in `tinyworlds-frontend/public/email/` (`npm run email-images` makes them) and
-  the front page's loops in `tinyworlds-frontend/public/loops/` are, and so is each film's music
+  the front page's loops and stills in `tinyworlds-frontend/public/loops/` (`npm run stills`
+  makes the smaller copies) are, and so is each film's music
   bed (`tinyworlds-videos/*/assets/music/`: a film is timed to it); the videos' plates, takes,
   sound effects and renders are not.
 - Every picture of a map, still or moving, is cut from the real tiles or filmed from the real

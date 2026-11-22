@@ -12,7 +12,7 @@ import type { HallCity, HallTotals } from "@/lib/hall";
 import type { BenefactorLink } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import type { WallEntry } from "@/lib/wall";
-import { hallCityUrl, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { hallCityUrl, worldCardSrcSet, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
 import { AchievementBadges } from "./achievement-badges";
 
 /** Ranked plaques read across each row in the same order as the list. */
@@ -141,6 +141,9 @@ export function BuiltCityCard({
         <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />
         <MovingPicture
           still={worldCardUrl(worldId)}
+          srcSet={worldCardSrcSet(worldId)}
+          // the hall's gallery: one, two, then three across
+          sizes="(min-width: 64rem) 26rem, (min-width: 40rem) 45vw, 90vw"
           loop={worldLoopUrl(worldId)}
           alt=""
           className="aspect-[1200/630] w-full"

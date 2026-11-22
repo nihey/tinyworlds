@@ -66,6 +66,19 @@ export function byVisits<T extends { id: string }>(worlds: T[], counts: WorldCou
 }
 
 /**
+ * The visits a page was built with ([world, visits], what `bakedVisits` keeps) as counts, with
+ * nobody exploring: the figures and the order the front page shows until the API answers.
+ */
+export function bakedCounts(baked: [string, number][]): WorldCounts {
+  return new Map(baked.map(([world, visits]) => [world, { visits, live: 0 }]));
+}
+
+/** What the build keeps of the counts: every world's visits, never who was exploring then. */
+export function bakedVisits(counts: WorldCounts): [string, number][] {
+  return [...counts].map(([world, count]) => [world, count.visits]);
+}
+
+/**
  * Every world's visits together, and everyone exploring now: the front page's own figures.
  * Null until the counts are there.
  */
