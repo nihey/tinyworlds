@@ -1,0 +1,326 @@
+<!doctype html>
+<!--
+  "How a city is made": a social clip, 1920 × 1080, 34 s. A few blocks of Pittsburgh built layer
+  by layer by the pipeline's own renderer on the city's real scene (compositions/build.html, the
+  plates of `scripts/social/made.ts stages`), the last layer the finished tile pixel for pixel;
+  then out to the whole city, cut from the real tiles (assets/takes/pullback.mp4), and the end
+  card. See SPEC.md.
+
+  The site's address is never written here (the repository is public): it is the `address`
+  variable, given at render time by `scripts/social/made.ts render`.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"address","type":"string","label":"Address on the end card, no scheme","default":"example.com/tinypit/"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Tiny5";
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: "Archivo", sans-serif;
+      }
+      #pullback,
+      #whole {
+        position: absolute;
+        z-index: 2;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        object-fit: contain;
+      }
+      /* the credit the map always carries */
+      #credit {
+        position: absolute;
+        right: 28px;
+        bottom: 24px;
+        z-index: 20;
+      }
+      #credit-line {
+        padding: 6px 14px 7px;
+        border-radius: 10px;
+        background: rgb(21 23 26 / 0.82);
+        color: #f4f2ec;
+        font-size: 20px;
+        line-height: 1.2;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      /* the end card, on the fog under the whole city */
+      #endcard {
+        position: absolute;
+        left: 96px;
+        bottom: 96px;
+        z-index: 10;
+      }
+      #endcard-sign {
+        display: flex;
+        align-items: center;
+        gap: 44px;
+        padding: 30px 52px 32px 44px;
+        background: #15171a;
+        color: #f4f2ec;
+        border-radius: 20px;
+        box-shadow:
+          inset 0 2px 0 rgb(255 255 255 / 0.08),
+          0 0 0 2px rgb(0 0 0 / 0.6),
+          0 32px 68px -28px rgb(0 0 0 / 0.65),
+          0 4px 12px -2px rgb(0 0 0 / 0.3);
+        white-space: nowrap;
+      }
+      #endcard-mark {
+        font-family: "Tiny5", monospace;
+        font-size: 132px;
+        line-height: 0.85;
+        letter-spacing: 0.03em;
+      }
+      #endcard-mark span {
+        color: #ffd447;
+      }
+      #endcard-words {
+        padding-left: 44px;
+        border-left: 2px solid rgb(244 242 236 / 0.16);
+      }
+      #endcard-line {
+        font-size: 44px;
+        line-height: 1.15;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      #endcard-address {
+        padding-top: 10px;
+        font-size: 52px;
+        line-height: 1.15;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: #ffd447;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="34"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- the build: seven layers of the real scene, drawn by the pipeline's renderer -->
+      <div
+        id="build"
+        data-composition-id="build"
+        data-composition-src="compositions/build.html"
+        data-start="0"
+        data-duration="19.2333"
+        data-track-index="1"
+        style="z-index: 1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <!-- out to the whole city: every frame cut from the real tiles, from where the build ends -->
+      <video
+        id="pullback"
+        class="clip"
+        src="assets/takes/pullback.mp4"
+        data-start="19.2333"
+        data-duration="7.2"
+        data-track-index="2"
+        muted
+        playsinline
+      ></video>
+      <img
+        id="whole"
+        class="clip"
+        src="assets/plates/whole.png"
+        alt=""
+        data-start="26.4333"
+        data-duration="7.5667"
+        data-track-index="2"
+      />
+      <div
+        id="finale"
+        data-composition-id="finale"
+        data-composition-src="compositions/finale.html"
+        data-start="19.2333"
+        data-duration="9.6"
+        data-track-index="3"
+        style="z-index: 3"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <!-- the end card lands on the bed's peak -->
+      <div id="endcard" class="clip" data-start="28.8333" data-duration="5.1667" data-track-index="4">
+        <div id="endcard-sign">
+          <div id="endcard-mark">tiny<span>pit</span></div>
+          <div id="endcard-words">
+            <div id="endcard-line">Free to explore in your browser</div>
+            <div id="endcard-address" data-var-text="address">example.com/tinypit/</div>
+          </div>
+        </div>
+      </div>
+      <div id="credit" class="clip" data-start="0" data-duration="34" data-track-index="5" data-layout-ignore>
+        <div id="credit-line">© OpenStreetMap contributors · Overture Maps Foundation</div>
+      </div>
+
+      <!-- sound: the bed (made.ts sound), and an effect for each thing that happens on screen.
+           Each effect starts early by where its hit is in its file, to land a frame after its picture. -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/bed.mp3"
+        data-start="0"
+        data-duration="34"
+        data-track-index="10"
+        data-volume="0.8"
+        data-fade-out="1.5"
+      ></audio>
+      <!-- the cut from the title to the first layer -->
+      <audio
+        id="sfx-cut"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="2.393"
+        data-duration="0.37"
+        data-track-index="11"
+        data-volume="0.7"
+      ></audio>
+      <!-- each scan crosses mid-frame on its beat -->
+      <audio
+        id="sfx-scan2"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="4.704"
+        data-duration="0.57"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="sfx-scan3"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="7.104"
+        data-duration="0.5"
+        data-track-index="12"
+        data-volume="0.4"
+        data-playback-rate="1.15"
+      ></audio>
+      <audio
+        id="sfx-scan4"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="9.504"
+        data-duration="0.57"
+        data-track-index="12"
+        data-volume="0.45"
+        data-playback-rate="0.9"
+      ></audio>
+      <!-- the heights rise -->
+      <audio
+        id="sfx-rise"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="11.92"
+        data-duration="0.57"
+        data-track-index="13"
+        data-volume="0.6"
+        data-playback-rate="0.8"
+      ></audio>
+      <audio
+        id="sfx-scan6"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="14.304"
+        data-duration="0.5"
+        data-track-index="12"
+        data-volume="0.4"
+        data-playback-rate="1.15"
+      ></audio>
+      <audio
+        id="sfx-scan7"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="16.704"
+        data-duration="0.57"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <!-- the pull-back lifts off -->
+      <audio
+        id="sfx-pullback"
+        class="clip"
+        src="assets/sfx/whoosh-cinematic.mp3"
+        data-start="19.997"
+        data-media-start="2.0"
+        data-duration="2.4"
+        data-track-index="15"
+        data-volume="0.5"
+      ></audio>
+      <!-- into the end card -->
+      <audio
+        id="sfx-riser"
+        class="clip"
+        src="assets/sfx/riser.mp3"
+        data-start="25.394"
+        data-duration="3.47"
+        data-track-index="16"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="sfx-impact"
+        class="clip"
+        src="assets/sfx/impact-bass-1.mp3"
+        data-start="28.793"
+        data-duration="2.12"
+        data-track-index="17"
+        data-volume="0.7"
+      ></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      // signs arrive the way pixels do, in steps
+      tl.fromTo(
+        "#endcard-sign",
+        { y: 42, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" },
+        28.8333,
+      );
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

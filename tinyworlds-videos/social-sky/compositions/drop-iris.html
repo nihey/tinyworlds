@@ -1,0 +1,42 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #iris-map {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      --iris: 0px;
+      -webkit-mask-image: radial-gradient(
+        circle at 928px 581px,
+        transparent var(--iris),
+        #000 calc(var(--iris) + 1px)
+      );
+      mask-image: radial-gradient(
+        circle at 928px 581px,
+        transparent var(--iris),
+        #000 calc(var(--iris) + 1px)
+      );
+    }
+  </style>
+  <div id="root" data-composition-id="drop-iris" data-width="1920" data-height="1080">
+    <!-- the map's last frame, opening like an iris from where the person was let go -->
+    <img
+      id="iris-map"
+      class="clip"
+      data-start="0"
+      data-duration="0.3"
+      data-track-index="0"
+      src="assets/takes/map-last.png"
+      alt=""
+    />
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#iris-map", { "--iris": "0px" }, { "--iris": "2300px", duration: 0.26, ease: "power2.in" }, 0);
+    window.__timelines["drop-iris"] = tl;
+  </script>
+</template>

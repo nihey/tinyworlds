@@ -1,0 +1,788 @@
+<template>
+  <!--
+    The build: the opening framing of Pittsburgh's Point, and seven layers of its real scene, each
+    drawn by the pipeline's own renderer (scripts/social/made.ts stages: 3840 x 2160 plates of map
+    px x -618..3222, y -885..1275). One camera moves every plate alike: in octaves from 2 map px a
+    pixel (the Point, both rivers) to 1:1 on downtown, lingering wide while the ground is laid, still
+    from 18.6 s on whole pixels. Each
+    layer comes in behind the accent bar's scan; the heights rise in eighteen renders. Bars of the
+    bed (100 BPM): 2.4333, 4.8333 ... 19.2333 s.
+  -->
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+      font-family: "Archivo", sans-serif;
+    }
+    .build-layer,
+    .build-wipe {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+    }
+    /* a plate: 3840 x 2160 map px, top-left at map px (-618, -885); the camera script places it */
+    .build-cam {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 3840px;
+      height: 2160px;
+      transform-origin: 0 0;
+    }
+    .build-cam img {
+      display: block;
+      width: 3840px;
+      height: 2160px;
+      max-width: none;
+    }
+    #hook-done-wipe {
+      clip-path: inset(0px 0px 0px 900px);
+    }
+    /* the scan: the accent bar with the sign's black either side */
+    .build-over {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+    }
+    .build-scan {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+    }
+    .build-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 12px;
+      height: 1080px;
+      background: #ffd447;
+      border-left: 3px solid #15171a;
+      border-right: 3px solid #15171a;
+    }
+    #hook-bar {
+      left: 0;
+    }
+    /* a sign in the site's manner */
+    .build-sign {
+      position: absolute;
+      background: #15171a;
+      color: #f4f2ec;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+      white-space: nowrap;
+    }
+    .build-step {
+      left: 96px;
+      bottom: 96px;
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      padding: 24px 44px 26px 34px;
+    }
+    .build-num {
+      font-family: "Tiny5", monospace;
+      font-size: 112px;
+      line-height: 0.82;
+      color: #ffd447;
+    }
+    .build-title {
+      font-size: 56px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .build-source {
+      margin-top: 6px;
+      font-size: 30px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: #b4b1a8;
+    }
+    #hook-sign {
+      left: 96px;
+      top: 88px;
+      padding: 40px 52px 38px 48px;
+      overflow: hidden;
+    }
+    #hook-strip {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 8px;
+      background: #ffd447;
+    }
+    #hook-title {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      font-size: 92px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    #hook-arrow {
+      width: 81px;
+      height: 63px;
+      flex: none;
+      shape-rendering: crispEdges;
+    }
+    #hook-sub {
+      margin-top: 14px;
+      font-size: 40px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: #b4b1a8;
+    }
+  </style>
+  <div id="root" data-composition-id="build" data-width="1920" data-height="1080">
+    <div
+      id="hook-data"
+      class="clip build-layer"
+      data-start="0.0"
+      data-duration="2.4333"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 1"
+    >
+      <div id="hook-data-wipe" class="build-wipe">
+        <div class="build-cam"><img id="hook-data-img" src="assets/plates/s3-streets.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="hook-done"
+      class="clip build-layer"
+      data-start="0.0"
+      data-duration="2.4333"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 2"
+    >
+      <div id="hook-done-wipe" class="build-wipe">
+        <div class="build-cam"><img id="hook-done-img" src="assets/plates/s7-details.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l1"
+      class="clip build-layer"
+      data-start="2.4333"
+      data-duration="2.6333"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 3"
+    >
+      <div id="l1-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l1-img" src="assets/plates/s1-land.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l2"
+      class="clip build-layer"
+      data-start="4.6333"
+      data-duration="2.8333"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 4"
+    >
+      <div id="l2-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l2-img" src="assets/plates/s2-landuse.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l3"
+      class="clip build-layer"
+      data-start="7.0333"
+      data-duration="2.8333"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 5"
+    >
+      <div id="l3-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l3-img" src="assets/plates/s3-streets.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l4"
+      class="clip build-layer"
+      data-start="9.4333"
+      data-duration="2.6"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 6"
+    >
+      <div id="l4-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l4-img" src="assets/plates/s4-footprints.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r01"
+      class="clip build-layer"
+      data-start="12.0333"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 7"
+    >
+      <div id="r01-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r01-img" src="assets/plates/rise-01.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r02"
+      class="clip build-layer"
+      data-start="12.1"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 8"
+    >
+      <div id="r02-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r02-img" src="assets/plates/rise-02.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r03"
+      class="clip build-layer"
+      data-start="12.1667"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 9"
+    >
+      <div id="r03-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r03-img" src="assets/plates/rise-03.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r04"
+      class="clip build-layer"
+      data-start="12.2333"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 10"
+    >
+      <div id="r04-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r04-img" src="assets/plates/rise-04.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r05"
+      class="clip build-layer"
+      data-start="12.3"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 11"
+    >
+      <div id="r05-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r05-img" src="assets/plates/rise-05.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r06"
+      class="clip build-layer"
+      data-start="12.3667"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 12"
+    >
+      <div id="r06-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r06-img" src="assets/plates/rise-06.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r07"
+      class="clip build-layer"
+      data-start="12.4333"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 13"
+    >
+      <div id="r07-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r07-img" src="assets/plates/rise-07.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r08"
+      class="clip build-layer"
+      data-start="12.5"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 14"
+    >
+      <div id="r08-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r08-img" src="assets/plates/rise-08.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r09"
+      class="clip build-layer"
+      data-start="12.5667"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 15"
+    >
+      <div id="r09-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r09-img" src="assets/plates/rise-09.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r10"
+      class="clip build-layer"
+      data-start="12.6333"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 16"
+    >
+      <div id="r10-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r10-img" src="assets/plates/rise-10.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r11"
+      class="clip build-layer"
+      data-start="12.7"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 17"
+    >
+      <div id="r11-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r11-img" src="assets/plates/rise-11.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r12"
+      class="clip build-layer"
+      data-start="12.7667"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 18"
+    >
+      <div id="r12-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r12-img" src="assets/plates/rise-12.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r13"
+      class="clip build-layer"
+      data-start="12.8333"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 19"
+    >
+      <div id="r13-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r13-img" src="assets/plates/rise-13.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r14"
+      class="clip build-layer"
+      data-start="12.9"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 20"
+    >
+      <div id="r14-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r14-img" src="assets/plates/rise-14.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r15"
+      class="clip build-layer"
+      data-start="12.9667"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 21"
+    >
+      <div id="r15-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r15-img" src="assets/plates/rise-15.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r16"
+      class="clip build-layer"
+      data-start="13.0333"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 22"
+    >
+      <div id="r16-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r16-img" src="assets/plates/rise-16.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="r17"
+      class="clip build-layer"
+      data-start="13.1"
+      data-duration="0.0667"
+      data-track-index="2"
+      data-layout-allow-overflow
+      style="z-index: 23"
+    >
+      <div id="r17-wipe" class="build-wipe">
+        <div class="build-cam"><img id="r17-img" src="assets/plates/rise-17.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l5"
+      class="clip build-layer"
+      data-start="13.1667"
+      data-duration="1.5"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 24"
+    >
+      <div id="l5-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l5-img" src="assets/plates/s5-heights.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l6"
+      class="clip build-layer"
+      data-start="14.2333"
+      data-duration="2.8333"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 25"
+    >
+      <div id="l6-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l6-img" src="assets/plates/s6-trees.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="l7"
+      class="clip build-layer"
+      data-start="16.6333"
+      data-duration="2.6"
+      data-track-index="1"
+      data-layout-allow-overflow
+      style="z-index: 26"
+    >
+      <div id="l7-wipe" class="build-wipe">
+        <div class="build-cam"><img id="l7-img" src="assets/plates/s7-details.webp" alt="" /></div>
+      </div>
+    </div>
+    <div
+      id="hook-divider"
+      class="clip build-scan"
+      data-start="0"
+      data-duration="2.4333"
+      data-track-index="3"
+      style="z-index: 60"
+    >
+      <div id="hook-bar" class="build-bar" style="left: 891px"></div>
+    </div>
+    <div
+      id="scan2"
+      class="clip build-scan"
+      data-start="4.6333"
+      data-duration="0.4"
+      data-track-index="3"
+      data-layout-allow-overflow
+      style="z-index: 61"
+    >
+      <div id="scan2-bar" class="build-bar"></div>
+    </div>
+    <div
+      id="scan3"
+      class="clip build-scan"
+      data-start="7.0333"
+      data-duration="0.4"
+      data-track-index="3"
+      data-layout-allow-overflow
+      style="z-index: 61"
+    >
+      <div id="scan3-bar" class="build-bar"></div>
+    </div>
+    <div
+      id="scan4"
+      class="clip build-scan"
+      data-start="9.4333"
+      data-duration="0.4"
+      data-track-index="3"
+      data-layout-allow-overflow
+      style="z-index: 61"
+    >
+      <div id="scan4-bar" class="build-bar"></div>
+    </div>
+    <div
+      id="scan6"
+      class="clip build-scan"
+      data-start="14.2333"
+      data-duration="0.4"
+      data-track-index="3"
+      data-layout-allow-overflow
+      style="z-index: 61"
+    >
+      <div id="scan6-bar" class="build-bar"></div>
+    </div>
+    <div
+      id="scan7"
+      class="clip build-scan"
+      data-start="16.6333"
+      data-duration="0.4"
+      data-track-index="3"
+      data-layout-allow-overflow
+      style="z-index: 61"
+    >
+      <div id="scan7-bar" class="build-bar"></div>
+    </div>
+    <div
+      id="hook"
+      class="clip build-over"
+      data-start="0"
+      data-duration="2.4333"
+      data-track-index="4"
+      style="z-index: 70"
+    >
+      <div id="hook-sign" class="build-sign">
+        <div id="hook-strip"></div>
+        <div id="hook-title">
+          <span id="hook-from">Open data</span>
+          <svg id="hook-arrow" viewBox="0 0 9 7" fill="#ffd447" aria-hidden="true">
+            <rect x="5" y="0" width="1" height="1" />
+            <rect x="5" y="1" width="1" height="1" />
+            <rect x="6" y="1" width="1" height="1" />
+            <rect x="0" y="2" width="1" height="1" />
+            <rect x="1" y="2" width="1" height="1" />
+            <rect x="2" y="2" width="1" height="1" />
+            <rect x="3" y="2" width="1" height="1" />
+            <rect x="4" y="2" width="1" height="1" />
+            <rect x="5" y="2" width="1" height="1" />
+            <rect x="6" y="2" width="1" height="1" />
+            <rect x="7" y="2" width="1" height="1" />
+            <rect x="0" y="3" width="1" height="1" />
+            <rect x="1" y="3" width="1" height="1" />
+            <rect x="2" y="3" width="1" height="1" />
+            <rect x="3" y="3" width="1" height="1" />
+            <rect x="4" y="3" width="1" height="1" />
+            <rect x="5" y="3" width="1" height="1" />
+            <rect x="6" y="3" width="1" height="1" />
+            <rect x="7" y="3" width="1" height="1" />
+            <rect x="8" y="3" width="1" height="1" />
+            <rect x="0" y="4" width="1" height="1" />
+            <rect x="1" y="4" width="1" height="1" />
+            <rect x="2" y="4" width="1" height="1" />
+            <rect x="3" y="4" width="1" height="1" />
+            <rect x="4" y="4" width="1" height="1" />
+            <rect x="5" y="4" width="1" height="1" />
+            <rect x="6" y="4" width="1" height="1" />
+            <rect x="7" y="4" width="1" height="1" />
+            <rect x="5" y="5" width="1" height="1" />
+            <rect x="6" y="5" width="1" height="1" />
+            <rect x="5" y="6" width="1" height="1" />
+          </svg>
+          <span id="hook-to">pixel art</span>
+        </div>
+        <div id="hook-sub">Pittsburgh, built layer by layer</div>
+      </div>
+    </div>
+    <div
+      id="step1"
+      class="clip build-over"
+      data-start="2.4333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step1-sign" class="build-sign build-step">
+        <div class="build-num">1</div>
+        <div>
+          <div class="build-title">Land and water</div>
+          <div class="build-source">Overture Maps, from OpenStreetMap</div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="step2"
+      class="clip build-over"
+      data-start="4.8333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step2-sign" class="build-sign build-step">
+        <div class="build-num">2</div>
+        <div>
+          <div class="build-title">Parks and land use</div>
+          <div class="build-source">Overture land use and cover</div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="step3"
+      class="clip build-over"
+      data-start="7.2333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step3-sign" class="build-sign build-step">
+        <div class="build-num">3</div>
+        <div>
+          <div class="build-title">Streets and bridges</div>
+          <div class="build-source">Overture transportation, 70 km here</div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="step4"
+      class="clip build-over"
+      data-start="9.6333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step4-sign" class="build-sign build-step">
+        <div class="build-num">4</div>
+        <div>
+          <div class="build-title">Building footprints</div>
+          <div class="build-source">503 from Overture buildings</div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="step5"
+      class="clip build-over"
+      data-start="12.0333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step5-sign" class="build-sign build-step">
+        <div class="build-num">5</div>
+        <div>
+          <div class="build-title">Heights</div>
+          <div class="build-source">36% mapped, the rest estimated</div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="step6"
+      class="clip build-over"
+      data-start="14.4333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step6-sign" class="build-sign build-step">
+        <div class="build-num">6</div>
+        <div>
+          <div class="build-title">Trees</div>
+          <div class="build-source">Mapped, plus more by rule</div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="step7"
+      class="clip build-over"
+      data-start="16.8333"
+      data-duration="2.4"
+      data-track-index="5"
+      style="z-index: 80"
+    >
+      <div id="step7-sign" class="build-sign build-step">
+        <div class="build-num">7</div>
+        <div>
+          <div class="build-title">Windows, roofs, shadows</div>
+          <div class="build-source">By rule, per building type</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+
+    // the camera: every plate alike, in octaves from WIDE to CLOSE (map px, CSS px per map px)
+    const X0 = -618;
+    const Y0 = -885;
+    const WIDE = { x: 1302, y: 195, s: 0.5 };
+    const CLOSE = { x: 1500, y: -40, s: 1 };
+    const cams = document.querySelectorAll(".build-cam");
+    const place = (u) => {
+      const s = Math.exp(Math.log(WIDE.s) + (Math.log(CLOSE.s) - Math.log(WIDE.s)) * u);
+      const k = (1 / s - 1 / WIDE.s) / (1 / CLOSE.s - 1 / WIDE.s);
+      const x = WIDE.x + (CLOSE.x - WIDE.x) * k;
+      const y = WIDE.y + (CLOSE.y - WIDE.y) * k;
+      const transform = `translate(${960 - (x - X0) * s}px, ${540 - (y - Y0) * s}px) scale(${s})`;
+      cams.forEach((cam) => (cam.style.transform = transform));
+    };
+    // the push lingers wide while the ground is laid (the whole Point in frame), then closes in on
+    // downtown for the buildings: u = (1 - cos(π x²)) / 2 over the push's time x, still at both ends
+    const camera = { x: 0 };
+    const push = () => place((1 - Math.cos(Math.PI * camera.x * camera.x)) / 2);
+    place(0);
+    tl.fromTo(camera, { x: 0 }, { x: 1, duration: 18.6, ease: "none", onUpdate: push }, 0);
+
+    // a layer comes in behind the bar, left to right, at a constant speed: mid-frame on the beat
+    const scan = (n, at) => {
+      tl.fromTo(
+        `#l${n}-wipe`,
+        { clipPath: "inset(0px 1920px 0px 0px)" },
+        { clipPath: "inset(0px 0px 0px 0px)", duration: 0.4, ease: "none" },
+        at,
+      );
+      tl.fromTo(`#scan${n}-bar`, { x: -18 }, { x: 1920, duration: 0.4, ease: "none" }, at);
+    };
+    scan(2, 4.6333);
+    scan(3, 7.0333);
+    scan(4, 9.4333);
+    scan(6, 14.2333);
+    scan(7, 16.6333);
+
+    // signs arrive and leave the way pixels do: in steps, never eased
+    const signIn = (id, at) =>
+      tl.fromTo(id, { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, at);
+    const signOut = (id, at) =>
+      tl.fromTo(
+        id,
+        { y: 0, opacity: 1 },
+        { y: -28, opacity: 0, duration: 0.1667, ease: "steps(3)", immediateRender: false },
+        at,
+      );
+
+    // the title is up on frame 0 (the thumbnail) and leaves before the first layer
+    signOut("#hook-sign", 2.2333);
+    signIn("#step1-sign", 2.4333);
+    signOut("#step1-sign", 4.6333);
+    signIn("#step2-sign", 4.8333);
+    signOut("#step2-sign", 7.0333);
+    signIn("#step3-sign", 7.2333);
+    signOut("#step3-sign", 9.4333);
+    signIn("#step4-sign", 9.6333);
+    signOut("#step4-sign", 11.8333);
+    signIn("#step5-sign", 12.0333);
+    signOut("#step5-sign", 14.2333);
+    signIn("#step6-sign", 14.4333);
+    signOut("#step6-sign", 16.6333);
+    signIn("#step7-sign", 16.8333);
+    signOut("#step7-sign", 19.0333);
+
+    window.__timelines["build"] = tl;
+  </script>
+</template>

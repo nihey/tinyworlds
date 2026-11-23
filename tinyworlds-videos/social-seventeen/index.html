@@ -1,0 +1,466 @@
+<!doctype html>
+<!--
+  "Seventeen cities": 1920 × 1080, 39.5 s. The real cities in the order they went up, a bar of
+  the music each (1.5 s at 160 BPM), filmed on the live site; the count climbs in pixel numerals
+  on one sign that stays put while the cities cut behind it. Then three proofs in the viewer (a
+  search and its flight, a building that tells its story, the little person dropped into Street
+  Walk), and the 18th slot, left blank: "Which city next?".
+
+  Made by scripts/social/seventeen.ts (shots, search, sight, walk, render). The site's address is
+  never written here (the repository is public): it is the `address` variable, given at render
+  time. The music's first beat is 0.02 s into the file: the bed starts there, so the cuts fall
+  on whole bars of the film.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"address","type":"string","label":"Where the site lives, on the end card","default":"example.com"},
+    {"id":"question","type":"string","label":"The question on the end card","default":"Which city next?"},
+    {"id":"rule","type":"string","label":"The line under it","default":"A city goes up when its gifts reach $30."}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Tiny5";
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: "Archivo", sans-serif;
+      }
+      /* the end: the fog, the counter's sign back in its place on its 18th slot, left blank */
+      #end {
+        position: absolute;
+        inset: 0;
+        background: #e9e6df;
+        z-index: 5;
+      }
+      #end-sign {
+        position: absolute;
+        left: 96px;
+        bottom: 96px;
+        width: 600px;
+        height: 560px;
+        overflow: hidden;
+        background: #15171a;
+        color: #f4f2ec;
+        border-radius: 20px;
+        box-shadow:
+          inset 0 2px 0 rgb(255 255 255 / 0.08),
+          0 0 0 2px rgb(0 0 0 / 0.6),
+          0 32px 68px -28px rgb(0 0 0 / 0.65),
+          0 4px 12px -2px rgb(0 0 0 / 0.3);
+        white-space: nowrap;
+      }
+      #end-strip {
+        height: 10px;
+        background: #f7c21b;
+      }
+      #end-num {
+        padding: 6px 0 0 40px;
+        font-family: "Tiny5", monospace;
+        font-size: 290px;
+        line-height: 0.92;
+        letter-spacing: -0.02em;
+        -webkit-text-stroke: 3px #f4f2ec;
+      }
+      #end-mark {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        padding: 14px 0 0 44px;
+        font-family: "Tiny5", monospace;
+        font-size: 62px;
+        line-height: 1;
+      }
+      #end-cursor {
+        display: inline-block;
+        width: 34px;
+        height: 50px;
+        margin-bottom: 4px;
+        background: #f7c21b;
+      }
+      /* the name not written yet: a bar, as the game blanks a name */
+      #end-blank {
+        margin: 30px 0 0 44px;
+        width: 330px;
+        height: 40px;
+        border-radius: 6px;
+        background: #2e3136;
+      }
+      #end-blank2 {
+        margin: 14px 0 0 44px;
+        width: 220px;
+        height: 26px;
+        border-radius: 5px;
+        background: #24272b;
+      }
+      #end-words {
+        position: absolute;
+        left: 800px;
+        top: 360px;
+        color: #15171a;
+        white-space: nowrap;
+      }
+      #end-question {
+        font-size: 128px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+      #end-rule {
+        padding-top: 30px;
+        font-size: 44px;
+        line-height: 1.2;
+        font-weight: 500;
+        color: #3d3f43;
+      }
+      #end-foot {
+        position: absolute;
+        left: 800px;
+        bottom: 104px;
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        white-space: nowrap;
+      }
+      #end-wordmark {
+        background: #15171a;
+        border-radius: 14px;
+        padding: 12px 22px 14px;
+        font-family: "Tiny5", monospace;
+        font-size: 44px;
+        line-height: 1;
+        color: #f4f2ec;
+      }
+      #end-wordmark b {
+        font-weight: 400;
+        color: #f7c21b;
+      }
+      #end-address {
+        font-size: 44px;
+        line-height: 1;
+        font-weight: 600;
+        color: #15171a;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="39.5"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div
+        id="reel"
+        data-composition-id="reel"
+        data-composition-src="compositions/reel.html"
+        data-start="0"
+        data-duration="25.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="proofs"
+        data-composition-id="proofs"
+        data-composition-src="compositions/proofs.html"
+        data-start="25.5"
+        data-duration="9"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <!-- the end card lives in the root: a render sets only the root's variables -->
+      <div id="end" class="clip" data-start="34.5" data-duration="5" data-track-index="3">
+        <div id="end-sign">
+          <div id="end-strip"></div>
+          <div id="end-num">18</div>
+          <div id="end-mark"><span>tiny</span><span id="end-cursor"></span></div>
+          <div id="end-blank"></div>
+          <div id="end-blank2"></div>
+        </div>
+        <div id="end-words">
+          <div id="end-question" data-var-text="question">Which city next?</div>
+          <div id="end-rule" data-var-text="rule">A city goes up when its gifts reach $30.</div>
+        </div>
+        <div id="end-foot">
+          <div id="end-wordmark">tiny<b>worlds</b></div>
+          <div id="end-address" data-var-text="address">example.com</div>
+        </div>
+      </div>
+
+      <!-- the bed (seventeen.ts music): 160 BPM, its first beat 0.02 s in; its last hit is at
+           36 s of the film, where the question lands, and it rings out from there -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/bed.mp3"
+        data-start="0"
+        data-duration="39.5"
+        data-media-start="0.02"
+        data-track-index="10"
+        data-volume="0.8"
+        data-fade-out="0.8"
+      ></audio>
+      <!-- a tick as each number lands, two takes in turn -->
+      <audio
+        id="tick-01"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="1.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-02"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="2.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-03"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="4.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-04"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="5.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-05"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="7.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-06"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="8.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-07"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="10.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-08"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="11.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-09"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="13.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-10"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="14.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-11"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="16.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-12"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="17.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-13"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="19.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-14"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="20.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-15"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="22.47"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="tick-16"
+        class="clip"
+        src="assets/sfx/key-press.mp3"
+        data-start="23.94"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.45"
+      ></audio>
+      <!-- the proofs: the keys, the click on the result, the building lighting, the drop -->
+      <audio
+        id="sfx-typing"
+        class="clip"
+        src="assets/sfx/typing.mp3"
+        data-start="25.6"
+        data-duration="0.75"
+        data-track-index="13"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-choose"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="26.57"
+        data-duration="0.36"
+        data-track-index="14"
+        data-volume="0.55"
+      ></audio>
+      <audio
+        id="sfx-lit"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="28.5"
+        data-duration="0.5"
+        data-track-index="14"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-drop"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="32.44"
+        data-duration="0.57"
+        data-track-index="14"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-end"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="34.47"
+        data-duration="0.36"
+        data-track-index="14"
+        data-volume="0.55"
+      ></audio>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      // the end card: the 18 stamped on with the cut, the question on the music's last hit
+      tl.fromTo("#end-num", { y: -26 }, { y: 0, duration: 0.1, ease: "steps(2)" }, 34.5);
+      tl.fromTo(
+        "#end-words",
+        { y: 46, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" },
+        35.98,
+      );
+      tl.fromTo("#end-rule", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "steps(3)" }, 36.73);
+      tl.fromTo(
+        "#end-foot",
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" },
+        37.1,
+      );
+      // the cursor blinks on the beat
+      tl.set("#end-cursor", { opacity: 1 }, 34.5);
+      tl.set("#end-cursor", { opacity: 0 }, 34.875);
+      tl.set("#end-cursor", { opacity: 1 }, 35.25);
+      tl.set("#end-cursor", { opacity: 0 }, 35.625);
+      tl.set("#end-cursor", { opacity: 1 }, 36.0);
+      tl.set("#end-cursor", { opacity: 0 }, 36.375);
+      tl.set("#end-cursor", { opacity: 1 }, 36.75);
+      tl.set("#end-cursor", { opacity: 0 }, 37.125);
+      tl.set("#end-cursor", { opacity: 1 }, 37.5);
+      tl.set("#end-cursor", { opacity: 0 }, 37.875);
+      tl.set("#end-cursor", { opacity: 1 }, 38.25);
+      tl.set("#end-cursor", { opacity: 0 }, 38.625);
+      tl.set("#end-cursor", { opacity: 1 }, 39.0);
+      tl.set("#end-cursor", { opacity: 0 }, 39.375);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,71 @@
+<template>
+  <!--
+    The pull-back's words: two signs over the tiles as the camera leaves downtown for the whole
+    city (the picture itself is the root's: assets/takes/pullback.mp4, then assets/plates/whole.png).
+    Local times: this scene starts at 19.2333 s, on the bed's opening bar.
+  -->
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      font-family: "Archivo", sans-serif;
+    }
+    .finale-over {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+    }
+    .finale-sign {
+      position: absolute;
+      left: 96px;
+      bottom: 96px;
+      padding: 24px 44px 26px;
+      background: #15171a;
+      color: #f4f2ec;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+      font-size: 56px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .finale-sign b {
+      color: #ffd447;
+      font-weight: 600;
+    }
+  </style>
+  <div id="root" data-composition-id="finale" data-width="1920" data-height="1080">
+    <div id="finale-l1" class="clip finale-over" data-start="0.6" data-duration="4.2" data-track-index="1">
+      <div id="finale-l1-sign" class="finale-sign">Exactly the live map, <b>pixel for pixel</b></div>
+    </div>
+    <div id="finale-l2" class="clip finale-over" data-start="4.8" data-duration="4.8" data-track-index="1">
+      <div id="finale-l2-sign" class="finale-sign">All of Pittsburgh: <b>3,606 tiles</b></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // signs arrive and leave the way pixels do: in steps, never eased
+    const signIn = (id, at) =>
+      tl.fromTo(id, { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, at);
+    const signOut = (id, at) =>
+      tl.fromTo(
+        id,
+        { y: 0, opacity: 1 },
+        { y: -28, opacity: 0, duration: 0.1667, ease: "steps(3)", immediateRender: false },
+        at,
+      );
+    signIn("#finale-l1-sign", 0.6);
+    signOut("#finale-l1-sign", 4.6);
+    signIn("#finale-l2-sign", 4.8);
+    signOut("#finale-l2-sign", 9.4);
+    window.__timelines["finale"] = tl;
+  </script>
+</template>

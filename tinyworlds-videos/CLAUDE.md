@@ -69,6 +69,7 @@ film/                # 1920 × 1080, 31 s: the showcase film (SPEC.md, REVIEW.md
 westeros/            # 1920 × 1080, 35 s: the tour of tinywesteros (SPEC.md, REVIEW.md)
 recap/               # 1920 × 1080, 57.6 s: the recap film, narrated (STORYLINES.md, SPEC.md, REVIEW.md)
 street-walk/         # 1920 × 1080, 30 s: the New York Street Walk announcement (README.md, SPEC.md, REVIEW.md)
+social-*/            # the clips made to post (Reddit, short-video apps): see "Social clips" below
 ```
 
 It imports from the pipeline's source (`../tinyworlds-pipeline/src/`: the cities' card
@@ -203,6 +204,46 @@ NEXT_PUBLIC_DATA_BASE=/tinydal/data`, built in a copy of the frontend as `deploy
   page's `public/loops/` into `recap/assets/loops/`, not committed) over the cards.
 - **Names on screen** are the site's public ones (the opening's two gifts are the `stones`
   composition's variables `first` and `second`).
+
+## Social clips
+
+Short clips made to be posted (Reddit first, then the short-video apps), filmed from **the live
+site**, so every world and its latest data are there without a local build. Scripts in
+`scripts/social/`, run with `npm exec -- tsx scripts/social/<name>.ts …`; renders in
+`out/social/<series>/`.
+
+- **`lib/live.ts`** opens a world of the live site for filming, `openLive(world, options)`, on
+  `lib/film.ts`'s clock (options: `hash`, `view` as `LANDSCAPE` or `VERTICAL`, `prefs`, `seed`,
+  `startMs`). Only the site's own host is fetched; the funnel's and presence's mutations are
+  answered in the browser; the cookie question is answered no; the page's `setInterval` runs on
+  film time (the six-minute day is read every 500 ms of film time); the benefactors' plaque
+  hides with the other signs. A program's browser is never counted as a visit
+  (`navigator.webdriver`). `prefs` fix the viewer's settings (default: fixed daylight, clear
+  weather, tilt-shift on, English). `scripts/social/smoke.ts` takes a map still and a
+  street-walk still.
+- **The address** comes from `SITE_URL` at render time, never from a file. The scripts refuse to
+  render without it: a render that fell back to `example.com` once put that on five end cards.
+- **Run them on a machine with cores to spare.** On a headless Chrome without a GPU, Street Walk
+  is software WebGL: about 2 min to load, slow frames. HyperFrames cancels a render when the
+  shell that started it exits, so a detached render needs `HYPERFRAMES_RENDER_DETACHED=1`.
+
+| Project             | Clip                                                                                                                                  | Script                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `social-city/`      | "Your city", 1080 × 1920, 21 s, one per real city: the whole city, four landmarks, one lit, "Find your street"                        | `city.ts` (`city-plan.ts`: landmarks and words)     |
+| `social-quiz/`      | "Guess the building", 1080 × 1920, 30 s, one per city with a quiz: three rounds of the real game with a countdown and the real shares | `quiz-take.ts`, `quiz-render.ts` (`quiz-worlds.ts`) |
+| `social-sky/`       | "From the sky to the sidewalk": all of San Francisco down to driving across the Golden Gate                                           | `sky-takes.ts`                                      |
+| `social-chaos/`     | Street Walk in New York: motorcycle, chase, car fire, punch, boat, Brooklyn Bridge                                                    | `chaos-takes.ts`                                    |
+| `social-daynight/`  | Midtown from golden hour to golden hour, a seamless loop (clear and storm)                                                            | `daynight.ts`                                       |
+| `social-seventeen/` | The real cities counted in the order they went up, then "18: which city next?"                                                        | `seventeen.ts`                                      |
+| `social-gta/`       | A tour of the five GTA-inspired worlds, for fans, with the fan-made disclaimer                                                        | `gta.ts`                                            |
+| `social-made/`      | "How a city is made": the pipeline's own renderer drawing Pittsburgh's Point layer by layer                                           | `made.ts`                                           |
+
+- **Guess the building and empty tallies.** A program's answer is not counted, so where nobody
+  has answered a building the API's tally is all zeros, and the card would show 0% on every row,
+  the right pick included. `quiz-take.ts` holds back a tally with no answers, so the round ends
+  as the viewer ends one without the API: the answer, no shares.
+- The vertical clips keep every word between 168 and 1330 px down and clear of the right-hand
+  rail, where the apps draw their own buttons.
 
 ## Gotchas
 

@@ -1,0 +1,71 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #end {
+      position: absolute;
+      inset: 0;
+    }
+    #end-veil {
+      position: absolute;
+      inset: 0;
+      background: rgb(21 23 26 / 0.28);
+    }
+    #end-plate {
+      position: absolute;
+      left: 50%;
+      top: 300px;
+      width: 1040px;
+      margin-left: -520px;
+      padding: 64px 0 150px;
+      text-align: center;
+      background: var(--enamel);
+      color: var(--paper);
+      border-radius: 28px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 40px 80px -30px rgb(0 0 0 / 0.7),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+    }
+    #end-mark {
+      margin: 0;
+      font:
+        176px/1 Tiny5,
+        monospace;
+      letter-spacing: 0.02em;
+    }
+    #end-mark span {
+      color: var(--accent);
+    }
+    #end-free {
+      margin: 26px 0 0;
+      font-size: 54px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+  </style>
+  <div id="root" data-composition-id="end-card" data-width="1920" data-height="1080">
+    <div id="end" class="clip" data-start="0" data-duration="4.565" data-track-index="0">
+      <div id="end-veil"></div>
+      <div id="end-plate">
+        <p id="end-mark">tiny<span>sfo</span></p>
+        <p id="end-free">Free, in your browser</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#end-veil", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.inOut" }, 0);
+    tl.fromTo(
+      "#end-plate",
+      { opacity: 0, y: -16 },
+      { opacity: 1, y: 0, duration: 0.42, ease: "expo.out" },
+      0,
+    );
+    tl.fromTo("#end-free", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.6);
+    window.__timelines["end-card"] = tl;
+  </script>
+</template>

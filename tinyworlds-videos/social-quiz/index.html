@@ -1,0 +1,752 @@
+<!doctype html>
+<!--
+  "Guess the building": a vertical short per city (1080 × 1920, 30 s), for its subreddit and the
+  apps. The picture is one take of the live viewer playing its own game (scripts/social/quiz-take.ts):
+  three rounds, then the map alone. This file adds only the clip's own words: the hook, a 3-2-1 per
+  round, the end card. Its moments are SCHEDULE in scripts/social/quiz-worlds.ts (120 BPM, a round
+  is four bars), and one row per city of the render's batch sets the variables
+  (scripts/social/quiz-render.ts). Every word sits between 168 and 1330 px: the apps cover the rest.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"take","type":"string","label":"The take","default":"assets/takes/tinyphl.mp4"},
+    {"id":"mark","type":"string","label":"Wordmark, after tiny","default":"phl"},
+    {"id":"accent","type":"color","label":"The world&apos;s colour","default":"#5b7cfa"},
+    {"id":"hook1","type":"string","label":"Hook, first line","default":"Can you name"},
+    {"id":"hook2","type":"string","label":"Hook, second line","default":"this building?"},
+    {"id":"round1","type":"string","label":"Round 1","default":"Round 1 of 3"},
+    {"id":"round2","type":"string","label":"Round 2","default":"Round 2 of 3"},
+    {"id":"round3","type":"string","label":"Round 3","default":"Round 3 of 3"},
+    {"id":"end1","type":"string","label":"End, first line","default":"How many"},
+    {"id":"end2","type":"string","label":"End, second line","default":"did you get?"},
+    {"id":"comments","type":"string","label":"Invitation to comment","default":"Tell us in the comments"},
+    {"id":"play","type":"string","label":"Before the address","default":"Play the whole game at"},
+    {"id":"address","type":"string","label":"The world&apos;s address","default":"example.com/tinyphl/"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <title>Tiny Worlds · Guess the building</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: Archivo;
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: Tiny5;
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: #e9e6df;
+        font-family: Archivo, sans-serif;
+        color: #f4f2ec;
+        --enamel: #15171a;
+        --paper: #f4f2ec;
+        --paper-dim: #a4a6a1;
+        --line: rgb(255 255 255 / 0.11);
+      }
+      #take {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+        object-fit: cover;
+        z-index: 1;
+      }
+      /* the site's black enamel sign */
+      .enamel {
+        position: absolute;
+        background: var(--enamel);
+        color: var(--paper);
+        border-radius: 20px;
+        box-shadow:
+          inset 0 2px 0 rgb(255 255 255 / 0.08),
+          0 0 0 2px rgb(0 0 0 / 0.6),
+          0 32px 68px -28px rgb(0 0 0 / 0.65),
+          0 4px 12px -2px rgb(0 0 0 / 0.3);
+        overflow: hidden;
+      }
+      .enamel::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 6px;
+        background: var(--accent);
+      }
+      .mark {
+        font-family: Tiny5, monospace;
+        font-size: 44px;
+        line-height: 1;
+        letter-spacing: 0.03em;
+        white-space: nowrap;
+      }
+      .mark .city {
+        color: var(--accent);
+      }
+
+      /* each round's sign, top left: the wordmark, then the hook or the countdown */
+      .round {
+        left: 36px;
+        top: 184px;
+        width: 380px;
+        height: 262px;
+        z-index: 5;
+      }
+      .round .head {
+        position: absolute;
+        left: 28px;
+        right: 26px;
+        top: 30px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .round .rule {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 96px;
+        height: 2px;
+        background: var(--line);
+      }
+      .hook {
+        position: absolute;
+        left: 28px;
+        right: 20px;
+        top: 114px;
+        font-size: 47px;
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      .hook .second {
+        color: var(--accent);
+      }
+      .label {
+        position: absolute;
+        left: 28px;
+        top: 122px;
+        font-size: 28px;
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--paper-dim);
+        width: 150px;
+      }
+      .digit {
+        position: absolute;
+        right: 36px;
+        top: 104px;
+        width: 130px;
+        text-align: center;
+        font-family: Tiny5, monospace;
+        font-size: 132px;
+        line-height: 1;
+        color: var(--accent);
+      }
+      .digit.armed {
+        color: rgb(244 242 236 / 0.42);
+      }
+      /* the time left: twelve blocks, one goes out every quarter second */
+      .blocks {
+        position: absolute;
+        left: 28px;
+        right: 28px;
+        bottom: 26px;
+        height: 14px;
+        display: flex;
+        gap: 6px;
+      }
+      .blocks i {
+        flex: 1;
+        background: var(--accent);
+      }
+
+      /* the end */
+      #end {
+        left: 72px;
+        top: 452px;
+        width: 936px;
+        height: 676px;
+        z-index: 6;
+      }
+      #end .mark {
+        position: absolute;
+        left: 56px;
+        top: 66px;
+        font-size: 84px;
+      }
+      #end-q {
+        position: absolute;
+        left: 56px;
+        right: 48px;
+        top: 186px;
+        font-size: 92px;
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      #end-q .second {
+        color: var(--accent);
+      }
+      #end-comments {
+        position: absolute;
+        left: 56px;
+        top: 392px;
+        font-size: 42px;
+        line-height: 1.15;
+        font-weight: 650;
+        color: var(--paper);
+      }
+      #end-rule {
+        position: absolute;
+        left: 56px;
+        right: 56px;
+        top: 482px;
+        height: 2px;
+        background: var(--line);
+      }
+      #end-play {
+        position: absolute;
+        left: 56px;
+        top: 516px;
+        font-size: 32px;
+        line-height: 1.2;
+        font-weight: 600;
+        color: var(--paper-dim);
+      }
+      #end-address {
+        position: absolute;
+        left: 56px;
+        top: 570px;
+        font-size: 46px;
+        line-height: 1.1;
+        font-weight: 750;
+        letter-spacing: -0.01em;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="quiz"
+      data-start="0"
+      data-duration="30"
+      data-width="1080"
+      data-height="1920"
+    >
+      <video
+        id="take"
+        class="clip"
+        data-start="0"
+        data-duration="30"
+        data-track-index="0"
+        src="assets/takes/tinyphl.mp4"
+        data-var-src="take"
+        muted
+        playsinline
+      ></video>
+
+      <!-- round 1: the hook, then 3-2-1 -->
+      <div
+        id="sign-1"
+        class="clip enamel round"
+        data-start="0"
+        data-duration="5"
+        data-track-index="1"
+        data-track-kind="graphics"
+      >
+        <div class="head">
+          <span class="mark">tiny<span class="city" data-var-text="mark">phl</span></span>
+        </div>
+        <div class="rule"></div>
+        <p id="hook" class="clip hook" data-start="0" data-duration="2" data-track-index="9">
+          <span data-var-text="hook1">Can you name</span>
+          <span class="second" data-var-text="hook2">this building?</span>
+        </p>
+        <p
+          id="label-1"
+          class="clip label"
+          data-start="2"
+          data-duration="3"
+          data-track-index="2"
+          data-var-text="round1"
+        >
+          Round 1 of 3
+        </p>
+        <p id="d1-3" class="clip digit" data-start="2" data-duration="1" data-track-index="5">3</p>
+        <p id="d1-2" class="clip digit" data-start="3" data-duration="1" data-track-index="6">2</p>
+        <p id="d1-1" class="clip digit" data-start="4" data-duration="1" data-track-index="7">1</p>
+        <div id="blocks-1" class="clip blocks" data-start="2" data-duration="3" data-track-index="4">
+          <i id="b1-0"></i><i id="b1-1"></i><i id="b1-2"></i><i id="b1-3"></i><i id="b1-4"></i
+          ><i id="b1-5"></i><i id="b1-6"></i><i id="b1-7"></i><i id="b1-8"></i><i id="b1-9"></i
+          ><i id="b1-10"></i><i id="b1-11"></i>
+        </div>
+      </div>
+
+      <!-- round 2 -->
+      <div
+        id="sign-2"
+        class="clip enamel round"
+        data-start="8.2"
+        data-duration="4.8"
+        data-track-index="1"
+        data-track-kind="graphics"
+      >
+        <div class="head">
+          <span class="mark">tiny<span class="city" data-var-text="mark">phl</span></span>
+        </div>
+        <div class="rule"></div>
+        <p
+          id="label-2"
+          class="clip label"
+          data-start="8.2"
+          data-duration="4.8"
+          data-track-index="2"
+          data-var-text="round2"
+        >
+          Round 2 of 3
+        </p>
+        <p id="d2-0" class="clip digit armed" data-start="8.2" data-duration="1.8" data-track-index="3">3</p>
+        <p id="d2-3" class="clip digit" data-start="10" data-duration="1" data-track-index="5">3</p>
+        <p id="d2-2" class="clip digit" data-start="11" data-duration="1" data-track-index="6">2</p>
+        <p id="d2-1" class="clip digit" data-start="12" data-duration="1" data-track-index="7">1</p>
+        <div id="blocks-2" class="clip blocks" data-start="8.2" data-duration="4.8" data-track-index="4">
+          <i id="b2-0"></i><i id="b2-1"></i><i id="b2-2"></i><i id="b2-3"></i><i id="b2-4"></i
+          ><i id="b2-5"></i><i id="b2-6"></i><i id="b2-7"></i><i id="b2-8"></i><i id="b2-9"></i
+          ><i id="b2-10"></i><i id="b2-11"></i>
+        </div>
+      </div>
+
+      <!-- round 3 -->
+      <div
+        id="sign-3"
+        class="clip enamel round"
+        data-start="16.2"
+        data-duration="4.8"
+        data-track-index="1"
+        data-track-kind="graphics"
+      >
+        <div class="head">
+          <span class="mark">tiny<span class="city" data-var-text="mark">phl</span></span>
+        </div>
+        <div class="rule"></div>
+        <p
+          id="label-3"
+          class="clip label"
+          data-start="16.2"
+          data-duration="4.8"
+          data-track-index="2"
+          data-var-text="round3"
+        >
+          Round 3 of 3
+        </p>
+        <p id="d3-0" class="clip digit armed" data-start="16.2" data-duration="1.8" data-track-index="3">3</p>
+        <p id="d3-3" class="clip digit" data-start="18" data-duration="1" data-track-index="5">3</p>
+        <p id="d3-2" class="clip digit" data-start="19" data-duration="1" data-track-index="6">2</p>
+        <p id="d3-1" class="clip digit" data-start="20" data-duration="1" data-track-index="7">1</p>
+        <div id="blocks-3" class="clip blocks" data-start="16.2" data-duration="4.8" data-track-index="4">
+          <i id="b3-0"></i><i id="b3-1"></i><i id="b3-2"></i><i id="b3-3"></i><i id="b3-4"></i
+          ><i id="b3-5"></i><i id="b3-6"></i><i id="b3-7"></i><i id="b3-8"></i><i id="b3-9"></i
+          ><i id="b3-10"></i><i id="b3-11"></i>
+        </div>
+      </div>
+
+      <!-- the end card, over the city -->
+      <div
+        id="end"
+        class="clip enamel"
+        data-start="24.1"
+        data-duration="5.9"
+        data-track-index="8"
+        data-track-kind="graphics"
+      >
+        <span class="mark">tiny<span class="city" data-var-text="mark">phl</span></span>
+        <p id="end-q">
+          <span data-var-text="end1">How many</span><br /><span class="second" data-var-text="end2"
+            >did you get?</span
+          >
+        </p>
+        <p id="end-comments" data-var-text="comments">Tell us in the comments</p>
+        <div id="end-rule"></div>
+        <p id="end-play" data-var-text="play">Play the whole game at</p>
+        <p id="end-address" data-var-text="address">example.com/tinyphl/</p>
+      </div>
+
+      <audio
+        id="music"
+        class="clip"
+        data-start="0"
+        data-duration="30"
+        data-media-start="0.035"
+        data-track-index="10"
+        data-volume="0.62"
+        data-fade-out="1.6"
+        src="assets/music/bed.mp3"
+      ></audio>
+
+      <audio
+        id="tick-1a"
+        class="clip"
+        data-start="2"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-1b"
+        class="clip"
+        data-start="2.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="tick-1c"
+        class="clip"
+        data-start="3"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-1d"
+        class="clip"
+        data-start="3.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="tick-1e"
+        class="clip"
+        data-start="4"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-1f"
+        class="clip"
+        data-start="4.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="press-1"
+        class="clip"
+        data-start="5"
+        data-duration="0.4"
+        data-track-index="13"
+        data-volume="0.5"
+        src="assets/sfx/key-press.mp3"
+      ></audio>
+      <audio
+        id="hit-1"
+        class="clip"
+        data-start="5"
+        data-duration="1.6"
+        data-track-index="14"
+        data-volume="0.3"
+        data-fade-out="0.6"
+        src="assets/sfx/impact-bass-1.mp3"
+      ></audio>
+      <audio
+        id="shares-1"
+        class="clip"
+        data-start="5.4"
+        data-duration="0.7"
+        data-track-index="15"
+        data-volume="0.3"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+
+      <audio
+        id="fly-2"
+        class="clip"
+        data-start="8"
+        data-duration="0.57"
+        data-track-index="16"
+        data-volume="0.3"
+        src="assets/sfx/whoosh-short.mp3"
+      ></audio>
+      <audio
+        id="tick-2a"
+        class="clip"
+        data-start="10"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-2b"
+        class="clip"
+        data-start="10.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="tick-2c"
+        class="clip"
+        data-start="11"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-2d"
+        class="clip"
+        data-start="11.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="tick-2e"
+        class="clip"
+        data-start="12"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-2f"
+        class="clip"
+        data-start="12.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="press-2"
+        class="clip"
+        data-start="13"
+        data-duration="0.4"
+        data-track-index="13"
+        data-volume="0.5"
+        src="assets/sfx/key-press.mp3"
+      ></audio>
+      <audio
+        id="hit-2"
+        class="clip"
+        data-start="13"
+        data-duration="1.6"
+        data-track-index="14"
+        data-volume="0.3"
+        data-fade-out="0.6"
+        src="assets/sfx/impact-bass-1.mp3"
+      ></audio>
+      <audio
+        id="shares-2"
+        class="clip"
+        data-start="13.4"
+        data-duration="0.7"
+        data-track-index="15"
+        data-volume="0.3"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+
+      <audio
+        id="fly-3"
+        class="clip"
+        data-start="16"
+        data-duration="0.57"
+        data-track-index="16"
+        data-volume="0.3"
+        src="assets/sfx/whoosh-short.mp3"
+      ></audio>
+      <audio
+        id="tick-3a"
+        class="clip"
+        data-start="18"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-3b"
+        class="clip"
+        data-start="18.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="tick-3c"
+        class="clip"
+        data-start="19"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-3d"
+        class="clip"
+        data-start="19.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="tick-3e"
+        class="clip"
+        data-start="20"
+        data-duration="0.36"
+        data-track-index="11"
+        data-volume="0.55"
+        src="assets/sfx/click.mp3"
+      ></audio>
+      <audio
+        id="tick-3f"
+        class="clip"
+        data-start="20.5"
+        data-duration="0.36"
+        data-track-index="12"
+        data-volume="0.28"
+        src="assets/sfx/click-soft.mp3"
+      ></audio>
+      <audio
+        id="press-3"
+        class="clip"
+        data-start="21"
+        data-duration="0.4"
+        data-track-index="13"
+        data-volume="0.5"
+        src="assets/sfx/key-press.mp3"
+      ></audio>
+      <audio
+        id="hit-3"
+        class="clip"
+        data-start="21"
+        data-duration="1.6"
+        data-track-index="14"
+        data-volume="0.3"
+        data-fade-out="0.6"
+        src="assets/sfx/impact-bass-1.mp3"
+      ></audio>
+      <audio
+        id="shares-3"
+        class="clip"
+        data-start="21.4"
+        data-duration="0.7"
+        data-track-index="15"
+        data-volume="0.3"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+
+      <audio
+        id="end-in"
+        class="clip"
+        data-start="24.1"
+        data-duration="1.8"
+        data-track-index="16"
+        data-volume="0.32"
+        data-fade-out="0.8"
+        src="assets/sfx/sparkle.mp3"
+      ></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      // a sign steps in and out as the site's do: pixels do not ease
+      const stepIn = (sel, at) =>
+        tl.fromTo(sel, { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.13, ease: "steps(3)" }, at);
+      const stepOut = (sel, at) =>
+        tl.fromTo(sel, { opacity: 1, y: 0 }, { opacity: 0, y: -12, duration: 0.1, ease: "steps(2)" }, at);
+      // round 1 is up from the first frame (it is the thumbnail); 2 and 3 step in after the flight starts
+      stepOut("#sign-1", 4.88);
+      stepIn("#sign-2", 8.2);
+      stepOut("#sign-2", 12.88);
+      stepIn("#sign-3", 16.2);
+      stepOut("#sign-3", 20.88);
+      // each digit lands with a small drop
+      for (const [sel, at] of [
+        ["#d1-3", 2],
+        ["#d1-2", 3],
+        ["#d1-1", 4],
+        ["#d2-3", 10],
+        ["#d2-2", 11],
+        ["#d2-1", 12],
+        ["#d3-3", 18],
+        ["#d3-2", 19],
+        ["#d3-1", 20],
+      ]) {
+        tl.fromTo(sel, { y: -18 }, { y: 0, duration: 0.1, ease: "steps(3)" }, at);
+      }
+      // the hook gives way to the countdown
+      tl.fromTo("#label-1", { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "steps(2)" }, 2);
+      // the time left, a block a quarter second, from the 3 to the pick
+      for (const [r, from] of [
+        [1, 2],
+        [2, 10],
+        [3, 18],
+      ]) {
+        for (let i = 0; i < 12; i++) {
+          tl.set(`#b${r}-${11 - i}`, { opacity: 1 }, 0);
+          tl.set(`#b${r}-${11 - i}`, { opacity: 0.16 }, from + 0.25 * (i + 1) - 0.001);
+        }
+      }
+      // the end card
+      stepIn("#end", 24.1);
+      tl.fromTo(
+        "#end-q",
+        { opacity: 0, y: -16 },
+        { opacity: 1, y: 0, duration: 0.13, ease: "steps(3)" },
+        24.3,
+      );
+      tl.fromTo("#end-comments", { opacity: 0 }, { opacity: 1, duration: 0.1, ease: "steps(2)" }, 24.9);
+      tl.fromTo(
+        ["#end-rule", "#end-play", "#end-address"],
+        { opacity: 0 },
+        { opacity: 1, duration: 0.1, ease: "steps(2)" },
+        25.5,
+      );
+      window.__timelines["quiz"] = tl;
+    </script>
+  </body>
+</html>

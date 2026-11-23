@@ -1,0 +1,82 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .line {
+      position: absolute;
+      left: 192px;
+      top: 130px;
+    }
+    .plate {
+      padding: 26px 40px 32px;
+      background: var(--enamel);
+      color: var(--paper);
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+    }
+    .kicker {
+      margin: 0 0 14px;
+      font:
+        44px/1 Tiny5,
+        monospace;
+      letter-spacing: 0.02em;
+    }
+    .kicker span {
+      color: var(--accent);
+    }
+    .words {
+      margin: 0;
+      font-size: 104px;
+      font-weight: 800;
+      line-height: 0.98;
+      letter-spacing: -0.035em;
+      white-space: nowrap;
+    }
+    .words em {
+      font-style: normal;
+      color: var(--accent);
+    }
+  </style>
+  <div id="root" data-composition-id="lines" data-width="1920" data-height="1080">
+    <div id="line-real" class="line clip" data-start="0" data-duration="2.06" data-track-index="0">
+      <div id="line-real-plate" class="plate">
+        <p class="kicker">tiny<span>nyc</span></p>
+        <p class="words">Real New York.</p>
+      </div>
+    </div>
+    <div id="line-tab" class="line clip" data-start="19.055" data-duration="3.5" data-track-index="0">
+      <div id="line-tab-plate" class="plate">
+        <p class="words">In a <em>browser tab</em>.</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // up on frame 0 (the thumbnail), then out on the cut; the second steps in as the site's signs do
+    tl.fromTo(
+      "#line-real-plate",
+      { opacity: 1, y: 0 },
+      { opacity: 0, y: -10, duration: 0.16, ease: "power2.in" },
+      1.88,
+    );
+    tl.fromTo(
+      "#line-tab-plate",
+      { opacity: 0, y: -16 },
+      { opacity: 1, y: 0, duration: 0.42, ease: "expo.out" },
+      19.055,
+    );
+    tl.fromTo(
+      "#line-tab-plate",
+      { opacity: 1, y: 0 },
+      { opacity: 0, y: -10, duration: 0.2, ease: "power2.in", immediateRender: false },
+      22.3,
+    );
+    window.__timelines["lines"] = tl;
+  </script>
+</template>

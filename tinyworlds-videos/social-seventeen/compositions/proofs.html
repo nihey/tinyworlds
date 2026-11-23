@@ -1,0 +1,132 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+      font-family: "Archivo", sans-serif;
+    }
+    .proof-take {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      object-fit: contain;
+    }
+    /* what each proof shows, on a sign in the site's manner: black enamel, paper lettering,
+       taxi yellow along its top. Bottom left, where the viewer has none of its own signs */
+    .proof-sign {
+      position: absolute;
+      left: 96px;
+      bottom: 96px;
+      overflow: hidden;
+      background: #15171a;
+      color: #f4f2ec;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+      white-space: nowrap;
+    }
+    .proof-strip {
+      height: 8px;
+      background: #f7c21b;
+    }
+    .proof-line {
+      padding: 20px 44px 26px;
+      font-size: 68px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+  </style>
+  <div id="root" data-composition-id="proofs" data-width="1920" data-height="1080">
+    <!-- the search typed into the viewer's own sign, and the viewer's own flight (Los Angeles) -->
+    <video
+      id="proof-search"
+      class="clip proof-take"
+      data-start="0"
+      data-duration="3"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/search.mp4"
+      muted
+      playsinline
+    ></video>
+    <!-- a building lit under the pointer, with its Wikipedia opening (Philadelphia's City Hall) -->
+    <video
+      id="proof-sight"
+      class="clip proof-take"
+      data-start="3"
+      data-duration="3"
+      data-media-start="0.54"
+      data-track-index="0"
+      src="assets/takes/sight.mp4"
+      muted
+      playsinline
+    ></video>
+    <!-- the little person taken from the tools and let go over Times Square, then the walk -->
+    <video
+      id="proof-drop"
+      class="clip proof-take"
+      data-start="6"
+      data-duration="1.08"
+      data-media-start="0.35"
+      data-track-index="0"
+      src="assets/takes/drop.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="proof-walk"
+      class="clip proof-take"
+      data-start="7.08"
+      data-duration="1.92"
+      data-media-start="0.2"
+      data-track-index="0"
+      src="assets/takes/walk.mp4"
+      muted
+      playsinline
+    ></video>
+
+    <div id="proof-c1" class="clip" data-start="0.1" data-duration="2.8" data-track-index="1">
+      <div id="proof-s1" class="proof-sign">
+        <div class="proof-strip"></div>
+        <div class="proof-line">Search any place</div>
+      </div>
+    </div>
+    <div id="proof-c2" class="clip" data-start="3.1" data-duration="2.8" data-track-index="1">
+      <div id="proof-s2" class="proof-sign">
+        <div class="proof-strip"></div>
+        <div class="proof-line">Landmarks tell their story</div>
+      </div>
+    </div>
+    <div id="proof-c3" class="clip" data-start="6.1" data-duration="2.8" data-track-index="1">
+      <div id="proof-s3" class="proof-sign">
+        <div class="proof-strip"></div>
+        <div class="proof-line">Then walk the streets</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // signs arrive and leave the way pixels do: in steps, never eased
+    const sign = (id, arrives, leaves) => {
+      tl.fromTo(id, { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, arrives);
+      tl.fromTo(
+        id,
+        { y: 0, opacity: 1 },
+        { y: -28, opacity: 0, duration: 0.17, ease: "steps(3)", immediateRender: false },
+        leaves,
+      );
+    };
+    sign("#proof-s1", 0.1, 2.72);
+    sign("#proof-s2", 3.1, 5.72);
+    sign("#proof-s3", 6.1, 8.72);
+    window.__timelines["proofs"] = tl;
+  </script>
+</template>

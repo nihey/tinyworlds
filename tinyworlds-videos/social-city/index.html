@@ -1,0 +1,473 @@
+<!doctype html>
+<!--
+  "Your city": a vertical short per real city, 1080 × 1920, 20.8 s, for the city's subreddit.
+  One continuous take of the live viewer (scripts/social/city.ts): the whole city with a line on
+  it from the first frame, four flights to the places a local names first, each named on a sign
+  as the view lands, the last one lit under the pointer, then back out to the whole city and
+  "Find your street". What is added on top is the signs, the end card and the sound.
+
+  One project for every city: the take, the words and the colour are variables, given per city
+  by `city.ts render`. The address is never written here (the repository is public): it is the
+  `address` variable, given at render time.
+
+  The clock is the bed's (assets/music/bed.mp3: 100 BPM, a beat every 0.6 s, the first downbeat
+  at 0.035 s, its last chord at 19.235 s): bar k starts at 0.035 + 2.4 k. The take's moments are
+  the same numbers (AT in scripts/social/city-plan.ts).
+
+  On a phone the apps cover the top 168 px, everything under 1330 px and the right-hand rail:
+  every word here is inside 168–1330, and left of 920 px.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"take","type":"string","label":"The take","default":"assets/takes/tinypit.mp4"},
+    {"id":"code","type":"string","label":"The wordmark after tiny","default":"pit"},
+    {"id":"accent","type":"color","label":"The world&apos;s colour","default":"#ffd447"},
+    {"id":"hook1","type":"string","label":"Hook, big","default":"All of Pittsburgh"},
+    {"id":"hook2","type":"string","label":"Hook, second line","default":"every building"},
+    {"id":"name1","type":"string","label":"First place","default":"Point State Park"},
+    {"id":"area1","type":"string","label":"First place: part of town","default":"Downtown"},
+    {"id":"name2","type":"string","label":"Second place","default":"PNC Park"},
+    {"id":"area2","type":"string","label":"Second place: part of town","default":"North Side"},
+    {"id":"name3","type":"string","label":"Third place","default":"PPG Place"},
+    {"id":"area3","type":"string","label":"Third place: part of town","default":"Downtown"},
+    {"id":"name4","type":"string","label":"Last place (lit)","default":"Cathedral of Learning"},
+    {"id":"area4","type":"string","label":"Last place: part of town","default":"Oakland"},
+    {"id":"find","type":"string","label":"End line","default":"Find your street"},
+    {"id":"note","type":"string","label":"Small print","default":"Free to explore. No account."},
+    {"id":"address","type":"string","label":"Where the map lives","default":"example.com/tinypit/"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Tiny5";
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+      :root {
+        --fog: #e9e6df;
+        --sign: #15171a;
+        --paper: #f4f2ec;
+        --paper-dim: #b4b1a8;
+        --accent: #ffd447;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: var(--fog);
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        font-family: "Archivo", sans-serif;
+      }
+      #take {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1080px;
+        height: 1920px;
+        object-fit: contain;
+      }
+      /* every sign hangs from the same place, top left, under the apps' top bar */
+      .slot {
+        position: absolute;
+        left: 60px;
+        top: 232px;
+        width: 860px;
+        z-index: 3;
+      }
+      /* the site's black enamel: paper lettering, the world's colour along its top edge */
+      .sign {
+        display: inline-block;
+        max-width: 860px;
+        overflow: hidden;
+        background: var(--sign);
+        color: var(--paper);
+        border-radius: 26px;
+        box-shadow:
+          inset 0 2px 0 rgb(255 255 255 / 0.08),
+          0 0 0 3px rgb(0 0 0 / 0.55),
+          0 36px 72px -30px rgb(0 0 0 / 0.7),
+          0 6px 16px -4px rgb(0 0 0 / 0.35);
+      }
+      .strip {
+        height: 9px;
+        background: var(--accent);
+      }
+      .sign-body {
+        padding: 26px 46px 34px;
+      }
+      /* the hook: as bold as the site gets */
+      /* a long hook says where it breaks ("\n" in its words) */
+      #hook-1 {
+        white-space: pre-line;
+        font-size: 104px;
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        text-wrap: balance;
+      }
+      #hook-2 {
+        padding-top: 10px;
+        font-size: 64px;
+        line-height: 1.05;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        color: var(--accent);
+      }
+      /* a place: its part of town small in the world's colour, its name large */
+      .area {
+        font-size: 40px;
+        line-height: 1.1;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        color: var(--accent);
+      }
+      .name {
+        text-wrap: balance;
+        padding-top: 4px;
+        font-size: 80px;
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.022em;
+      }
+      /* the end card */
+      #end-find {
+        font-size: 92px;
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.022em;
+      }
+      /* the two signs of the end card share the wider one's width */
+      .stack {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 22px;
+        max-width: 860px;
+      }
+      .stack .sign {
+        display: block;
+      }
+      #where-sign .sign-body {
+        padding-top: 34px;
+      }
+      /* the wordmark: "tiny" in paper, the city's code in its colour, in the pixel face */
+      #end-wordmark {
+        font-family: "Tiny5", monospace;
+        font-size: 104px;
+        line-height: 0.9;
+        letter-spacing: 0.03em;
+        color: var(--paper);
+      }
+      #end-code {
+        color: var(--accent);
+      }
+      #end-address {
+        padding-top: 14px;
+        font-size: 44px;
+        line-height: 1.15;
+        font-weight: 600;
+        color: var(--accent);
+      }
+      #end-note {
+        padding-top: 12px;
+        font-size: 36px;
+        line-height: 1.2;
+        font-weight: 500;
+        color: var(--paper-dim);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="20.8"
+      data-width="1080"
+      data-height="1920"
+    >
+      <!-- one continuous take of the live viewer, 624 frames -->
+      <video
+        id="take"
+        class="clip"
+        data-start="0"
+        data-duration="20.8"
+        data-track-index="0"
+        data-var-src="take"
+        src="assets/takes/tinypit.mp4"
+        muted
+        playsinline
+      ></video>
+
+      <!-- the hook: up from the first frame (the thumbnail), gone as the view dives -->
+      <div id="hook" class="clip slot" data-start="0" data-duration="2.75" data-track-index="1">
+        <div id="hook-sign" class="sign">
+          <div class="strip"></div>
+          <div class="sign-body">
+            <div id="hook-1" data-var-text="hook1">All of Pittsburgh</div>
+            <div id="hook-2" data-var-text="hook2">every building</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- a sign per place: in as the view lands (on the downbeat), out once it has left -->
+      <div id="p1" class="clip slot" data-start="4.6" data-duration="1.85" data-track-index="2">
+        <div id="p1-sign" class="sign">
+          <div class="strip"></div>
+          <div class="sign-body">
+            <div id="p1-area" class="area" data-var-text="area1">Downtown</div>
+            <div id="p1-name" class="name" data-var-text="name1">Point State Park</div>
+          </div>
+        </div>
+      </div>
+      <div id="p2" class="clip slot" data-start="7.0" data-duration="1.85" data-track-index="3">
+        <div id="p2-sign" class="sign">
+          <div class="strip"></div>
+          <div class="sign-body">
+            <div id="p2-area" class="area" data-var-text="area2">North Side</div>
+            <div id="p2-name" class="name" data-var-text="name2">PNC Park</div>
+          </div>
+        </div>
+      </div>
+      <div id="p3" class="clip slot" data-start="9.4" data-duration="1.85" data-track-index="2">
+        <div id="p3-sign" class="sign">
+          <div class="strip"></div>
+          <div class="sign-body">
+            <div id="p3-area" class="area" data-var-text="area3">Downtown</div>
+            <div id="p3-name" class="name" data-var-text="name3">PPG Place</div>
+          </div>
+        </div>
+      </div>
+      <div id="p4" class="clip slot" data-start="11.8" data-duration="4.9" data-track-index="3">
+        <div id="p4-sign" class="sign">
+          <div class="strip"></div>
+          <div class="sign-body">
+            <div id="p4-area" class="area" data-var-text="area4">Oakland</div>
+            <div id="p4-name" class="name" data-var-text="name4">Cathedral of Learning</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- the end card, over the whole city again: a line, then where, then the small print -->
+      <div id="end" class="clip slot" data-start="16.7" data-duration="4.1" data-track-index="4">
+        <div class="stack">
+          <div id="end-sign" class="sign">
+            <div class="strip"></div>
+            <div class="sign-body">
+              <div id="end-find" data-var-text="find">Find your street</div>
+            </div>
+          </div>
+          <div id="where-sign" class="sign">
+            <div class="sign-body">
+              <div id="end-wordmark">tiny<span id="end-code" data-var-text="code">pit</span></div>
+              <div id="end-address" data-var-text="address">example.com/tinypit/</div>
+              <div id="end-note" data-var-text="note">Free to explore. No account.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- the bed (scripts/social/city-sound.ts): it starts on its first beat -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/bed.mp3"
+        data-start="0"
+        data-duration="20.8"
+        data-track-index="10"
+        data-volume="0.72"
+        data-fade-out="1.0"
+      ></audio>
+      <!-- the effects, on the picture's moves: the dive, each landing, each way off, the light -->
+      <audio
+        id="sfx-dive"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="2.3"
+        data-duration="0.57"
+        data-track-index="11"
+        data-volume="0.4"
+      ></audio>
+      <audio
+        id="sfx-land1"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="4.82"
+        data-duration="0.72"
+        data-track-index="12"
+        data-volume="0.32"
+      ></audio>
+      <audio
+        id="sfx-off1"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="5.98"
+        data-duration="0.57"
+        data-track-index="13"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-land2"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="7.22"
+        data-duration="0.72"
+        data-track-index="12"
+        data-volume="0.32"
+      ></audio>
+      <audio
+        id="sfx-off2"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="8.38"
+        data-duration="0.57"
+        data-track-index="13"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-land3"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="9.62"
+        data-duration="0.72"
+        data-track-index="12"
+        data-volume="0.32"
+      ></audio>
+      <audio
+        id="sfx-off3"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="10.78"
+        data-duration="0.57"
+        data-track-index="13"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-land4"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="12.02"
+        data-duration="0.72"
+        data-track-index="12"
+        data-volume="0.32"
+      ></audio>
+      <audio
+        id="sfx-lit"
+        class="clip"
+        src="assets/sfx/sparkle.mp3"
+        data-start="13.18"
+        data-duration="1.8"
+        data-track-index="14"
+        data-volume="0.34"
+      ></audio>
+      <audio
+        id="sfx-out"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="16.7"
+        data-duration="0.57"
+        data-track-index="11"
+        data-volume="0.34"
+      ></audio>
+      <audio
+        id="sfx-where"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="17.42"
+        data-duration="0.36"
+        data-track-index="15"
+        data-volume="0.45"
+      ></audio>
+    </div>
+    <script>
+      // A long line is set smaller until it fits on one line (down to `min` px), and past that
+      // wraps in two balanced lines: the words are each city's, so their length is not known here.
+      const fit = (selector, max, min) => {
+        const el = document.querySelector(selector);
+        const room = 860 - 92;
+        el.style.whiteSpace = "pre";
+        let size = max;
+        el.style.fontSize = `${size}px`;
+        while (el.scrollWidth > room && size > min) el.style.fontSize = `${(size -= 2)}px`;
+        if (el.scrollWidth > room) el.style.fontSize = `${max - 8}px`;
+        el.style.whiteSpace = "";
+      };
+      // a place's name may take two lines, never three: set smaller until it does
+      const fitLines = (selector, max, min, lines) => {
+        for (const el of document.querySelectorAll(selector)) {
+          let size = max;
+          el.style.fontSize = `${size}px`;
+          while (el.offsetHeight > size * 1.02 * lines + 2 && size > min)
+            el.style.fontSize = `${(size -= 2)}px`;
+        }
+      };
+      const fitAll = () => {
+        fit("#hook-1", 104, 84);
+        fit("#end-find", 92, 72);
+        fitLines(".name", 80, 60, 2);
+      };
+      fitAll();
+      // again once the face is in, and whenever the runtime puts this city's words in
+      if (document.fonts) document.fonts.ready.then(fitAll);
+      for (const el of document.querySelectorAll("#hook-1, #end-find, .name"))
+        new MutationObserver(fitAll).observe(el, { childList: true, characterData: true, subtree: true });
+
+      const tl = gsap.timeline({ paused: true });
+      // signs come and go the way pixels do: in steps, never eased
+      const stepIn = (id, at) =>
+        tl.fromTo(id, { y: 44, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, at);
+      const stepOut = (id, at) =>
+        tl.fromTo(
+          id,
+          { y: 0, opacity: 1 },
+          { y: -30, opacity: 0, duration: 0.17, ease: "steps(3)", immediateRender: false },
+          at,
+        );
+
+      // the hook is whole on the first frame; it goes as the view dives (bar 1, 2.435 s)
+      stepOut("#hook-sign", 2.55);
+      // the places: the view lands on 4.835, 7.235, 9.635, 12.035 and leaves 1.2 s later
+      const lands = [4.835, 7.235, 9.635, 12.035];
+      lands.forEach((land, i) => {
+        stepIn(`#p${i + 1}-sign`, land - 0.15);
+        if (i < 3) stepOut(`#p${i + 1}-sign`, land + 1.4);
+      });
+      // the last stays while its building is lit, and goes with the pointer, before the bar
+      stepOut("#p4-sign", 16.5);
+      // the end card: the line on the bar, where on its second beat, the small print on the third
+      stepIn("#end-sign", 16.835 - 0.12);
+      stepIn("#where-sign", 17.435 - 0.12);
+      tl.fromTo(
+        "#end-note",
+        { y: 16, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" },
+        18.035 - 0.12,
+      );
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

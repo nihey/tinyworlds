@@ -45,17 +45,41 @@ export interface Stage {
   page: Page;
 }
 
+export interface StageOptions {
+  /** CSS px and device pixel ratio; the picture is width·dpr × height·dpr. Default: `VIEW`. */
+  view?: { width: number; height: number; dpr: number };
+  /** Called with the page before it navigates (request interception, a user data dir's cookies…). */
+  prepare?: (page: Page) => Promise<void>;
+  /** Extra Chrome flags. */
+  args?: string[];
+  /** Keep a browser profile here, so the tiles of one take are in the cache for the next. */
+  userDataDir?: string;
+}
+
 /** `init`: more script to run before the page's own, after the clock is taken over. */
-export async function openStage(url: string, startMs = 0, init?: string): Promise<Stage> {
+export async function openStage(
+  url: string,
+  startMs = 0,
+  init?: string,
+  options: StageOptions = {},
+): Promise<Stage> {
+  const view = options.view ?? VIEW;
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_PATH ?? "/usr/bin/google-chrome",
     headless: true,
-    args: ["--hide-scrollbars", "--force-color-profile=srgb", "--autoplay-policy=no-user-gesture-required"],
+    userDataDir: options.userDataDir,
+    args: [
+      "--hide-scrollbars",
+      "--force-color-profile=srgb",
+      "--autoplay-policy=no-user-gesture-required",
+      ...(options.args ?? []),
+    ],
   });
   const page = await browser.newPage();
-  await page.setViewport({ width: VIEW.width, height: VIEW.height, deviceScaleFactor: VIEW.dpr });
+  await page.setViewport({ width: view.width, height: view.height, deviceScaleFactor: view.dpr });
   await page.evaluateOnNewDocument(CLOCK);
   if (init) await page.evaluateOnNewDocument(init);
+  if (options.prepare) await options.prepare(page);
   await page.goto(url, { waitUntil: "networkidle2", timeout: 120_000 });
   await page.addStyleTag({ content: STYLE });
   // the viewer keeps its engine on window.tinyworld; let it come up on its own clock first

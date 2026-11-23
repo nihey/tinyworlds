@@ -1,0 +1,296 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+      font-family: "Archivo", sans-serif;
+    }
+    .tour-take {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      object-fit: contain;
+    }
+    /* the world's name, then its landmark's, on signs in the site's manner: black enamel, paper
+       lettering, the world's own colour along the top */
+    .tour-sign {
+      position: absolute;
+      left: 96px;
+      bottom: 96px;
+      overflow: hidden;
+      background: #15171a;
+      color: #f4f2ec;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+      white-space: nowrap;
+      padding-bottom: 28px;
+    }
+    /* over the whole city the name stands in the open sea at the top left, clear of the districts */
+    .tour-top {
+      top: 96px;
+      bottom: auto;
+    }
+    .tour-strip {
+      height: 8px;
+      background: var(--accent);
+    }
+    .tour-mark {
+      padding: 24px 46px 0;
+      font-family: "Tiny5", monospace;
+      font-size: 78px;
+      line-height: 1;
+    }
+    .tour-mark b {
+      font-weight: 400;
+      color: var(--accent);
+    }
+    .tour-name {
+      padding: 20px 46px 0;
+      font-size: 76px;
+      line-height: 1.08;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    .tour-sub {
+      padding: 12px 46px 0;
+      font-size: 40px;
+      line-height: 1.15;
+      font-weight: 600;
+    }
+    .tour-dim {
+      font-weight: 500;
+      font-size: 36px;
+      color: #b4b1a8;
+    }
+  </style>
+  <div id="root" data-composition-id="tour" data-width="1920" data-height="1080">
+    <!-- a world a stop (6 s, three bars at 120 BPM), in the order the games came out, each one take
+         of the live viewer (scripts/social/gta.ts takes): the whole city with its districts named
+         by the viewer's own region lines, then its flight down to the landmark -->
+    <video
+      id="tour-v1"
+      class="clip tour-take"
+      data-start="0.0"
+      data-duration="6.0"
+      data-track-index="0"
+      src="assets/takes/tinygtaiii.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="tour-v2"
+      class="clip tour-take"
+      data-start="6.0"
+      data-duration="6.0"
+      data-track-index="0"
+      src="assets/takes/tinyvicecity.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="tour-v3"
+      class="clip tour-take"
+      data-start="12.0"
+      data-duration="6.0"
+      data-track-index="0"
+      src="assets/takes/tinysanandreas.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="tour-v4"
+      class="clip tour-take"
+      data-start="18.0"
+      data-duration="6.0"
+      data-track-index="0"
+      src="assets/takes/tinygtaiv.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="tour-v5"
+      class="clip tour-take"
+      data-start="24.0"
+      data-duration="6.0"
+      data-track-index="0"
+      src="assets/takes/tinygtav.mp4"
+      muted
+      playsinline
+    ></video>
+
+    <div
+      id="tour-w1"
+      class="clip"
+      data-start="0.0"
+      data-duration="1.9"
+      data-track-index="1"
+      style="--accent: #abd681"
+    >
+      <div id="tour-ws1" class="tour-sign tour-top">
+        <div class="tour-strip"></div>
+        <div class="tour-mark"><span>tiny</span><b>gtaiii</b></div>
+        <div class="tour-sub">Inspired by GTA III</div>
+      </div>
+    </div>
+    <div
+      id="tour-p1"
+      class="clip"
+      data-start="3.65"
+      data-duration="2.25"
+      data-track-index="2"
+      style="--accent: #abd681"
+    >
+      <div id="tour-ps1" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Ashwater Power Station</div>
+        <div class="tour-sub tour-dim">Mercury Works</div>
+      </div>
+    </div>
+    <div
+      id="tour-w2"
+      class="clip"
+      data-start="6.0"
+      data-duration="1.9"
+      data-track-index="1"
+      style="--accent: #f59bc8"
+    >
+      <div id="tour-ws2" class="tour-sign tour-top">
+        <div class="tour-strip"></div>
+        <div class="tour-mark"><span>tiny</span><b>vicecity</b></div>
+        <div class="tour-sub">Inspired by GTA: Vice City</div>
+      </div>
+    </div>
+    <div
+      id="tour-p2"
+      class="clip"
+      data-start="9.65"
+      data-duration="2.25"
+      data-track-index="2"
+      style="--accent: #f59bc8"
+    >
+      <div id="tour-ps2" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">The Coral Hour</div>
+        <div class="tour-sub tour-dim">Sunflash Beach</div>
+      </div>
+    </div>
+    <div
+      id="tour-w3"
+      class="clip"
+      data-start="12.0"
+      data-duration="1.9"
+      data-track-index="1"
+      style="--accent: #f4bd77"
+    >
+      <div id="tour-ws3" class="tour-sign tour-top">
+        <div class="tour-strip"></div>
+        <div class="tour-mark"><span>tiny</span><b>sanandreas</b></div>
+        <div class="tour-sub">Inspired by GTA: San Andreas</div>
+      </div>
+    </div>
+    <div
+      id="tour-p3"
+      class="clip"
+      data-start="15.65"
+      data-duration="2.25"
+      data-track-index="2"
+      style="--accent: #f4bd77"
+    >
+      <div id="tour-ps3" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Mirage Crown</div>
+        <div class="tour-sub tour-dim">Copper Mile</div>
+      </div>
+    </div>
+    <div
+      id="tour-w4"
+      class="clip"
+      data-start="18.0"
+      data-duration="1.9"
+      data-track-index="1"
+      style="--accent: #9cc8ee"
+    >
+      <div id="tour-ws4" class="tour-sign tour-top">
+        <div class="tour-strip"></div>
+        <div class="tour-mark"><span>tiny</span><b>gtaiv</b></div>
+        <div class="tour-sub">Inspired by GTA IV</div>
+      </div>
+    </div>
+    <div
+      id="tour-p4"
+      class="clip"
+      data-start="21.65"
+      data-duration="2.25"
+      data-track-index="2"
+      style="--accent: #9cc8ee"
+    >
+      <div id="tour-ps4" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Alder Span</div>
+        <div class="tour-sub tour-dim">Alder Heights</div>
+      </div>
+    </div>
+    <div
+      id="tour-w5"
+      class="clip"
+      data-start="24.0"
+      data-duration="1.9"
+      data-track-index="1"
+      style="--accent: #9cdc91"
+    >
+      <div id="tour-ws5" class="tour-sign tour-top">
+        <div class="tour-strip"></div>
+        <div class="tour-mark"><span>tiny</span><b>gtav</b></div>
+        <div class="tour-sub">Inspired by GTA V</div>
+      </div>
+    </div>
+    <div
+      id="tour-p5"
+      class="clip"
+      data-start="27.65"
+      data-duration="2.25"
+      data-track-index="2"
+      style="--accent: #9cdc91"
+    >
+      <div id="tour-ps5" class="tour-sign">
+        <div class="tour-strip"></div>
+        <div class="tour-name">Halo Observatory</div>
+        <div class="tour-sub tour-dim">Palisade Estates</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // signs arrive and leave the way pixels do: in steps, never eased
+    const sign = (id, arrives, leaves) => {
+      tl.fromTo(id, { y: 42, opacity: 0 }, { y: 0, opacity: 1, duration: 0.2, ease: "steps(3)" }, arrives);
+      out(id, leaves);
+    };
+    const out = (id, leaves) =>
+      tl.fromTo(
+        id,
+        { y: 0, opacity: 1 },
+        { y: -28, opacity: 0, duration: 0.17, ease: "steps(3)", immediateRender: false },
+        leaves,
+      );
+    out("#tour-ws1", 1.72);
+    sign("#tour-ps1", 3.65, 5.72);
+    sign("#tour-ws2", 6.05, 7.72);
+    sign("#tour-ps2", 9.65, 11.719999999999999);
+    sign("#tour-ws3", 12.05, 13.72);
+    sign("#tour-ps3", 15.65, 17.72);
+    sign("#tour-ws4", 18.05, 19.72);
+    sign("#tour-ps4", 21.65, 23.72);
+    sign("#tour-ws5", 24.05, 25.72);
+    sign("#tour-ps5", 27.65, 29.72);
+    window.__timelines["tour"] = tl;
+  </script>
+</template>

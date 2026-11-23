@@ -1,0 +1,88 @@
+<!doctype html>
+<!--
+  Midday to midnight, as a loop: 1920 × 1080, 18 s, no words. One fixed view of Midtown
+  Manhattan (Bryant Park in the middle, the Empire State Building at the left) filmed on the
+  live site while the viewer's own six-minute day plays through once, compressed: golden hour,
+  the windows lighting up, night, dawn, noon, and golden hour again. The last frame hands over
+  to the first, and the music's last two seconds are laid over its first two, so both loop
+  without a seam. Made by scripts/social/daynight.ts (take, then loop); the credit line is the
+  viewer's own.
+
+  Variables: `take` (the clear day or the stormy one).
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"take","type":"enum","label":"Which day","default":"assets/takes/nyc-clear-loop.mp4","options":[{"value":"assets/takes/nyc-clear-loop.mp4","label":"Clear"},{"value":"assets/takes/nyc-storm-loop.mp4","label":"Stormy"}]}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+      #day {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="18"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- the day, from golden hour round to golden hour: 540 frames of the real viewer -->
+      <video
+        id="day"
+        class="clip"
+        data-start="0"
+        data-duration="18"
+        data-track-index="0"
+        src="assets/takes/nyc-clear-loop.mp4"
+        data-var-src="take"
+        muted
+        playsinline
+      ></video>
+      <!-- beatless pads, cut to loop with the picture (daynight.ts loop) -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/loop.wav"
+        data-start="0"
+        data-duration="18"
+        data-track-index="10"
+        data-volume="0.8"
+      ></audio>
+    </div>
+    <script>
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

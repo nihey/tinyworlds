@@ -1,0 +1,533 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #e9e6df;
+      font-family: "Archivo", sans-serif;
+    }
+    .reel-take {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      object-fit: contain;
+    }
+    /* the counter: one black enamel sign that stays where it is while the cities cut behind it;
+       its number, wordmark, name and the colour along its top are each city's own */
+    #reel-sign {
+      position: absolute;
+      left: 96px;
+      bottom: 96px;
+      width: 600px;
+      height: 560px;
+      overflow: hidden;
+      background: #15171a;
+      border-radius: 20px;
+      box-shadow:
+        inset 0 2px 0 rgb(255 255 255 / 0.08),
+        0 0 0 2px rgb(0 0 0 / 0.6),
+        0 32px 68px -28px rgb(0 0 0 / 0.65),
+        0 4px 12px -2px rgb(0 0 0 / 0.3);
+    }
+    .reel-city {
+      position: absolute;
+      inset: 0;
+      color: #f4f2ec;
+      white-space: nowrap;
+    }
+    .reel-strip {
+      height: 10px;
+      background: var(--accent);
+    }
+    .reel-num {
+      padding: 6px 0 0 40px;
+      font-family: "Tiny5", monospace;
+      font-size: 290px;
+      line-height: 0.92;
+      letter-spacing: -0.02em;
+      /* the pixel face's squares meet in a hairline at this size: a stroke closes it */
+      -webkit-text-stroke: 3px #f4f2ec;
+    }
+    .reel-mark {
+      padding: 14px 0 0 44px;
+      font-family: "Tiny5", monospace;
+      font-size: 62px;
+      line-height: 1;
+    }
+    .reel-mark b {
+      font-weight: 400;
+      color: var(--accent);
+    }
+    .reel-name {
+      padding: 22px 0 0 44px;
+      font-size: 46px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: -0.012em;
+    }
+    .reel-region {
+      padding: 6px 0 0 44px;
+      font-size: 30px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: #b4b1a8;
+    }
+  </style>
+  <div id="root" data-composition-id="reel" data-width="1920" data-height="1080">
+    <!-- the cities in the order they went up, a bar (1.5 s at 160 BPM) each, filmed on the live
+         site: a slow push in on each one's best framing (scripts/social/seventeen.ts shots) -->
+    <video
+      id="reel-v01"
+      class="clip reel-take"
+      data-start="0.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinynyc.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v02"
+      class="clip reel-take"
+      data-start="1.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinyrao.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v03"
+      class="clip reel-take"
+      data-start="3.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinyorl.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v04"
+      class="clip reel-take"
+      data-start="4.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinyfte.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v05"
+      class="clip reel-take"
+      data-start="6.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinyvlc.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v06"
+      class="clip reel-take"
+      data-start="7.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinylas.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v07"
+      class="clip reel-take"
+      data-start="9.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinylax.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v08"
+      class="clip reel-take"
+      data-start="10.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinydal.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v09"
+      class="clip reel-take"
+      data-start="12.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinycvg.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v10"
+      class="clip reel-take"
+      data-start="13.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinypit.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v11"
+      class="clip reel-take"
+      data-start="15.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinyphl.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v12"
+      class="clip reel-take"
+      data-start="16.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinycos.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v13"
+      class="clip reel-take"
+      data-start="18.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinytkf.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v14"
+      class="clip reel-take"
+      data-start="19.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinyaus.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v15"
+      class="clip reel-take"
+      data-start="21.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinysfo.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v16"
+      class="clip reel-take"
+      data-start="22.5"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinymke.mp4"
+      muted
+      playsinline
+    ></video>
+    <video
+      id="reel-v17"
+      class="clip reel-take"
+      data-start="24.0"
+      data-duration="1.5"
+      data-media-start="0.3"
+      data-track-index="0"
+      src="assets/takes/tinybeth.mp4"
+      muted
+      playsinline
+    ></video>
+
+    <div id="reel-sign" class="clip" data-start="0" data-duration="25.5" data-track-index="1">
+      <div
+        id="reel-c01"
+        class="clip reel-city"
+        data-start="0.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #f7c21b"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n01" class="reel-num">1</div>
+        <div class="reel-mark"><span>tiny</span><b>nyc</b></div>
+        <div class="reel-name">New York</div>
+        <div class="reel-region">New York, USA</div>
+      </div>
+      <div
+        id="reel-c02"
+        class="clip reel-city"
+        data-start="1.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ff7a3d"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n02" class="reel-num">2</div>
+        <div class="reel-mark"><span>tiny</span><b>rao</b></div>
+        <div class="reel-name">Ribeirão Preto</div>
+        <div class="reel-region">São Paulo, Brazil</div>
+      </div>
+      <div
+        id="reel-c03"
+        class="clip reel-city"
+        data-start="3.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #3ccfc0"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n03" class="reel-num">3</div>
+        <div class="reel-mark"><span>tiny</span><b>orl</b></div>
+        <div class="reel-name">Orlando</div>
+        <div class="reel-region">Florida, USA</div>
+      </div>
+      <div
+        id="reel-c04"
+        class="clip reel-city"
+        data-start="4.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #b9a2ff"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n04" class="reel-num">4</div>
+        <div class="reel-mark"><span>tiny</span><b>fte</b></div>
+        <div class="reel-name">El Calafate</div>
+        <div class="reel-region">Patagonia, Argentina</div>
+      </div>
+      <div
+        id="reel-c05"
+        class="clip reel-city"
+        data-start="6.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ffa62b"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n05" class="reel-num">5</div>
+        <div class="reel-mark"><span>tiny</span><b>vlc</b></div>
+        <div class="reel-name">Valencia</div>
+        <div class="reel-region">Spain</div>
+      </div>
+      <div
+        id="reel-c06"
+        class="clip reel-city"
+        data-start="7.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ff4fa3"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n06" class="reel-num">6</div>
+        <div class="reel-mark"><span>tiny</span><b>las</b></div>
+        <div class="reel-name">Las Vegas</div>
+        <div class="reel-region">Nevada, USA</div>
+      </div>
+      <div
+        id="reel-c07"
+        class="clip reel-city"
+        data-start="9.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #55aaff"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n07" class="reel-num">7</div>
+        <div class="reel-mark"><span>tiny</span><b>lax</b></div>
+        <div class="reel-name">Los Angeles</div>
+        <div class="reel-region">California, USA</div>
+      </div>
+      <div
+        id="reel-c08"
+        class="clip reel-city"
+        data-start="10.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #6ee05a"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n08" class="reel-num">8</div>
+        <div class="reel-mark"><span>tiny</span><b>dal</b></div>
+        <div class="reel-name">Dallas</div>
+        <div class="reel-region">Texas, USA</div>
+      </div>
+      <div
+        id="reel-c09"
+        class="clip reel-city"
+        data-start="12.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #a56bff"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n09" class="reel-num">9</div>
+        <div class="reel-mark"><span>tiny</span><b>cvg</b></div>
+        <div class="reel-name">Cincinnati</div>
+        <div class="reel-region">Ohio, USA</div>
+      </div>
+      <div
+        id="reel-c10"
+        class="clip reel-city"
+        data-start="13.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ffd447"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n10" class="reel-num">10</div>
+        <div class="reel-mark"><span>tiny</span><b>pit</b></div>
+        <div class="reel-name">Pittsburgh</div>
+        <div class="reel-region">Pennsylvania, USA</div>
+      </div>
+      <div
+        id="reel-c11"
+        class="clip reel-city"
+        data-start="15.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #5b7cfa"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n11" class="reel-num">11</div>
+        <div class="reel-mark"><span>tiny</span><b>phl</b></div>
+        <div class="reel-name">Philadelphia</div>
+        <div class="reel-region">Pennsylvania, USA</div>
+      </div>
+      <div
+        id="reel-c12"
+        class="clip reel-city"
+        data-start="16.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ff6b57"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n12" class="reel-num">12</div>
+        <div class="reel-mark"><span>tiny</span><b>cos</b></div>
+        <div class="reel-name">Colorado Springs</div>
+        <div class="reel-region">Colorado, USA</div>
+      </div>
+      <div
+        id="reel-c13"
+        class="clip reel-city"
+        data-start="18.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #45d993"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n13" class="reel-num">13</div>
+        <div class="reel-mark"><span>tiny</span><b>tkf</b></div>
+        <div class="reel-name">Truckee</div>
+        <div class="reel-region">California, USA</div>
+      </div>
+      <div
+        id="reel-c14"
+        class="clip reel-city"
+        data-start="19.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ef8a48"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n14" class="reel-num">14</div>
+        <div class="reel-mark"><span>tiny</span><b>aus</b></div>
+        <div class="reel-name">Austin</div>
+        <div class="reel-region">Texas, USA</div>
+      </div>
+      <div
+        id="reel-c15"
+        class="clip reel-city"
+        data-start="21.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #f07858"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n15" class="reel-num">15</div>
+        <div class="reel-mark"><span>tiny</span><b>sfo</b></div>
+        <div class="reel-name">San Francisco</div>
+        <div class="reel-region">California, USA</div>
+      </div>
+      <div
+        id="reel-c16"
+        class="clip reel-city"
+        data-start="22.5"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #f0c879"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n16" class="reel-num">16</div>
+        <div class="reel-mark"><span>tiny</span><b>mke</b></div>
+        <div class="reel-name">Milwaukee</div>
+        <div class="reel-region">Wisconsin, USA</div>
+      </div>
+      <div
+        id="reel-c17"
+        class="clip reel-city"
+        data-start="24.0"
+        data-duration="1.5"
+        data-track-index="2"
+        style="--accent: #ed996c"
+      >
+        <div class="reel-strip"></div>
+        <div id="reel-n17" class="reel-num">17</div>
+        <div class="reel-mark"><span>tiny</span><b>beth</b></div>
+        <div class="reel-name">Bethlehem</div>
+        <div class="reel-region">Pennsylvania, USA</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // each new number is stamped on with the cut, the way pixels arrive: in steps, never eased
+    const land = (id, at) => tl.fromTo(id, { y: -26 }, { y: 0, duration: 0.1, ease: "steps(2)" }, at);
+    land("#reel-n02", 1.5);
+    land("#reel-n03", 3.0);
+    land("#reel-n04", 4.5);
+    land("#reel-n05", 6.0);
+    land("#reel-n06", 7.5);
+    land("#reel-n07", 9.0);
+    land("#reel-n08", 10.5);
+    land("#reel-n09", 12.0);
+    land("#reel-n10", 13.5);
+    land("#reel-n11", 15.0);
+    land("#reel-n12", 16.5);
+    land("#reel-n13", 18.0);
+    land("#reel-n14", 19.5);
+    land("#reel-n15", 21.0);
+    land("#reel-n16", 22.5);
+    land("#reel-n17", 24.0);
+    window.__timelines["reel"] = tl;
+  </script>
+</template>

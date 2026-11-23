@@ -1,0 +1,294 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"link","type":"string","label":"The New York map address, no scheme","default":"example.com/tinynyc/"}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Tiny Worlds · Street Walk: real New York in a browser tab</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: Archivo;
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: Tiny5;
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+      }
+      :root {
+        --enamel: #15171a;
+        --paper: #f4f2ec;
+        --fog: #e9e6df;
+        --accent: #f7c21b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+      }
+      #social-chaos {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--enamel);
+        font-family: Archivo, sans-serif;
+      }
+      .take {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        z-index: 1;
+      }
+      .graphics {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+      #link {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 668px;
+        z-index: 3;
+        margin: 0;
+        text-align: center;
+        color: var(--accent);
+        font-size: 46px;
+        font-weight: 640;
+        letter-spacing: -0.01em;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      id="social-chaos"
+      data-composition-id="social-chaos"
+      data-start="0"
+      data-duration="28"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- TAKES -->
+      <video
+        id="bike"
+        class="clip take"
+        data-start="0.0"
+        data-duration="4.055"
+        data-media-start="0.0"
+        data-track-index="0"
+        src="assets/takes/bike.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="chase"
+        class="clip take"
+        data-start="4.055"
+        data-duration="2.0"
+        data-media-start="0.8"
+        data-track-index="0"
+        src="assets/takes/chase.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="crash"
+        class="clip take"
+        data-start="6.055"
+        data-duration="1.0"
+        data-media-start="1.0"
+        data-track-index="0"
+        src="assets/takes/fire-a.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="burning"
+        class="clip take"
+        data-start="7.055"
+        data-duration="2.5"
+        data-media-start="2.0"
+        data-track-index="0"
+        src="assets/takes/fire-a.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="boom"
+        class="clip take"
+        data-start="9.555"
+        data-duration="2.5"
+        data-media-start="0.067"
+        data-track-index="0"
+        src="assets/takes/fire-b.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="punch"
+        class="clip take"
+        data-start="12.055"
+        data-duration="2.0"
+        data-media-start="0.6"
+        data-track-index="0"
+        src="assets/takes/punch.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="boat"
+        class="clip take"
+        data-start="14.055"
+        data-duration="4.0"
+        data-media-start="0.4"
+        data-track-index="0"
+        src="assets/takes/boat.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="bridge"
+        class="clip take"
+        data-start="18.055"
+        data-duration="9.945"
+        data-media-start="0.0"
+        data-track-index="0"
+        src="assets/takes/bridge.mp4"
+        muted
+        playsinline
+      ></video>
+
+      <div
+        id="lines"
+        class="clip graphics"
+        data-composition-id="lines"
+        data-composition-src="compositions/lines.html"
+        data-start="0"
+        data-duration="22.6"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="end-card"
+        class="clip graphics"
+        data-composition-id="end-card"
+        data-composition-src="compositions/end-card.html"
+        data-start="23.055"
+        data-duration="4.945"
+        data-track-index="2"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <p
+        id="link"
+        class="clip"
+        data-start="23.555"
+        data-duration="4.445"
+        data-track-index="3"
+        data-track-kind="graphics"
+        data-var-text="link"
+      >
+        example.com/tinynyc/
+      </p>
+
+      <!-- SOUND -->
+      <audio
+        id="bed"
+        class="clip"
+        data-start="0"
+        data-duration="28"
+        data-track-index="4"
+        data-volume="0.9"
+        data-fade-in="0.02"
+        data-fade-out="1.5"
+        src="assets/music/bed.mp3"
+      ></audio>
+      <audio
+        id="chase-pass"
+        class="clip"
+        data-start="3.925"
+        data-duration="0.5"
+        data-track-index="6"
+        data-volume="0.4"
+        src="assets/sfx/whoosh-short.mp3"
+      ></audio>
+      <audio
+        id="crash-hit"
+        class="clip"
+        data-start="6.495"
+        data-duration="1.2"
+        data-track-index="5"
+        data-volume="0.5"
+        data-fade-out="0.4"
+        src="assets/sfx/impact-bass-1.mp3"
+      ></audio>
+      <audio
+        id="boom-hit"
+        class="clip"
+        data-start="9.105"
+        data-duration="2.59"
+        data-track-index="6"
+        data-volume="0.85"
+        src="assets/sfx/impact-bass-2.mp3"
+      ></audio>
+      <audio
+        id="punch-hit"
+        class="clip"
+        data-start="12.995"
+        data-duration="0.45"
+        data-track-index="5"
+        data-volume="0.6"
+        data-fade-out="0.2"
+        src="assets/sfx/impact-bass-1.mp3"
+      ></audio>
+      <audio
+        id="boat-cut"
+        class="clip"
+        data-start="13.925"
+        data-duration="0.57"
+        data-track-index="6"
+        data-volume="0.35"
+        src="assets/sfx/whoosh.mp3"
+      ></audio>
+      <audio
+        id="bridge-cut"
+        class="clip"
+        data-start="17.925"
+        data-duration="0.57"
+        data-track-index="5"
+        data-volume="0.3"
+        src="assets/sfx/whoosh-short.mp3"
+      ></audio>
+      <audio
+        id="end-pop"
+        class="clip"
+        data-start="22.935"
+        data-duration="0.6"
+        data-track-index="6"
+        data-volume="0.35"
+        data-fade-out="0.15"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+    </main>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#link", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 23.555);
+      window.__timelines["social-chaos"] = tl;
+    </script>
+  </body>
+</html>
