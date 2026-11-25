@@ -136,8 +136,7 @@ describe("planTiles", () => {
     expect(plan.wanted.some((w) => w.z === 1 && w.tx === 2 && w.ty === 1 && w.pri === 1)).toBe(
       true,
     );
-    // default ring is off in this change: no prefetch
-    expect(plan.wanted.every((w) => w.pri !== 2)).toBe(true);
+    expect(plan.wanted.some((w) => w.pri === 2 && w.z === 0)).toBe(true);
 
     const ready = new Set(["0/4_2", "1/2_1"]);
     const kept = planTiles(
@@ -148,5 +147,10 @@ describe("planTiles", () => {
     );
     expect(kept.wanted.some((w) => w.z === 0 && w.tx === 4 && w.ty === 2)).toBe(false);
     expect(kept.retain).toContainEqual({ z: 1, tx: 2, ty: 1 });
+  });
+
+  it("can skip the ring when asked", () => {
+    const none = planTiles(pyramid, view, () => false, () => false, { ring: 0 });
+    expect(none.wanted.every((w) => w.pri !== 2)).toBe(true);
   });
 });
