@@ -150,7 +150,13 @@ describe("planTiles", () => {
   });
 
   it("can skip the ring when asked", () => {
-    const none = planTiles(pyramid, view, () => false, () => false, { ring: 0 });
+    const none = planTiles(
+      pyramid,
+      view,
+      () => false,
+      () => false,
+      { ring: 0 },
+    );
     expect(none.wanted.every((w) => w.pri !== 2)).toBe(true);
   });
 });
