@@ -153,4 +153,13 @@ describe("planTiles", () => {
     const none = planTiles(pyramid, view, () => false, () => false, { ring: 0 });
     expect(none.wanted.every((w) => w.pri !== 2)).toBe(true);
   });
+
+  it("can skip native tiles while a pan is in flight", () => {
+    const deferred = planTiles(pyramid, view, () => false, () => false, {
+      ring: 0,
+      deferNative: true,
+    });
+    expect(deferred.wanted.some((w) => w.z === 0)).toBe(false);
+    expect(deferred.wanted.some((w) => w.z === 1)).toBe(true);
+  });
 });
