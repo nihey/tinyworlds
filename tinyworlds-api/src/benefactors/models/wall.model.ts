@@ -1,6 +1,18 @@
 import { Field, Int, ObjectType } from '@nestjs/graphql';
 import { BenefactorLink } from '../../links/models/benefactor-link.model.js';
 
+@ObjectType({ description: 'Founding achievements earned in a city' })
+export class WallFoundation {
+  @Field(() => Int)
+  number: number;
+
+  @Field()
+  firstStone: boolean;
+
+  @Field()
+  keystone: boolean;
+}
+
 @ObjectType({ description: 'A city someone on the wall gave to' })
 export class WallCity {
   @Field()
@@ -14,6 +26,9 @@ export class WallCity {
     description: 'The id of its map once it is built ("tinynyc")',
   })
   worldId: string | null;
+
+  @Field(() => WallFoundation, { nullable: true })
+  foundation?: WallFoundation;
 }
 
 @ObjectType({

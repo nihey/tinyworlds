@@ -3,6 +3,7 @@ import { drawIcon, drawPicture, type Drawn } from './link-images.js';
 import {
   cleanText,
   decodeHtml,
+  isYouTubeChannel,
   readPageMeta,
   TITLE_MAX,
   type PageMeta,
@@ -33,6 +34,7 @@ export const READ_MS = 9000;
 
 /** The most that is read of a page (its head is at its start), of a picture, and of an icon. */
 const PAGE_BYTES = 600_000;
+const YOUTUBE_CHANNEL_BYTES = 1_500_000;
 const PICTURE_BYTES = 5_000_000;
 const ICON_BYTES = 500_000;
 
@@ -125,7 +127,7 @@ export function createLinkReader(
       try {
         const page = await fetcher(url, {
           accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
-          maxBytes: PAGE_BYTES,
+          maxBytes: isYouTubeChannel(url) ? YOUTUBE_CHANNEL_BYTES : PAGE_BYTES,
           longer: 'cut',
           deadline,
         });

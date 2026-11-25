@@ -42,7 +42,11 @@ export function buildEndpoint(
 // one answer per build for each question, however many pages ask it
 const asked = new Map<string, Promise<unknown>>();
 
-function ask(query: string, variables?: Record<string, unknown>): Promise<unknown> | null {
+/**
+ * Asks the API once per build (the front page's bake asks here too); null when the build names
+ * no API. Rejects as `askHall` does: the caller turns that into nothing baked.
+ */
+export function ask(query: string, variables?: Record<string, unknown>): Promise<unknown> | null {
   const endpoint = buildEndpoint();
   if (!endpoint) return null;
   const key = `${query}${JSON.stringify(variables ?? {})}`;
@@ -56,7 +60,8 @@ function ask(query: string, variables?: Record<string, unknown>): Promise<unknow
   return answer;
 }
 
-const originOf = (): string | null => {
+/** The API's origin, for the pictures of the links it answers (paths on its own host). */
+export const originOf = (): string | null => {
   const endpoint = buildEndpoint();
   return endpoint ? new URL(endpoint).origin : null;
 };

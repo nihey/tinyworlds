@@ -32,7 +32,7 @@ export interface Scene {
   trees: { xy: Float32Array; kind: Uint8Array; count: number };
   /**
    * Bridge cables and trusses: 3D paths as (x, ground y, rise) triples. Kind 0 is a main cable,
-   * 1 a suspender, 2 a truss chord, 3 a lesser truss member.
+   * 1 a suspender, 2 a truss chord, 3 a lesser truss member, 4 and 5 painted suspension cables.
    */
   cab: { start: Uint32Array; xyz: Float32Array; kind: Uint8Array; bbox: Float32Array; count: number };
   fog: {

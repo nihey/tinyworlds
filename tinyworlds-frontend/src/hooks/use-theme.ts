@@ -9,7 +9,7 @@ import { useMediaQuery } from "./use-media-query";
 export function useTheme(pref: ThemePref): "light" | "dark" {
   const hydrated = useHydrated();
   const systemDark = useMediaQuery("(prefers-color-scheme: dark)");
-  const theme = pref === "system" ? (systemDark ? "dark" : "light") : pref;
+  const theme = pref === "system" || pref === "cycle" ? (systemDark ? "dark" : "light") : pref;
   useEffect(() => {
     // until hydration the stored setting isn't known here; the script in layout.tsx has it right
     if (hydrated) document.documentElement.classList.toggle("dusk", theme === "dark");

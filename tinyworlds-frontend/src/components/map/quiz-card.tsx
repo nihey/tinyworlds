@@ -399,9 +399,11 @@ function Round({
           ),
         )}
       </p>
-      <p className="mt-1.5 text-[11.5px] text-paper-dim">
-        {answered ? t.quiz.credit : t.quiz.source}
-      </p>
+      {!question.reference && (
+        <p className="mt-1.5 text-[11.5px] text-paper-dim">
+          {answered ? t.quiz.credit : t.quiz.source}
+        </p>
+      )}
 
       {counted && note && (
         <p className="mt-2 text-[13px] text-paper-dim">
@@ -501,7 +503,7 @@ function Round({
               rel="noopener noreferrer"
               className="ml-auto flex items-center gap-1 text-[12.5px] font-semibold text-taxi hover:underline"
             >
-              {t.sight.readOn}
+              {article.reference ? t.sight.readSource : t.sight.readOn}
               <ArrowUpRight aria-hidden className="size-3.5" strokeWidth={2.25} />
             </a>
           )}

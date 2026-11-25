@@ -12,10 +12,11 @@ import { useI18n } from "@/hooks/use-i18n";
 import type { CityBenefactors } from "@/lib/benefactors";
 import { broughtBy } from "@/lib/brought-by";
 import { API_URL, formatUsd } from "@/lib/donate";
-import { fetchCityHall, hasPeople } from "@/lib/hall";
+import { cityHallPeople, fetchCityHall } from "@/lib/hall";
 import { cn } from "@/lib/utils";
-import { HALL_URL, SITE_ID, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
-import { BenefactorCard, CARDS, FounderCard } from "./hall-cards";
+import { HALL_URL, SITE_ID, worldCardSrcSet, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { AchievementBadges } from "./achievement-badges";
+import { LEADERBOARD, PersonCard } from "./hall-cards";
 import { HallFrame } from "./hall-frame";
 
 type Load =
@@ -23,8 +24,6 @@ type Load =
   | { state: "failed" }
   | { state: "unknown" }
   | { state: "ready"; city: CityBenefactors };
-
-const HEADING = "pb-3 text-[17px] leading-tight font-semibold text-[#15171a] dusk:text-paper";
 
 /**
  * A city's hall of fame: its picture once it is on the map, its foundation (and, for a city its
@@ -57,6 +56,7 @@ export function CityHall({ slug, initial }: { slug: string; initial: CityBenefac
   }, [slug]);
 
   const city = load.state === "ready" ? load.city : null;
+  const people = city ? cityHallPeople(city) : [];
   const title = city ? t.hall.cityTitle.replace("{city}", city.name) : t.hall.title;
   // an older API does not count the people: each row of its lists is someone
   const brought = city
@@ -108,6 +108,8 @@ export function CityHall({ slug, initial }: { slug: string; initial: CityBenefac
                     // beside the words where there is room, above them where there is not
                     <MovingPicture
                       still={worldCardUrl(city.worldId)}
+                      srcSet={worldCardSrcSet(city.worldId)}
+                      sizes="(min-width: 64rem) 40rem, 100vw"
                       loop={worldLoopUrl(city.worldId)}
                       alt=""
                       eager
@@ -191,36 +193,51 @@ export function CityHall({ slug, initial }: { slug: string; initial: CityBenefac
                 </div>
               </section>
 
-              {!hasPeople(city) && (
+              {people.length === 0 ? (
                 <p className="text-[15px] text-[#15171a]/80 dusk:text-paper-dim">{t.hall.empty}</p>
-              )}
-
-              {city.founders.length > 0 && (
-                <section aria-labelledby="hall-founders">
-                  <h2 id="hall-founders" className={HEADING}>
-                    {t.benefactors.founders}
-                  </h2>
-                  <ul className={CARDS}>
-                    {city.founders.map((founder) => (
-                      <FounderCard key={founder.number} founder={founder} />
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {city.benefactors.length > 0 && (
+              ) : (
                 <section aria-labelledby="hall-benefactors">
-                  <h2 id="hall-benefactors" className={HEADING}>
-                    {t.benefactors.benefactors}{" "}
-                    <span className="text-sm font-medium text-[#15171a]/70 dusk:text-paper-dim">
-                      · {t.benefactors.keepingRunning}
-                    </span>
-                  </h2>
-                  <ul className={CARDS}>
-                    {city.benefactors.map((benefactor) => (
-                      <BenefactorCard key={benefactor.rank} benefactor={benefactor} />
-                    ))}
-                  </ul>
+                  <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1 pb-4">
+                    <h2
+                      id="hall-benefactors"
+                      className="text-[22px] leading-tight font-semibold tracking-[-0.01em] text-[#15171a] dusk:text-paper"
+                    >
+                      {t.hall.everyone}
+                    </h2>
+                    <p className="text-sm text-[#15171a]/70 dusk:text-paper-dim">
+                      {t.hall.rankedBy}
+                    </p>
+                  </div>
+                  <ol role="list" className={LEADERBOARD}>
+                    {people.map((person, index) => {
+                      const founder = "number" in person ? person : null;
+                      return (
+                        <PersonCard
+                          key={
+                            "number" in person
+                              ? `founder-${person.number}`
+                              : `benefactor-${person.rank}`
+                          }
+                          rank={index + 1}
+                          name={person.name}
+                          amountCents={person.amountCents}
+                          links={person.links}
+                        >
+                          {founder && (
+                            <div className="space-y-1">
+                              <AchievementBadges foundation={founder} />
+                              <p className="text-[13px] text-paper-dim">
+                                {(founder.stones === 1
+                                  ? t.benefactors.stones.one
+                                  : t.benefactors.stones.other
+                                ).replace("{n}", String(founder.stones))}
+                              </p>
+                            </div>
+                          )}
+                        </PersonCard>
+                      );
+                    })}
+                  </ol>
                 </section>
               )}
 

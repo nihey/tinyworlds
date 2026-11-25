@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "cli": "tsc -p tsconfig.json && node dist/cli.js",
+    "cli": "tsc -p tsconfig.json && node --max-old-space-size=16384 dist/cli.js",
     "fetch": "npm run cli -- fetch",
     "render": "npm run cli -- render",
     "all": "npm run cli -- all",

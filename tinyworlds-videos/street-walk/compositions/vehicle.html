@@ -1,0 +1,90 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .drive-caption {
+      position: absolute;
+      right: 192px;
+      bottom: 145px;
+    }
+    .drive-caption h2 {
+      position: static;
+      font-size: 62px;
+    }
+    #drive-caption-trade h2 {
+      font-size: 55px;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="vehicle"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[
+      {"id":"times","type":"string","label":"Times Square","default":"Times Square"},
+      {"id":"trade","type":"string","label":"One World Trade Center","default":"One World Trade Center"},
+      {"id":"vessel","type":"string","label":"The Vessel","default":"The Vessel"},
+      {"id":"park","type":"string","label":"Central Park","default":"Central Park"}
+    ]'
+  >
+    <div
+      id="drive-caption-times"
+      class="clip drive-caption"
+      data-start="0"
+      data-duration="2.1"
+      data-track-index="0"
+      data-beat="Times Square"
+    >
+      <h2 class="sign direction" data-var-text="times">Times Square</h2>
+    </div>
+    <div
+      id="drive-caption-trade"
+      class="clip drive-caption"
+      data-start="2.1"
+      data-duration="1.8"
+      data-track-index="0"
+      data-beat="One World Trade Center"
+    >
+      <h2 class="sign direction" data-var-text="trade">One World Trade Center</h2>
+    </div>
+    <div
+      id="drive-caption-vessel"
+      class="clip drive-caption"
+      data-start="3.9"
+      data-duration="1.8"
+      data-track-index="0"
+      data-beat="The Vessel"
+    >
+      <h2 class="sign direction" data-var-text="vessel">The Vessel</h2>
+    </div>
+    <div
+      id="drive-caption-park"
+      class="clip drive-caption"
+      data-start="5.7"
+      data-duration="1.8"
+      data-track-index="0"
+      data-beat="Central Park"
+    >
+      <h2 class="sign direction" data-var-text="park">Central Park</h2>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    for (const [name, time] of [
+      ["times", 0],
+      ["trade", 2.1],
+      ["vessel", 3.9],
+      ["park", 5.7],
+    ]) {
+      tl.fromTo(
+        "#drive-caption-" + name + " h2",
+        { x: 18 },
+        { x: 0, duration: 0.18, ease: "power2.out" },
+        time,
+      );
+    }
+    window.__timelines["vehicle"] = tl;
+  </script>
+</template>

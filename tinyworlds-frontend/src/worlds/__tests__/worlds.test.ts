@@ -29,6 +29,10 @@ describe("resolveWorld", () => {
       "tinyphl",
       "tinycos",
       "tinytkf",
+      "tinyaus",
+      "tinysfo",
+      "tinymke",
+      "tinybeth",
       "tinywinterfell",
       "tinykingslanding",
     ]) {
@@ -52,9 +56,18 @@ describe("resolveWorld", () => {
       "tinyphl",
       "tinycos",
       "tinytkf",
+      "tinyaus",
+      "tinysfo",
+      "tinymke",
+      "tinybeth",
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
+      "tinygtaiii",
+      "tinyvicecity",
+      "tinysanandreas",
+      "tinygtaiv",
+      "tinygtav",
     ]);
   });
 
@@ -70,6 +83,26 @@ describe("resolveWorld", () => {
 });
 
 describe("worlds", () => {
+  it("enables Street Walk in every real city", () => {
+    const disabled = Object.values(WORLDS)
+      .filter((world) => !world.fictional && world.walk !== true)
+      .map((world) => world.id);
+    expect(disabled).toEqual([]);
+  });
+
+  it.each(["tinyaus", "tinysfo", "tinymke", "tinybeth"])(
+    "opens Street Walk from both map views and offers the building quiz in %s",
+    (id) => {
+      expect(resolveWorld(id)).toMatchObject({
+        turn: "grid",
+        walk: true,
+        sights: true,
+        quiz: true,
+        units: "imperial",
+      });
+    },
+  );
+
   it("are filed under their own id and have a dictionary", () => {
     for (const [key, world] of Object.entries(WORLDS)) {
       expect(world.id).toBe(key);
@@ -226,21 +259,24 @@ describe("worlds", () => {
       "tinywinterfell",
       "tinykingslanding",
       "tinywesteros",
+      "tinygtaiii",
+      "tinyvicecity",
+      "tinysanandreas",
+      "tinygtaiv",
+      "tinygtav",
     ]);
     for (const world of imagined) {
       for (const locale of LOCALES) {
         const { about, description } = world.copy[locale];
         const said = [about.intro, ...about.notes].join(" ");
-        // whose story it is, and that neither its author nor the series stands behind this map
-        expect(said, `${world.id} ${locale}`).toMatch(/George R\. R\. Martin/);
-        expect(said, `${world.id} ${locale}`).toMatch(/HBO/);
+        expect(said, `${world.id} ${locale}`).toMatch(/George R\. R\. Martin.*HBO|Rockstar Games/);
         // nothing here comes from open data, and nothing may claim it does
         expect(`${said} ${description}`, `${world.id} ${locale}`).not.toMatch(
           /open data|dados abertos|datos abiertos|OpenStreetMap/i,
         );
       }
       expect(world.copy["en-US"].about.notes[0]).toMatch(/unofficial, fan-made/);
-      expect(world.copy["en-US"].about.notes[1]).toMatch(/invented for this map/);
+      expect(world.copy["en-US"].about.notes.join(" ")).toMatch(/invented for this map/);
       expect(world.credit).not.toMatch(/OpenStreetMap|Overture/);
     }
     // and every other world is a real place drawn from real data
@@ -296,24 +332,11 @@ describe("worlds", () => {
     expect(WORLDS.tinytkf.copy["en-US"].about.notes[0]).toMatch(/not measured/);
   });
 
-  it("light up their buildings, and play Guess the building only where they do", () => {
-    const lit = Object.values(WORLDS).filter((world) => world.sights);
-    expect(lit.map((world) => world.id)).toEqual([
-      "tinynyc",
-      "tinydal",
-      "tinycvg",
-      "tinypit",
-      "tinyphl",
-      "tinycos",
-      "tinytkf",
-    ]);
-    // the game is played on the lit buildings: no quiz without sights, and none in a made-up place
+  it("offers landmark highlights and Guess the Building across real cities", () => {
     for (const world of Object.values(WORLDS)) {
-      if (world.quiz) expect(world.sights, world.id).toBe(true);
-      if (world.fictional) expect(world.sights ?? false, world.id).toBe(false);
+      expect(world.sights ?? false, world.id).toBe(!world.fictional);
+      expect(world.quiz ?? false, world.id).toBe(!world.fictional);
     }
-    // every lit city plays but Truckee: a small town with six Wikipedia articles is no game
-    expect(lit.filter((world) => !world.quiz).map((world) => world.id)).toEqual(["tinytkf"]);
   });
 
   it("write search aliases the way queries are normalised: lower case, no accents", () => {

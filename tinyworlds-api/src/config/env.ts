@@ -112,6 +112,19 @@ const baseSchema = z.object({
   SMTP_USER: optional,
   SMTP_PASSWORD: optional,
   MAIL_FROM: optional,
+  /** Where to send new payment and city funding alerts. */
+  OWNER_ALERT_EMAIL: optional.refine(
+    (email) => email === undefined || z.email().safeParse(email).success,
+    'OWNER_ALERT_EMAIL must be an email address',
+  ),
+  TELEGRAM_BOT_TOKEN: optional.refine(
+    (token) => token === undefined || /^\d+:[\w-]+$/.test(token),
+    'TELEGRAM_BOT_TOKEN must be a Telegram bot token',
+  ),
+  TELEGRAM_CHAT_ID: optional.refine(
+    (chatId) => chatId === undefined || /^-?\d+$/.test(chatId),
+    'TELEGRAM_CHAT_ID must be a numeric chat ID',
+  ),
   /**
    * The site's owner, for the note they send each donor once (benefactors/note-cli.ts): how
    * they sign it, who it is from (an address, or `Name <address>`: one the mail server may

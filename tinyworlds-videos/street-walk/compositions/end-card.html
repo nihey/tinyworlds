@@ -1,0 +1,74 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #outro {
+      position: absolute;
+      inset: 0;
+    }
+    #outro-panel {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 1032px;
+      background: var(--enamel);
+      border-right: 12px solid var(--taxi);
+    }
+    #outro-lockup {
+      position: absolute;
+      top: 385px;
+      left: 192px;
+      color: var(--paper);
+    }
+    #outro-wordmark {
+      margin: 0;
+      font:
+        104px/1 Tiny5,
+        monospace;
+      letter-spacing: 0.03em;
+    }
+    #outro-wordmark-accent {
+      color: var(--taxi);
+    }
+    #outro-action {
+      margin: 46px 0 0;
+      font-size: 56px;
+      font-weight: 680;
+      line-height: 1.08;
+      letter-spacing: -0.028em;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="end-card"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[{"id":"action","type":"string","label":"Action","default":"Open the New York map"}]'
+  >
+    <div id="outro" class="clip" data-start="0" data-duration="4" data-track-index="0">
+      <div id="outro-panel" aria-hidden="true"></div>
+      <div id="outro-lockup">
+        <p id="outro-wordmark">tiny<span id="outro-wordmark-accent">worlds</span></p>
+        <p id="outro-action" data-var-text="action">Open the New York map</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#outro-panel", { x: -1032 }, { x: 0, duration: 0.34, ease: "power3.out" }, 0);
+    tl.fromTo(
+      "#outro-wordmark",
+      { clipPath: "inset(0 100% 0 0)" },
+      { clipPath: "inset(0 0% 0 0)", duration: 0.32, ease: "power3.out" },
+      0.27,
+    );
+    tl.fromTo(
+      "#outro-action",
+      { clipPath: "inset(0 100% 0 0)" },
+      { clipPath: "inset(0 0% 0 0)", duration: 0.3, ease: "power3.out" },
+      0.57,
+    );
+    window.__timelines["end-card"] = tl;
+  </script>
+</template>

@@ -10,6 +10,7 @@ export const tinywesteros: World = {
   wordmark: "westeros",
   homeLocale: "en-US",
   fictional: true,
+  weather: "cloudy",
   copy: {
     "en-US": {
       city: "Westeros",

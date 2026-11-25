@@ -8,7 +8,14 @@ import { API_URL } from "@/lib/donate";
 import { cityAsked, fetchHall, hallCities, hallTotals, type HallData } from "@/lib/hall";
 import { SITE_ID } from "@/site";
 import { CityHall } from "./city-hall";
-import { BuiltCityCard, CARDS, CityTile, HallFigures, PersonCard } from "./hall-cards";
+import {
+  BuiltCityCard,
+  CityTile,
+  HallFigures,
+  LEADERBOARD,
+  PersonCard,
+  PersonCities,
+} from "./hall-cards";
 import { HallFrame } from "./hall-frame";
 
 /** The address does not change under the page: nothing to listen for. */
@@ -113,15 +120,23 @@ export function HallOfFame({ initial }: { initial: HallData | null }) {
 
           {data && (
             <section aria-labelledby="hall-everyone">
-              <Head id="hall-everyone" title={t.hall.everyone} line={t.benefactors.wall.line} />
+              <Head id="hall-everyone" title={t.hall.everyone} line={t.hall.rankedBy} />
               {data.wall.length === 0 ? (
                 <p className="text-[15px] text-[#15171a]/80 dusk:text-paper-dim">{t.hall.empty}</p>
               ) : (
-                <ul className={CARDS}>
+                <ol role="list" className={LEADERBOARD}>
                   {data.wall.map((entry, i) => (
-                    <PersonCard key={i} entry={entry} rank={i + 1} />
+                    <PersonCard
+                      key={i}
+                      rank={i + 1}
+                      name={entry.name}
+                      amountCents={entry.amountCents}
+                      links={entry.links}
+                    >
+                      <PersonCities cities={entry.cities} />
+                    </PersonCard>
                   ))}
-                </ul>
+                </ol>
               )}
             </section>
           )}

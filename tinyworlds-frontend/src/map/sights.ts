@@ -48,6 +48,7 @@ export interface SightText {
   url: string;
   text: string;
   lang: string;
+  reference?: true;
 }
 
 export type SightTexts = Record<string, SightText>;
@@ -111,7 +112,7 @@ export function parseSightTexts(json: unknown): SightTexts {
     const { title, url, text, lang } = v;
     if (typeof title !== "string" || typeof text !== "string" || typeof lang !== "string") continue;
     if (typeof url !== "string" || !/^https:\/\//.test(url)) continue;
-    out[id] = { title, url, text, lang };
+    out[id] = { title, url, text, lang, ...(v.reference === true ? { reference: true } : {}) };
   }
   return out;
 }

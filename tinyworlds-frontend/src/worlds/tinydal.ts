@@ -6,6 +6,8 @@ export const tinydal: World = {
   wordmark: "dal",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  units: "imperial",
   // the map's districts are the cities on it: Dallas, Highland Park, University Park…
   copy: {
     "en-US": {

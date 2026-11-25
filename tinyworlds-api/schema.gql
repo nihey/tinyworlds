@@ -165,6 +165,12 @@ type CityWaiting {
   waiting: Int!
 }
 
+type CityWeather {
+  condition: WeatherCondition!
+  observedAt: DateTime!
+  station: String!
+}
+
 input CreateDonationCheckoutInput {
   """
   What to give, in US cents: a whole number from 100 to 1000000. Leave out to choose the amount on Stripe's page.
@@ -264,6 +270,9 @@ type FounderRow {
 
   """How many stones these gifts laid"""
   stones: Int!
+
+  """All gifts on this row, including named gifts after the goal"""
+  totalAmountCents: Int!
 }
 
 """
@@ -566,6 +575,9 @@ type Query {
   """
   cityMilestones: [CityMilestone!]!
 
+  """Latest nearby weather observation for a real world"""
+  cityWeather(world: String!): CityWeather
+
   """
   For admins: how many visits reached each step towards a donation over a period
   """
@@ -702,11 +714,28 @@ type WallBenefactor {
 
 """A city someone on the wall gave to"""
 type WallCity {
+  foundation: WallFoundation
   name: String!
   slug: String!
 
   """The id of its map once it is built ("tinynyc")"""
   worldId: String
+}
+
+"""Founding achievements earned in a city"""
+type WallFoundation {
+  firstStone: Boolean!
+  keystone: Boolean!
+  number: Int!
+}
+
+enum WeatherCondition {
+  clear
+  cloudy
+  fog
+  rain
+  snow
+  storm
 }
 
 """How many visits a world has had, and how many are there now"""

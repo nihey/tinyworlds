@@ -41,6 +41,7 @@ const along = (km: number, alt: number): [number, number, number] => [
  */
 export const tinyvlc: City = {
   id: "tinyvlc",
+  walk: true,
   title: "València",
   // Plaça de l'Ajuntament
   origin: { lon: -0.37643, lat: 39.47019 },
@@ -116,6 +117,30 @@ export const tinyvlc: City = {
   // l'Horta: market gardens right up to the city's edge
   ground: { landCover: { crop: G.Crop }, landUse: { farmland: G.Crop, orchard: G.Park } },
 
+  sights: {
+    placeWords: ["Valencia", "València", "Comunitat Valenciana", "España", "Spain"],
+    areaByDistrict: true,
+    wikipedia: {
+      "l'hemisfèric": "L'Hemisfèric",
+      "museu de les ciències": "Museu de les Ciències Príncipe Felipe",
+      "palau de les arts reina sofia": "Palau de les Arts Reina Sofía",
+      "l'oceanogràfic": "L'Oceanogràfic",
+      "l'àgora": "L'Àgora",
+      "basílica de la mare de déu dels desemparats": "Basilica of the Virgin of the Helpless",
+      "estadi ciutat de valència": "Estadi Ciutat de València",
+      "mercat central": "Mercado Central, Valencia",
+      "llotja de la seda": "Llotja de la Seda",
+      "catedral de valència": "Valencia Cathedral",
+      "palau de la generalitat": "Palau de la Generalitat Valenciana",
+      "torres de quart": "Torres de Quart",
+      "estació del nord": "Estació del Nord (Valencia)",
+      "plaça de bous": "Plaza de Toros de Valencia",
+      "estació joaquín sorolla": "València Joaquín Sorolla railway station",
+      "mercat de colón": "Mercado de Colón",
+      "museu de belles arts": "Museu de Belles Arts de València",
+      ivam: "Institut Valencià d'Art Modern",
+    },
+  },
   curated: CURATED,
   flights: [
     // landing from over the city onto the runway at Manises

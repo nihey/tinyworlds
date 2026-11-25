@@ -10,7 +10,7 @@ import { useI18n } from "@/hooks/use-i18n";
 import type { BroughtWorld } from "@/lib/brought-by";
 import { cn } from "@/lib/utils";
 import { visitsLine, type WorldCount } from "@/lib/visits";
-import { hallCityUrl, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { hallCityUrl, worldCardSrcSet, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
 import type { World } from "@/worlds";
 
 /** A card lifts under the pointer and lights up in its world's own colour (`--card`). */
@@ -24,14 +24,26 @@ const WHOLE =
 const lit = (world: World) => ({ "--card": world.accent.color }) as CSSProperties;
 
 /**
+ * How wide a card's picture is shown, by the catalogue's columns (`world-catalogue.tsx`): four
+ * on a wide screen, three, two, then one; the browser takes the copy it needs from that.
+ */
+const CATALOGUE_SIZES =
+  "(min-width: 80rem) 19rem, (min-width: 48rem) calc((100vw - 8rem) / 3), (min-width: 28rem) calc((100vw - 5rem) / 2), calc(100vw - 4rem)";
+
+/** The same for a row of small cards ("Your cities": two across, four on a wide screen). */
+const ROW_SIZES = "(min-width: 64rem) 15rem, calc((100vw - 3rem) / 2)";
+
+/**
  * A world's picture on its card: its share card, which starts to drift once the card is on
  * screen (the loop opens on the card's own framing, wordmark and all). Until a world has a
  * share card where the front page looks for it, its name on a plain plate.
  */
-function CardPicture({ world, alt }: { world: World; alt: string }) {
+function CardPicture({ world, alt, sizes }: { world: World; alt: string; sizes: string }) {
   return (
     <MovingPicture
       still={worldCardUrl(world.id)}
+      srcSet={worldCardSrcSet(world.id)}
+      sizes={sizes}
       loop={worldLoopUrl(world.id)}
       alt={alt}
       className="aspect-[1200/630] w-full"
@@ -103,7 +115,7 @@ export function WorldCard({
   return (
     <div className={CARD} style={lit(world)}>
       {brought && <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />}
-      <CardPicture world={world} alt={copy.cardAlt} />
+      <CardPicture world={world} alt={copy.cardAlt} sizes={CATALOGUE_SIZES} />
       <div className="flex flex-1 flex-col px-4 pt-3.5 pb-2.5">
         <h3 className="text-lg leading-tight font-semibold text-paper">
           <a href={worldUrl(world.id)} className={WHOLE}>
@@ -157,7 +169,7 @@ export function SmallWorldCard({ world, count }: { world: World; count: WorldCou
   const copy = world.copy[locale];
   return (
     <div className={CARD} style={lit(world)}>
-      <CardPicture world={world} alt={copy.cardAlt} />
+      <CardPicture world={world} alt={copy.cardAlt} sizes={ROW_SIZES} />
       <div className="flex flex-1 flex-col px-3 pt-2.5 pb-2.5">
         <h3 className="flex items-start justify-between gap-2 text-[15px] leading-tight font-semibold text-paper">
           <a href={worldUrl(world.id)} className={cn(WHOLE, "min-w-0")}>

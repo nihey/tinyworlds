@@ -19,6 +19,11 @@ export class FounderRow {
   @Field(() => Int)
   amountCents: number;
 
+  @Field(() => Int, {
+    description: 'All gifts on this row, including named gifts after the goal',
+  })
+  totalAmountCents: number;
+
   @Field(() => Int, { description: 'How many stones these gifts laid' })
   stones: number;
 

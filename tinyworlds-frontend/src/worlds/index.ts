@@ -1,16 +1,25 @@
+import { tinyaus } from "./tinyaus";
+import { tinybeth } from "./tinybeth";
 import { tinycos } from "./tinycos";
 import { tinycvg } from "./tinycvg";
 import { tinydal } from "./tinydal";
 import { tinyfte } from "./tinyfte";
+import { tinygtaiii } from "./tinygtaiii";
+import { tinygtaiv } from "./tinygtaiv";
+import { tinygtav } from "./tinygtav";
 import { tinykingslanding } from "./tinykingslanding";
 import { tinylas } from "./tinylas";
 import { tinylax } from "./tinylax";
+import { tinymke } from "./tinymke";
 import { tinynyc } from "./tinynyc";
 import { tinyphl } from "./tinyphl";
 import { tinypit } from "./tinypit";
 import { tinyorl } from "./tinyorl";
 import { tinyrao } from "./tinyrao";
+import { tinysanandreas } from "./tinysanandreas";
+import { tinysfo } from "./tinysfo";
 import { tinytkf } from "./tinytkf";
+import { tinyvicecity } from "./tinyvicecity";
 import { tinyvlc } from "./tinyvlc";
 import { tinywesteros } from "./tinywesteros";
 import { tinywinterfell } from "./tinywinterfell";
@@ -36,9 +45,18 @@ export const WORLDS: Record<string, World> = {
   tinyphl,
   tinycos,
   tinytkf,
+  tinyaus,
+  tinysfo,
+  tinymke,
+  tinybeth,
   tinywinterfell,
   tinykingslanding,
   tinywesteros,
+  tinygtaiii,
+  tinyvicecity,
+  tinysanandreas,
+  tinygtaiv,
+  tinygtav,
 };
 export const DEFAULT_WORLD = "tinynyc";
 

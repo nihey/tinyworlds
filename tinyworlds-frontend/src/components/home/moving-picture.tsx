@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +18,14 @@ const IN_VIEW = 0.4;
 interface MovingPictureProps {
   /** the still: shown first, and all there is for visitors who asked for less motion or less data */
   still: string;
+  /** the still at other sizes, and how wide it is shown: the browser takes the one it needs */
+  srcSet?: string;
+  sizes?: string;
+  /**
+   * The still in a few hundred bytes (a data: URL), shown blurred until the still is there: the
+   * frame opens on the picture's shapes and colours, never on an empty plate.
+   */
+  preview?: string;
   /** a silent loop that opens on the still's own picture, so one takes over from the other unseen */
   loop: string;
   alt: string;
@@ -17,6 +33,8 @@ interface MovingPictureProps {
   fallback?: ReactNode;
   /** load the still at once: it is at the top of the page */
   eager?: boolean;
+  /** prepare a carousel slide and tell it when its still or fallback can be shown */
+  onStillReady?: () => void;
   /**
    * Whether this is the picture being shown (the hero's current slide). One that is not keeps
    * its still, or the frame it stopped on, and fetches and plays nothing.
@@ -32,50 +50,87 @@ interface MovingPictureProps {
   style?: CSSProperties;
 }
 
+/** Whether the page has finished loading (its `load` event): what a film waits for. */
+function usePageLoaded(): boolean {
+  return useSyncExternalStore(
+    (changed) => {
+      window.addEventListener("load", changed);
+      return () => window.removeEventListener("load", changed);
+    },
+    () => document.readyState === "complete",
+    () => false,
+  );
+}
+
 /**
- * A still that comes alive. The loop is fetched only once the picture is on screen (and is the
- * one being shown), plays while it stays there and stops when it leaves; it is never fetched
+ * A still that comes alive. The loop waits until the still is ready, the page has loaded and the
+ * picture is on screen (and is the one being shown), plays while it stays there and stops when it leaves; it is never fetched
  * under `prefers-reduced-motion` or a data-saving connection, and if it cannot play the still
  * simply stays.
  */
 export function MovingPicture({
   still,
+  srcSet,
+  sizes,
+  preview,
   loop,
   alt,
   fallback,
   eager,
+  onStillReady,
   active = true,
   className,
   style,
   focus = "center",
 }: MovingPictureProps) {
   const fit = focus === "right" ? "object-cover object-right" : "object-cover";
+  const bgFit = focus === "right" ? "bg-right" : "bg-center";
   const frame = useRef<HTMLDivElement>(null);
   const picture = useRef<HTMLImageElement>(null);
   const film = useRef<HTMLVideoElement>(null);
-  const [missing, setMissing] = useState(false);
-  const [playing, setPlaying] = useState(false);
+  const [loaded, setLoaded] = useState<{ still: string; missing: boolean } | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const settled = loaded?.still === still;
   const calm = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const pageLoaded = usePageLoaded();
 
-  // a picture that failed before the page came alive never tells: ask it
+  const finishStill = useCallback(
+    (img: HTMLImageElement) => {
+      const finish = () => {
+        if (picture.current === img) setLoaded({ still, missing: img.naturalWidth === 0 });
+      };
+      // A fetched picture may still be decoding. Keep the previous slide visible in the meantime.
+      void img.decode().then(finish, finish);
+    },
+    [still],
+  );
+
+  // A picture that loaded (or failed) before hydration may never send us an event.
   useEffect(() => {
     const img = picture.current;
-    if (img && img.complete && img.naturalWidth === 0) setMissing(true);
-  }, []);
+    if (img?.complete) finishStill(img);
+  }, [finishStill]);
+
+  useEffect(() => {
+    if (settled) onStillReady?.();
+  }, [onStillReady, settled]);
 
   useEffect(() => {
     const box = frame.current;
     const video = film.current;
-    if (!box || !video || calm || !active) return;
+    // a film waits for the page: until it has loaded, the stills and the code come first
+    if (!box || !video || calm || !active || !settled || !pageLoaded) return;
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } })
       .connection;
-    if (connection?.saveData) return;
+    if (connection?.saveData || typeof IntersectionObserver === "undefined") return;
     const watcher = new IntersectionObserver(
       (entries) => {
         // the last word of a delivery is how things stand (out of view and back in at once)
-        if (entries.at(-1)?.isIntersecting) {
+        const entry = entries.at(-1);
+        if (entry && entry.intersectionRatio >= IN_VIEW) {
+          if (!video.hasAttribute("src")) video.src = loop;
           // the browser may refuse (no autoplay): the still stays, which is fine
-          video.play().catch(() => undefined);
+          void video.play().catch(() => undefined);
         } else {
           video.pause();
         }
@@ -87,7 +142,7 @@ export function MovingPicture({
       watcher.disconnect();
       video.pause();
     };
-  }, [calm, active]);
+  }, [calm, active, loop, settled, pageLoaded]);
 
   return (
     <div
@@ -95,16 +150,28 @@ export function MovingPicture({
       className={cn("relative overflow-hidden bg-sign-raised", className)}
       style={style}
     >
-      {!missing ? (
+      {preview && !settled && (
+        // under the still, blurred, and grown a little so the blur keeps a clean edge
+        <div
+          aria-hidden
+          className={cn("absolute inset-0 scale-110 bg-cover blur-xl", bgFit)}
+          style={{ backgroundImage: `url("${preview}")` }}
+        />
+      )}
+      {!(settled && loaded.missing) ? (
         // eslint-disable-next-line @next/next/no-img-element -- a plain file, no optimizer in a static export
         <img
+          key={still}
           ref={picture}
           src={still}
+          srcSet={srcSet}
+          sizes={srcSet ? sizes : undefined}
           alt={alt}
-          loading={eager ? "eager" : "lazy"}
+          loading={eager || onStillReady ? "eager" : "lazy"}
           decoding="async"
           fetchPriority={eager ? "high" : undefined}
-          onError={() => setMissing(true)}
+          onLoad={(event) => finishStill(event.currentTarget)}
+          onError={() => setLoaded({ still, missing: true })}
           className={cn("absolute inset-0 size-full", fit)}
         />
       ) : (
@@ -114,8 +181,8 @@ export function MovingPicture({
       )}
       {!calm && (
         <video
+          key={loop}
           ref={film}
-          src={loop}
           muted
           loop
           playsInline
@@ -124,11 +191,11 @@ export function MovingPicture({
           disableRemotePlayback
           aria-hidden
           tabIndex={-1}
-          onPlaying={() => setPlaying(true)}
+          onPlaying={() => setPlaying(loop)}
           className={cn(
             "pointer-events-none absolute inset-0 size-full transition-opacity duration-300",
             fit,
-            playing ? "opacity-100" : "opacity-0",
+            playing === loop ? "opacity-100" : "opacity-0",
           )}
         />
       )}

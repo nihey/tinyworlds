@@ -57,7 +57,7 @@ export function SiteNumbers({
         <div
           key={item.key}
           className={cn(
-            "flex h-[74px] flex-col-reverse justify-center border-sign-line px-5",
+            "home-arrive flex h-[74px] flex-col-reverse justify-center border-sign-line px-5",
             // a line between neighbours: two to a row on a phone, all in a row from there
             i % 2 === 1 && "max-sm:border-l",
             i >= 2 && "max-sm:border-t",

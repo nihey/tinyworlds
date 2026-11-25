@@ -49,6 +49,11 @@ export interface Manifest {
   /** the image spans `bounds` */
   overview: { src: string; width: number; height: number };
   attribution: string[];
+  /**
+   * cache-busting id of the street walk's files (walk/walk.json and its squares), appended as ?v=
+   * to them; absent: this data set has no walk.
+   */
+  walk?: string;
 }
 
 export type PlaceType =
@@ -142,5 +147,6 @@ export function parseManifest(json: unknown): Manifest {
     attribution: Array.isArray(m.attribution)
       ? m.attribution.filter((a) => typeof a === "string")
       : [],
+    walk: typeof m.walk === "string" && m.walk !== "" ? m.walk : undefined,
   };
 }

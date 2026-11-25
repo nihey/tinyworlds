@@ -7,6 +7,7 @@ import {
   resolveDataBase,
   setMapView,
   viewDataBase,
+  worldDataUrl,
 } from "../data";
 import { parseManifest } from "../manifest";
 
@@ -65,6 +66,16 @@ describe("dataUrl", () => {
 
   it("uses the active world's folder by default", () => {
     expect(dataUrl("manifest.json")).toBe("/data/tinynyc/manifest.json");
+  });
+
+  it("keeps the world's own folder for the street walk, whichever way the map is turned", () => {
+    try {
+      setMapView("grid");
+      expect(worldDataUrl("walk/walk.json", "w1")).toBe("/data/tinynyc/walk/walk.json?v=w1");
+      expect(worldDataUrl("manifest.json")).toBe("/data/tinynyc/manifest.json");
+    } finally {
+      setMapView("north");
+    }
   });
 
   it("follows the view the map is turned to", () => {
@@ -168,5 +179,12 @@ describe("parseManifest", () => {
     expect(parseManifest({ ...valid, build: "t1", indexes: "i2" }).indexes).toBe("i2");
     expect(parseManifest({ ...valid, build: "t1", indexes: "" }).indexes).toBe("t1");
     expect(parseManifest({ ...valid, build: "t1", indexes: 7 }).indexes).toBe("t1");
+  });
+
+  it("names the street walk's version only when the data has one", () => {
+    expect(parseManifest({ ...valid, walk: "dd51cc933381" }).walk).toBe("dd51cc933381");
+    expect(parseManifest(valid).walk).toBeUndefined();
+    expect(parseManifest({ ...valid, walk: "" }).walk).toBeUndefined();
+    expect(parseManifest({ ...valid, walk: 3 }).walk).toBeUndefined();
   });
 });

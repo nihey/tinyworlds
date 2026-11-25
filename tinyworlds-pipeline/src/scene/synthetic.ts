@@ -317,6 +317,7 @@ export async function buildSyntheticScene(opts: { log?: (msg: string) => void } 
     },
     {
       geo,
+      synthetic: true,
       bounds,
       ...(clip ? { clip } : {}),
       flora: CITY.flora,

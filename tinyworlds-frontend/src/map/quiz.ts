@@ -30,6 +30,7 @@ export interface QuizQuestion {
   parts: string[];
   /** the text's own language */
   lang: string;
+  reference?: true;
 }
 
 const isText = (v: unknown): v is string => typeof v === "string";
@@ -76,6 +77,7 @@ export function parseQuiz(value: unknown): QuizQuestion[] {
       ...(isText(item.area) && item.area ? { area: item.area } : {}),
       parts,
       lang: isText(item.lang) && item.lang ? item.lang : "en",
+      ...(item.reference === true ? { reference: true } : {}),
     });
   }
   return out;

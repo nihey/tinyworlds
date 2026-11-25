@@ -1,7 +1,7 @@
 "use client";
 
-import { Link2 } from "lucide-react";
-import { useState } from "react";
+import { ArrowUpRight, Link2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useI18n } from "@/hooks/use-i18n";
 import { LINK_REL, hostOf, type BenefactorLink } from "@/lib/links";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
  * not load. `className` sizes the tile (20 px unless it says).
  */
 export function LinkIcon({ src, className }: { src: string | null; className?: string }) {
-  const [broken, setBroken] = useState(false);
-  if (!src || broken)
+  const [broken, setBroken] = useState<string | null>(null);
+  if (!src || broken === src)
     return (
       <span className={cn("grid size-5 shrink-0 place-items-center", className)}>
         <Link2 aria-hidden className="size-[80%] text-paper-dim" strokeWidth={2.25} />
@@ -31,95 +31,152 @@ export function LinkIcon({ src, className }: { src: string | null; className?: s
         height={16}
         loading="lazy"
         decoding="async"
-        onError={() => setBroken(true)}
+        onError={() => setBroken(src)}
         className="size-[80%] rounded-[2px] object-contain"
       />
     </span>
   );
 }
 
-/** A page's picture, in a share card's shape; gone if it does not load. */
-export function LinkPicture({ src, className }: { src: string; className?: string }) {
-  const [there, setThere] = useState(true);
-  if (!there) return null;
+/** A fixed frame for a page's picture at its original proportions. */
+export function LinkPicture({
+  src,
+  className,
+  fallback = <LinkIcon src={null} />,
+}: {
+  src: string;
+  className?: string;
+  fallback?: ReactNode;
+}) {
+  const [broken, setBroken] = useState<string | null>(null);
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- a small file from the API, no optimizer in a static export
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      onError={() => setThere(false)}
+    <span
       className={cn(
-        "aspect-[1.91/1] rounded-md bg-white/[0.04] object-cover shadow-[0_0_0_1px_rgb(0_0_0/0.6)]",
+        "relative block aspect-[1.91/1] overflow-hidden rounded-[5px] bg-white/[0.045]",
         className,
       )}
-    />
+    >
+      {broken === src ? (
+        <span className="absolute inset-0 grid place-items-center">{fallback}</span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- a small file from the API, no optimizer in a static export
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(src)}
+          className="absolute inset-0 size-full object-contain p-1.5"
+        />
+      )}
+    </span>
   );
 }
 
-/**
- * One of a benefactor's links: the site's icon, the page's title and where it leads. It opens
- * in a new tab and says `dofollow`, a link a search engine follows (`LINK_REL`). As a
- * `card` its picture, when it has one to show, lies across the top; as a `row` the picture is
- * a small one in the icon's place.
- */
+type LinkLook = "card" | "row" | "strip" | "compact";
+
+/** Picture, title and destination share one link. The card has room for a larger picture. */
 export function BenefactorLinkItem({
   link,
   look,
   className,
 }: {
   link: BenefactorLink;
-  look: "card" | "row";
+  look: LinkLook;
   className?: string;
 }) {
   const { t } = useI18n();
   const host = hostOf(link.url);
+  const title =
+    host === "youtube.com" && link.title.startsWith(`${host}/`) ? "YouTube" : link.title;
+  const destination = {
+    href: link.url,
+    target: "_blank",
+    rel: LINK_REL,
+    "aria-label": t.benefactors.linkLabel.replace("{title}", title).replace("{host}", host),
+  };
+
+  if (look === "compact") {
+    return (
+      <a
+        {...destination}
+        title={`${title} · ${host}`}
+        className={cn(
+          "flex h-7 min-w-0 items-center gap-1 rounded-md bg-white/[0.06] px-1.5 text-[11px] font-medium text-paper-dim outline-none ring-inset hover:text-taxi focus-visible:ring-2 focus-visible:ring-taxi",
+          className,
+        )}
+      >
+        <span className="truncate">{title}</span>
+        <ArrowUpRight aria-hidden className="size-3 shrink-0" />
+      </a>
+    );
+  }
+
+  const icon = <LinkIcon src={link.icon} />;
   return (
     <a
-      href={link.url}
-      target="_blank"
-      rel={LINK_REL}
+      {...destination}
       title={link.description ?? undefined}
-      aria-label={t.benefactors.linkLabel.replace("{title}", link.title).replace("{host}", host)}
       className={cn(
-        "group/link block rounded-md outline-none focus-visible:shadow-[0_0_0_2px_var(--taxi)]",
+        "group/link block rounded-md border border-sign-line bg-white/[0.025] p-1.5 outline-none transition-colors hover:border-taxi/45 hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-taxi",
+        look !== "card" && "flex min-h-11 items-center gap-2",
         className,
       )}
     >
-      {look === "card" && link.image && <LinkPicture src={link.image} className="mb-2 w-full" />}
-      <span className="flex items-center gap-2">
-        {look === "row" && link.image ? (
-          <LinkPicture src={link.image} className="w-[68px] shrink-0" />
-        ) : (
-          <LinkIcon src={link.icon} />
-        )}
-        <span className="min-w-0 leading-tight">
+      {link.image && (
+        <LinkPicture
+          src={link.image}
+          fallback={icon}
+          className={look === "card" ? "mb-1.5 w-full max-h-28" : "w-16 shrink-0"}
+        />
+      )}
+      <span
+        className={cn("flex min-w-0 flex-1 items-center gap-2", look === "card" && "px-1 py-0.5")}
+      >
+        {(look === "card" || !link.image) && icon}
+        <span className="min-w-0 flex-1 leading-tight">
           <span className="block truncate text-[13px] font-semibold text-paper group-hover/link:text-taxi">
-            {link.title}
+            {title}
           </span>
           <span className="block truncate text-[11px] text-paper-dim">{host}</span>
         </span>
+        <ArrowUpRight
+          aria-hidden
+          className="size-3.5 shrink-0 text-paper-dim group-hover/link:text-taxi"
+        />
       </span>
     </a>
   );
 }
 
-/** A named benefactor's links, one under the other. Draws nothing for none. */
+/** A named benefactor's links. Draws nothing for none. */
 export function BenefactorLinks({
   links,
   look,
   className,
 }: {
   links: BenefactorLink[];
-  look: "card" | "row";
+  look: LinkLook;
   className?: string;
 }) {
   if (links.length === 0) return null;
   return (
-    <ul className={cn(look === "card" ? "space-y-2.5" : "space-y-1.5", className)}>
+    <ul
+      className={cn(
+        look === "compact" && "flex gap-1 overflow-x-auto [scrollbar-width:thin]",
+        look === "strip" && "flex gap-2",
+        (look === "card" || look === "row") && "space-y-1.5",
+        className,
+      )}
+    >
       {links.map((link) => (
-        <li key={link.url}>
+        <li
+          key={link.url}
+          className={cn(
+            look === "strip" && "w-52 shrink-0",
+            look === "compact" && "max-w-[min(9rem,100%)] min-w-0 shrink-0",
+          )}
+        >
           <BenefactorLinkItem link={link} look={look} />
         </li>
       ))}

@@ -1,6 +1,7 @@
 "use client";
 
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import type { ReactElement } from "react";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/hooks/use-i18n";
 import { BenefactorsPanel, type CityRef } from "./benefactors-panel";
 
@@ -8,15 +9,23 @@ interface BenefactorsSignProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   by: CityRef;
+  trigger?: ReactElement;
   /** the button at the bottom: the opener takes it to the donate sign */
   onBecome: (cityName: string) => void;
 }
 
 /** A city's benefactors on a sign, like the donate sign. The panel is mounted only while open, so each opening fetches afresh. */
-export function BenefactorsSign({ open, onOpenChange, by, onBecome }: BenefactorsSignProps) {
+export function BenefactorsSign({
+  open,
+  onOpenChange,
+  by,
+  trigger,
+  onBecome,
+}: BenefactorsSignProps) {
   const { t } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent
         aria-describedby={undefined}
         onOpenAutoFocus={(event) => {

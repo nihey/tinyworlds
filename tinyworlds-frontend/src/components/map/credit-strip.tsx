@@ -10,12 +10,20 @@ import { WORLD } from "@/worlds";
 interface CreditStripProps {
   engine: MapEngine;
   onAbout: () => void;
+  /** where the view is, before the credit (left out over the street walk, where the map is not seen) */
+  readout?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
 
 /** Bottom corner: where the centre of the view is (for a real place), and whose data this is. */
-export function CreditStrip({ engine, onAbout, className, style }: CreditStripProps) {
+export function CreditStrip({
+  engine,
+  onAbout,
+  readout: showReadout = true,
+  className,
+  style,
+}: CreditStripProps) {
   const readout = useRef<HTMLSpanElement>(null);
   const { t } = useI18n();
 
@@ -44,8 +52,12 @@ export function CreditStrip({ engine, onAbout, className, style }: CreditStripPr
       )}
       style={style}
     >
-      <span ref={readout} className="whitespace-pre tabular-nums max-md:hidden" aria-hidden />
-      <span aria-hidden className="h-3 w-px bg-sign-line max-md:hidden" />
+      {showReadout && (
+        <>
+          <span ref={readout} className="whitespace-pre tabular-nums max-md:hidden" aria-hidden />
+          <span aria-hidden className="h-3 w-px bg-sign-line max-md:hidden" />
+        </>
+      )}
       <button
         type="button"
         onClick={onAbout}

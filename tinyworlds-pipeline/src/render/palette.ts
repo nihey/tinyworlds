@@ -120,6 +120,7 @@ const RAMP_DEFS = {
 } as const;
 
 export type RampName = keyof typeof RAMP_DEFS;
+export type RampColors = Partial<Record<RampName, `#${string}`>>;
 export const RAMP_NAMES = Object.keys(RAMP_DEFS) as RampName[];
 
 /** Ramp ids by name: `R.brickRed` is a small integer; palette index = id · 6 + shade. */
@@ -162,11 +163,11 @@ export function buildRamp(hex: string): [number, number, number][] {
 }
 
 /** RGBA for every palette index, as a Uint32Array in little-endian ABGR (what a Uint8 RGBA view expects). */
-export function buildPalette(): { rgba: Uint32Array; rgb: [number, number, number][] } {
+export function buildPalette(colors?: RampColors): { rgba: Uint32Array; rgb: [number, number, number][] } {
   const rgba = new Uint32Array(RAMP_COUNT * SHADES);
   const rgb: [number, number, number][] = [];
   RAMP_NAMES.forEach((name, rampId) => {
-    buildRamp(RAMP_DEFS[name]).forEach(([r, g, b], shade) => {
+    buildRamp(colors?.[name] ?? RAMP_DEFS[name]).forEach(([r, g, b], shade) => {
       rgba[rampId * SHADES + shade] = (255 << 24) | (b << 16) | (g << 8) | r;
       rgb[rampId * SHADES + shade] = [r, g, b];
     });

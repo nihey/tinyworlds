@@ -41,7 +41,7 @@ function bitmap32(side: number, [r, g, b, a]: number[]): Buffer {
 }
 
 describe('drawPicture', () => {
-  it("cuts a share card down to the card's shape, as WebP", async () => {
+  it('scales a standard share card down as WebP', async () => {
     const drawn = await drawPicture(await solid(1200, 630).jpeg().toBuffer());
     expect(drawn).toMatchObject(PICTURE_SIZE);
     const meta = await sharp(drawn?.bytes).metadata();
@@ -49,9 +49,14 @@ describe('drawPicture', () => {
     expect(drawn?.bytes.length).toBeLessThan(20_000);
   });
 
-  it('cuts a tall picture around its middle', async () => {
+  it('preserves the shape of a tall picture', async () => {
     const drawn = await drawPicture(await solid(600, 1800).png().toBuffer());
-    expect(drawn).toMatchObject(PICTURE_SIZE);
+    expect(drawn).toMatchObject({ width: 84, height: 252 });
+  });
+
+  it('preserves the shape of a wide wordmark', async () => {
+    const drawn = await drawPicture(await solid(1200, 300).png().toBuffer());
+    expect(drawn).toMatchObject({ width: 480, height: 120 });
   });
 
   it('never enlarges a small one', async () => {

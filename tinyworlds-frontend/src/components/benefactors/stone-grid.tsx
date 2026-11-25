@@ -39,7 +39,7 @@ export function StoneGrid({
             key={i}
             title={title}
             className={cn(
-              "relative aspect-square rounded-[2px] shadow-[inset_0_-2px_0_rgb(0_0_0/0.25)]",
+              "stone",
               LOOK[look],
               marked &&
                 "after:absolute after:inset-[30%] after:rotate-45 after:rounded-[1px] after:bg-taxi-ink after:content-['']",

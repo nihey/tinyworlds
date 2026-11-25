@@ -6,6 +6,10 @@ export const tinylax: World = {
   wordmark: "lax",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  sights: true,
+  quiz: true,
+  units: "imperial",
   // the map's districts are the cities of the basin: Los Angeles, Santa Monica, Beverly Hills…
   copy: {
     "en-US": {
