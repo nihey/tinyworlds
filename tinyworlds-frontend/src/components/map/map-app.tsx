@@ -180,6 +180,7 @@ export function MapApp() {
           fileUrl: (path) => dataUrl(path, manifest.indexes),
           reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           start: parseHash(window.location.hash) ?? walkLinkView(window.location.hash),
+          minZoom: WORLD.minZoom,
         });
         started = live;
         window.tinyworld = live; // a handle for the console: tinyworld.flyTo({ lon, lat })

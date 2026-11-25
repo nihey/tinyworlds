@@ -25,6 +25,7 @@ import {
 } from "./sights";
 import { WindowLights } from "./window-lights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
+import { clampCentre, minScaleFor } from "./zoom-limit";
 
 /**
  * The map engine: a plain class that owns two canvases and the view. React never
@@ -90,6 +91,8 @@ export interface EngineOptions {
   reducedMotion?: boolean;
   /** first view; defaults to manifest.start */
   start?: { lon: number; lat: number; scale?: number };
+  /** how far out the view may go (see zoom-limit.ts); none: the whole map fits */
+  minZoom?: number;
 }
 
 /** A sight's picture, loaded the first time it lights up (no bitmap: loading, or it failed). */
@@ -156,6 +159,7 @@ export class MapEngine {
   private readonly pyramid: Pyramid;
   private readonly tileUrl: EngineOptions["tileUrl"];
   private readonly fileUrl: EngineOptions["fileUrl"];
+  private readonly minZoom: number | undefined;
 
   private view: ViewState = {
     x: 0,
@@ -260,6 +264,7 @@ export class MapEngine {
     this.manifest = options.manifest;
     this.tileUrl = options.tileUrl;
     this.fileUrl = options.fileUrl;
+    this.minZoom = options.minZoom;
     this.reducedMotion = options.reducedMotion ?? false;
     this.projection = createProjection(options.manifest.geo);
     this.pyramid = new Pyramid(options.manifest);
@@ -605,8 +610,13 @@ export class MapEngine {
       if (c.width !== w) c.width = w;
       if (c.height !== h) c.height = h;
     }
-    const fit = this.getFitScale();
-    this.minScale = Math.min(fit * 0.6, this.manifest.maxScale, 1);
+    this.minScale = minScaleFor(
+      width,
+      height,
+      this.manifest.bounds,
+      this.manifest.maxScale,
+      this.minZoom,
+    );
     const t = this.manifest.tileSize;
     const onScreen = (Math.ceil((width * dpr) / t) + 1) * (Math.ceil((height * dpr) / t) + 1);
     this.maxTiles = clamp(Math.round(onScreen * 2.5), 48, 200);
@@ -617,10 +627,16 @@ export class MapEngine {
     const v = this.view;
     const b = this.manifest.bounds;
     v.scale = clamp(v.scale, this.minScale, this.manifest.maxScale);
-    v.x = clamp(v.x, b.minX, b.maxX);
-    v.y = clamp(v.y, b.minY, b.maxY);
     const hw = v.width / 2 / v.scale;
     const hh = v.height / 2 / v.scale;
+    if (this.minZoom !== undefined) {
+      // a world with a zoom-out limit keeps the view on the map: no panning out into the paper
+      v.x = clampCentre(v.x, hw, b.minX, b.maxX);
+      v.y = clampCentre(v.y, hh, b.minY, b.maxY);
+    } else {
+      v.x = clamp(v.x, b.minX, b.maxX);
+      v.y = clamp(v.y, b.minY, b.maxY);
+    }
     v.left = v.x - hw;
     v.right = v.x + hw;
     v.top = v.y - hh;

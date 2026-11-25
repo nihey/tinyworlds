@@ -67,6 +67,12 @@ export interface World {
   /** Initial sky in an imagined world. Real cities start with a live observation. */
   weather?: WeatherCondition;
   /**
+   * How far out the view may go, as a share of the scale at which the map's bounds fill the
+   * screen (1: edge to edge, above 1: closer in), and the view then stays on the map. Without
+   * it the whole map fits with room around it (map/zoom-limit.ts).
+   */
+  minZoom?: number;
+  /**
    * Its data has sights (sights.json): buildings found in the search light up under the pointer,
    * with a line from Wikipedia. Without it the viewer never asks for the file.
    */
