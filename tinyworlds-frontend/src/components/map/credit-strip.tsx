@@ -25,6 +25,7 @@ export function CreditStrip({
   style,
 }: CreditStripProps) {
   const readout = useRef<HTMLSpanElement>(null);
+  const loading = useRef<HTMLSpanElement>(null);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -41,7 +42,14 @@ export function CreditStrip({
         );
     };
     write();
-    return engine.on("view", write);
+    const offView = engine.on("view", write);
+    const offCover = engine.on("coverage", ({ ready, total }) => {
+      if (loading.current) loading.current.hidden = !(total > 0 && ready < total);
+    });
+    return () => {
+      offView();
+      offCover();
+    };
   }, [engine, t]);
 
   return (
@@ -54,6 +62,12 @@ export function CreditStrip({
     >
       {showReadout && (
         <>
+          <span
+            ref={loading}
+            hidden
+            aria-hidden
+            className="size-1.5 shrink-0 rounded-full bg-taxi animate-pulse"
+          />
           <span ref={readout} className="whitespace-pre tabular-nums max-md:hidden" aria-hidden />
           <span aria-hidden className="h-3 w-px bg-sign-line max-md:hidden" />
         </>
