@@ -34,7 +34,7 @@ describe("dictionaries", () => {
 
   it("keep the same key caps in the help lines", () => {
     for (const [locale, dictionary] of Object.entries(DICTIONARIES)) {
-      for (const key of ["keysSearch", "keysToggles", "keysTogglesNoHoods"] as const) {
+      for (const key of ["keysSearch", "keysToggles", "keysTogglesNoHoods", "keysWalk"] as const) {
         expect(placeholders(dictionary.about[key]), `${locale} ${key}`).toEqual(
           placeholders(DICTIONARIES["en-US"].about[key]),
         );

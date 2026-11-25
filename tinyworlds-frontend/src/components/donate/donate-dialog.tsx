@@ -33,6 +33,7 @@ import {
 import { currentVisit, trackStep } from "@/lib/funnel";
 import { rememberCheckout, sessionStore, siteEvent } from "@/lib/site-events";
 import { BUILT_CITIES, SITE_ID, SITE_NAME } from "@/site";
+import { WORLDS } from "@/worlds";
 import { AmountPicker } from "./amount-picker";
 import { CityPicker } from "./city-picker";
 import { FundingPreview } from "./funding-preview";
@@ -103,6 +104,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
   const amount = amountCents / 100;
   const name = chosenCity(choice);
   const known = name ? findMilestone(cities, name) : null;
+  const builtWorld = known?.status === "BUILT" && known.worldId ? WORLDS[known.worldId] : null;
   // the chosen city as it stands: one nobody has given to yet stands at zero
   const standing = name
     ? (known ?? { name, raisedCents: 0, goalCents: defaultGoal(cities) })
@@ -241,6 +243,7 @@ function DonateBody({ city: opening }: { city: string | null }) {
             {name && (
               <JoinBlock
                 city={name}
+                mapSpot={Boolean(builtWorld && !builtWorld.fictional)}
                 on={joinOn}
                 name={joinName}
                 onOn={setJoinOn}

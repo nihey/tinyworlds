@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Walk spike</title>
+<style>
+  :root { --sign: #16181b; --paper: #f2efe6; --dim: #a9a597; --taxi: #f7c21b; --fog: #c9d3d6; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--sign); font: 14px/1.35 system-ui, sans-serif; color: var(--paper); overflow: hidden; }
+  #app { display: grid; grid-template-columns: 7fr 3fr; height: 100vh; }
+  @media (max-width: 800px), (orientation: portrait) { #app { grid-template-columns: 1fr; grid-template-rows: 7fr 3fr; } }
+  .pane { position: relative; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #walk canvas { image-rendering: pixelated; cursor: crosshair; }
+  #map { cursor: pointer; image-rendering: pixelated; background: var(--fog); }
+  .sign { position: absolute; background: var(--sign); border-radius: 10px; padding: 7px 11px; box-shadow: 0 4px 14px rgba(0,0,0,.3); font-size: 12px; color: var(--dim); pointer-events: none; }
+  .sign b { color: var(--paper); font-weight: 600; }
+  #hint { left: 12px; top: 12px; }
+  #where { left: 12px; bottom: 12px; }
+  #mapnote { left: 10px; top: 10px; }
+  #stats { right: 12px; top: 12px; }
+  #menubtn { position: absolute; left: 12px; top: 52px; background: var(--sign); color: var(--dim); border: 0; border-radius: 10px; padding: 6px 11px; font: 12px system-ui; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  #menubtn:hover { color: var(--paper); }
+  #menu { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; background: rgba(22,24,27,.72); }
+  #menu[hidden] { display: none; }
+  .menu-card { background: var(--sign); border-radius: 12px; padding: 16px 18px; width: min(760px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .menu-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 10px; }
+  .menu-head b { font-size: 16px; }
+  .menu-head span { color: var(--dim); font-size: 12px; }
+  #menu-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 18px; }
+  #menu-groups h3 { margin: 6px 0 4px; font-size: 12px; color: var(--taxi); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .krow { display: grid; grid-template-columns: 1fr 74px 74px; gap: 5px; align-items: center; padding: 2px 0; font-size: 13px; }
+  .keybtn { background: #24272b; color: var(--paper); border: 1px solid #3a3e44; border-radius: 6px; padding: 4px 5px; font: 12px system-ui; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .keybtn:hover { border-color: var(--dim); }
+  .keybtn.empty { color: #6b6a63; }
+  .keybtn.wait { border-color: var(--taxi); color: var(--taxi); }
+  .menu-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .menu-foot button { border: 0; border-radius: 8px; padding: 8px 14px; font: 600 13px system-ui; cursor: pointer; background: #2d3035; color: var(--paper); }
+  .menu-foot button.go { background: var(--taxi); color: var(--sign); }
+  #stick { position: absolute; width: 96px; height: 96px; border-radius: 50%; border: 2px solid rgba(242,239,230,.5); display: none; pointer-events: none; }
+  #stick i { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px; border-radius: 50%; background: rgba(247,194,27,.85); }
+</style>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.170.0/build/three.module.js" } }</script>
+</head>
+<body>
+<div id="app">
+  <div class="pane" id="walk">
+    <div id="hint" class="sign"></div>
+    <button id="menubtn"></button>
+    <div id="menu" hidden>
+      <div class="menu-card">
+        <div class="menu-head"><b>Controls</b><span>Click a key, then press the new one. Esc cancels, Backspace clears. Kept in this browser.</span></div>
+        <div id="menu-groups"></div>
+        <div class="menu-foot"><button id="menu-reset">Reset to defaults</button><button id="menu-close" class="go">Done</button></div>
+      </div>
+    </div>
+    <div id="stats" class="sign"></div>
+    <div id="where" class="sign"></div>
+    <div id="stick"><i></i></div>
+  </div>
+  <div class="pane"><canvas id="map"></canvas><div id="mapnote" class="sign">Click the map to stand there</div></div>
+</div>
+<script type="module">
+import * as THREE from "three";
+
+const [WORLD, PAL, manifest] = await Promise.all([
+  fetch("world/world.json").then(r => r.json()),
+  fetch("palette.json").then(r => r.json()),
+  fetch("data/manifest.json").then(r => r.json()),
+]);
+const geo = WORLD.geo, KZ = geo.kz, RAD = Math.PI / 180;
+const CELL = WORLD.cell;
+const known = new Set(WORLD.cells);
+
+// ---------- palette ----------
+const RI = Object.fromEntries(PAL.names.map((n, i) => [n, i]));
+const OUTLINE = 0, DEEP = 1, SHADE = 2, HALF = 3, LIT = 4, HIGH = 5;
+const pidx = (ramp, shade) => RI[ramp] * 6 + shade;
+const palData = new Uint8Array(PAL.rgb.length * 4);
+PAL.rgb.forEach(([r, g, b], i) => palData.set([r, g, b, 255], i * 4));
+const palTex = new THREE.DataTexture(palData, PAL.rgb.length, 1, THREE.RGBAFormat);
+palTex.magFilter = palTex.minFilter = THREE.NearestFilter;
+palTex.needsUpdate = true;
+const rgb = (i) => new THREE.Color(PAL.rgb[i][0] / 255, PAL.rgb[i][1] / 255, PAL.rgb[i][2] / 255);
+
+// ---------- sky and fog ----------
+const SKY = new THREE.Color("#9fc6dc"), HORIZON = new THREE.Color("#d5dfe2");
+const FOG_NEAR = 140, FOG_FAR = 560, LOAD_R = 3; // cells around you
+const SUN = new THREE.Vector2(Math.sin(254 * RAD), Math.cos(254 * RAD));
+const GRID = 29 * RAD; // Manhattan's street grid, for paving patterns
+
+// ---------- shaders ----------
+const HASH = `
+uint mixh(uint a, uint b) {
+  uint h = a ^ (b * 0x9e3779b1u);
+  h = (h ^ (h >> 16)) * 0x85ebca6bu;
+  h = (h ^ (h >> 13)) * 0xc2b2ae35u;
+  return h ^ (h >> 16);
+}
+uint hash2(int x, int y) { return mixh(uint(x), uint(y) + 0x632be5abu); }
+`;
+const FOG = `
+uniform vec3 fogColor; uniform float fogNear, fogFar;
+vec3 fogged(vec3 c, float d) { return mix(c, fogColor, smoothstep(fogNear, fogFar, d)); }
+`;
+const commonUniforms = () => ({
+  pal: { value: palTex }, kz: { value: KZ }, palN: { value: PAL.rgb.length },
+  fogColor: { value: HORIZON }, fogNear: { value: FOG_NEAR }, fogFar: { value: FOG_FAR },
+  gridRot: { value: new THREE.Vector2(Math.cos(GRID), Math.sin(GRID)) },
+});
+
+// walls: the map's own window patterns, one texel = one map pixel (1/kz m)
+const wallMat = new THREE.ShaderMaterial({
+  uniforms: commonUniforms(),
+  side: THREE.DoubleSide,
+  vertexShader: `
+    attribute vec2 uvm; attribute vec4 look; attribute vec3 dims;
+    varying vec2 vUV; flat varying vec4 vLook; flat varying vec3 vDims; varying vec3 vMV;
+    void main() {
+      vUV = uvm; vLook = look; vDims = dims;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vMV = mv.xyz;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    precision highp float; precision highp int;
+    uniform sampler2D pal; uniform float kz;
+    ${HASH} ${FOG}
+    varying vec2 vUV; flat varying vec4 vLook; flat varying vec3 vDims; varying vec3 vMV;
+    vec3 P(int ramp, int shade) { return texelFetch(pal, ivec2(ramp * 6 + clamp(shade, 0, 5), 0), 0).rgb; }
+    void main() {
+      int wall = int(vLook.x), glass = int(vLook.y), pattern = int(vLook.z), tone = int(vDims.z);
+      uint seed = uint(vLook.w);
+      int lenPx = max(1, int(round(vDims.x * kz)));
+      int wallH = max(1, int(round(vDims.y * kz)));
+      int c = clamp(int(floor(vUV.x * kz)), 0, lenPx - 1);
+      int vv = clamp(int(floor(vUV.y * kz)), 0, wallH - 1);
+      vec3 wallC = P(wall, tone), wallHi = P(wall, tone + 1), wallLo = P(wall, tone - 1);
+      vec3 winC = P(glass, tone == 4 ? 2 : 1), winHi = P(glass, tone == 4 ? 4 : 2);
+      int F = pattern == 3 ? 6 : 8;
+      float bayM = pattern == 3 ? 2.0 : pattern == 4 ? 6.0 : pattern == 6 ? 4.0 : pattern == 5 ? 3.6 : 3.0;
+      int B = int(round(bayM * kz));
+      if (B < 4) B = 0; else if (B > 14) B = 14;
+      int bays = B > 0 ? (lenPx - 1) / B : 0;
+      int margin = B > 0 ? (lenPx - bays * B + 1) / 2 : 0;
+      int u = c - margin;
+      bool inBay = B > 0 && u >= 0 && u < bays * B;
+      int bi = inBay ? u / B : -1;
+      int ub = inBay ? u - bi * B : -1;
+      bool tallEnough = wallH >= 3 * F;
+      vec3 col = wallC;
+      int vf = vv % F;
+      if (vv == wallH - 1 && wallH >= 4) col = wallHi;
+      else if (pattern == 1) {            // punched windows, shopfronts below
+        if (vv == wallH - 2 && tallEnough) col = wallLo;
+        else if (ub >= 0) {
+          if (tallEnough && vv < F - 1) {
+            if (vv == F - 2) col = wallLo; else if (ub > 0 && vv > 0) col = winC;
+          } else if (vf >= 2 && vf < F - 2 && ub >= 2 && ub < B - 1)
+            col = (vf == F - 3 && (mixh(seed + uint(bi), uint(vv / F)) & 7u) == 0u) ? winHi : winC;
+        }
+      } else if (pattern == 2) {          // ribbon windows
+        if (vv == wallH - 2 && tallEnough) col = wallLo;
+        else if (vf >= 3 && vf < F - 1 && !(ub == 0 && bi % 3 == 0) && bi >= 0) col = winC;
+      } else if (pattern == 3) {          // curtain wall
+        if (ub < 0 || vf == 0 || ub == 0) col = wallLo;
+        else {
+          int fi = vv / F;
+          uint pane = mixh(seed ^ uint(bi * 131), uint(fi)) & 15u;
+          if ((bi + fi * 2 + int(seed & 63u)) % 19 < 4 || pane == 0u) col = wallHi;
+          else if (pane == 1u) col = wallLo;
+        }
+      } else if (pattern == 4) {          // sparse openings
+        if (ub >= 2 && ub < B - 2 && vf >= 3 && vf < F - 1 && (mixh(seed + uint(bi * 7), uint(vv / F)) & 3u) == 0u) col = winC;
+      } else if (pattern == 5) {          // house
+        if (ub >= 2 && ub < B - 2 && vf >= 3 && vf < F - 1 && !(bi == 0 && vv < F)) col = winC;
+      } else if (pattern == 6) {          // tall windows between piers
+        if (ub >= 2 && ub < B - 2 && vv >= 3 && vv < wallH - 4) col = (vv & 7) == 7 ? wallLo : winC;
+      }
+      // far away a texel is smaller than a pixel: settle on the wall's average instead of shimmering
+      float fw = max(fwidth(vUV.x * kz), fwidth(vUV.y * kz));
+      col = mix(col, mix(wallC, winC, 0.28), smoothstep(0.55, 1.4, fw));
+      gl_FragColor = vec4(fogged(col, length(vMV)), 1.0);
+    }`,
+});
+
+// ground, roofs and streets: a colour, an alternate scattered by texel, and a pattern
+const flatMat = new THREE.ShaderMaterial({
+  uniforms: commonUniforms(),
+  side: THREE.DoubleSide,
+  depthWrite: true,
+  vertexShader: `
+    attribute vec4 paint; attribute vec2 lane; attribute float along;
+    varying vec3 vW; flat varying vec4 vPaint; varying vec2 vLane; varying vec3 vMV; varying float vAlong;
+    void main() {
+      vPaint = paint; vLane = lane; vAlong = along;
+      vec4 w = modelMatrix * vec4(position, 1.0);
+      vW = w.xyz;
+      vec4 mv = viewMatrix * w;
+      vMV = mv.xyz;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    precision highp float; precision highp int;
+    uniform sampler2D pal; uniform float kz; uniform vec2 gridRot;
+    ${HASH} ${FOG}
+    varying vec3 vW; flat varying vec4 vPaint; varying vec2 vLane; varying vec3 vMV; varying float vAlong;
+    vec3 C(float i) { return texelFetch(pal, ivec2(int(i), 0), 0).rgb; }
+    void main() {
+      // texels on the street grid (east = x, north = -z)
+      vec2 en = vec2(vW.x, -vW.z);
+      vec2 g = vec2(en.x * gridRot.x - en.y * gridRot.y, en.x * gridRot.y + en.y * gridRot.x) * kz;
+      ivec2 t = ivec2(floor(g));
+      float r = float(hash2(t.x, t.y) & 1023u) / 1024.0;
+      int pat = int(vPaint.w);
+      vec3 col = C(vPaint.x);
+      if (pat == 0) { if (r < vPaint.z) col = C(vPaint.y); }
+      else if (pat == 1) { if ((t.x & 7) == 0 || (t.y & 7) == 0) col = C(vPaint.y); }       // paving grid
+      else if (pat == 2) { if (((t.x >> 3) & 1) == 0) col = C(vPaint.y); }                  // mown stripes
+      else if (pat == 3) {                                                                  // a street
+        if (r < vPaint.z) col = C(vPaint.y);
+        // a dashed lane line down the middle of a wide street: across in -1..1, along in metres
+        float w = vLane.y;
+        if (w > 9.0 && abs(vLane.x) * w * 0.5 < 0.12 && fract(vAlong / 6.0) < 0.5) col = C(${pidx("markingWhite", LIT)}.0);
+      }
+      gl_FragColor = vec4(fogged(col, length(vMV)), 1.0);
+    }`,
+});
+
+// trees: upright billboards, a pixel crown that always faces you
+function treeTexture() {
+  const W = 24, H = 40, cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const g = cv.getContext("2d");
+  const px = (x, y, i) => { const [r, gg, b] = PAL.rgb[i]; g.fillStyle = `rgb(${r},${gg},${b})`; g.fillRect(x, y, 1, 1); };
+  for (let y = 26; y < H; y++) for (let x = 11; x < 13; x++) px(x, y, pidx("trunk", x === 11 ? HALF : SHADE));
+  let s = 7;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let y = 0; y < 30; y++)
+    for (let x = 0; x < W; x++) {
+      const dx = (x - 11.5) / 11.5, dy = (y - 14) / 14;
+      const d = dx * dx + dy * dy;
+      if (d > 1 - rnd() * 0.18) continue;
+      const lightSide = dx * 0.8 - dy * 0.6;
+      const shade = lightSide + rnd() * 0.5 > 0.55 ? HIGH : lightSide + rnd() * 0.5 > 0.05 ? LIT : lightSide + rnd() * 0.4 > -0.45 ? HALF : SHADE;
+      px(x, y, pidx("leaf", shade));
+    }
+  const t = new THREE.CanvasTexture(cv);
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const treeMat = new THREE.ShaderMaterial({
+  uniforms: { ...commonUniforms(), map: { value: treeTexture() }, camRight: { value: new THREE.Vector3(1, 0, 0) } },
+  vertexShader: `
+    attribute vec3 corner; uniform vec3 camRight;
+    varying vec2 vUv; varying vec3 vMV;
+    void main() {
+      vUv = vec2(corner.x + 0.5, corner.y);
+      vec3 p = position + camRight * corner.x * corner.z * 0.62 + vec3(0.0, corner.y * corner.z, 0.0);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vMV = mv.xyz;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    precision highp float;
+    uniform sampler2D map; ${FOG}
+    varying vec2 vUv; varying vec3 vMV;
+    void main() {
+      vec4 c = texture2D(map, vUv);
+      if (c.a < 0.5) discard;
+      gl_FragColor = vec4(fogged(c.rgb, length(vMV)), 1.0);
+    }`,
+});
+
+// ---------- ground kinds → paint [colour, alternate, how often, pattern] ----------
+const KIND = {
+  0: ["water", LIT, "water", HIGH, 0.04, 0], 30: ["water", LIT, "water", HIGH, 0.04, 0],
+  1: ["pavement", LIT, "pavement", HALF, 0.02, 0], 2: ["pavement", LIT, "pavement", HALF, 0.02, 0],
+  3: ["concrete", LIT, "concrete", HALF, 0.03, 0], 4: ["gravel", LIT, "gravel", HALF, 0.12, 0],
+  5: ["dirt", LIT, "dirt", HALF, 0.06, 0], 6: ["concrete", HIGH, "concrete", LIT, 0, 1],
+  10: ["scrub", LIT, "scrub", HALF, 0.12, 0], 11: ["wetland", LIT, "waterShallow", HALF, 0.1, 0],
+  12: ["park", LIT, "lawn", LIT, 0.18, 0], 13: ["park", LIT, "greyStone", HIGH, 0.02, 0],
+  14: ["forest", LIT, "forest", HALF, 0.12, 0], 15: ["lawn", LIT, "lawn", HIGH, 0.03, 0],
+  16: ["lawn", LIT, "rose", HIGH, 0.06, 0], 17: ["sand", LIT, "sand", HIGH, 0.06, 0],
+  18: ["rock", LIT, "rock", HALF, 0.12, 0], 22: ["lawn", LIT, "park", LIT, 0, 2], 23: ["lawn", LIT, "dirt", LIT, 0, 2],
+  24: ["court", LIT, "court", LIT, 0, 0], 25: ["courtGreen", LIT, "courtGreen", LIT, 0, 0],
+  26: ["track", LIT, "track", LIT, 0, 0], 27: ["dirt", HIGH, "carRed", LIT, 0.03, 0],
+  28: ["plaza", LIT, "plaza", HALF, 0, 1], 29: ["asphaltLight", LIT, "asphaltLight", HALF, 0.03, 0],
+  31: ["pool", LIT, "foam", HIGH, 0.02, 0], 32: ["pier", LIT, "pier", HALF, 0, 2],
+  33: ["plaza", HIGH, "plaza", LIT, 0.05, 0], 34: ["gravel", HALF, "darkStone", SHADE, 0.25, 0],
+  35: ["asphaltLight", LIT, "asphaltLight", HALF, 0.03, 3], 36: ["asphalt", LIT, "asphalt", HALF, 0.015, 3],
+  37: ["asphalt", LIT, "asphalt", HALF, 0.015, 3], 38: ["asphaltDark", LIT, "asphaltDark", HALF, 0.05, 3],
+  42: ["cobble", LIT, "cobble", HALF, 0.2, 0], 43: ["dirtRoad", LIT, "dirtRoad", HALF, 0.1, 0],
+  44: ["park", LIT, "lawn", LIT, 0.2, 0],
+};
+const RANK = (k) => ({ 41: 1.5, 44: 1.6, 43: 32.5, 42: 35.5, 45: 18.5 })[k] ?? k;
+function paintOf(kind) {
+  const p = KIND[kind] ?? ["pavement", LIT, "pavement", HALF, 0.02, 0];
+  return [pidx(p[0], p[1]), pidx(p[2], p[3]), p[4], p[5]];
+}
+
+// ---------- three ----------
+const walkEl = document.getElementById("walk");
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // palette colours go out exactly as they are
+walkEl.prepend(renderer.domElement);
+let pixel = 3;
+const scene = new THREE.Scene();
+scene.background = SKY;
+const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 2000);
+camera.rotation.order = "YXZ";
+
+// the sea under everything, and a horizon band of sky
+{
+  const g = new THREE.PlaneGeometry(40000, 40000);
+  g.rotateX(-Math.PI / 2);
+  const n = g.attributes.position.count;
+  const paint = new Float32Array(n * 4), lane = new Float32Array(n * 2);
+  const p = paintOf(0);
+  for (let i = 0; i < n; i++) paint.set(p, i * 4);
+  g.setAttribute("paint", new THREE.BufferAttribute(paint, 4));
+  g.setAttribute("lane", new THREE.BufferAttribute(lane, 2));
+  g.setAttribute("along", new THREE.BufferAttribute(new Float32Array(n), 1));
+  const m = new THREE.Mesh(g, flatMat);
+  m.position.y = -0.4;
+  m.renderOrder = -200;
+  scene.add(m);
+}
+
+// ---------- building a cell ----------
+const v3 = (e, h, n) => [e, h, -n];
+function signedArea(r) { let a = 0; for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) a += r[j] * r[i + 1] - r[i] * r[j + 1]; return a / 2; }
+
+class Buf {
+  constructor() { this.pos = []; this.idx = []; this.extra = {}; }
+  vert(p, attrs) { this.pos.push(...p); for (const [k, v] of Object.entries(attrs)) (this.extra[k] ??= []).push(...v); return this.pos.length / 3 - 1; }
+  geometry(sizes) {
+    if (!this.pos.length) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
+    for (const [k, n] of Object.entries(sizes)) g.setAttribute(k, new THREE.Float32BufferAttribute(this.extra[k] ?? new Array((this.pos.length / 3) * n).fill(0), n));
+    g.setIndex(this.idx);
+    return g;
+  }
+}
+
+function triangulate(rings, h, buf, paint) {
+  const toV = (r) => { const out = []; for (let i = 0; i < r.length; i += 2) out.push(new THREE.Vector2(r[i], r[i + 1])); return out; };
+  const contour = toV(rings[0]);
+  if (contour.length < 3) return;
+  const holes = rings.slice(1).map(toV).filter(h => h.length >= 3);
+  let faces;
+  try { faces = THREE.ShapeUtils.triangulateShape(contour, holes); } catch { return; }
+  const all = contour.concat(...holes);
+  const base = buf.pos.length / 3;
+  for (const p of all) buf.vert(v3(p.x, h, p.y), { paint, lane: [0, 0], along: [0] });
+  for (const f of faces) buf.idx.push(base + f[0], base + f[1], base + f[2]);
+}
+
+function buildCell(data) {
+  const group = new THREE.Group();
+  const walls = new Buf(), roofs = new Buf(), trees = new Buf();
+  const groundByRank = new Map();
+  const solids = [];
+
+  // volumes
+  for (const [base, top, roofH, shape, wall, roof, glass, pattern, seed, flags, rings] of data.v) {
+    const wallTop = shape === 1 ? top + roofH : top;
+    const wallH = wallTop - base;
+    for (let ri = 0; ri < rings.length; ri++) {
+      const r = rings[ri];
+      const n = r.length / 2;
+      if (n < 3) continue;
+      const orient = Math.sign(signedArea(r)) * (ri === 0 ? 1 : -1);
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        const ae = r[i * 2], an = r[i * 2 + 1], be = r[j * 2], bn = r[j * 2 + 1];
+        const de = be - ae, dn = bn - an, L = Math.hypot(de, dn);
+        if (L < 0.05) continue;
+        // outward normal of a CCW ring is (dn, -de)
+        const nx = (orient * dn) / L, ny = (orient * -de) / L;
+        const light = nx * SUN.x + ny * SUN.y;
+        const tone = light > 0.25 ? LIT : light > -0.25 ? HALF : SHADE;
+        const look = [wall, glass, pattern, seed & 0xffff];
+        const dims = [L, wallH, tone];
+        const b0 = walls.vert(v3(ae, base, an), { uvm: [0, 0], look, dims });
+        walls.vert(v3(be, base, bn), { uvm: [L, 0], look, dims });
+        walls.vert(v3(be, wallTop, bn), { uvm: [L, wallH], look, dims });
+        walls.vert(v3(ae, wallTop, an), { uvm: [0, wallH], look, dims });
+        walls.idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+      }
+    }
+    const roofPaint = [roof * 6 + LIT, roof * 6 + HALF, 0.06, 0];
+    if ((shape === 2 || shape === 3) && roofH > 0.5 && rings[0].length >= 6) {
+      // a spire or a dome: a pyramid to the middle, in two tones
+      const r = rings[0], n = r.length / 2;
+      let ce = 0, cn = 0;
+      for (let i = 0; i < n; i++) { ce += r[i * 2]; cn += r[i * 2 + 1]; }
+      ce /= n; cn /= n;
+      const apex = roofs.vert(v3(ce, top + roofH, cn), { paint: roofPaint, lane: [0, 0], along: [0] });
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        const a = roofs.vert(v3(r[i * 2], top, r[i * 2 + 1]), { paint: roofPaint, lane: [0, 0], along: [0] });
+        const b = roofs.vert(v3(r[j * 2], top, r[j * 2 + 1]), { paint: roofPaint, lane: [0, 0], along: [0] });
+        roofs.idx.push(apex, a, b);
+      }
+    } else triangulate(rings, wallTop, roofs, roofPaint);
+    if (base < 2.5) {
+      let e0 = Infinity, e1 = -Infinity, n0 = Infinity, n1 = -Infinity;
+      for (let i = 0; i < rings[0].length; i += 2) { e0 = Math.min(e0, rings[0][i]); e1 = Math.max(e1, rings[0][i]); n0 = Math.min(n0, rings[0][i + 1]); n1 = Math.max(n1, rings[0][i + 1]); }
+      solids.push({ rings, e0, e1, n0, n1 });
+    }
+  }
+
+  // ground: one mesh per paint rank, painted in rank order like the map
+  const groundBuf = (rank) => { let b = groundByRank.get(rank); if (!b) groundByRank.set(rank, (b = new Buf())); return b; };
+  for (const [kind, , rings] of data.g) triangulate(rings, 0, groundBuf(RANK(kind)), paintOf(kind));
+
+  // streets as ribbons of their true width, square ends overlapping at the joins
+  for (const [kind, width, , path] of data.l) {
+    const buf = groundBuf(RANK(kind) + 0.25);
+    const paint = paintOf(kind), hw = width / 2;
+    let along = 0;
+    for (let i = 0; i + 3 < path.length; i += 2) {
+      const ae = path[i], an = path[i + 1], be = path[i + 2], bn = path[i + 3];
+      const de = be - ae, dn = bn - an, L = Math.hypot(de, dn);
+      if (L < 0.01) continue;
+      const ue = de / L, un = dn / L, pe = -un * hw, pn = ue * hw;
+      const xe0 = ae - ue * hw * 0.5, xn0 = an - un * hw * 0.5, xe1 = be + ue * hw * 0.5, xn1 = bn + un * hw * 0.5;
+      const b0 = buf.vert(v3(xe0 + pe, 0, xn0 + pn), { paint, lane: [-1, width], along: [along - hw * 0.5] });
+      buf.vert(v3(xe0 - pe, 0, xn0 - pn), { paint, lane: [1, width], along: [along - hw * 0.5] });
+      buf.vert(v3(xe1 - pe, 0, xn1 - pn), { paint, lane: [1, width], along: [along + L + hw * 0.5] });
+      buf.vert(v3(xe1 + pe, 0, xn1 + pn), { paint, lane: [-1, width], along: [along + L + hw * 0.5] });
+      buf.idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+      along += L;
+    }
+  }
+
+  // trees
+  for (let i = 0; i < data.t.length; i += 3) {
+    const e = data.t[i], n = data.t[i + 1];
+    const size = 7 + ((Math.abs(Math.sin(e * 12.9898 + n * 78.233)) * 43758.5453) % 1) * 4;
+    const b0 = trees.vert(v3(e, 0, n), { corner: [-0.5, 0, size] });
+    trees.vert(v3(e, 0, n), { corner: [0.5, 0, size] });
+    trees.vert(v3(e, 0, n), { corner: [0.5, 1, size] });
+    trees.vert(v3(e, 0, n), { corner: [-0.5, 1, size] });
+    trees.idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+  }
+
+  const add = (geom, mat, order, depthWrite = true) => {
+    if (!geom) return;
+    const m = new THREE.Mesh(geom, depthWrite ? mat : groundMatNoDepth);
+    m.renderOrder = order;
+    m.frustumCulled = true;
+    group.add(m);
+  };
+  for (const [rank, b] of [...groundByRank].sort((a, b) => a[0] - b[0])) add(b.geometry({ paint: 4, lane: 2, along: 1 }), flatMat, rank - 100, false);
+  add(walls.geometry({ uvm: 2, look: 4, dims: 3 }), wallMat, 0);
+  add(roofs.geometry({ paint: 4, lane: 2, along: 1 }), flatMat, 0);
+  add(trees.geometry({ corner: 3 }), treeMat, 1);
+  return { group, solids };
+}
+const groundMatNoDepth = flatMat.clone();
+groundMatNoDepth.depthWrite = false;
+groundMatNoDepth.uniforms = flatMat.uniforms;
+
+// ---------- streaming ----------
+const cells = new Map(); // key → { state, group, solids }
+function cellKey(i, j) { return `${i}_${j}`; }
+function updateCells(e, n) {
+  const ci = Math.floor(e / CELL), cj = Math.floor(n / CELL);
+  for (let di = -LOAD_R; di <= LOAD_R; di++)
+    for (let dj = -LOAD_R; dj <= LOAD_R; dj++) {
+      if (di * di + dj * dj > (LOAD_R + 0.5) ** 2) continue;
+      const key = cellKey(ci + di, cj + dj);
+      if (!known.has(key) || cells.has(key)) continue;
+      const entry = { state: "loading" };
+      cells.set(key, entry);
+      fetch(`world/cells/${key}.json`).then(r => r.json()).then(data => {
+        if (cells.get(key) !== entry) return;
+        const built = buildCell(data);
+        Object.assign(entry, built, { state: "ready" });
+        scene.add(built.group);
+      });
+    }
+  for (const [key, entry] of cells) {
+    const [i, j] = key.split("_").map(Number);
+    if ((i - ci) ** 2 + (j - cj) ** 2 > (LOAD_R + 1.5) ** 2) {
+      if (entry.group) { scene.remove(entry.group); entry.group.traverse(o => o.geometry?.dispose()); }
+      cells.delete(key);
+    }
+  }
+}
+
+// ---------- you ----------
+function lonlatToEN(lon, lat) {
+  const R = 6371008.8;
+  return [(lon - geo.lon0) * RAD * R * Math.cos(geo.lat0 * RAD), (lat - geo.lat0) * RAD * R];
+}
+const me = { e: 0, n: 0, yaw: 209, pitch: 0, eye: 1.7, bob: 0, y: 0, vy: 0, ground: 0 };
+[me.e, me.n] = lonlatToEN(-73.98492, 40.75893); // Duffy Square, looking down Broadway
+
+const RADIUS = 0.35;
+function inside(r, e, n) {
+  let hit = false;
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+    const yi = r[i + 1], yj = r[j + 1];
+    if ((yi > n) !== (yj > n) && e < ((r[j] - r[i]) * (n - yi)) / (yj - yi) + r[i]) hit = !hit;
+  }
+  return hit;
+}
+function nearEdge(r, e, n, rad) {
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) {
+    const ax = r[j], ay = r[j + 1], bx = r[i], by = r[i + 1];
+    const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((e - ax) * dx + (n - ay) * dy) / L2));
+    if ((e - ax - t * dx) ** 2 + (n - ay - t * dy) ** 2 < rad * rad) return true;
+  }
+  return false;
+}
+function blocked(e, n) {
+  const ci = Math.floor(e / CELL), cj = Math.floor(n / CELL);
+  for (let di = -1; di <= 1; di++)
+    for (let dj = -1; dj <= 1; dj++) {
+      const c = cells.get(cellKey(ci + di, cj + dj));
+      if (!c?.solids) continue;
+      for (const s of c.solids) {
+        if (e < s.e0 - 1 || e > s.e1 + 1 || n < s.n0 - 1 || n > s.n1 + 1) continue;
+        let inSolid = inside(s.rings[0], e, n);
+        for (let h = 1; h < s.rings.length && inSolid; h++) if (inside(s.rings[h], e, n)) inSolid = false;
+        if (inSolid) return true;
+        for (const r of s.rings) if (nearEdge(r, e, n, RADIUS)) return true;
+      }
+    }
+  return false;
+}
+
+function cellReady(e, n) {
+  const key = cellKey(Math.floor(e / CELL), Math.floor(n / CELL));
+  return !known.has(key) || cells.get(key)?.state === "ready";
+}
+let cars = null;
+
+// ---------- controls: GTA's keyboard by default, every key yours to change ----------
+const ACTIONS = [
+  ["forward", "Walk forward", "On foot", ["KeyW", "ArrowUp"]],
+  ["back", "Walk back", "On foot", ["KeyS", "ArrowDown"]],
+  ["left", "Walk left", "On foot", ["KeyA", "ArrowLeft"]],
+  ["right", "Walk right", "On foot", ["KeyD", "ArrowRight"]],
+  ["sprint", "Sprint", "On foot", ["ShiftLeft", "ShiftRight"]],
+  ["jump", "Jump", "On foot", ["Space", null]],
+  ["enter", "Get in a car", "On foot", ["KeyF", null]],
+  ["accelerate", "Accelerate", "Driving", ["KeyW", "ArrowUp"]],
+  ["brake", "Brake / reverse", "Driving", ["KeyS", "ArrowDown"]],
+  ["steerLeft", "Steer left", "Driving", ["KeyA", "ArrowLeft"]],
+  ["steerRight", "Steer right", "Driving", ["KeyD", "ArrowRight"]],
+  ["handbrake", "Handbrake", "Driving", ["Space", null]],
+  ["horn", "Horn", "Driving", ["KeyE", null]],
+  ["exit", "Get out", "Driving", ["KeyF", null]],
+  ["camera", "Change camera", "Driving", ["KeyV", null]],
+  ["lookBehind", "Look behind", "Driving", ["KeyC", null]],
+  ["menu", "Controls", "Anywhere", ["KeyP", null]],
+  ["pixelDown", "Smaller pixels", "Anywhere", ["BracketLeft", null]],
+  ["pixelUp", "Bigger pixels", "Anywhere", ["BracketRight", null]],
+];
+const DEFAULTS = Object.fromEntries(ACTIONS.map(([id, , , k]) => [id, [...k]]));
+const GROUP_OF = Object.fromEntries(ACTIONS.map(([id, , g]) => [id, g]));
+const STORE = "tinyworlds.walk.controls.v1";
+let bind = structuredClone(DEFAULTS);
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE) ?? "null");
+  if (saved) for (const id in DEFAULTS) if (Array.isArray(saved[id])) bind[id] = [saved[id][0] ?? null, saved[id][1] ?? null];
+} catch {}
+const saveBind = () => { try { localStorage.setItem(STORE, JSON.stringify(bind)); } catch {} };
+const keys = new Set();
+const act = (id) => bind[id].some((c) => c && keys.has(c));
+const KEY_NAMES = { Space: "Space", ShiftLeft: "Left Shift", ShiftRight: "Right Shift", ControlLeft: "Left Ctrl", ControlRight: "Right Ctrl", AltLeft: "Left Alt", AltRight: "Right Alt", MetaLeft: "Left Meta", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right", BracketLeft: "[", BracketRight: "]", Backquote: "`", Minus: "-", Equal: "=", Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", CapsLock: "Caps Lock" };
+const codeName = (c) => (!c ? "" : KEY_NAMES[c] ?? c.replace(/^Key/, "").replace(/^Digit/, "").replace(/^Numpad/, "Num "));
+const keyName = (id) => codeName(bind[id].find(Boolean)) || "unbound";
+
+const canvas = renderer.domElement;
+const hintEl = document.getElementById("hint"), menuBtn = document.getElementById("menubtn");
+const menuEl = document.getElementById("menu"), groupsEl = document.getElementById("menu-groups");
+let capturing = null;
+function updateHint() {
+  hintEl.innerHTML = `<b>Click to play.</b> ${["forward", "left", "back", "right"].map(keyName).join(" ")} move · mouse look · ${keyName("sprint")} sprint · ${keyName("jump")} jump · ${keyName("enter")} get in a car · Esc let go`;
+  menuBtn.textContent = `Controls (${keyName("menu")})`;
+}
+function renderMenu() {
+  groupsEl.innerHTML = "";
+  for (const g of ["On foot", "Driving", "Anywhere"]) {
+    const sec = document.createElement("section");
+    sec.innerHTML = `<h3>${g}</h3>`;
+    for (const [id, label, grp] of ACTIONS) {
+      if (grp !== g) continue;
+      const row = document.createElement("div");
+      row.className = "krow";
+      row.append(Object.assign(document.createElement("span"), { textContent: label }));
+      for (const slot of [0, 1]) {
+        const b = document.createElement("button"), code = bind[id][slot];
+        b.className = "keybtn" + (code ? "" : " empty");
+        b.textContent = code ? codeName(code) : "none";
+        b.onclick = () => {
+          if (capturing) capturing.el.classList.remove("wait");
+          capturing = { id, slot, el: b };
+          b.classList.add("wait");
+          b.textContent = "press a key";
+        };
+        row.append(b);
+      }
+      sec.append(row);
+    }
+    groupsEl.append(sec);
+  }
+  updateHint();
+}
+function openMenu(open) {
+  menuEl.hidden = !open;
+  capturing = null;
+  keys.clear();
+  if (open) { document.exitPointerLock?.(); renderMenu(); }
+}
+menuBtn.addEventListener("click", () => openMenu(true));
+document.getElementById("menu-close").addEventListener("click", () => openMenu(false));
+document.getElementById("menu-reset").addEventListener("click", () => { bind = structuredClone(DEFAULTS); saveBind(); renderMenu(); });
+// while a key is being chosen, it goes to the menu and nowhere else
+addEventListener("keydown", (e) => {
+  if (!capturing) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const { id, slot } = capturing;
+  capturing = null;
+  if (e.code === "Escape") return renderMenu();
+  if (e.code === "Backspace" || e.code === "Delete") bind[id][slot] = null;
+  else {
+    const g = GROUP_OF[id];
+    for (const [other, , og] of ACTIONS)
+      if (other !== id && (og === g || og === "Anywhere" || g === "Anywhere")) bind[other] = bind[other].map((c) => (c === e.code ? null : c));
+    if (bind[id][1 - slot] === e.code) bind[id][1 - slot] = null;
+    bind[id][slot] = e.code;
+  }
+  saveBind();
+  renderMenu();
+}, true);
+addEventListener("keydown", e => {
+  if (!menuEl.hidden) {
+    if (e.code === "Escape" || bind.menu.includes(e.code)) openMenu(false);
+    return;
+  }
+  keys.add(e.code);
+  const is = (id) => bind[id].includes(e.code);
+  if (!e.repeat) {
+    if (is("menu")) openMenu(true);
+    if (is("pixelDown")) setPixel(pixel - 1);
+    if (is("pixelUp")) setPixel(pixel + 1);
+    if (cars?.driving) {
+      if (is("exit")) cars.enterOrExit();
+      else if (is("horn")) cars.honk();
+      else if (is("camera")) cars.view();
+    } else {
+      if (is("enter")) cars?.enterOrExit();
+      else if (is("jump") && me.y <= me.ground + 0.02) me.vy = 5.2;
+    }
+  }
+  if (e.code.startsWith("Arrow") || e.code === "Space" || e.code === "Tab") e.preventDefault();
+});
+addEventListener("keyup", e => keys.delete(e.code));
+addEventListener("blur", () => keys.clear());
+updateHint();
+canvas.addEventListener("click", () => { if (matchMedia("(pointer: fine)").matches) canvas.requestPointerLock?.(); });
+document.addEventListener("pointerlockchange", () => { const on = document.pointerLockElement === canvas; hintEl.style.display = on ? "none" : ""; menuBtn.style.display = on ? "none" : ""; });
+document.addEventListener("mousemove", e => {
+  if (document.pointerLockElement !== canvas) return;
+  if (cars?.driving) return cars.look(e.movementX * 0.12, -e.movementY * 0.12);
+  me.yaw = (me.yaw + e.movementX * 0.12 + 360) % 360;
+  me.pitch = Math.max(-80, Math.min(80, me.pitch - e.movementY * 0.12));
+});
+// touch: left half is a thumb stick, right half looks around
+const stickEl = document.getElementById("stick");
+const touches = new Map();
+let stick = { x: 0, y: 0 };
+canvas.addEventListener("pointerdown", e => {
+  if (e.pointerType === "mouse") return;
+  canvas.setPointerCapture(e.pointerId);
+  const r = canvas.getBoundingClientRect();
+  const left = e.clientX - r.left < r.width / 2;
+  touches.set(e.pointerId, { left, x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY, yaw: me.yaw, pitch: me.pitch });
+  if (left) { stickEl.style.display = "block"; stickEl.style.left = e.clientX - r.left - 48 + "px"; stickEl.style.top = e.clientY - r.top - 48 + "px"; }
+});
+canvas.addEventListener("pointermove", e => {
+  const t = touches.get(e.pointerId);
+  if (!t) return;
+  const dx = e.clientX - t.x, dy = e.clientY - t.y;
+  setTimeout(() => { t.px = e.clientX; t.py = e.clientY; });
+  if (t.left) {
+    const l = Math.min(1, Math.hypot(dx, dy) / 48), a = Math.atan2(dy, dx);
+    stick = { x: Math.cos(a) * l, y: Math.sin(a) * l };
+    stickEl.firstElementChild.style.transform = `translate(${stick.x * 30}px, ${stick.y * 30}px)`;
+  } else if (cars?.driving) {
+    cars.look(-(e.clientX - t.px) * 0.25, (e.clientY - t.py) * 0.25);
+  } else {
+    me.yaw = (t.yaw - dx * 0.25 + 360) % 360;
+    me.pitch = Math.max(-80, Math.min(80, t.pitch + dy * 0.25));
+  }
+});
+const endTouch = e => { const t = touches.get(e.pointerId); if (t?.left) { stick = { x: 0, y: 0 }; stickEl.style.display = "none"; } touches.delete(e.pointerId); };
+canvas.addEventListener("pointerup", endTouch);
+canvas.addEventListener("pointercancel", endTouch);
+
+function setPixel(p) { pixel = Math.max(1, Math.min(6, p)); resize(); }
+function resize() {
+  const w = walkEl.clientWidth, h = walkEl.clientHeight;
+  renderer.setPixelRatio(1 / pixel);
+  renderer.setSize(w, h, true);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", () => { resize(); drawMap(); });
+resize();
+
+// ---------- the map beside you ----------
+const mapCv = document.getElementById("map"), mctx = mapCv.getContext("2d");
+const T = manifest.tileSize, tiles = new Map();
+const sinB = Math.sin(geo.betaDeg * RAD), cosB = Math.cos(geo.betaDeg * RAD);
+const toMapPx = (e, n) => { const p = e * sinB + n * cosB, q = e * cosB - n * sinB; return { x: (p + q) * geo.k, y: ((q - p) * geo.k) / 2 }; };
+const fromMapPx = (x, y) => { const s = x / geo.k, d = (2 * y) / geo.k, p = (s - d) / 2, q = (s + d) / 2; return [p * sinB + q * cosB, p * cosB - q * sinB]; };
+let mapScale = 0.6;
+function tile(z, tx, ty) {
+  const key = `${z}/${tx}_${ty}`;
+  let t = tiles.get(key);
+  if (!t) { t = new Image(); t.onload = () => drawMap(); t.onerror = () => (t.dead = true); t.src = `data/tiles/${key}.webp?v=${manifest.build}`; tiles.set(key, t); }
+  return t;
+}
+function drawMap() {
+  const dpr = devicePixelRatio || 1, w = mapCv.clientWidth, h = mapCv.clientHeight;
+  if (mapCv.width !== Math.round(w * dpr) || mapCv.height !== Math.round(h * dpr)) { mapCv.width = Math.round(w * dpr); mapCv.height = Math.round(h * dpr); }
+  const c = toMapPx(me.e, me.n);
+  const z = mapScale >= 1 ? 0 : Math.min(3, Math.floor(Math.log2(1 / mapScale)));
+  const s = mapScale * dpr, left = c.x - w / 2 / mapScale, top = c.y - h / 2 / mapScale;
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  mctx.fillStyle = "#c9d3d6"; mctx.fillRect(0, 0, mapCv.width, mapCv.height);
+  mctx.imageSmoothingEnabled = z > 0;
+  mctx.setTransform(s, 0, 0, s, -left * s, -top * s);
+  const span = T * 2 ** z;
+  for (let ty = Math.floor((top - manifest.origin.y) / span); ty <= Math.floor((top + h / mapScale - manifest.origin.y) / span); ty++)
+    for (let tx = Math.floor((left - manifest.origin.x) / span); tx <= Math.floor((left + w / mapScale - manifest.origin.x) / span); tx++) {
+      const t = tile(z, tx, ty);
+      if (t.complete && !t.dead && t.naturalWidth) mctx.drawImage(t, manifest.origin.x + tx * span, manifest.origin.y + ty * span, span, span);
+    }
+  mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = w / 2, cy = h / 2;
+  if (cars) for (const car of cars.traffic) {
+    const p = toMapPx(car.e, car.n), sx = (p.x - c.x) * mapScale + cx, sy = (p.y - c.y) * mapScale + cy;
+    if (sx < -4 || sy < -4 || sx > w + 4 || sy > h + 4) continue;
+    mctx.fillStyle = car.kind === "taxi" ? "#f7c21b" : "#ffffff";
+    mctx.fillRect(sx - 2, sy - 2, 4, 4);
+  }
+  const dir = (deg, len) => { const a = toMapPx(me.e + Math.sin(deg * RAD), me.n + Math.cos(deg * RAD)); const l = Math.hypot(a.x - c.x, a.y - c.y); return { x: ((a.x - c.x) / l) * len, y: ((a.y - c.y) / l) * len }; };
+  const a = dir(me.yaw - 35, 60), b = dir(me.yaw + 35, 60);
+  mctx.fillStyle = "rgba(247,194,27,.35)"; mctx.strokeStyle = "#f7c21b"; mctx.lineWidth = 2;
+  mctx.beginPath(); mctx.moveTo(cx, cy); mctx.lineTo(cx + a.x, cy + a.y); mctx.lineTo(cx + b.x, cy + b.y); mctx.closePath(); mctx.fill(); mctx.stroke();
+  mctx.fillStyle = "#e8432e"; mctx.strokeStyle = "#fff"; mctx.lineWidth = 2.5;
+  mctx.beginPath(); mctx.arc(cx, cy, 6, 0, 7); mctx.fill(); mctx.stroke();
+}
+mapCv.addEventListener("click", e => {
+  const r = mapCv.getBoundingClientRect(), c = toMapPx(me.e, me.n);
+  const [e2, n2] = fromMapPx(c.x + (e.clientX - r.left - r.width / 2) / mapScale, c.y + (e.clientY - r.top - r.height / 2) / mapScale);
+  me.e = e2; me.n = n2;
+});
+mapCv.addEventListener("wheel", e => { e.preventDefault(); mapScale = Math.max(0.25, Math.min(3, mapScale * (e.deltaY < 0 ? 1.25 : 0.8))); }, { passive: false });
+
+// ---------- the loop ----------
+const stats = document.getElementById("stats"), whereEl = document.getElementById("where");
+let last = performance.now(), frames = 0, fpsT = last, mapT = 0, cellT = 0;
+let simShift = 0; // debug fast-forward: time it has run ahead
+function frame(now) {
+  now += simShift;
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  tick(dt, now);
+  requestAnimationFrame(frame);
+}
+function sim(seconds) {
+  for (let i = 0; i < seconds * 30; i++) { simShift += 1000 / 30; last += 1000 / 30; tick(1 / 30, last, i % 30 !== 29); }
+  tick(0, last);
+}
+function tick(dt, now, skipRender = false) {
+  if (!cars?.driving) walkStep(dt);
+  cars?.update(dt, now);
+  camera.updateMatrixWorld();
+  treeMat.uniforms.camRight.value.setFromMatrixColumn(camera.matrixWorld, 0).setY(0).normalize();
+  if (now - cellT > 300) { cellT = now; updateCells(me.e, me.n); }
+  if (skipRender) return;
+  renderer.render(scene, camera);
+  if (now - mapT > 66) { mapT = now; drawMap(); }
+  frames++;
+  if (now - fpsT > 500) {
+    const ready = [...cells.values()].filter(c => c.state === "ready").length;
+    stats.textContent = `${Math.round((frames * 1000) / (now - fpsT))} fps · ${ready} blocks around you · ${cars ? cars.traffic.length : 0} cars moving · pixel ${pixel}`;
+    frames = 0; fpsT = now;
+    const R = 6371008.8;
+    whereEl.textContent = `${(geo.lat0 + me.n / (RAD * R)).toFixed(5)}, ${(geo.lon0 + me.e / (RAD * R * Math.cos(geo.lat0 * RAD))).toFixed(5)} · facing ${Math.round(me.yaw)}°`;
+  }
+}
+function walkStep(dt) {
+  let f = 0, s = 0;
+  if (act("forward")) f += 1;
+  if (act("back")) f -= 1;
+  if (act("right")) s += 1;
+  if (act("left")) s -= 1;
+  f -= stick.y; s += stick.x;
+  // in the air you can land on a car's roof; on the ground a car is a wall
+  const air = me.y > me.ground + 0.02 || me.vy > 0;
+  const step = air ? 1.15 : 0.3;
+  const probe = (e, n) => (blocked(e, n) ? null : cars ? cars.walkerProbe(e, n, me.y, step) : { ground: 0 });
+  const mag = Math.hypot(f, s);
+  if (mag > 0.05) {
+    const speed = (act("sprint") ? 11 : 4.5) * Math.min(1, mag);
+    const yr = me.yaw * RAD;
+    const fe = Math.sin(yr), fn = Math.cos(yr), re = Math.cos(yr), rn = -Math.sin(yr);
+    const ve = ((fe * f + re * s) / Math.max(1, mag)) * speed * dt, vn = ((fn * f + rn * s) / Math.max(1, mag)) * speed * dt;
+    if (probe(me.e + ve, me.n + vn)) { me.e += ve; me.n += vn; }
+    else if (probe(me.e + ve, me.n)) me.e += ve;
+    else if (probe(me.e, me.n + vn)) me.n += vn;
+    if (!air) me.bob += dt * speed * 1.7;
+  }
+  me.ground = probe(me.e, me.n)?.ground ?? 0;
+  if (me.ground > me.y) { me.y = me.ground; me.vy = 0; }
+  me.vy -= 13 * dt;
+  me.y += me.vy * dt;
+  if (me.y <= me.ground) { me.y = me.ground; me.vy = 0; }
+  camera.position.set(me.e, me.eye + me.y + (air ? 0 : Math.sin(me.bob) * 0.05), -me.n);
+  camera.rotation.set(me.pitch * RAD, -me.yaw * RAD, 0);
+}
+updateCells(me.e, me.n);
+const { createCars } = await import("./cars.js?v=" + Date.now());
+cars = await createCars({ scene, camera, renderer, PAL, RI, FOG, commonUniforms, SUN, blocked, cellReady, act, keyName, getStick: () => stick, me, walkEl });
+requestAnimationFrame(frame);
+window.walk = { me, camera, scene, cells, setPixel, renderer, cars, sim, keys, bind: () => bind };
+</script>
+</body>
+</html>

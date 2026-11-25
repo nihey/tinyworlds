@@ -16,6 +16,7 @@ export interface Article {
   title: string;
   url: string;
   text: string;
+  reference?: true;
 }
 export type Articles = Record<Lang, Article | undefined>;
 
@@ -211,6 +212,7 @@ export async function buildWiki(
   const overrides = new Map(
     Object.entries(CITY.sights?.wikipedia ?? {}).map(([name, title]) => [name.toLowerCase(), title]),
   );
+  const references = new Map(CITY.curated.map((place) => [place.n.toLowerCase(), place.reference]));
   const http = cachedHttp(path.join(DIRS.raw, "wikipedia"), fetch, {
     force: opts.force ?? false,
     delayMs: 200,
@@ -221,9 +223,22 @@ export async function buildWiki(
   let matched = 0;
   let failed = 0;
   for (const [i, sight] of sights.entries()) {
+    const key = sight.n.toLowerCase();
+    const reference = references.get(key);
+    if (reference) {
+      for (const { locale, lang } of LOCALES)
+        texts[locale][sight.id] = {
+          title: sight.n,
+          url: reference.url,
+          text: reference[lang],
+          lang,
+          reference: true,
+        };
+      continue;
+    }
     let found: Articles;
     try {
-      found = await articleFor(http, sight, overrides.get(sight.n.toLowerCase()));
+      found = await articleFor(http, sight, overrides.get(key));
     } catch (error) {
       failed++;
       log(`wiki: ${sight.n}: ${error instanceof Error ? error.message : String(error)}`);

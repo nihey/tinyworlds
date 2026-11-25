@@ -21,6 +21,14 @@ export const BUILT: SeedCity[] = [
   { slug: 'philadelphia', name: 'Philadelphia', worldId: 'tinyphl' },
   { slug: 'colorado-springs', name: 'Colorado Springs', worldId: 'tinycos' },
   { slug: 'truckee-ca', name: 'Truckee, CA', worldId: 'tinytkf' },
+  { slug: 'austin', name: 'Austin', worldId: 'tinyaus' },
+  { slug: 'san-francisco', name: 'San Francisco', worldId: 'tinysfo' },
+  { slug: 'milwaukee-wi', name: 'Milwaukee, WI', worldId: 'tinymke' },
+  {
+    slug: 'bethlehem-pennsylvania',
+    name: 'Bethlehem, Pennsylvania',
+    worldId: 'tinybeth',
+  },
   { slug: 'winterfell', name: 'Winterfell', worldId: 'tinywinterfell' },
   {
     slug: 'king-s-landing',

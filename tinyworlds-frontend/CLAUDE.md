@@ -5,12 +5,13 @@ The map viewer: a Next.js 16 static export that draws the tiles and indexes writ
 One build is one **target**: a **world** — the cities `tinynyc`, `tinyrao`, `tinyorl`, `tinyfte`
 (El Calafate), `tinyvlc` (Valencia), `tinylas` (Las Vegas), `tinylax` (Los Angeles), `tinydal`
 (Dallas), `tinycvg` (Cincinnati), `tinypit` (Pittsburgh), `tinyphl` (Philadelphia), `tinycos`
-(Colorado Springs), `tinytkf` (Truckee), and three
+(Colorado Springs), `tinytkf` (Truckee), `tinyaus` (Austin), `tinysfo` (San Francisco),
+`tinymke` (Milwaukee), `tinybeth` (Bethlehem, Pennsylvania), and three
 places that do not exist, `tinywinterfell`,
 `tinykingslanding` and `tinywesteros` (the whole known world) — or `home`, the front page that
 lists the worlds. The interface speaks the visitor's language (English, Brazilian
 Portuguese, Spanish), decided in the browser. Donations are optional: payment links, and, when
-`tinyworlds-api` is deployed, a list of cities being funded (GraphQL through Apollo Client).
+`tinyworlds-api` is deployed, a list of cities being funded (GraphQL; Apollo Client for the checkout).
 With the API, every page also reports the steps of the donation funnel, and the front page's
 build carries the admin pages (`/admin/`) where signed-in admins read it.
 
@@ -28,6 +29,7 @@ npm run lint         # eslint + prettier --check      (lint:fix to fix)
 npm run typecheck    # next typegen (route types such as LayoutProps) + tsc
 npm test             # vitest
 npm run email-images # public/email/: the API's mails' pictures (the wordmark, the three badges)
+npm run stills       # public/loops/: the front page's pictures at its sizes, and the hero's previews
 ```
 
 ### Environment (all inlined at build time)
@@ -47,6 +49,7 @@ npm run email-images # public/email/: the API's mails' pictures (the wordmark, t
 | `NEXT_PUBLIC_WORLDS_BASE`                                     | empty                      | what the worlds' folders hang from on the front page (`""` → `/tinynyc/`)                                                 |
 | `NEXT_PUBLIC_CARDS_BASE`                                      | unset                      | **dev only**: take the front page's card pictures from one folder (`/og`)                                                 |
 | `NEXT_PUBLIC_HERO_FILMS`                                      | what is in `public/loops/` | the worlds the front page's hero shows, comma-separated; set by `next.config.ts`, by hand only to try the hero with fewer |
+| `NEXT_PUBLIC_STILLS`                                          | what is in `public/loops/` | the front page's pictures that have smaller copies (`card-tinynyc`, `hero-tinyrao`); set by `next.config.ts`              |
 
 Production builds:
 
@@ -102,7 +105,13 @@ front page's build serves them. `wordmark.png` (Tiny5's letters, "tiny" paper wh
 cannot leave white on white; 2×) and `founding.png`, `first-stone.png`, `keystone.png`
 (the badges' maps of `pixel-art.ts` at 3×, nearest neighbour) are made by
 `scripts/email-images.mjs` (`npm run email-images`, Node 22.18+: it imports the `.ts` maps);
-run it after changing the art, and commit what it writes.
+run it after changing the art, and commit what it writes. **The front page's pictures at its
+own sizes** are committed too, made by `scripts/stills.mjs` (`npm run stills`, sharp) from the
+originals, smaller and as WebP, never redrawn: `public/loops/card-<world>-{400,800}.webp` (a
+world's share card, for its card), `public/loops/hero[-<world>]-{960,1280}.webp` (a hero
+still) and `src/lib/hero-previews.json` (each hero still in a few hundred bytes, read only by
+the build). Run it after a share card, a hero film or a world changes, and commit what it
+writes; a picture without its copies keeps its original (`NEXT_PUBLIC_STILLS`).
 
 ## Layout
 
@@ -135,15 +144,22 @@ src/
 │   ├── life.ts          # ferries and flights
 │   ├── sights.ts sight-state.ts   # the buildings that light up, and which one is lit or pinned
 │   ├── quiz.ts          # Guess the building's questions (quiz.<locale>.json): parseQuiz
+│   ├── person.ts        # the street walk's little person, one character per pixel
+│   ├── walker.ts        # the walk on the map: the ways lit under the carried person
 │   └── __tests__/
+├── walk/                # the street walk (below): pure simulation, its data, and render/
+│                        # (three.js); reached only through import()
 ├── components/map/      # the signs: search (with the way back to the front page), tool
 │                        # column, minimap, settings, about, …
+├── components/walk/     # the street walk's screen (walk-screen.tsx, by import() only), its
+│                        # signs, minimap, wasted screen, controls menu and touch pad; the
+│                        # person in the tool column (walk-person.tsx)
 ├── components/donate/   # the donate sign: city picker, amount picker, live funding bar;
 │                        # "Build the next city" (build-next.tsx), a city's card and its
 │                        # wall of stones (city-fund-card.tsx, stone-wall.tsx)
 ├── components/styles.ts # the buttons the front page and "Your cities" share, as class lists
 ├── components/home/     # the front page: landing.tsx and its pieces (section-head,
-│                        # world-card, site-numbers, next-city-tile), moving-picture.tsx
+│                        # world-catalogue, world-card, site-numbers), moving-picture.tsx
 │                        # (a still that comes alive: the hero and the cards),
 │                        # benefactor-wall.tsx (everyone who gave: columns down the sides,
 │                        # or a strip) and drift.tsx (a list that drifts by)
@@ -172,12 +188,15 @@ src/
 ├── components/ui/       # shadcn/ui
 ├── hooks/               # useI18n, usePrefs, useTheme, useMilestones, useDocumentLanguage,
 │                        # useFunnelVisit, usePresence, useWorldVisits, useWall,
-│                        # useAdminSession, useLists, useJoinReturn, …
+│                        # useAdminSession, useLists, useJoinReturn, useStreetWalk (the
+│                        # walk as the map sees it), …
 └── lib/                 # prefs.ts (settings, localStorage "<site>.prefs"), donate.ts (pure
                          # donation logic: links, amounts, the checkout input), city-picker.ts
                          # (pure: what the picker offers, the bar preview, the ranking),
-                         # city-catalogue.ts (well-known cities to pick from), donate-api.ts
-                         # (Apollo Client; imported lazily), funnel.ts (the visit and the
+                         # city-catalogue.ts (well-known cities to pick from), milestones.ts
+                         # (the cities being funded, plain fetch), donate-api.ts (the
+                         # checkout: Apollo Client; imported lazily), home-build.ts (what
+                         # the front page's build bakes in), funnel.ts (the visit and the
                          # steps it reports), visits.ts (each world's visits: the cards'
                          # words and order, the map's "still here"), admin.ts (pure: the
                          # session, the funnel's arithmetic), sign-in-api.ts (REST sign-in:
@@ -215,13 +234,23 @@ src/
 - **`src/site.ts`** answers "what is this build" for code that is not about a map (settings,
   language, analytics, donations): `SITE_ID` is the world id or `"home"`. On the front page
   `WORLD` is only a stand-in (the default world) that nothing shows: use `site.ts` there.
-- **The front page, top to bottom** (`components/home/landing.tsx`): links to its own sections
-  (`#cities`, `#imagined`, `#ranking`, `#open-source`; hidden below `sm`) and "Your cities" as a
-  button; the hero; a strip of figures; the benefactors as a strip (only where the screen has
-  no room for them beside the page: below); the cities, then the imagined places, as cards; "Build
-  the next city" (Donations, below); open source as one strip; the footer. Each section's title
-  (`section-head.tsx`) sits on the fog with a line saying what the section is, and carries the
-  section's id.
+- **The front page** (`components/home/landing.tsx`) opens with a wordmark and links to the
+  catalogue and funding. The split panorama leads to the site figures, funding list, searchable
+  catalogue (`world-catalogue.tsx`), benefactors, open source, and the footer. `#cities` opens the
+  catalogue and `#imagined` selects its imagined-places filter.
+- **The front page is baked, then asks again** (`lib/home-build.ts`, as the hall of fame is):
+  `page.home.tsx` is an async page that asks the API when the build runs (every world's visits,
+  the cities being funded, the wall) and hands it to `Landing` as `initial`. So the page opens
+  whole and **in its final order**: the hero's first city, the catalogue's cards, the figures,
+  the funding list and the benefactors are in the HTML, and nothing moves or changes places
+  when the API answers. Once open, each part asks again at once (`useWorldVisits`,
+  `useMilestones`, `useWall` take what was baked as their first state) and shows what is true
+  now; a failed answer keeps what was baked. Who was exploring is never baked (it would be a
+  day old): the live figures wait for the page's own answer. The build never fails for it: an
+  API that does not answer leaves that part to load as it always did. The daily run
+  (`deploy.sh release --fresh-home`) keeps what is baked a day old at most. The build also
+  bakes the hero's first picture's preview (`hero-previews.json`): it lies blurred under that
+  picture until the picture is there, so the hero never opens on an empty frame.
 - **A world's card** (`world-card.tsx`) is one link to the world, another build (`/<id>/`): the
   link is the card's name, stretched over the whole card, and the Benefactors button lies over
   it as its sibling, never inside it. Its picture is the world's share card, served from the
@@ -252,84 +281,55 @@ src/
   by name, then "+2 more"), and a named benefactor's links (below). An unnamed gift is
   "Anonymous" with what it gave and where. Last comes an empty lot, "Your name here", which
   opens the donate sign (only where donations are taken).
-  - **From 90rem wide** (`WallColumns`): a column fixed down each side of the page, beside its
-    64rem column (10.5 to 15.5rem wide, a little into the page's own margin), the wall dealt
+  - **From 110rem wide** (`WallColumns`): a column fixed down each side of the page, beside its
+    84rem column (10.5 to 15.5rem wide), the wall dealt
     left and right in turn (`wallSides`). A link is a card: its picture, when it has one to
     show, across the plaque, then icon, title and host. Over the left column, "Our
     Benefactors"; over the right one, across the page from it, the way to the hall of fame.
     Both stand level with the page's own links and the plaques begin level with the hero, so
     the columns read as part of the page.
   - **Narrower** (`WallStrip`): "Our Benefactors", what the list is and the way to the hall
-    of fame on one line, then one row under the figures, every plaque one height (84 px: a
-    name, the sum and cities on one line, the links on one line; the first picture at the
-    plaque's side). Its room is there from the first paint, with empty plaques while the list
-    is on its way, so the page below does not move; a failed answer leaves the invitation
-    alone. Only one of the two is ever in the page (`useMediaQuery`), so no picture is
-    fetched twice.
-  - **They drift** (`drift.tsx`, `.drift` in `globals.css`) only when there is more than fits:
+    of fame on one line, then a horizontally scrollable row below funding. Every plaque is
+    116 px high, with compact link previews beneath the name and cities. Empty plaques reserve
+    the row's height during loading. A failed answer leaves the invitation alone.
+  - **The side columns drift** (`drift.tsx`, `.drift` in `globals.css`) when there is more than fits:
     the list is then in the page twice, the second copy `inert` and hidden from screen
-    readers, and the track moves by exactly one copy (16 px a second up a column, 26 along
-    the strip), so the loop has no seam; it comes out of the fog and goes back into it (a
+    readers, and the track moves by exactly one copy (16 px a second), so the loop has
+    no seam. It comes out of the fog and goes back into it (a
     mask). It stands still under the pointer and while anything in it has the focus, and
     never moves under `prefers-reduced-motion`: there it is one list, scrolled by hand. The
     columns are not scroll containers otherwise, so the wheel over them scrolls the page.
-- **"Which city should I build next?"** (`next-city-tile.tsx`, where donations are taken): a
-  tile after the cities' cards, in what is left of their last row or in a row of its own
-  (`tileSpan` in `lib/home.ts`, at each breakpoint), with the three cities nearest to being
-  built (`leading`), a button that opens the donate sign and a link to the ranking. Most
-  visitors look at the worlds and never reach the ranking otherwise. While the list is on its
-  way three empty bars hold their place.
 - **The front page's pictures move** (`components/home/moving-picture.tsx`). Each card plays
   its world's loop (`/loops/<id>.mp4`, 800 × 420, silent, a few hundred kB) over its share card:
   the loop opens on the card's own framing, wordmark included, and drifts round an ellipse back
-  to it, so the still hands over to the film unseen and the film loops unseen.
-  A loop is fetched only when its picture is on screen (`preload="none"`, an
-  `IntersectionObserver`) and is the one being shown (`active`), plays while it stays there,
+  to it, so the still hands over to the film unseen and the film loops unseen. The still comes
+  in the size the card is shown at (`srcset`, `worldCardSrcSet`: 400 or 800 px of WebP, the
+  share card itself for the densest screens), so the catalogue costs a few hundred kB rather
+  than a dozen MB. No film is fetched before the page's `load` event: the stills and the code
+  come first.
+  A loop is fetched only once the still or its fallback is ready, at least 40% of its frame
+  is on screen (`IntersectionObserver`), and it is the one being shown (`active`). It plays while it stays there
   and is never fetched under `prefers-reduced-motion` or `Save-Data`; if it is missing or
   cannot play, the still stays. The loops are the front page's own files (`LOOPS_BASE` in
   `site.ts`), unlike the share cards: `deploy/deploy.sh home` is all they need, and a world's
   folder does not carry them.
-- **The hero goes round the worlds** (`components/home/hero-carousel.tsx`): a slide for every
-  world that has a hero film (`heroSlides`: the registry's order, New York first), the same
-  idea at the page's width. A film is a slow lap with no sign on it, `/loops/hero.{mp4,jpg}`
-  for New York and `/loops/hero-<id>.{mp4,jpg}` for the others (`worldHero`), framed by
-  `tinyworlds-videos` to keep what is worth seeing clear of the page's sign. Which worlds
-  have one is what the build finds in `public/loops/` (`next.config.ts` →
-  `NEXT_PUBLIC_HERO_FILMS` → `HERO_FILMS`), so a world added without a film is simply not in
-  the hero, and with one film listed the hero is a picture and a sign, with no controls.
-  - **The sign** stays over the picture's lower left (below `lg` it hangs from the picture's
-    bottom edge instead): the wordmark, the tagline, the pitch, then the world being shown
-    (its wordmark in its colour, its city on one line, so the sign is as tall whatever the
-    world), "Explore" (the link to that world, named "Explore {city}") and, where donations
-    are taken, "Fund the next city" (`#ranking`). The buttons share a row from `sm` and stack
-    below it: they never wrap.
-  - **It moves on by itself** every `SLIDE_MS` (8 s), the new picture fading in over the old
-    (`FADE_MS`, the `hero-in` keyframes), only while `mayAdvance` (`lib/home.ts`) says so:
-    more than one slide, the hero on screen, the page in view, no pointer on it, no keyboard
-    focus in it, and never under `prefers-reduced-motion` or `Save-Data` (then it stands
-    still and only the stills are fetched). Choosing a slide stops it for good: the hero is the visitor's from then on, which is
-    how a finger (it has no hover) or a screen reader holds it. A tab opened behind another
-    is hidden from the start (`watchHidden`), and of an observer's delivery the last word
-    is the one believed (`lastSeen`).
-  - **Choosing**: a pill at the picture's lower right from `lg`, at its top right below (where
-    the sign would cover it): previous, a dot per world (the current one in that world's
-    colour; a count instead on a phone, where dots are too small to press), next; the arrow
-    keys work inside it. Each slide chosen by hand is said to a screen reader, through a
-    polite region that is there from the start; one the timer brought is not.
-  - **What is fetched**: the first still at once; each other still a second before its turn
-    (`AHEAD_MS`); a film only when its slide is the one showing. Only the current slide and
-    the one it is fading in over are in the page.
+- **The split hero** (`hero-carousel.tsx`) keeps the headline beside the panorama on large
+  screens and below it on narrow screens. Its Explore link and city caption follow the
+  visible slide. The carousel walks the visit-ranked worlds that have hero films
+  (`heroSlides` and `worldHero`). It waits 8 seconds before preparing the next still and
+  crossfades after decode. The first still is eager and high priority, in WebP at the size the
+  panorama is shown (`worldHero(id).srcSet`: 960 or 1280 px; the JPEG is the fallback). Previous and next, arrow keys within the
+  control group, and pause/play allow manual control. Autoplay holds while hovered, focused,
+  hidden, or off-screen. Reduced motion and Save-Data keep it manual.
 - **Each card says how visited its world is** (with an API): "41,203 visits" under the card's
   text, and "● 23 exploring now" beside it once more than ten (`LIVE_SHOWN_ABOVE`) have that
   map open (`visitsLine` in `lib/visits.ts`, numbers in the visitor's way of writing them).
   `useWorldVisits` asks `worldVisits` for every world in the registry with a plain `fetch`
   (5 s timeout), at once and then every 30 s while the page is in view; a failed answer leaves
-  the last numbers. Each group of cards comes **most visited first** (`byVisits`; ties and
-  worlds with no count keep the registry's order), ordered by the **first** answer only: later
-  ones change the numbers, never the order, so nothing moves under the pointer. Before that
-  answer, and for good without one, the cards keep the registry's order and say nothing; the
-  line's height is there from the start (`box-content`: a `min-h` would otherwise swallow the
-  line's padding), so the cards do not grow when the numbers come.
+  the last numbers. The catalogue and carousel share one total-visit ranking (`byVisits`,
+  `heroOrder`): the visits baked into the page, or, when the build had none, the **first**
+  answer's. The registry supplies the fallback order and breaks ties. Later answers update the
+  numbers while keeping the order stable.
 - **The front page's share card** is its own picture, `public/og/tinyworlds.jpg`
   (`HOME_CARD_PATH`): six cities in leaning slices under the wordmark, not a world's card.
 - Inside a map, the arrow at the left of the search sign (and "All cities" in About) is a plain
@@ -360,9 +360,12 @@ src/
   "fan-made" in the visitor's language instead of crediting map data; About sets the world's
   notes apart as a disclaimer (unofficial, invented layout, not affiliated with the author or
   the series — `worlds.test.ts` checks every fictional world says so in every language and
-  never claims open data); and the front page lists them in their own group ("Imagined places")
-  after the cities. They are worlds like any other for everything else (share links, search,
+  never claims open data); and the front page includes them in the "Imagined places" filter.
+  They are worlds like any other for everything else (share links, search,
   donations), and the donate picker never offers them as cities to fund.
+- The GTA-inspired fictional worlds are `tinygtaiii`, `tinyvicecity`, `tinysanandreas`,
+  `tinygtaiv` and `tinygtav`. Their entries use the shared localized copy in `worlds/gta.ts`
+  and still cards from the pipeline.
 - **Long wordmarks.** `tinykingslanding` is sixteen letters where an airport code makes seven:
   `Wordmark` sets a name longer than ten letters smaller in proportion (`wordmarkScale` in
   `lib/wordmark.ts`), so the search sign, the cards and the splash need no special case.
@@ -466,21 +469,17 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   - It says, in every language: cities with the most funding are built first, and what is given
     beyond a city's goal pays for the servers and keeps the project improving.
 - **"Build the next city"** (`components/donate/build-next.tsx`, `rankCities`): the front
-  page's ranking, and a short form of it on "Your cities". Three steps say how it works (pick
-  a city, give from US$1, at the goal it is built), each under one of the badges' pictures.
-  Then every city is a card (`city-fund-card.tsx`) in three groups:
-  - **Built**: `BUILT` with `raisedCents >= goalCents`, most raised first. A city never leaves
-    the ranking: once built it stays here, lit in the accent, with its share card as a band,
-    every stone laid, "Funded in full", and two actions, Benefactors and Explore. No Donate
-    (see Benefactors). The rule is the whole rule: one of the worlds built without funding
-    joins the group if its gifts ever reach its goal, which is why the card never says
-    "built by". Six before a "show all" of their own (`BUILT_LIMIT`).
+  page's ranking, and a short form of it on "Your cities". Visitors can drag, swipe or page
+  through each group, search by name or alternate spelling, or open the donation picker
+  with “Name a city”. The funding steps and new-city signup follow the list.
+  - **Built**: cities that reached their goal and are on the map. This first row scrolls
+    back and forth while visible, with pause/play controls. Searching, hover, focus, and
+    reduced motion hold it still. Each card explains how public gifts earn lasting recognition.
   - **Funded** (`FUNDED` and `BUILDING`), as before.
   - **Being funded**, most funded first and, among equals, the most people waiting for it
-    (`waiting`: "Tell me" is the free vote), eight before "show all" (`RANKING_LIMIT`), and
-    last an empty lot, "A city that is not here?", which opens the donate sign with no city
-    chosen. **Only a city with money has a number**: a place among cities at nothing would mean
-    nothing. A city nobody has given to shows its goal ("$30 goal"), not "$0 of $30"; while
+    (`waiting`: "Tell me" is the free vote). A search keeps the original funding rank.
+    **Only a city with money has a number**: a place among cities at nothing would mean nothing.
+    A city nobody has given to shows its goal ("$30 goal"), not "$0 of $30"; while
     nobody has given to any, a line says the order is how many are waiting (when some are) and
     that the first donation puts its city at the top.
 - **A city's card** shows its bar as **its foundation, a stone per dollar** (`StoneWall`,
@@ -496,16 +495,19 @@ Optional, and never in the way: with nothing configured there is no heart, no di
   the sign back to the payment link (`donateMode` in `lib/donate.ts` is the whole rule), where
   the amount and the city are set on the checkout page instead.
 - `lib/donate-api.ts` (Apollo Client 4, core API, no provider) is only ever imported dynamically
-  (`useMilestones`, the checkout button), so Apollo is not in the bundle the map starts with.
+  (the checkout button), so Apollo is not in the bundle a page starts with. The list of cities
+  (`useMilestones`, `lib/milestones.ts`) is a plain `fetch`: the front page shows it at once.
 - The heart in the tool column, the link in About and the front page's ranking all open the
   same sign.
 - **What the page analytics hear** (`lib/site-events.ts`): `donate_open`, `donate_checkout`,
   `donate_cancelled`, `donate_complete` (the conversion, with `value` in US$ and `currency`),
-  `explore_more` and `quiz_start`, each with `world` (and `city`, `amount` when there are). `siteEvent()` pushes
+  `explore_more`, `quiz_start` and `walk_start` (a street walk opened), each with `world` (and
+  `city`, `amount` when there are). `siteEvent()` pushes
   every one to Tag Manager's `dataLayer`, where the container sends it on to Google Analytics.
   Rybbit hears the clicks from declarative hooks on the buttons (`data-rybbit-event` with
   `data-rybbit-prop-world`, `-city`, `-amount`), so `siteEvent(…, { rybbit: true })` is only for
-  the two returns from the checkout, which no click marks. What the donor chose rides to the
+  what no click marks: the two returns from the checkout, and `walk_start` (said once the walk
+  has opened: the person's button is pressed for drags, taps and drops that find no street). What the donor chose rides to the
   checkout and back in session storage (`tinyworlds.checkout`); only an API checkout returns
   here, so a payment-link donation is not a `donate_complete` (the API still knows it from
   Stripe). Every message carries all its keys, `undefined` when absent, because the data layer
@@ -565,13 +567,19 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
 
 - **Where the sign opens.** `BenefactorsSign` (a city's founders, benefactors and stone grid, from
   `cityBenefactors`) opens from the front page (a world's card, a city's card in the ranking),
-  from "Your cities" and, in a map,
-  from About (`BenefactorsPanel`, drawn only for a city the API knows and that is built). The
+  from "Your cities" and from the map's corner plaque. About embeds `BenefactorsPanel` for a
+  real city the API knows. The
   panel is mounted only while open, so each opening fetches afresh. A card offers it only for
   worlds the API lists a city for.
-- **Built cities reach the Donate sign only through it.** The picker never offers a built city
-  (nothing to fund); the benefactors' sign has a button that closes that sign and opens
-  Donate with the city chosen (one sign at a time).
+- **Map plaque.** `MapBenefactors` reads the live public city data once the map is available.
+  Above the credits it cycles through the publicly named donors in Hall of Fame order, showing
+  one name and its links at a time. The name opens the city's sign. Visitors can pause or advance
+  the carousel. It stands still on hover, keyboard focus, and under reduced motion. The
+  invitation opens Donate with the city already chosen, including on a map with no public names.
+  The public-name switch explains how a donation earns a spot on the map. The plaque appears on
+  real maps whose API city is built.
+- **Giving to a built city.** The map's invitation and the benefactors' sign open Donate with the
+  city chosen. The picker lists cities still being funded.
 - **The join block** (`components/donate/join-block.tsx`) is "Put my name on {city}": off by
   default, a name field (40 code points, `cleanName`) when on, and Donate disabled until a name
   is left, saying why in a hint under the field (`donate.join.needsName`, tied to the field and the button with `aria-describedby`). The checkout carries `benefactorName`, null when off. The email's existing name is kept.
@@ -585,8 +593,9 @@ Optional like the rest of the donations: everything here needs `NEXT_PUBLIC_API_
   `setNameHidden`; it acts at once, since it is reversible, and is loaded apart from the funnel).
 - **A benefactor's links** (`benefactors/benefactor-link.tsx`, `lib/links.ts`): up to three
   pages a named donor points to, each with what the API read of it (title, description, the
-  site's icon, the page's picture). They show under the name in a city's sign (`look="row"`:
-  a small picture in the icon's place) and on the front page's plaques (`look="card"`), never
+  site's icon, the page's picture). The picture fits its frame at its original proportions,
+  and the image, title and host share one link. The home strip and city's sign use small previews.
+  The side columns and Hall of Fame have room for the larger preview card. Links never show
   on an unnamed row (the parsers drop them there, whatever the answer says). A link opens in
   a new tab and is a **dofollow link**, `rel="dofollow noopener"` (`LINK_REL`, in
   `lib/links.ts`): never `nofollow`, `sponsored` or `ugc`, because the benefactors are told
@@ -648,21 +657,21 @@ canonical address.
   everyone on the wall, the cities built with their gifts); "Built by benefactors", a gallery
   of the cities their benefactors brought to the map (`BuiltCityCard`: the city's picture,
   name, plaque and first names; the card leads to its hall, "Explore" over it to the map);
-  "Our Benefactors", everyone on the wall as cards, ranked from the largest gift
-  (`PersonCard`: place, name, sum, the cities, each a link to that city's hall, and their
-  links with pictures); then "More cities": a tile for every other city someone gave to
-  (`CityTile`: how many are in its hall, where it stands with a bar while it is funded, the
-  first names). `hallCities` gives each city its people (the API's count when it says, else
+  "Our Benefactors", everyone on the wall as cards, ranked by total donated
+  (`PersonCard`: place, name, sum, the cities with links to their own halls and the founding
+  badges earned in each, and the benefactor's links with pictures); then "More cities", a tile
+  for every other city someone gave to (`CityTile`: how many are in its hall, its funding
+  progress, and the first names). `hallCities` gives each city its people (the API's count when it says, else
   the wall's entries) and its `broughtBy`. Last, "Fund a city" and what the links are.
 - **`/hall-of-fame/<slug>/`** (`components/hall/city-hall.tsx`): a built city's picture
   (beside the words on a wide screen, kept to its right side so the frame does not cut
   through its wordmark: `MovingPicture`'s `focus`, above them on a narrow one), for a city its
   benefactors brought their plaque in place of "raised of goal", the city's foundation (the
   sign's `StoneGrid` and legend), "Become a benefactor" and "Explore" for a built one, then
-  its founders (`FounderCard`: number, badges, stones, sum, links) and its benefactors
-  (`BenefactorCard`), all of them, as cards.
-- **Cards are set in columns** (`CARDS`: one, two, three, each filled from the top), because
-  a card with pictures is several times as tall as one without: a grid of rows leaves holes.
+  one leaderboard for its founders and later benefactors, ranked together by total donated.
+  A founder's card also shows their founding badges and how many stones they laid.
+- **Ranked cards read across each row** (`LEADERBOARD`, one to three columns). Achievement
+  descriptions are available on hover, keyboard focus, or tap in each supported language.
 - **The pages are baked** (`lib/hall-build.ts`): each is an async page that asks the API when
   the build runs (`hallAtBuild`, `cityAtBuild`; `buildEndpoint`: `NEXT_PUBLIC_API_URL`, on
   `NEXT_PUBLIC_SITE_URL` when it is a path) and hands what it got to its client component as
@@ -692,11 +701,12 @@ Anyone may ask to hear when a city is built, or when any new one is (root `CLAUD
 lists' bullet). Only with an API (`withApi`); `lib/lists.ts` is the pure part, `lib/lists-api.ts`
 (Apollo, lazy) the calls, `useLists` (`hooks/use-lists.ts`) the donor's lists.
 
-- **On the front page**: each city being funded (the "Build the next city" tile and the
-  ranking's cards, `CityFundCard`) has a **"Tell me"** button (`TellMeButton`; "You'll be told"
+- **On the front page**: each city being funded (`CityFundCard`) has a
+  **"Tell me"** button (`TellMeButton`; "You'll be told"
   once on the list, and pressing it leaves: its label for screen readers starts with those
-  words, `leaveAria`; a donor of the city is told without a list, and the button says so) and shows **"N waiting"** (`waiting` of `cityMilestones`). The tile (`NextCityTile`)
-  also has **"Tell me when new cities are built"** (`NewCitiesButton`).
+  words, `leaveAria`; a donor of the city is told without a list, and the button says so)
+  and shows **"N waiting"** (`waiting` of `cityMilestones`). Below the funding rows is
+  **"Tell me when new cities are built"** (`NewCitiesButton`).
 - **The join sign** (`JoinSign`): a signed-in donor joins at once; anyone else is asked for an
   address and confirms it with the sign-in link or code (`SignIn purpose="donor"`, the list
   carried in `magic-link`'s `list`, so the link joins server side wherever it is opened).
@@ -777,7 +787,7 @@ frame: components call methods and subscribe with `engine.on("view" | "settle" |
 `requestAnimationFrame` only runs while something is moving, fading or animated.
 
 - **Tiles canvas** (`.map-tiles`): the pixel-art tiles, then _scene layers_. Sits under the
-  tilt-shift blur and the dusk tint.
+  tilt-shift blur and the time-of-day grade.
 - **Marks canvas** (`.map-marks`): neighbourhood lines, name plates, the building spotlight, the
   search pin. Above the blur, always sharp.
 - View = centre in map px + `scale` (CSS px per map px). `scale ≥ 1` draws level 0 with smoothing
@@ -818,11 +828,15 @@ runway. It only animates things that are never hidden behind a building, because
 no depth information: no cars.
 
 Layers are called every frame while life is on; with `prefers-reduced-motion` they are called
-once per redraw with `timeMs = 0`. The live engine is also on `window.tinyworld` for the console.
+once per redraw with `timeMs = 0`. A layer added with `{ always: true }` is a sign, not life (the
+ways lit under the street walk's carried person, `map/walker.ts`): it is drawn with life off too,
+whenever the map is redrawn. `setPaused(true)` stops all drawing while something covers the whole
+map (the street walk): the view can still be moved, and `setPaused(false)` draws it again. The
+live engine is also on `window.tinyworld` for the console.
 
 ### The building spotlight (`map/sights.ts`, `map/sight-state.ts`, `components/map/sight-sign.tsx`)
 
-In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee), a building found in the search
+In a world with `sights: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs, Truckee, Austin, San Francisco, Milwaukee, Bethlehem), a building found in the search
 lights up under the mouse: the rest of the map dims (`rgba(12, 14, 16, 0.58)` over the marks canvas, the building's
 outline cut out), a 2 px line of the accent runs round it, and a sign beside its top says what
 it is (type · context line, name), the opening of its Wikipedia article and "Read on Wikipedia".
@@ -845,7 +859,7 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 - **The whole building.** The tiles are flat, so a lower tower in front still hides the lit one;
   each sight's picture (`sprite` in `sights.json`: the pipeline draws it alone, nothing in front)
   goes over the tiles on the tiles canvas, under the dim's cut-out, placed and smoothed exactly
-  like a tile so it lines up and takes the blur and the dusk like the map. It is fetched the
+  like a tile so it lines up and takes the blur and the lighting of the map. It is fetched the
   first time the sight lights up (`fileUrl`), fades in with the spotlight (or as it arrives),
   and the last few stay, up to `PICTURE_BUDGET` px (`picturesToDrop`). A sight without one, or
   whose picture fails, lights up as before.
@@ -864,8 +878,7 @@ it is (type · context line, name), the opening of its Wikipedia article and "Re
 
 ### Guess the building (`hooks/use-quiz.ts`, `components/map/quiz-*.tsx`, `lib/quiz*.ts`)
 
-In a world with `quiz: true` (New York, Dallas, Cincinnati, Pittsburgh, Philadelphia, Colorado Springs; it needs `sights`, and
-Truckee's, with six Wikipedia articles among them, are too few for a game), a sign under
+In every real city, `quiz: true` and `sights: true` enable the game. A sign under
 "more cities and worlds" (`QuizBanner`, class `quiz-invite`) opens the game once the buildings are in. The card
 first asks what to play (`choosing`): a difficulty (easy, medium, hard), a borough or all
 (the areas the questions have, most first; the row is named by the world's `borough` word) and
@@ -874,7 +887,7 @@ a kind or all (buildings, museums, landmarks, stations), and says how many build
 emptied by another change lets go of the kind, then the borough (`fixChoice`). The choice is
 remembered (`<world>.quiz.choice`; easy, all, all the first time). A game is every matching
 building once, in a random order, those played before last (`gameOrder`): a building is lit,
-its Wikipedia opening shown with the name blanked, the visitor picks its name out of four, and
+its sourced clue shown with the name blanked, the visitor picks its name out of four, and
 sees how everyone else answered on that difficulty. The header shows the choice and "round r
 of N · k right", with a gear back to choosing; after the last building the card says how many
 were right (`finished`) and offers Play again, Change and Stop. Stop, the close button or Esc
@@ -936,7 +949,8 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
   points every data URL at the other set (`setMapView`, `viewDataBase` in `map/data.ts`) and
   starts the engine again from the address bar, as a shared link would. A game of Guess the
   building ends first. Nothing of one view is mixed with the other's: `dataUrl()` follows the
-  view by default, so the minimap and the quiz follow too.
+  view by default, so the minimap and the quiz follow too. The street walk is the one exception:
+  it is the world's own whichever way the map is turned (`worldDataUrl`, below).
 - **Remembered per world** in the visitor's preferences (`prefs.view`, `"north"` by default), not
   in the shared link: a link always opens north up. The tab reads it once, when it opens (the
   view is in no markup before the map is in, so the page still hydrates as prerendered): turning
@@ -947,14 +961,274 @@ data set in `grid/` inside its data folder (root `CLAUDE.md`, Data contract).
 - The About notes say so in each language: north is up, and the compass turns the map the way
   it was first drawn.
 
+## The street walk (`src/walk/`, `components/walk/`)
+
+In a world with `walk: true` whose manifest names `walk` (the data has `walk/`), the
+city can be walked at street level, in 3D: on foot, at the wheel and on the water. The root
+`CLAUDE.md` has the data (`walk/walk.json`, `walk/cells/<i>_<j>.bin`) and the design is
+`docs/superpowers/specs/2026-11-16-street-walk-design.md`.
+
+- **One walk for both views.** The walk is in metres, so it is the world's own (`walk/` of its
+  own folder, never `grid/`): its files come through `worldDataUrl` with the version the
+  world's own manifest names. North up that is the map's manifest; turned to the street grid,
+  whose manifest names no walk, `map-app.tsx` reads the world's own beside it
+  (`loadWorldManifest`, `walkManifest`), and the person stands in the tools once it is in. On
+  the map side everything goes through the engine's current projection: `mapFrame` (in
+  `walk/load.ts`) takes the walk's metres to the map's px through lon/lat, and the drop
+  (`dropAtMap`, `pickDeck`) and the lit ways (`waysNearMap`, `dropHighlight`) take it; the way
+  back centres the map on you with `engine.projection`. Turning the map starts a new engine; the
+  compass is not there while walking, so a walk never outlives its map.
+- **Nothing of it is in the map's first bundle.** `walk-screen.tsx` is the only way in: its
+  default export is reached by `import()` from `useStreetWalk` (`hooks/use-street-walk.ts`,
+  the walk as the map sees it) when a walk opens, and three.js and every module under
+  `src/walk/` come with it. First the tiny `walk/webgl.ts` says whether the browser can draw
+  it at all (WebGL 2, and a browser that can unzip the squares): otherwise a toast says so and
+  nothing more is downloaded. It is asked as soon as the person is picked up (dragged or
+  tapped), before the drop's squares are fetched or "Let go to walk here" is said. The map itself
+  carries only the person's button (`walk-person.tsx`, `map/person.ts`), the hook, the walk
+  link's parser (`map/hash.ts`) and the walk's CSS; `map/walker.ts` and the drop's data
+  (`walk/load.ts`) are imported when the person is picked up or a walk opens.
+- **Getting in.** The little person stands in the tool column (in the map's pixel style, its
+  shirt the accent; not anyone else's figure). Drag it onto the map: the ways near the pointer
+  it can stand on light up (`dropHighlight`, from the squares under the pointer, read as it
+  moves) and it dangles over the spot with "Let go to walk here" or "No street here". A point
+  of the map is taken as the map draws it (`WalkData.dropAtMap`): bridges and overpasses are
+  drawn raised by z·kz, so a deck is hit where it is drawn (`pickDeck`, in map px, within its
+  half-width) and not at its footprint (71 m away for the Brooklyn Bridge's 41 m span); off
+  any deck, `snapDrop` puts it on the nearest sidewalk or street to the ground point within
+  150 m, facing along it; nothing near is the "No street here" toast and no walk. A tap on the
+  person then a tap on the map does the same (`armed`, the map's own tap taken by the hook;
+  its sign says tap or click after what pressed the person; Esc lets go). **W** (free among
+  the map's keys), or the button from the keyboard, puts it down in the middle of the map. A
+  link `#walk=lat,lon,heading` opens the walk there (`parseWalkHash`, also on `hashchange`; a
+  link carries no height, so on a deck's footprint it opens on the deck), and the walk writes
+  one through `writeHash` whenever you stand still. Analytics: `walk_start` through
+  `siteEvent` with `world`, Rybbit included, once the walk has opened.
+- **Full screen** (`.walk-full` in `globals.css`): the owner asked for the map "in the bottom
+  left side with just the streets just like it works on GTA" instead of beside the walk, so the
+  walk takes the whole screen. The map's `MapEngine` stays alive underneath, hidden and paused
+  (`setPaused`, from the hook while walking: nothing drawn, life included, and it does not follow
+  you); its other signs give way (search, banners, quiz, tools, its own minimap, the building
+  spotlight). The credit stays, in the bottom-right corner. M or "Back to the map" leaves with the
+  map centred where you are (on a bridge, its deck as the map draws it, from the game's own
+  height), from the moment the walk is asked for: while its code downloads, while it loads and
+  after it fails. A walk link followed while walking takes you there (`goTo`, the game's
+  `teleport`); the map itself is not a way to move you any more.
+- **The minimap** (`street-minimap.tsx`, drawn by `walk/minimap.ts`): a small square sign in the
+  bottom-left corner (176 CSS px, scaling from 96 to 128 on narrow or short screens via
+  `--walk-mm` on `.walk-pane`, clear of the safe-area insets), just the streets, centred on you and
+  turned with you (the way you face is up; your heading: on foot where you look, at the wheel
+  the car's), zoomed out with your speed (`minimapSpan`: 150 m across standing, on foot or
+  swimming, out to 450 m at 30 m/s and over, eased over about half a second; at once under
+  reduced motion, though it still turns). Pixel art: an odd number of pixels across, each two
+  (or so) CSS px and a whole number of device pixels, shown without smoothing; every pixel one
+  tone. The streets (`StreetEdge`s cut to each square, `squareSegments`) at their real width
+  (at least 1.2 px) in a light paper (`concrete`), the major classes (secondary and up) a touch
+  brighter (`markingWhite`), the elevated ways (bridges, highways) over them in `salmon`; the
+  water the palette's deep water from each square's mask, and past the edge of the data as the
+  walk lays its open water (`offDataWater`); the land, and a 3 px rim, the sign's dark. You are
+  a pixel arrow in the accent at the middle; north a little paper triangle in the rim. No other
+  marks, no labels. A picture for a screen reader named once (`walk.minimap`); no target for a
+  pointer (`pointer-events: none`), so a thumb on it reaches the stick under it; under the wasted
+  screen and the signs. Its cost: each square's segments are made once, the first time it is in reach (six a drawing at
+  most, the nearest first), and dropped when the world lets the square go; a drawing (at most 20
+  a second, none while nothing has moved) runs each segment in reach through the transform and
+  fills the pixel rows it covers (`rasterSegments`: a capsule, one run a row), reads the masks
+  for the pixels no line covers, and puts the picture: about 0.15 to 0.25 ms in a desktop
+  Chrome. No Path2D, no antialiasing to undo, nothing read back from the canvas.
+- **The screen** (`WalkScreen`): checks WebGL 2 again (`canDrawWalk`), reads `walk.json`
+  ("couldn't start" with Try again, on a new canvas, and Back), builds
+  `WalkView` (the renderer) and `WalkGame` (the game: `game.ts` and the modules it ties
+  together), and takes the keys while it is open (not while typing or while a dialog is open:
+  the map's own keys stand aside), the mouse through pointer lock (a click on the view asks,
+  "Click to look around" until then, Esc lets go), and on a touch screen the touch pad. New
+  York's first walk of the visit, opened within 400 m of the manifest's `start`, finds a red
+  supercar parked there (`starter`; put elsewhere before its squares are in, or after 15 s
+  whatever they do, it is given up, so the streets still park). A phone may take the GPU back
+  (`webglcontextlost`): the walk says it stopped, and Try again opens where you were.
+- **Automatic quality** (`walk/quality.ts`, `QualityLadder`): under 30 fps for 3 s (counted a
+  few seconds after the first squares are in, while the page is in view), one step down, then
+  3 s more to see: the water's reflections, then fewer people and cars (150 → 90 → 60 people,
+  70 → 45 → 30 cars: `setCrowd`; a touch screen starts at 90 people and 45 cars), then the pixels a
+  size bigger, up to 5, unless the visitor chose one. It never steps back up in a walk (quality
+  that comes and goes reads as a bug, and a phone slow in one street is slow in the next); the
+  crowd and the pixel size it reached stay for the visit's next walk.
+- **The signs** (`walk-hud.tsx`, text from `walk/hud-text.ts`): the corner sign with the life
+  bar, always (20 pixel cells of 5, green, amber under 50, red under 25, flashing on a hit,
+  "Life 64 of 100" for a screen reader), the damage bar beside it at the wheel or "Wrecked",
+  the speed in the world's units (`units: "imperial"` is mph, else km/h) and the vehicle's
+  name, the explosion warning and countdown, the line of keys built from the current bindings
+  (not on touch), "F get in the taxi",
+  the messages, and the buttons (controls, back to the map: above even the wasted screen). A
+  hit reddens the view's edges (a plain red frame under reduced motion). React hears the game
+  only when what the signs say changes; what fades every frame goes to the DOM through refs.
+- **The wasted screen** (`wasted-overlay.tsx`): the word ("WASTED", "DETONADO", "ACABADO") in
+  Tiny5, paper white outlined one of its own pixels wide, over a vignette dithered in whole
+  pixels (a Bayer matrix on a small canvas), faded as `wastedAt` says; said once in a polite
+  live region (`wastedSaid`); a key or a tap skips once it is up. The greying, the slow motion
+  and the lifting camera are the game's and the view's.
+- **The controls** (`controls-menu.tsx`, a shadcn `Dialog`, P or its button): every action by
+  group with two keys; a key button waits for the next key (Esc stops waiting) and `rebind`
+  takes it from whatever it would clash with; "Reset to defaults"; the pixel size (1 to 6) and
+  the sound switch. Defaults are GTA's keyboard plus turning on the arrows and M for the map
+  (`walk/controls.ts`).
+- **Motorcycles** share the road-vehicle simulation, traffic and kerb parking (`TRAFFIC_MIX`).
+  Use the vehicle interaction key to mount or dismount. The bike leans into tight turns at low
+  speed and follows wider arcs at speed. Analog steering scales the available turn, and the
+  chase camera anticipates curves. The front and rear brakes slow the bike while it turns, and
+  it backs up at walking speed. Hard impacts and landings throw the rider off and deal damage
+  based on the impact. Survivors slide to a stop and get back up.
+- **Touch** (`touch-pad.tsx`): the left half moves (including over the minimap) and the right half
+  looks. Each gesture keeps its own finger, with no layout reads during a drag. The bottom-right
+  controls stay clear of the minimap and the credit. At the wheel, Get out stays below the horn,
+  camera, and brake. The HUD fits the safe-area insets and puts messages below the life sign.
+- **Critical vehicle damage** (`walk/vehicles.ts`): a road vehicle loses power and catches fire
+  for eight seconds at full damage. You can bail out while it rolls if a door or end is clear.
+  The explosion knocks nearby pedestrians down and damages other vehicles and the player, even
+  when driving another vehicle. An occupant of the source vehicle dies. Blast damage falls off
+  from the hull, and secondary wrecks start their own eight-second fuses. Sinking puts out the
+  fire and clears the fuse. Boats sink when critically damaged.
+- **Punching**: left-click while the pointer is locked, press E on foot (rebindable), or tap
+  Punch. The fist swings toward the reticle (`punch-view.tsx`) and the game checks the nearest
+  upright pedestrian along the view (`walk/punch.ts`). A hit requires a clear path and briefly
+  knocks the pedestrian down. The overlay gives a hit marker and uses a still fist under
+  reduced motion. Existing custom E bindings take priority when loading older settings.
+- **The water** (the rules and their numbers in `walk/water.ts`, the shader in
+  `render/materials.ts`, the mirror in `render/view.ts`): the owner asked for it "prettier
+  according to" a write-up of layered pixel-art water, whose ideas are re-made here for a
+  first-person view. Every layer picks one palette tone per pixel, never a blend; where two
+  tones meet, the line is crossed in a 4 × 4 Bayer pattern over a few pixels. Each square with
+  water has its own surface (and the open water lies only where no square is shown, so the
+  water is drawn once, after the ground's depth), shaded by a field made once from the data's
+  `shore` (`shoreField` in `render/shore.ts`: the distance to land, smoothed so the bands
+  follow the bank, which way the land lies, and the land's own distance to the water; a wet
+  square whose data lacks `shore` is drawn as the open water is, never a hole). Past the edge of
+  the data the open water lies only where no shown square beside it is all land, so where the
+  data ends inland the city ends in the fog's wall. The layers: **depth** (a teal shallow rim at
+  the shore, 2 m but never more than a few pixels across, a light rim, the base, the deep beyond
+  about 14 m), as the shore says at any angle, darker away from the land from a bridge as from
+  the water (an angle band once drew a dark ring round anyone looking down from a bridge);
+  **the horizon** (towards it the sky takes the depth back a shade at a time, up to the map's
+  water, so along any look outwards the water changes with the shore, then only lightens);
+  **reflections** (a camera mirrored under the surface
+  draws everything but the sky, the water, the ground and the particles into a picture of the
+  drawing's size, half of it on a touch screen; the water reads it in three flat tones, one,
+  two and three shades under the water they lie on, so they always show, its rows shifted
+  sideways by whole pixels the farther they are under their foot (a pixel whose own texel is
+  sky takes a neighbour's that sways onto it, `mirrorSource`, so a cable is not dotted), a
+  shade fewer at a time with the fog along the mirrored path); **the shore** (the first metre
+  of land a shade darker, not on a pier nor on what is painted over one, a plaza or a path on
+  it; on a near, lit shore a light lapping line two or three cells out, a pixel or
+  two wide, in dashes travelling along it; on a quiet one, farther than 150 m or facing away
+  from the sun, a dark line where it meets the water instead; a broken light line at the
+  waterline of what stands in the water, bridge piers, piles and boats, whose walls reach down
+  to it); **the living surface** (short horizontal dashes a shade lighter or darker, one in
+  some squares of a world grid whose squares double where they would be too small on screen,
+  so they stay a few pixels apart, drifting and showing for part of the loop); **glints** on
+  the open water, new places every loop; and **ripple rings** round every splash, a person
+  knocked off a quay too (`particles.ts`; the crowd says who went in, `CrowdEvents.splashes`). Every motion is a whole number of cycles in a 5 s loop. Under reduced
+  motion nothing on the water moves (no wobble, no glints, the lapping on its near ring, the
+  dashes still); the rings, being events, still show. What lies on the water or is the ground
+  goes on the layer `NOT_MIRRORED`; the shore's own faces mark themselves in the mirror's
+  alpha, so they get no light line. The mirror costs about one more drawing of the city: it is
+  drawn only when a square's water within 500 m is in the camera's view (`waterInView`), and
+  let go for the rest of the walk when the frames that drew it stay under 40 fps for 2 s
+  (`SlowWatch`: a slow street far from the water says nothing of the mirror's cost; a frame
+  over 1 s is a gap); the automatic quality's first step lets it go too.
+  `view.setReflections(on)` sets it again, `view.reflections` says whether it is on.
+- **Billboards** (`render/billboards.ts` where and what, `billboard-mesh.ts`,
+  `billboard-material.ts`): the owner asked to "put the billboards in times square". A world's
+  `billboards` (areas: lon, lat, a radius in metres) say where; New York's is Times Square,
+  centred where Broadway crosses Seventh Avenue as the walk's streets have it (the bowtie's
+  waist), 215 m round, so West 42nd and West 47th Street are in. A wall there carries screens when
+  it is a straight run of its footprint (edges turning under 12° are one wall) at least 8 m long
+  (taken in pieces of about 36 m), its volume stands on the street (base ≤ 6 m) and is tall (top ≥
+  15 m), and it faces open ground: probes from three points along it, 3 to 15 m out (Manhattan's
+  side streets are 18 m from front to front), meet no volume rising above 6 m, and the middle one
+  ends inside the area. Walls near the centre are taken first and more often, with two or three
+  screens stacked up them (one or two further out, one at the edge), from 6 m up to 2 m under the
+  top (60 m at most), each 60 to 90% of the wall wide (wider near the centre), 1:1 to 3:1, 0.3 m
+  off the wall in a dark housing. Each square's share of an area's 120 screens is the share of the area it
+  holds; New York's has 111. All of it from the data and hashes of each volume's seed and wall,
+  so the screens are the same every visit; a square's are hung (`WalkView.hangBillboards`, one
+  square a frame, about 0.2 to 1.3 ms) once it and every square round it are in, the probes
+  reaching into them, as one instanced mesh of its group: one draw call a square, no measurable
+  frame time at the waist (5.5 ms against 5.2 ms a frame, within the noise, 60 fps both, 1440 ×
+  900 at pixel size 3). What they show (`screenOf`, by hash): a slideshow of big pictograms on a
+  flat field (a new one every 3 s), a ticker band of coloured blocks scrolling under a picture,
+  colour bands sweeping (diagonal, sideways or rings), or a pictogram blinking or pulsing between
+  two palettes; every loop a whole number of seconds. The pictograms are drawn in code, 16 × 16
+  (a star, theatre masks, music, a film clapper, a cup, a sneaker, a heart, a lightning bolt).
+  Pixel art in LED pixels of 0.25 m, every pixel one of the palette's bright colours exactly
+  (`SCHEMES`: taxi yellow, reds, blues, greens, pinks, oranges, white, and the darks), gradients
+  in a 4 × 4 Bayer pattern of the screen's own pixels, a dark frame round each, then the fog and
+  the wasted greying (`fogged`); far away whole blocks of its pixels take one pixel's colour, so
+  nothing shimmers. **No brands, no logos, no letters or digits anywhere** (nothing to
+  translate). Under reduced motion every screen keeps one frame. Not in the minimap, not solid
+  (nothing reaches a wall 6 m up); a palette without their ramps shows none.
+- **Brooklyn Bridge** (`render/brooklyn-bridge.ts`): the mapped stone tower footprints and heights
+  give the street walk its paired Gothic arches, buttresses and stone courses. The raised central
+  promenade is painted with transverse wood boards. Diagonal stays supplement the packed cables.
+  The landmark uses the existing street walk cells and rides on the same road and footway decks.
+- **Decks and rails** (`world.ts`): elevated ways often overlap (the data's widths are wider
+  than the gaps between its lines), so which deck you are on is told by your history and your
+  direction (`surfaceUnder`'s `on` and `going`). You stay on the way you are on while its strip
+  holds you, whatever rises or falls beside it; another takes over only where the two are one
+  surface (within 0.2 m for a car, 0.09 m for a walker: less than either's snap down) and goes
+  your way clearly better (a car's direction is where it will point in half a second, so a
+  driver turning onto a branch at a fork gets it). On foot, proximity to a footway also counts
+  when both decks are level, so a walker following the Brooklyn Bridge promenade can leave the
+  adjacent roadway before their grades diverge. Coming off a way's end or edge, landing or
+  put down, you are on the deck nearest your height that fits best: nearest its line as a share
+  of its half-width, its direction nearest yours, of the kind you were on (footway after
+  footway); a car goes onto a footway only where no roadway is, and ties go to the deck nearest
+  your height, never to the higher. A car (and a walker) keeps the way it was last on through
+  the air and comes down on it. A way's round end counts only where no way holds the point
+  beside its line, where it stands well above them (the outside of a bend), or where it is
+  nearer your height than what is beside (the outside of a joint, a ledge the data leaves
+  between two ways' ends), so where one way ends and the next goes on down there is no ledge.
+  A deck holds you 0.5 m past its rails. **A rail stands for a body on its own way** unless what
+  lies 0.8 m past it (a deck, the ground) is within 0.5 m of the deck: where a branch parts from
+  yours, its rail holds you on yours. For anyone else a rail is open where another way's deck is
+  within 3 m of it (`JOIN_HEIGHT`: a car and a rail), so a car on the other way, in whose lanes
+  it lies, passes. Rails are closed round the outside of a bend, and each square gives the
+  pieces along its own stretch, so none is missing where a way crosses into the next square.
+  In a way's strip, from 0.5 m under its deck (three times its grade there, a car's nose on a
+  steep ramp, where that is more) to 5 m over it, no volume is a wall: the towers' openings, the
+  Queensboro's columns under its upper deck; at a gentle ramp's foot that reaches only its
+  first 6 m.
+- **What it keeps**: only the bindings, in `localStorage` `tinyworlds.walk.controls.v1` behind
+  try/catch (`loadBindings` gives a stored set out again through `rebind`, so a hand-edited
+  one cannot bind a key to two clashing actions). The pixel size and the sound last for the
+  visit, in memory. It sends nothing (no API): the privacy policy lists the keys under
+  `#your-browser`.
+- **The modules** (`src/walk/`, no React): `format.ts` `walk-index.ts` `cell.ts` `geo.ts`
+  (the data, in world metres east and north of the projection's origin), `load.ts` (fetching
+  it, `?v=<manifest.walk>`, and `mapFrame`: the walk on the map being shown), `world.ts` (surfaces, water, walls), `player.ts` `health.ts`
+  `wasted.ts` `spawn.ts` `drop.ts`, `vehicles.ts` `collide.ts` `crashes.ts` `doors.ts`
+  `fleet.ts` `ferries.ts` `tunnels.ts`, `roads.ts` `traffic.ts` `lights.ts` `signals.ts`
+  `people.ts`, `cameras.ts`, `sound.ts`, `controls.ts`, `hud-text.ts`, `webgl.ts`, `water.ts`,
+  `quality.ts`, `minimap.ts`, `game.ts`;
+  `render/` is the three.js side (`view.ts` with its streaming, `cell-mesh.ts`
+  `deck-mesh.ts` `shore.ts`, `billboards.ts` `billboard-mesh.ts` `billboard-material.ts`,
+  `models.ts` `particles.ts`, `palette.ts` `materials.ts`). The
+  production build has no `window.walk`: development builds put the game there for the
+  console (`walk.sim(5)`, `walk.state`).
+
 ## Design
 
 Every panel is a black enamel "sign" (`sign` utility) with paper-white lettering and the world's
 accent (the `taxi` token: taxi yellow in New York) for whatever is on; buttons are round `bullet`s. Signs are dark in **both** themes, so shadcn's
-`dark:` variant is always on (see the `@custom-variant` at the top of `globals.css`). The theme
-setting (Auto / Day / Dusk) only changes the fog behind the map and tints the map: it is the
-`dusk` class on `<html>`, set before paint by the script in `layout.tsx` and kept in sync by
-`useTheme`. Fonts: Archivo (UI) and Tiny5 (the wordmark), via `next/font/google`.
+`dark:` variant is always on (see the `@custom-variant` at the top of `globals.css`). The time-of-day setting defaults to a six-minute cycle. Day, Night and System hold a fixed
+grade. The map and Street Walk use the same clock and lookup tables in `src/map/daylight.ts`.
+The `dusk` class on `<html>` controls the interface colours. Fonts: Archivo (UI, weights only) and Tiny5 (the wordmark), via `next/font/google`.
+Tiny5 is preloaded, Archivo is not (its fallback has the same measure; on a slow connection it
+would hold up the stylesheet and the hero). next/font does not write the preload tag for our
+pages, because it looks them up as `page.home`/`page.map` while its manifest says `page`, so the
+layout writes it from that manifest (`lib/font-preloads.ts`); without it the wordmark showed in
+a fallback font first. The badges' pixel art (`PixelIcon`) is one SVG path per colour
+(`lib/pixel-paths.ts`) and a wall's stones one short class (`stone` in `globals.css`): the front
+page bakes hundreds of both into its HTML.
 
 Tokens live in `:root` in `globals.css` (`--fog`, `--sign`, `--paper`, `--taxi`, …) and are
 exposed to Tailwind as `bg-sign`, `text-paper-dim`, `bg-taxi`, etc.
@@ -973,4 +1247,5 @@ exposed to Tailwind as `bg-sign`, `text-paper-dim`, `bg-taxi`, etc.
 - A Radix tooltip and popover on the same button both set `data-state`; style open buttons with
   `aria-expanded` / `aria-pressed` instead.
 - Keyboard shortcuts are in `map-app.tsx` and are ignored while typing or while a dialog or the
-  settings panel is open.
+  settings panel is open; while a street walk is open they stand aside and the walk's own
+  (`walk-screen.tsx`, by `KeyboardEvent.code`, rebindable) take over.

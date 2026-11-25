@@ -6,6 +6,8 @@ export const tinypit: World = {
   wordmark: "pit",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  units: "imperial",
   // the map's districts are the parts of town (Downtown, North Side, Oakland…) and the boroughs
   // round the city; its outlines, the city's ninety neighborhoods
   copy: {

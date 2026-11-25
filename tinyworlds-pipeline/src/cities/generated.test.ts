@@ -3,7 +3,12 @@ import { EARTH_RADIUS } from "../projection.js";
 import { disc, insideRing } from "../scene/medieval.js";
 import type { SyntheticBuilder, SyntheticPlace } from "../scene/synthetic.js";
 import { lonLatOf } from "./generated.js";
+import { tinygtaiii } from "./tinygtaiii.js";
+import { tinygtaiv } from "./tinygtaiv.js";
+import { tinygtav } from "./tinygtav.js";
 import { tinykingslanding } from "./tinykingslanding.js";
+import { tinysanandreas } from "./tinysanandreas.js";
+import { tinyvicecity } from "./tinyvicecity.js";
 import { tinywesteros } from "./tinywesteros.js";
 import { tinywinterfell } from "./tinywinterfell.js";
 import type { City } from "./types.js";
@@ -38,10 +43,15 @@ function run(city: City): {
 }
 
 describe.each([
-  ["tinywinterfell", tinywinterfell, 1000],
-  ["tinykingslanding", tinykingslanding, 100000],
-  ["tinywesteros", tinywesteros, 400000],
-] as [string, City, number][])("%s", (_id, city, least) => {
+  ["tinywinterfell", tinywinterfell, 1000, "George R. R. Martin"],
+  ["tinykingslanding", tinykingslanding, 100000, "George R. R. Martin"],
+  ["tinywesteros", tinywesteros, 400000, "George R. R. Martin"],
+  ["tinygtaiii", tinygtaiii, 3000, "Rockstar Games"],
+  ["tinyvicecity", tinyvicecity, 5000, "Rockstar Games"],
+  ["tinysanandreas", tinysanandreas, 5000, "Rockstar Games"],
+  ["tinygtaiv", tinygtaiv, 7000, "Rockstar Games"],
+  ["tinygtav", tinygtav, 8000, "Rockstar Games"],
+] as [string, City, number, string][])("%s", (_id, city, least, inspiration) => {
   const first = run(city);
 
   it("is the same place every time it is generated", () => {
@@ -67,7 +77,7 @@ describe.each([
 
   it("is credited as a fan work and has no flights", () => {
     expect(city.attribution.join(" ")).toMatch(/fan-made/);
-    expect(city.attribution.join(" ")).toMatch(/George R\. R\. Martin/);
+    expect(city.attribution.join(" ")).toContain(inspiration);
     expect(city.flights).toEqual([]);
   });
 });

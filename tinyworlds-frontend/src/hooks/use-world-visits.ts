@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/donate";
 import {
+  bakedCounts,
   documentPage,
   everyWhileShown,
   fetchWorldVisits,
@@ -14,18 +15,28 @@ export interface WorldVisitsState {
   /** the latest counts; null until the first answer, and for good without an API */
   counts: WorldCounts | null;
   /**
-   * The first counts that came: what the cards are ordered by. Later answers change the numbers
-   * on the cards, never their order, so nothing moves under the pointer.
+   * The counts the page's visit ranking comes from: those baked into the page when it was built,
+   * or else the first answer. Later replies refresh the displayed counts while preserving
+   * navigation and card order.
    */
   ranked: WorldCounts | null;
 }
 
 /**
  * The worlds' visits for the front page's cards: asked at once, then every half minute while
- * the page is in view. A failed answer keeps the last counts on the cards.
+ * the page is in view. A failed answer keeps the last counts on the cards. `baked` is every
+ * world's visits as the build found them ([world, visits]): the page is ranked by them from
+ * the first paint, and shows them until the first answer (with nobody exploring: who was there
+ * when the page was built is no one's business now).
  */
-export function useWorldVisits(worlds: string[]): WorldVisitsState {
-  const [state, setState] = useState<WorldVisitsState>({ counts: null, ranked: null });
+export function useWorldVisits(
+  worlds: string[],
+  baked: [string, number][] | null = null,
+): WorldVisitsState {
+  const [state, setState] = useState<WorldVisitsState>(() => {
+    const counts = API_URL && baked ? bakedCounts(baked) : null;
+    return { counts, ranked: counts };
+  });
   const key = worlds.join(",");
   useEffect(() => {
     if (!API_URL || !key) return;

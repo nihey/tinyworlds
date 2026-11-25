@@ -67,7 +67,7 @@ export const PRIVACY: LegalDocs = {
             items: [
               {
                 term: "Rybbit,",
-                text: "which we run ourselves. It counts page views and a few clicks (opening the donate sign, starting the game), with the page, the site you came from, your browser, device and language, and the country and region worked out from your IP address. It sets no cookies.",
+                text: "which we run ourselves. It counts page views and a few clicks (opening the donate sign, starting the game, opening the street walk), with the page, the site you came from, your browser, device and language, and the country and region worked out from your IP address. It sets no cookies.",
               },
               {
                 term: "Google Analytics,",
@@ -87,6 +87,7 @@ export const PRIVACY: LegalDocs = {
             items: [
               "your settings (language, theme, the map's switches) and your answer to the cookie question;",
               "the buildings you have already played in Guess the building, and the game you chose;",
+              "the keys you chose for the street walk;",
               "the visit's id, and what you chose in the donate sign while you are at the checkout (in session storage, gone when the tab closes);",
               "if you sign in, your session, for 7 days;",
               'if you press "Tell me" before signing in, which list you asked for and when (under tinyworlds.join): it is read and removed once the sign-in completes, and ignored if it is more than an hour old.',
@@ -115,7 +116,7 @@ export const PRIVACY: LegalDocs = {
         id: "public",
         title: "What is public",
         blocks: [
-          "A gift's amount and stones are shown on its city's list without saying who gave them, unless you ask to be named: then your name is shown there, on the front page and in the Hall of Fame, with the links you add. You can stop being named, change your name or remove your links at any time on [Your cities](me). We may hide a name or links that break our [Terms of Service](terms).",
+          "A gift's amount and stones are shown on its city's list without saying who gave them, unless you ask to be named: then your name is shown there, on the front page and in the Hall of Fame, with the links you add. Your name and links can also appear in the corner of the city map. You can stop being named, change your name or remove your links at any time on [Your cities](me). We may hide a name or links that break our [Terms of Service](terms).",
           "To show a link, our server reads the linked page once (and again whenever you ask) and keeps its title, its description and small copies of its icon and picture, so that visitors' browsers never contact the linked site.",
         ],
       },
@@ -277,7 +278,7 @@ export const PRIVACY: LegalDocs = {
             items: [
               {
                 term: "Rybbit,",
-                text: "que nós mesmos mantemos. Ele conta visualizações de página e alguns cliques (abrir o painel de doação, começar o jogo), com a página, o site de onde você veio, seu navegador, aparelho e idioma, e o país e a região deduzidos do seu endereço IP. Ele não usa cookies.",
+                text: "que nós mesmos mantemos. Ele conta visualizações de página e alguns cliques (abrir o painel de doação, começar o jogo, abrir a caminhada pelas ruas), com a página, o site de onde você veio, seu navegador, aparelho e idioma, e o país e a região deduzidos do seu endereço IP. Ele não usa cookies.",
               },
               {
                 term: "Google Analytics,",
@@ -297,6 +298,7 @@ export const PRIVACY: LegalDocs = {
             items: [
               "suas configurações (idioma, tema, as opções do mapa) e sua resposta sobre os cookies;",
               "os prédios que você já jogou no Adivinhe o prédio, e o jogo que escolheu;",
+              "as teclas que você escolheu para a caminhada pelas ruas;",
               "o código da visita, e o que você escolheu no painel de doação enquanto está no pagamento (no armazenamento de sessão, que some quando a aba é fechada);",
               "se você entrar, sua sessão, por 7 dias;",
               'se você clicar em "Me avise" antes de entrar, qual lista você pediu e quando (em tinyworlds.join): ele é lido e apagado quando o acesso é concluído, e ignorado se tiver mais de uma hora.',
@@ -325,7 +327,7 @@ export const PRIVACY: LegalDocs = {
         id: "public",
         title: "O que é público",
         blocks: [
-          "O valor e as pedras de uma doação aparecem na lista da cidade sem dizer quem doou, a menos que você peça para ter seu nome: aí seu nome aparece ali, na página inicial e no Hall da Fama, com os links que você adicionar. Você pode deixar de aparecer, mudar seu nome ou remover seus links a qualquer momento em [Suas cidades](me). Podemos ocultar um nome ou links que desrespeitem nossos [Termos de Uso](terms).",
+          "O valor e as pedras de uma doação aparecem na lista da cidade sem dizer quem doou, a menos que você peça para ter seu nome: aí seu nome aparece ali, na página inicial e no Hall da Fama, com os links que você adicionar. Seu nome e seus links também podem aparecer no canto do mapa da cidade. Você pode deixar de aparecer, mudar seu nome ou remover seus links a qualquer momento em [Suas cidades](me). Podemos ocultar um nome ou links que desrespeitem nossos [Termos de Uso](terms).",
           "Para mostrar um link, nosso servidor lê a página indicada uma vez (e de novo sempre que você pedir) e guarda o título, a descrição e pequenas cópias do ícone e da imagem dela, para que os navegadores dos visitantes nunca contatem o site indicado.",
         ],
       },
@@ -487,7 +489,7 @@ export const PRIVACY: LegalDocs = {
             items: [
               {
                 term: "Rybbit,",
-                text: "que mantenemos nosotros mismos. Cuenta las páginas vistas y algunos clics (abrir el panel de donación, empezar el juego), con la página, el sitio del que vienes, tu navegador, dispositivo e idioma, y el país y la región deducidos de tu dirección IP. No usa cookies.",
+                text: "que mantenemos nosotros mismos. Cuenta las páginas vistas y algunos clics (abrir el panel de donación, empezar el juego, abrir el paseo por las calles), con la página, el sitio del que vienes, tu navegador, dispositivo e idioma, y el país y la región deducidos de tu dirección IP. No usa cookies.",
               },
               {
                 term: "Google Analytics,",
@@ -507,6 +509,7 @@ export const PRIVACY: LegalDocs = {
             items: [
               "tus ajustes (idioma, tema, las opciones del mapa) y tu respuesta sobre las cookies;",
               "los edificios que ya has jugado en Adivina el edificio, y la partida que elegiste;",
+              "las teclas que elegiste para el paseo por las calles;",
               "el código de la visita, y lo que elegiste en el panel de donación mientras estás en el pago (en el almacenamiento de sesión, que desaparece al cerrar la pestaña);",
               "si inicias sesión, tu sesión, durante 7 días;",
               "si pulsas «Avísame» antes de iniciar sesión, qué lista pediste y cuándo (en tinyworlds.join): se lee y se borra cuando termina el inicio de sesión, y se ignora si tiene más de una hora.",
@@ -535,7 +538,7 @@ export const PRIVACY: LegalDocs = {
         id: "public",
         title: "Lo que es público",
         blocks: [
-          "El importe y las piedras de una donación se muestran en la lista de su ciudad sin decir quién donó, salvo que pidas aparecer con tu nombre: entonces tu nombre aparece ahí, en la página principal y en el Salón de la Fama, con los enlaces que añadas. Puedes dejar de aparecer, cambiar tu nombre o quitar tus enlaces cuando quieras en [Tus ciudades](me). Podemos ocultar un nombre o unos enlaces que incumplan nuestras [Condiciones de uso](terms).",
+          "El importe y las piedras de una donación se muestran en la lista de su ciudad sin decir quién donó, salvo que pidas aparecer con tu nombre: entonces tu nombre aparece ahí, en la página principal y en el Salón de la Fama, con los enlaces que añadas. Tu nombre y tus enlaces también pueden aparecer en una esquina del mapa de la ciudad. Puedes dejar de aparecer, cambiar tu nombre o quitar tus enlaces cuando quieras en [Tus ciudades](me). Podemos ocultar un nombre o unos enlaces que incumplan nuestras [Condiciones de uso](terms).",
           "Para mostrar un enlace, nuestro servidor lee la página enlazada una vez (y otra vez cuando lo pidas) y guarda su título, su descripción y copias pequeñas de su icono y su imagen, para que los navegadores de los visitantes nunca contacten con el sitio enlazado.",
         ],
       },

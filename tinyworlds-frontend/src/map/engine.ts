@@ -23,6 +23,7 @@ import {
   type Sight,
   type SightShape,
 } from "./sights";
+import { WindowLights } from "./window-lights";
 import { levelForScale, Pyramid, tileKey } from "./tiles";
 
 /**
@@ -82,6 +83,7 @@ export interface EngineEvents {
 export interface EngineOptions {
   canvas: HTMLCanvasElement;
   marks: HTMLCanvasElement;
+  windows?: HTMLCanvasElement;
   manifest: Manifest;
   /** full URL of a tile file */
   tileUrl: (z: number, tx: number, ty: number) => string;
@@ -151,6 +153,7 @@ export class MapEngine {
   private readonly canvas: HTMLCanvasElement;
   private readonly marks: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
+  private readonly windowLights?: WindowLights;
   private readonly mctx: CanvasRenderingContext2D;
   private readonly pyramid: Pyramid;
   private readonly tileUrl: EngineOptions["tileUrl"];
@@ -173,6 +176,8 @@ export class MapEngine {
   private maxTiles = 120;
   private reducedMotion: boolean;
   private destroyed = false;
+  /** the street walk covers the map: nothing is drawn (life included) until it is let go */
+  private paused = false;
 
   // frame loop
   private raf = 0;
@@ -240,6 +245,8 @@ export class MapEngine {
   // scene
   private life = true;
   private readonly sceneLayers = new Set<SceneDraw>();
+  /** the layers drawn whatever "life on the map" says (the ways lit under the street walk's person) */
+  private readonly alwaysLayers = new Set<SceneDraw>();
 
   private readonly listeners: { [K in keyof EngineEvents]: Set<EngineEvents[K]> } = {
     view: new Set(),
@@ -266,6 +273,8 @@ export class MapEngine {
     if (!ctx || !mctx) throw new Error(activeStrings().errors.noCanvas);
     this.ctx = ctx;
     this.mctx = mctx;
+    if (options.windows)
+      this.windowLights = new WindowLights(options.windows, () => this.invalidate());
 
     this.measure();
     const start = options.start ?? options.manifest.start;
@@ -307,6 +316,7 @@ export class MapEngine {
 
   destroy(): void {
     this.destroyed = true;
+    this.windowLights?.dispose();
     cancelAnimationFrame(this.raf);
     if (this.settleTimer) clearTimeout(this.settleTimer);
     if (this.holdTimer) clearTimeout(this.holdTimer);
@@ -330,6 +340,7 @@ export class MapEngine {
     this.tiles.clear();
     for (const set of Object.values(this.listeners)) set.clear();
     this.sceneLayers.clear();
+    this.alwaysLayers.clear();
   }
 
   // ---- public API ------------------------------------------------------------------------
@@ -339,6 +350,10 @@ export class MapEngine {
     return () => {
       this.listeners[event].delete(listener);
     };
+  }
+
+  setWindowLight(amount: number): void {
+    this.windowLights?.setStrength(amount);
   }
 
   /** A copy of the current view. */
@@ -540,13 +555,15 @@ export class MapEngine {
   /**
    * Adds a layer drawn over the tiles in map space; returns its remover. Layers are
    * only called while life is on, every frame unless the visitor prefers reduced motion
-   * (then once per redraw, with time standing still).
+   * (then once per redraw, with time standing still). An `always` layer is not life but a sign
+   * (the ways lit under the street walk's person): it is drawn with life off too, and only when the map is redrawn.
    */
-  addSceneLayer(draw: SceneDraw): () => void {
-    this.sceneLayers.add(draw);
+  addSceneLayer(draw: SceneDraw, { always = false }: { always?: boolean } = {}): () => void {
+    (always ? this.alwaysLayers : this.sceneLayers).add(draw);
     this.invalidate();
     return () => {
       this.sceneLayers.delete(draw);
+      this.alwaysLayers.delete(draw);
       this.invalidate();
     };
   }
@@ -554,7 +571,25 @@ export class MapEngine {
   /** Ask for a redraw. */
   invalidate(): void {
     this.dirty = true;
-    if (!this.raf && !this.destroyed) this.raf = requestAnimationFrame(this.frame);
+    if (!this.raf && !this.destroyed && !this.paused) this.raf = requestAnimationFrame(this.frame);
+  }
+
+  /**
+   * Stops drawing while something covers the whole map (the street walk), and starts again,
+   * redrawn, when it is let go. Meanwhile the view can still be moved (`jumpTo`): the first frame
+   * after shows it there. Motion under way (a glide, a flight) is dropped.
+   */
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    if (paused) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.stopMotion();
+    } else {
+      this.lastFrame = 0;
+      this.invalidate();
+    }
   }
 
   // ---- view ------------------------------------------------------------------------------
@@ -567,7 +602,8 @@ export class MapEngine {
     this.view.width = width;
     this.view.height = height;
     this.view.dpr = dpr;
-    for (const c of [this.canvas, this.marks]) {
+    for (const c of [this.canvas, this.marks, this.windowLights?.canvas]) {
+      if (!c) continue;
       const w = Math.round(width * dpr);
       const h = Math.round(height * dpr);
       if (c.width !== w) c.width = w;
@@ -642,7 +678,7 @@ export class MapEngine {
 
   private readonly frame = (now: number): void => {
     this.raf = 0;
-    if (this.destroyed) return;
+    if (this.destroyed || this.paused) return;
     const dt = Math.min(64, this.lastFrame ? now - this.lastFrame : 16);
     this.lastFrame = now;
     this.frameNo++;
@@ -755,6 +791,7 @@ export class MapEngine {
     // on a dense screen the next finer level still has a pixel to show for every pixel it holds
     const z = levelForScale(v.scale * Math.min(v.dpr, 2), pyramid.maxZ);
     const range = pyramid.range(z, v);
+    this.windowLights?.begin(ctx.imageSmoothingEnabled);
     const devX = (mx: number) => Math.round((mx - v.left) * s);
     const devY = (my: number) => Math.round((my - v.top) * s);
     const span = pyramid.span(z);
@@ -802,6 +839,16 @@ export class MapEngine {
         if (alpha > 0 && tile?.bitmap) {
           ctx.globalAlpha = alpha;
           ctx.drawImage(tile.bitmap, dx, dy, dw, dh);
+          this.windowLights?.draw(tile.bitmap, left, top, 2 ** z, alpha, alpha < 1, [
+            0,
+            0,
+            tile.bitmap.width,
+            tile.bitmap.height,
+            dx,
+            dy,
+            dw,
+            dh,
+          ]);
           ctx.globalAlpha = 1;
         }
       }
@@ -847,6 +894,17 @@ export class MapEngine {
           const w = i === 0 ? midX - dx : dx + dw - midX;
           const h = j === 0 ? midY - dy : dy + dh - midY;
           ctx.drawImage(bitmap, x, y, w, h);
+          const rect = pyramid.tileRect(z - 1, tx * 2 + i, ty * 2 + j);
+          this.windowLights?.draw(bitmap, rect.left, rect.top, 2 ** (z - 1), 1, false, [
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+            x,
+            y,
+            w,
+            h,
+          ]);
         }
         return;
       }
@@ -861,6 +919,17 @@ export class MapEngine {
       const sx = (tx - (ax << dz)) * size;
       const sy = (ty - (ay << dz)) * size;
       ctx.drawImage(ancestor.bitmap, sx, sy, size, size, dx, dy, dw, dh);
+      const rect = pyramid.tileRect(z + dz, ax, ay);
+      this.windowLights?.draw(ancestor.bitmap, rect.left, rect.top, 2 ** (z + dz), 1, false, [
+        sx,
+        sy,
+        size,
+        size,
+        dx,
+        dy,
+        dw,
+        dh,
+      ]);
       return;
     }
   }
@@ -943,15 +1012,20 @@ export class MapEngine {
       });
   }
 
+  private get cachedTileCount(): number {
+    return this.tiles.size + (this.windowLights?.pixels ?? 0) / this.manifest.tileSize ** 2;
+  }
+
   private evict(): void {
-    if (this.tiles.size <= this.maxTiles) return;
+    if (this.cachedTileCount <= this.maxTiles) return;
     const idle: Tile[] = [];
     for (const tile of this.tiles.values()) {
       if (tile.state === "ready" && !tile.pinned && tile.usedFrame < this.frameNo) idle.push(tile);
     }
     idle.sort((a, b) => a.usedFrame - b.usedFrame);
     for (const tile of idle) {
-      if (this.tiles.size <= this.maxTiles) break;
+      if (this.cachedTileCount <= this.maxTiles) break;
+      if (tile.bitmap) this.windowLights?.release(tile.bitmap);
       tile.bitmap?.close();
       this.tiles.delete(tile.key);
     }
@@ -986,6 +1060,15 @@ export class MapEngine {
     ctx.imageSmoothingEnabled = v.scale < 1;
     ctx.globalAlpha = alpha;
     ctx.drawImage(picture.bitmap, dx, dy, dw, dh);
+    this.windowLights?.draw(
+      picture.bitmap,
+      sprite.x,
+      sprite.y,
+      sprite.w / picture.bitmap.width,
+      alpha,
+      true,
+      [0, 0, picture.bitmap.width, picture.bitmap.height, dx, dy, dw, dh],
+    );
     ctx.globalAlpha = 1;
     return alpha < 1;
   }
@@ -1027,7 +1110,11 @@ export class MapEngine {
       usedAt: p.usedAt,
     }));
     for (const id of picturesToDrop(list, lit?.id ?? null, PICTURE_BUDGET)) {
-      this.pictures.get(id)?.bitmap?.close();
+      const bitmap = this.pictures.get(id)?.bitmap;
+      if (bitmap) {
+        this.windowLights?.release(bitmap);
+        bitmap.close();
+      }
       this.pictures.delete(id);
     }
   }
@@ -1035,15 +1122,22 @@ export class MapEngine {
   // ---- scene (sprites, in map space) -----------------------------------------------------
 
   private drawScene(now: number): void {
-    if (!this.life || this.sceneLayers.size === 0) return;
-    const { ctx, view: v } = this;
+    const life = this.life && this.sceneLayers.size > 0;
+    if (!life && this.alwaysLayers.size === 0) return;
+    const v = this.view;
     const s = v.scale * v.dpr;
-    ctx.save();
-    ctx.setTransform(s, 0, 0, s, Math.round(-v.left * s), Math.round(-v.top * s));
-    ctx.imageSmoothingEnabled = false;
     const time = this.reducedMotion ? 0 : now;
-    for (const draw of this.sceneLayers) draw(ctx, v, time);
-    ctx.restore();
+    // Aircraft and ferries cover the light behind their silhouettes as they cross the map.
+    for (const ctx of [this.ctx, this.windowLights?.activeContext]) {
+      if (!ctx) continue;
+      ctx.save();
+      if (ctx !== this.ctx) ctx.globalCompositeOperation = "destination-out";
+      ctx.setTransform(s, 0, 0, s, Math.round(-v.left * s), Math.round(-v.top * s));
+      ctx.imageSmoothingEnabled = false;
+      if (life) for (const draw of this.sceneLayers) draw(ctx, v, time);
+      for (const draw of this.alwaysLayers) draw(ctx, v, time);
+      ctx.restore();
+    }
   }
 
   // ---- marks (lines, names, pin) ---------------------------------------------------------

@@ -1,0 +1,332 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"address","type":"string","label":"New York map address","default":""}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Tiny Worlds · Street Walk</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: Archivo;
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: Tiny5;
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+      }
+      :root {
+        --enamel: #15171a;
+        --paper: #f4f2ec;
+        --taxi: #f7c21b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+      }
+      #street-walk {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--enamel);
+        font-family: Archivo, sans-serif;
+      }
+      .take {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        z-index: 1;
+      }
+      .graphics {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .sign {
+        position: absolute;
+        margin: 0;
+        background: var(--enamel);
+        color: var(--paper);
+        border-left: 10px solid var(--taxi);
+        box-shadow: 0 5px 0 #101214;
+        font-weight: 730;
+        letter-spacing: -0.04em;
+      }
+      .direction {
+        padding: 21px 30px 25px;
+        font-size: 69px;
+        line-height: 1;
+      }
+      #destination {
+        position: absolute;
+        left: 192px;
+        top: 626px;
+        z-index: 3;
+        margin: 0;
+        color: var(--taxi);
+        font-size: 36px;
+        line-height: 1.15;
+        font-weight: 590;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      id="street-walk"
+      data-composition-id="street-walk"
+      data-start="0"
+      data-duration="30"
+      data-width="1920"
+      data-height="1080"
+    >
+      <video
+        id="times-square-teaser"
+        class="clip take"
+        data-start="0"
+        data-duration="2.5"
+        data-track-index="0"
+        src="assets/takes/tease.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="map-drag"
+        class="clip take"
+        data-start="2.5"
+        data-duration="5.5"
+        data-track-index="0"
+        src="assets/takes/drop.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="times-square-walk"
+        class="clip take"
+        data-start="8"
+        data-duration="6.5"
+        data-track-index="0"
+        src="assets/takes/walk.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="drive-times"
+        class="clip take"
+        data-start="14.5"
+        data-duration="2.1"
+        data-track-index="0"
+        src="assets/takes/drive-times.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="drive-world-trade"
+        class="clip take"
+        data-start="16.6"
+        data-duration="1.8"
+        data-track-index="0"
+        src="assets/takes/drive-world-trade.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="drive-vessel"
+        class="clip take"
+        data-start="18.4"
+        data-duration="1.8"
+        data-track-index="0"
+        src="assets/takes/drive-vessel.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="drive-park"
+        class="clip take"
+        data-start="20.2"
+        data-duration="1.8"
+        data-track-index="0"
+        src="assets/takes/drive-park.mp4"
+        muted
+        playsinline
+      ></video>
+      <video
+        id="brooklyn-bridge"
+        class="clip take"
+        data-start="22"
+        data-duration="8"
+        data-track-index="0"
+        src="assets/takes/bridge.mp4"
+        muted
+        playsinline
+      ></video>
+
+      <div
+        id="title"
+        class="clip graphics"
+        data-composition-id="title"
+        data-composition-src="compositions/title.html"
+        data-start="0"
+        data-duration="2.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="direction"
+        class="clip graphics"
+        data-composition-id="direction"
+        data-composition-src="compositions/direction.html"
+        data-start="2.5"
+        data-duration="5.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="district"
+        class="clip graphics"
+        data-composition-id="district"
+        data-composition-src="compositions/district.html"
+        data-start="8"
+        data-duration="6.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="vehicle"
+        class="clip graphics"
+        data-composition-id="vehicle"
+        data-composition-src="compositions/vehicle.html"
+        data-start="14.5"
+        data-duration="7.5"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="bridge-label"
+        class="clip graphics"
+        data-composition-id="bridge-label"
+        data-composition-src="compositions/bridge-label.html"
+        data-start="22"
+        data-duration="4"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+      <div
+        id="end-card"
+        class="clip graphics"
+        data-composition-id="end-card"
+        data-composition-src="compositions/end-card.html"
+        data-start="26"
+        data-duration="4"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+      ></div>
+
+      <p
+        id="destination"
+        class="clip"
+        data-start="27"
+        data-duration="3"
+        data-track-index="4"
+        data-track-kind="graphics"
+        data-var-text="address"
+      ></p>
+
+      <audio
+        id="music"
+        class="clip"
+        data-start="0"
+        data-duration="30"
+        data-track-index="2"
+        data-volume="0.86"
+        data-fade-in="0.025"
+        data-fade-out="1.18"
+        src="assets/music/street-level.mp3"
+      ></audio>
+      <audio
+        id="map-sweep"
+        class="clip"
+        data-start="2.52"
+        data-duration="0.5"
+        data-track-index="3"
+        data-volume="0.26"
+        data-fade-out="0.1"
+        src="assets/sfx/whoosh-short.mp3"
+      ></audio>
+      <audio
+        id="street-drop"
+        class="clip"
+        data-start="7.92"
+        data-duration="0.45"
+        data-track-index="3"
+        data-volume="0.45"
+        data-fade-out="0.1"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+      <audio
+        id="car-passes"
+        class="clip"
+        data-start="14.48"
+        data-duration="0.4"
+        data-track-index="3"
+        data-volume="0.29"
+        data-fade-out="0.14"
+        src="assets/sfx/whoosh-short.mp3"
+      ></audio>
+      <audio
+        id="crossing-pop-one"
+        class="clip"
+        data-start="15.3"
+        data-duration="0.26"
+        data-track-index="3"
+        data-volume="0.36"
+        data-fade-out="0.08"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+      <audio
+        id="crossing-pop-two"
+        class="clip"
+        data-start="15.63"
+        data-duration="0.26"
+        data-track-index="3"
+        data-volume="0.31"
+        data-fade-out="0.08"
+        src="assets/sfx/pop.mp3"
+      ></audio>
+    </main>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo(
+        "#destination",
+        { clipPath: "inset(0 100% 0 0)" },
+        { clipPath: "inset(0 0% 0 0)", duration: 0.27, ease: "power3.out" },
+        27,
+      );
+      window.__timelines["street-walk"] = tl;
+    </script>
+  </body>
+</html>

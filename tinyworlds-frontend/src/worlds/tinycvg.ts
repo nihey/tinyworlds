@@ -6,6 +6,8 @@ export const tinycvg: World = {
   wordmark: "cvg",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  units: "imperial",
   // the map's districts are the cities on both banks: Cincinnati, Covington, Newport…
   copy: {
     "en-US": {

@@ -7,6 +7,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useI18n } from "@/hooks/use-i18n";
 import { LOCALE_NAMES, LOCALES, type LocalePref } from "@/i18n";
 import type { Prefs, ThemePref } from "@/lib/prefs";
+import { CONDITIONS, type WeatherPref } from "@/map/weather";
+import type { WeatherReport } from "@/lib/weather-api";
+import { WORLD } from "@/worlds";
 
 interface RowProps {
   label: string;
@@ -36,22 +39,23 @@ function Row({ label, hint, checked, onChange, children }: RowProps) {
   );
 }
 
-const THEMES: ThemePref[] = ["system", "light", "dark"];
+const THEMES: ThemePref[] = ["cycle", "light", "dark", "system"];
 const LANGUAGES: LocalePref[] = ["auto", ...LOCALES];
 
 const PILL =
   "h-7 rounded-full! px-3 text-xs font-semibold text-paper-dim hover:bg-transparent hover:text-paper data-[state=on]:bg-taxi data-[state=on]:text-taxi-ink";
 
 interface SettingsPanelProps {
+  report: WeatherReport | null | undefined;
   prefs: Prefs;
   onChange: (patch: Partial<Prefs>) => void;
   /** the world has outlines to draw (hoods.json is not empty) */
   hoodLines: boolean;
 }
 
-export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps) {
+export function SettingsPanel({ prefs, onChange, hoodLines, report }: SettingsPanelProps) {
   const strengthId = useId();
-  const { t, copy } = useI18n();
+  const { t, copy, locale } = useI18n();
   const keys: [string[], string][] = [
     [["/"], t.settings.keys.search],
     [["+", "−"], t.settings.keys.zoom],
@@ -92,7 +96,7 @@ export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps
             </label>
             <Slider
               id={strengthId}
-              aria-label={t.settings.tiltStrengthLabel}
+              thumbLabel={t.settings.tiltStrengthLabel}
               min={0}
               max={100}
               step={5}
@@ -105,8 +109,8 @@ export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps
       </Row>
       <Row label={t.settings.life} checked={prefs.life} onChange={(life) => onChange({ life })} />
 
-      <div className="flex items-center gap-2 px-3.5 pt-2 pb-2.5">
-        <span id={`${strengthId}-theme`} className="flex-1 text-sm font-medium">
+      <div className="px-3.5 pt-2 pb-2.5">
+        <span id={`${strengthId}-theme`} className="block pb-1.5 text-sm font-medium">
           {t.settings.timeOfDay}
         </span>
         <ToggleGroup
@@ -119,14 +123,64 @@ export function SettingsPanel({ prefs, onChange, hoodLines }: SettingsPanelProps
             // a single-choice group reports "" when the chosen one is pressed again: keep it
             if (theme) onChange({ theme: theme as ThemePref });
           }}
-          className="rounded-full bg-sign-raised p-0.5"
+          className="w-full rounded-full bg-sign-raised p-0.5"
         >
           {THEMES.map((theme) => (
-            <ToggleGroupItem key={theme} value={theme} className={PILL}>
+            <ToggleGroupItem key={theme} value={theme} className={`${PILL} flex-1 px-1.5`}>
               {t.settings.themes[theme]}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+      </div>
+
+      <div className="px-3.5 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor={`${strengthId}-weather`} className="text-sm font-medium">
+            {t.settings.weather}
+          </label>
+          <select
+            id={`${strengthId}-weather`}
+            value={prefs.weather}
+            onChange={(event) => onChange({ weather: event.target.value as WeatherPref })}
+            className="h-8 max-w-[66%] rounded-md bg-sign-raised px-2 text-sm text-paper focus-visible:outline-taxi"
+          >
+            {!WORLD.fictional && <option value="live">{t.settings.conditions.live}</option>}
+            {CONDITIONS.map((condition) => (
+              <option key={condition} value={condition}>
+                {t.settings.conditions[condition]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {prefs.weather === "live" && (
+          <p role="status" className="pt-1 text-xs text-paper-dim">
+            {report ? (
+              <>
+                {t.settings.conditions[report.condition]} ·{" "}
+                <a
+                  className="underline underline-offset-2"
+                  href={`https://aviationweather.gov/data/metar/?id=${report.station}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {report.station}
+                </a>{" "}
+                ·{" "}
+                <time dateTime={report.observedAt}>
+                  {new Date(report.observedAt).toLocaleTimeString(locale, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZoneName: "short",
+                  })}
+                </time>
+              </>
+            ) : report === null ? (
+              t.settings.weatherUnavailable
+            ) : (
+              t.settings.weatherLoading
+            )}
+          </p>
+        )}
       </div>
 
       <div className="px-3.5 pt-1 pb-2.5">

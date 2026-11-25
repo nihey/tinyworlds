@@ -18,6 +18,8 @@ import { LinksModule } from './links/links.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { VisitsModule } from './visits/visits.module.js';
 import { QuizModule } from './quiz/quiz.module.js';
+import { WeatherResolver } from './weather/weather.resolver.js';
+import { WeatherService } from './weather/weather.service.js';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -54,6 +56,8 @@ const isProduction = process.env.NODE_ENV === 'production';
       useValue: new ValidationPipe({ whitelist: true, transform: true }),
     },
     HealthResolver,
+    WeatherService,
+    WeatherResolver,
   ],
 })
 export class AppModule {}

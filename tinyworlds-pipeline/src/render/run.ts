@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
 import sharp from "sharp";
-import { CHUNK_TILES, CITY, DIRS, TILE, VIEW } from "../config.js";
+import { CHUNK_TILES, CITY, DIRS, OTHER_VIEW, TILE, VIEW } from "../config.js";
 import { makeProjection } from "../projection.js";
 import { fogRange, orderJob } from "./bin.js";
 import { PAD, SUN_DROP, type ChunkJob } from "./chunk.js";
@@ -31,6 +31,23 @@ interface Grid {
   ccols: number;
   crows: number;
   chunk: number;
+}
+
+/**
+ * What a new manifest keeps of the one it replaces: the street walk's version. The walk is cut
+ * from the scene, not the tiles, so a new render leaves it standing (the indexes' version is
+ * stamped again by `index`, which runs after the render). An unreadable manifest keeps nothing,
+ * and so does the other view's (`otherView`: `--view` other than the city's own), which has no
+ * walk: the walk is the world's own, in its own folder, whichever way the map is turned.
+ */
+export function keptFromManifest(file: string, otherView = false): { walk?: string } {
+  if (otherView || !fs.existsSync(file)) return {};
+  try {
+    const old = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, unknown>;
+    return typeof old.walk === "string" ? { walk: old.walk } : {};
+  } catch {
+    return {};
+  }
 }
 
 function makeGrid(scene: Scene): Grid {
@@ -388,6 +405,7 @@ export async function renderAll(opts: RenderOptions = {}): Promise<void> {
     geo: scene.geo,
     overview: { src: "overview.webp", width: crop.width, height: crop.height },
     attribution: CITY.attribution,
+    ...keptFromManifest(path.join(out, "manifest.json"), OTHER_VIEW),
   };
   fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest));
   log(`render: manifest written, ${levels} levels, minimap ${crop.width}×${crop.height} from level ${oz}`);

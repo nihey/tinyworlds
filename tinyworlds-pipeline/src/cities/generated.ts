@@ -31,6 +31,7 @@ export interface GeneratedCity {
   /** Metres from the generator's limits at which the map starts to dissolve, and where it is gone. */
   fog: { start: number; end: number };
   flora: City["flora"];
+  colors?: City["colors"];
   attribution: string[];
   /**
    * Bearing of the grid's `p` axis (default 0: `p` is north). 45 puts compass north straight up.
@@ -39,6 +40,7 @@ export interface GeneratedCity {
   gridDeg?: number;
   /** End the map at the bounding rectangle of its limits, with a clean edge and no dissolve. */
   framed?: boolean;
+  walk?: boolean;
   generate: (builder: SyntheticBuilder) => void;
 }
 
@@ -61,8 +63,10 @@ export function generatedCity(spec: GeneratedCity): City {
     card: { ...lonLatOf(spec.card.p, spec.card.q, betaDeg), shrink: spec.card.shrink },
     synthetic: spec.generate,
     framed: spec.framed,
+    walk: spec.walk,
     fog: spec.fog,
     flora: spec.flora,
+    colors: spec.colors,
     flights: [],
     // never consulted for a generated city
     limits: { kind: "built-up" },

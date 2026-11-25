@@ -54,6 +54,8 @@ export const tinynyc: City = {
   style: NEW_YORK,
   landmarks: LANDMARKS,
   statues: [LIBERTY],
+  // all five boroughs at street level, on foot, at the wheel and in the water
+  walk: true,
   sights: {
     // never blanked out of a question's text ("Guess the building")
     placeWords: ["New York", "New York City", "NYC", "Nueva York", "Nova Iorque", "Nova York"],

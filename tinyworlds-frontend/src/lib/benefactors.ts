@@ -15,6 +15,8 @@ export interface FounderRow {
   number: number;
   name: string | null;
   amountCents: number;
+  /** Includes the founder's later public gifts. The Hall of Fame requests this field. */
+  totalAmountCents?: number;
   stones: number;
   firstStone: boolean;
   keystone: boolean;
@@ -60,6 +62,7 @@ function parseFounder(v: unknown, origin: string | null): FounderRow | null {
     number: v.number,
     name: v.name,
     amountCents: v.amountCents,
+    ...(isInt(v.totalAmountCents) ? { totalAmountCents: v.totalAmountCents } : {}),
     stones: v.stones,
     firstStone: v.firstStone,
     keystone: v.keystone,

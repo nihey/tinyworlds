@@ -19,6 +19,7 @@ import { createLinkReader } from '../links/link-reader.js';
 import { LinksService } from '../links/links.service.js';
 import { VisitsService } from '../visits/visits.service.js';
 import { DonationsService } from './donations.service.js';
+import { OwnerAlertsService } from './owner-alerts.service.js';
 import { ThanksService } from './thanks.service.js';
 
 const ENV = {
@@ -58,6 +59,7 @@ function setup() {
     config,
     new FunnelService(prisma.asService()),
     thanks,
+    new OwnerAlertsService(prisma.asService(), config, mailer),
   );
   /** Waits for the thank-yous the deliveries set off: they go out after them, on their own. */
   const thanked = async (): Promise<boolean[]> => {

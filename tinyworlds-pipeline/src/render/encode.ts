@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { buildPalette, TRANSPARENT } from "./palette.js";
 
-const PALETTE = buildPalette().rgba;
+const PALETTE = buildPalette(CITY.colors).rgba;
 
 /** Palette indices → RGBA bytes. Returns null when every pixel is transparent. */
 export function toRgba(indices: Uint16Array, into?: Uint8Array): Uint8Array | null {
@@ -42,3 +42,4 @@ export async function writeWebp(
     .toFile(file);
   return info.size;
 }
+import { CITY } from "../config.js";

@@ -5,6 +5,7 @@ import { MailModule } from '../mail/mail.module.js';
 import { VisitsModule } from '../visits/visits.module.js';
 import { DonationsResolver } from './donations.resolver.js';
 import { DonationsService } from './donations.service.js';
+import { OwnerAlertsService } from './owner-alerts.service.js';
 import { StripeWebhookController } from './stripe-webhook.controller.js';
 import { stripeProvider } from './stripe.provider.js';
 import { ThanksService } from './thanks.service.js';
@@ -16,6 +17,7 @@ import { ThanksService } from './thanks.service.js';
     stripeProvider,
     DonationsService,
     DonationsResolver,
+    OwnerAlertsService,
     ThanksService,
   ],
 })

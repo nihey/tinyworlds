@@ -7,6 +7,7 @@ import { NAME_MAX } from "@/lib/benefactors";
 
 interface JoinBlockProps {
   city: string;
+  mapSpot: boolean;
   /** the switch: whether the donor asks to be listed */
   on: boolean;
   name: string;
@@ -19,8 +20,19 @@ interface JoinBlockProps {
 }
 
 /** "Put my name on {city}": off by default, and a name to show once it is on. */
-export function JoinBlock({ city, on, name, onOn, onName, disabled, hint, t }: JoinBlockProps) {
+export function JoinBlock({
+  city,
+  mapSpot,
+  on,
+  name,
+  onOn,
+  onName,
+  disabled,
+  hint,
+  t,
+}: JoinBlockProps) {
   const labelId = useId();
+  const mapSpotId = useId();
   const count = Array.from(name).length;
   return (
     <div className="mt-4 rounded-xl bg-white/[0.045] px-3.5 py-3">
@@ -33,9 +45,15 @@ export function JoinBlock({ city, on, name, onOn, onName, disabled, hint, t }: J
           onCheckedChange={onOn}
           disabled={disabled}
           aria-labelledby={labelId}
+          aria-describedby={mapSpot ? mapSpotId : undefined}
           className="data-checked:bg-taxi data-unchecked:bg-white/20"
         />
       </div>
+      {mapSpot && (
+        <p id={mapSpotId} className="pt-2 text-xs leading-relaxed font-medium text-taxi">
+          {t.donate.join.mapSpot.replace("{city}", city)}
+        </p>
+      )}
       {on && (
         <label className="mt-2.5 flex h-10 cursor-text items-center gap-2 rounded-lg border border-sign-line px-3 focus-within:border-taxi">
           <input

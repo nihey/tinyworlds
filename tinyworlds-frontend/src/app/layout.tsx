@@ -1,21 +1,28 @@
 import type { Metadata, Viewport } from "next";
+import { preload } from "react-dom";
 import { Archivo, Tiny5 } from "next/font/google";
 import { Analytics } from "@/components/analytics";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DICTIONARIES } from "@/i18n";
 import { ogLocale } from "@/i18n/locale";
+import { fontPreloads } from "@/lib/font-preloads";
 import { PREFS_KEY } from "@/lib/prefs";
 import { HOME_CARD_PATH, SITE_ACCENT, SITE_HOME_LOCALE, SITE_ID, SITE_NAME } from "@/site";
 import { IS_HOME, WORLD } from "@/worlds";
 import "./globals.css";
 
+// Weights only: nothing sets the width (font-stretch), and its axis doubled the file. Not
+// preloaded: the text has a fallback of the same measure until it comes, and on a slow
+// connection it would only hold up the stylesheet and the hero's picture.
 const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],
-  axes: ["wdth"],
+  preload: false,
 });
 
+// The wordmark's pixel font: a few kB, preloaded (lib/font-preloads.ts), so the wordmark at the
+// top of every page is drawn in it from the first paint rather than flashing in a fallback.
 const tiny5 = Tiny5({
   variable: "--font-tiny5",
   subsets: ["latin"],
@@ -102,6 +109,14 @@ const themeScript = `(function(){try{var t="system";try{var p=JSON.parse(localSt
 )})||"{}");if(p.theme==="light"||p.theme==="dark")t=p.theme}catch(e){}if(t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dusk")}catch(e){}})()`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  // the fonts, asked for with the page rather than once the stylesheet is read: next/font does
+  // not write these for our pages (lib/font-preloads.ts)
+  for (const file of fontPreloads())
+    preload(`${basePath}/_next/${file}`, {
+      as: "font",
+      type: "font/woff2",
+      crossOrigin: "anonymous",
+    });
   return (
     <html
       lang={SITE_HOME_LOCALE}

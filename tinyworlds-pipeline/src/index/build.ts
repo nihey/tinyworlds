@@ -282,7 +282,8 @@ export async function buildIndex(opts: { out?: string; log?: (m: string) => void
       log(`index: "${c.n}" is off the map, left out`);
       continue;
     }
-    add({ ...c, b: c.b ?? contextOf(c.lon, c.lat), src: "curated" });
+    const { reference, ...place } = c;
+    add({ ...place, b: c.b ?? contextOf(c.lon, c.lat), sight: c.sight || !!reference, src: "curated" });
   }
 
   // ---- districts: boroughs, zones

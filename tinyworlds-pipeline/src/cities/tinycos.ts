@@ -65,6 +65,7 @@ export function areas(rawDir: string): Areas {
  */
 export const tinycos: City = {
   id: "tinycos",
+  walk: true,
   title: "Colorado Springs",
   origin: { lon: -104.8214, lat: 38.8339 },
   gridDeg: 2.3,

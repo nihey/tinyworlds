@@ -1,4 +1,7 @@
+import type { WeatherPref } from "@/map/weather";
 import type { PlaceType } from "@/map/manifest";
+import type { ActionId } from "@/walk/controls";
+import type { BoatKind, CarKind } from "@/walk/kinds";
 
 /** The words of one sign-in sheet: the admin's and, later, the donor's. */
 export interface SignInWords {
@@ -62,8 +65,12 @@ export interface Strings {
     strength: string;
     tiltStrengthLabel: string;
     life: string;
+    weather: string;
+    conditions: Record<WeatherPref, string>;
+    weatherLoading: string;
+    weatherUnavailable: string;
     timeOfDay: string;
-    themes: { system: string; light: string; dark: string };
+    themes: { cycle: string; system: string; light: string; dark: string };
     language: string;
     /** the choice that follows the browser's language */
     languageAuto: string;
@@ -80,6 +87,8 @@ export interface Strings {
     keysToggles: string;
     /** the same line for a city with no neighbourhood lines */
     keysTogglesNoHoods: string;
+    /** in a world with the street walk: "{W}" is the key that picks up the little person */
+    keysWalk: string;
     link: string;
     mapData: string;
     /** the credit for the buildings' descriptions, with the licence's URL (made a link) */
@@ -95,13 +104,21 @@ export interface Strings {
     description: string;
     /** what the front page's share card shows, for those who cannot see it */
     cardAlt: string;
-    tagline: string;
+    tagline: { lead: string; accent: string };
     pitch: string;
     /** the hero's button, into the map its picture shows: "{city}" is that world's city */
     explore: string;
-    cities: string;
-    /** the heading of the worlds that are not real places */
-    imagined: string;
+    catalogue: {
+      title: string;
+      ranked: string;
+      search: string;
+      filters: string;
+      all: string;
+      real: string;
+      imagined: string;
+      count: { one: string; other: string };
+      empty: string;
+    };
     /** the cities being funded, in order of funding; and the ones that reached their goal */
     ranking: string;
     funded: string;
@@ -121,14 +138,9 @@ export interface Strings {
     /** names the row of links to the page's sections */
     navLabel: string;
     /** the line under each section's title */
-    citiesLine: string;
-    imaginedLine: string;
     rankingLine: string;
-    /** the hero's button, where the sign names the city beside it; and the one towards funding */
     exploreShort: string;
-    fundNext: string;
-    /** the hero goes round the worlds: its name, its arrows, and a dot's ("{city}") */
-    carousel: { label: string; previous: string; next: string; show: string };
+    carousel: { label: string; previous: string; next: string; play: string; pause: string };
     /** under the hero, each a figure and what it counts (the figure is set apart: no "{n}") */
     numbers: {
       worlds: { one: string; other: string };
@@ -136,8 +148,6 @@ export interface Strings {
       live: string;
       funding: { one: string; other: string };
     };
-    /** the tile after the cities: which one is built next; "{goal}" is a sum */
-    next: { kicker: string; title: string; body: string; action: string; ranking: string };
     /** why donate, when there is no list of cities to show */
     nextPitch: string;
     openSource: string;
@@ -212,6 +222,7 @@ export interface Strings {
      */
     join: {
       label: string;
+      mapSpot: string;
       name: string;
       namePlaceholder: string;
       counter: string;
@@ -221,13 +232,12 @@ export interface Strings {
     };
     donations: { none: string; one: string; other: string };
     status: { funded: string; building: string; built: string };
-    showAll: string;
-    showFewer: string;
     /**
      * "Build the next city": the three steps, a city's card and the last card. "{amount}" and
      * "{goal}" are sums; "{laid}" and "{total}" count stones.
      */
     build: {
+      matches: { one: string; other: string };
       steps: {
         pick: { title: string; body: string };
         give: { title: string; body: string };
@@ -238,9 +248,9 @@ export interface Strings {
       goal: string;
       firstUnclaimed: string;
       raised: string;
-      /** a built city whose donations reached its goal */
       fundedInFull: string;
       groupBuilt: string;
+      publicRecognition: string;
       /** the card for a city nobody has named yet */
       other: { title: string; body: string; action: string };
     };
@@ -261,6 +271,7 @@ export interface Strings {
     heading: string;
     founders: string;
     benefactors: string;
+    map: { heading: string; join: string; pause: string; resume: string; next: string };
     keepingRunning: string;
     anonymous: string;
     more: { one: string; other: string };
@@ -310,6 +321,8 @@ export interface Strings {
     openCity: string;
     /** the overall page's two parts */
     everyone: string;
+    rankedBy: string;
+    achievements: { founding: string; firstStone: string; keystone: string };
     byCity: string;
     byCityLine: string;
     /** the cities on the map because people paid for them: the section, and its line */
@@ -673,6 +686,7 @@ export interface Strings {
     building: string;
     /** the link to its Wikipedia article */
     readOn: string;
+    readSource: string;
   };
   /** Guess the building: the sign that starts it and the card a round is played on */
   quiz: {
@@ -738,6 +752,107 @@ export interface Strings {
     stop: string;
     loading: string;
     empty: string;
+  };
+  /**
+   * The street walk: the person on the map, the signs of the walk, the controls menu and the
+   * wasted screen. Hint templates take "{forward}", "{jump}"... (an action's id) and are filled
+   * with the key's label; "{key}", "{vehicle}", "{n}" and "{max}" are filled where they are shown.
+   */
+  walk: {
+    /** the tool-column button: the little person, and what it does */
+    person: string;
+    personHint: string;
+    /** while the person is held over the map */
+    dropHere: string;
+    /** after tapping the person with a finger, or clicking it with a mouse */
+    tapMap: string;
+    clickMap: string;
+    /** the sign when nothing walkable is near where it was dropped */
+    noStreet: string;
+    loading: string;
+    failed: string;
+    noWebgl: string;
+    /** leaves the walk for the map */
+    back: string;
+    /** the walk's view, for a screen reader */
+    viewLabel: string;
+    /** the controls menu: its title, its reset, the wait for a key, an empty slot, its close button */
+    controls: string;
+    resetControls: string;
+    pressKey: string;
+    unbound: string;
+    closeMenu: string;
+    /** under the controls menu's title: how a key is changed, and where they are kept */
+    controlsHelp: string;
+    /** a key's button in the menu, for a screen reader: "{action}" its name, "{key}" what it shows */
+    keySlot: string;
+    groups: { foot: string; drive: string; any: string };
+    actions: Record<ActionId, string>;
+    /** the names of keys that are not a letter or a digit */
+    keys: {
+      space: string;
+      leftShift: string;
+      rightShift: string;
+      leftCtrl: string;
+      rightCtrl: string;
+      leftAlt: string;
+      rightAlt: string;
+      up: string;
+      down: string;
+      left: string;
+      right: string;
+      enter: string;
+      tab: string;
+      backspace: string;
+      capsLock: string;
+    };
+    /** the corner sign's line for each way of moving, with the actions' ids as placeholders */
+    hints: { foot: string; swim: string; drive: string; ride: string; sail: string };
+    /** near a vehicle: "{key}" is the key to get in, "{vehicle}" a name from `vehicles` */
+    getIn: string;
+    getOnMotorcycle: string;
+    vehicles: Record<CarKind | BoatKind, string>;
+    /** "{n}" is the speed */
+    speed: { mph: string; kmh: string };
+    /** the bars' labels: the walker's life, a vehicle's damage, and "Life {n} of {max}" for screen readers */
+    life: string;
+    lifeLabel: string;
+    damage: string;
+    /** "Damage {n}%", for screen readers */
+    damageLabel: string;
+    wrecked: string;
+    explosionWarning: string;
+    /** brief messages */
+    messages: {
+      slowDown: string;
+      noRoom: string;
+      tunnelClosed: string;
+      sinking: string;
+      thrownOff: string;
+      edge: string;
+    };
+    /** the wasted screen's word, and what a screen reader hears */
+    wasted: string;
+    wastedSaid: string;
+    /** the settings: the pixel size and the sound switch */
+    pixel: string;
+    sound: string;
+    /** before the mouse is captured */
+    clickToLook: string;
+    /** the minimap in the corner, for a screen reader */
+    minimap: string;
+    /** the touch buttons */
+    touch: {
+      jump: string;
+      punch: string;
+      enter: string;
+      exit: string;
+      mount: string;
+      dismount: string;
+      horn: string;
+      camera: string;
+      brake: string;
+    };
   };
   /**
    * The terms of service and the privacy policy (their texts are in src/legal/, not here: no

@@ -275,7 +275,8 @@ only reads the city (never a hidden one) and its gifts.
 
 Three guards on grouping: only a named gift joins others (an unnamed gift is always its own row);
 a donor's founding gifts share their first row; a named founder is not listed again among the
-benefactors.
+benefactors. The Hall of Fame ranks founders by `totalAmountCents`, which also includes their
+later named gifts to that city. `amountCents` on the founder row counts their founding gifts.
 
 `donors` holds one row per lower-case email (`display_name`, `name_hidden`, `links_hidden`,
 `hall_mailed_at`, `note_mailed_at`, `last_login_at`);
@@ -305,7 +306,9 @@ list).
 that is shown, as one list for the front page (`wall.ts`, pure): a named donor **once**, their
 named gifts added up over every city they are named in (the city they gave most to first),
 with their links; every unnamed gift on its own, name `null`, with what it gave and its one
-city, as on a city's own list. Largest first, then the latest; at most `WALL_MAX` (200). Gifts
+city, as on a city's own list. Each city entry can carry a `foundation` with the founding
+number, First Stone, and Keystone from `cityStanding` for the gifts on that entry. Largest
+first, then the latest, with at most `WALL_MAX` (200) entries. Gifts
 to no city, to a hidden city or in another currency are on no list. An unnamed entry says
 nothing of whose it is: a donor named in one city and not in another is two entries.
 
@@ -337,15 +340,16 @@ pictures, `donors.links_hidden` an admin's switch.
   (`isPublicAddress`: no loopback, private, shared, link-local (the metadata service),
   documentation, multicast or reserved range, nor the IPv6 ranges that carry an IPv4 address),
   so a name cannot be public when checked and private when connected to. No more than it was
-  told is read, counted unpacked (a page is cut at 600 kB, a picture over 5 MB or an icon over
-  500 kB refused), and it gives up at the deadline. Nothing of anyone's goes out: no cookie, a
+  told is read, counted unpacked (600 kB per page, 1.5 MB for YouTube channel pages that can
+  publish Open Graph tags after the head, and a picture over 5 MB or an icon over 500 kB
+  refused). It gives up at the deadline. Nothing of anyone's goes out: no cookie, a
   generic user agent.
-- **Pictures are drawn again here** (`link-images.ts`, sharp): the page's picture cut to a share
-  card's shape (480 × 252, never enlarged; under 120 × 60 is not a picture), the icon within
+- **Pictures are drawn again here** (`link-images.ts`, sharp): the page's picture fits within
+  480 × 252 at its original proportions (never enlarged; under 120 × 60 is not a picture), the icon within
   64 px (an `.ico` through `ico.ts`, which the image library does not read), both WebP with
   nothing of the source but its pixels. A source of more than 25 million pixels is refused
   unread. So what the site shows is never a file a linked page sent, and a visitor's browser
-  never asks a linked site for anything.
+  never asks a linked site for anything. Previously cropped previews need a refresh to get the full image.
 - **`GET /api/link-images/:id`** (public) serves one: `image/webp`, `nosniff`, and
   `Cache-Control: public, max-age=31536000, immutable`, because an id's bytes never change: a
   new reading makes new rows, so new ids (404 for the old ones). GraphQL names an image by
@@ -795,7 +799,7 @@ donation is paid; `hidden` is the way to take one down. Merging two cities means
 donations (`UPDATE donations SET city_id = …`) and adding up the two counters by hand.
 
 `prisma/seed.ts` (`npm run seed`) upserts the starting cities by slug (`seed-cities.ts`): the
-built ones (every world on the site, from New York to Philadelphia, Colorado Springs and Truckee; re-asserted as
+built ones (including Austin, San Francisco and Milwaukee, re-asserted as
 `BUILT` with their `world_id`) and six suggestions at zero. It never touches a city's name, goal or what it has raised, and never
 changes a suggestion that is already there. A built city that donors had already put on the list
 as a proposal is therefore promoted in place: it becomes `BUILT` with its world and keeps every

@@ -26,6 +26,22 @@ const heroFilms = existsSync(loops)
       .sort()
   : [];
 
+// The front page's pictures that have smaller copies in public/loops/ (`npm run stills`): a
+// world's card ("card-tinynyc": -400 and -800.webp) and a hero still ("hero-tinyrao": -960 and
+// -1280.webp). Only a picture with all its sizes is offered them (src/site.ts: STILLS), so a
+// world added before its copies are made simply keeps its original.
+const STILL_WIDTHS: Record<string, number[]> = { card: [400, 800], hero: [960, 1280] };
+const stillFiles = existsSync(loops) ? new Set(readdirSync(loops)) : new Set<string>();
+const stills = [...stillFiles]
+  .flatMap((file) => {
+    const match = /^((card|hero)(?:-[a-z0-9]+)?)-\d+\.webp$/.exec(file);
+    return match ? [{ name: match[1], kind: match[2] }] : [];
+  })
+  .filter(({ name, kind }) =>
+    STILL_WIDTHS[kind].every((width) => stillFiles.has(`${name}-${width}.webp`)),
+  )
+  .map(({ name }) => name);
+
 const nextConfig: NextConfig = {
   output: "export",
   pageExtensions: [home ? "home.tsx" : "map.tsx", "tsx", "ts"],
@@ -34,6 +50,7 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   env: {
     NEXT_PUBLIC_HERO_FILMS: process.env.NEXT_PUBLIC_HERO_FILMS ?? heroFilms.join(","),
+    NEXT_PUBLIC_STILLS: process.env.NEXT_PUBLIC_STILLS ?? [...new Set(stills)].sort().join(","),
   },
   turbopack: {
     rules: {

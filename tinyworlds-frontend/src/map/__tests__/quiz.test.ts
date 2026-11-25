@@ -21,6 +21,14 @@ describe("parseQuiz", () => {
     expect(parseQuiz({ questions: [bare] })[0].lang).toBe("en");
   });
 
+  it("preserves original clue attribution alongside legacy Wikipedia questions", () => {
+    const [original, wikipedia] = parseQuiz({
+      questions: [{ ...good, reference: true }, good],
+    });
+    expect(original.reference).toBe(true);
+    expect(wikipedia.reference).toBeUndefined();
+  });
+
   it("drops a question it could not ask", () => {
     const questions = [
       { ...good, decoys: ["b2", "b3"] },

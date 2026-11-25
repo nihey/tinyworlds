@@ -121,6 +121,7 @@ export function areas(rawDir: string): Areas {
  */
 export const tinypit: City = {
   id: "tinypit",
+  walk: true,
   title: "Pittsburgh",
   origin: { lon: -80.01164, lat: 40.44174 },
   gridDeg: 61,

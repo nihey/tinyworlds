@@ -42,6 +42,28 @@ function serving(pages: Record<string, Partial<Fetched> | Error>) {
 const html = (text: string) => ({ body: Buffer.from(text) });
 
 describe('createLinkReader', () => {
+  it('finds a YouTube channel preview after its large head', async () => {
+    const channel = 'https://www.youtube.com/channel/UC-example/';
+    const avatar = 'https://yt3.googleusercontent.com/avatar.jpg';
+    const body =
+      Buffer.from(`<head><script>${' '.repeat(800_000)}</script></head><body>
+      <meta property="og:title" content="Tiny Channel">
+      <meta property="og:image" content="${avatar}"></body>`);
+    const { fetcher } = serving({
+      [channel]: { body },
+      [avatar]: { body: await picture(900, 900) },
+    });
+    const bounded: Fetcher = async (url, options) => {
+      const page = await fetcher(url, options);
+      return { ...page, body: page.body.subarray(0, options.maxBytes) };
+    };
+
+    expect(await createLinkReader(bounded).read(channel)).toMatchObject({
+      title: 'Tiny Channel',
+      picture: { width: 252, height: 252 },
+    });
+  });
+
   it("reads a page's words, its picture and its icon", async () => {
     const { fetcher, asked } = serving({
       'https://example.com/shop': html(

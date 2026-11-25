@@ -35,6 +35,7 @@ const KM = 1 / 111.19;
  */
 export const tinyorl: City = {
   id: "tinyorl",
+  walk: true,
   title: "Orlando",
   // the fountain of Lake Eola
   origin: { lon: -81.3725, lat: 28.54388 },
@@ -79,6 +80,7 @@ export const tinyorl: City = {
   flora: "subtropical",
   ground: { landCover: { barren: G.Sand } },
 
+  sights: { placeWords: ["Orlando", "Florida", "Bay Lake", "Winter Park"], areaByDistrict: true },
   curated: CURATED,
   flights: [
     // Orlando International: landing from the south on the west runway, the rollout north

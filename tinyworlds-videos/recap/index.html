@@ -1,0 +1,613 @@
+<!doctype html>
+<!--
+  "Thirty stones": the recap film, 1920 × 1080, 57.6 s. What tinyworlds has done so far and the
+  invitation to lay the next stone. Dallas's foundation fills in its two real gifts, the keystone
+  opens onto the real Dallas viewer (one continuous take: npm run recap -- take), then the history
+  of the map, every real city in the order it went up (cut from its tiles: npm run recap --
+  plates), the live front page's thirteen cities, the Hall of Fame and London's empty
+  foundation, captured from the site (npm run recap -- pages). Narrated (assets/voice,
+  npm run recap -- voice) with subtitles in the site's pixel letters. See SPEC.md.
+
+  The site's address is never written here (the repository is public): it is the `address`
+  variable, given at render time by npm run recap -- render.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"address","type":"string","label":"Site address on the end card","default":"example.com"},
+    {"id":"cta","type":"string","label":"Question on the end card","default":"Which city should we build next?"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        src: url("assets/fonts/archivo.woff2") format("woff2");
+        font-weight: 100 900;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Tiny5";
+        src: url("assets/fonts/tiny5-latin.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #e9e6df;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        font-family: "Archivo", sans-serif;
+        background: #e9e6df;
+      }
+      /* the end card: the wordmark laid letter by letter, like stones, on the site's black enamel */
+      #end {
+        position: absolute;
+        inset: 0;
+        z-index: 7;
+        background: #e9e6df;
+      }
+      #end-sign {
+        position: absolute;
+        left: 340px;
+        top: 160px;
+        width: 1240px;
+        padding: 74px 0 82px;
+        text-align: center;
+        background: #15171a;
+        color: #f4f2ec;
+        border-radius: 30px;
+        box-shadow:
+          inset 0 3px 0 rgb(255 255 255 / 0.08),
+          0 0 0 3px rgb(0 0 0 / 0.6),
+          0 48px 100px -40px rgb(0 0 0 / 0.65),
+          0 6px 18px -3px rgb(0 0 0 / 0.3);
+      }
+      #end-mark {
+        font-family: "Tiny5", monospace;
+        font-size: 176px;
+        line-height: 1;
+        letter-spacing: 0.01em;
+      }
+      .end-l {
+        display: inline-block;
+      }
+      .end-w {
+        color: #f7c21b;
+      }
+      #end-line {
+        margin-top: 50px;
+        font-size: 66px;
+        line-height: 1.1;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      #end-address {
+        margin-top: 18px;
+        font-size: 56px;
+        line-height: 1.15;
+        font-weight: 500;
+        color: #f7c21b;
+      }
+      /* the site's own "Fund a city" button, captured from the Hall of Fame */
+      #end-fund {
+        position: absolute;
+        left: 751px;
+        top: 812px;
+        width: 417px;
+        height: 132px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="57.6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- the foundation: Dallas's thirty stones, laid by two gifts -->
+      <div
+        id="stones"
+        data-composition-id="stones"
+        data-composition-src="compositions/stones.html"
+        data-start="0"
+        data-duration="7.8"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 1"
+      ></div>
+      <!-- the keystone opens onto the real Dallas viewer: search, a building's story, the game -->
+      <div
+        id="map"
+        data-composition-id="map"
+        data-composition-src="compositions/map.html"
+        data-start="7.0"
+        data-duration="15.555"
+        data-track-index="2"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 2"
+      ></div>
+      <!-- the history of the map: every real city in the order it went up, a beat or two each -->
+      <div
+        id="history"
+        data-composition-id="history"
+        data-composition-src="compositions/history.html"
+        data-start="22.555"
+        data-duration="12.5"
+        data-track-index="3"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 3"
+      ></div>
+      <!-- the front page's thirteen cities, each playing its loop -->
+      <div
+        id="cities"
+        data-composition-id="cities"
+        data-composition-src="compositions/cities.html"
+        data-start="35.055"
+        data-duration="4.375"
+        data-track-index="4"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 4"
+      ></div>
+      <!-- the Hall of Fame: the names with their cities -->
+      <div
+        id="hall"
+        data-composition-id="hall"
+        data-composition-src="compositions/hall.html"
+        data-start="39.43"
+        data-duration="5.0"
+        data-track-index="5"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 5"
+      ></div>
+      <!-- London's empty foundation, its first stone left open -->
+      <div
+        id="london"
+        data-composition-id="london"
+        data-composition-src="compositions/london.html"
+        data-start="44.43"
+        data-duration="6.57"
+        data-track-index="6"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 6"
+      ></div>
+      <!-- the end card carries the root's variables, so it lives here -->
+      <div id="end" class="clip" data-start="51" data-duration="6.6" data-track-index="7">
+        <div id="end-sign">
+          <div id="end-mark">
+            <span class="end-l" id="end-l1">t</span><span class="end-l" id="end-l2">i</span
+            ><span class="end-l" id="end-l3">n</span><span class="end-l" id="end-l4">y</span
+            ><span class="end-l end-w" id="end-l5">w</span><span class="end-l end-w" id="end-l6">o</span
+            ><span class="end-l end-w" id="end-l7">r</span><span class="end-l end-w" id="end-l8">l</span
+            ><span class="end-l end-w" id="end-l9">d</span><span class="end-l end-w" id="end-l10">s</span>
+          </div>
+          <div id="end-line" data-var-text="cta">Which city should we build next?</div>
+          <div id="end-address" data-var-text="address">example.com</div>
+        </div>
+        <img id="end-fund" src="assets/takes/pages/fund.png" alt="Fund a city" />
+      </div>
+      <!-- the subtitles, every group on one track -->
+      <div
+        id="captions"
+        data-composition-id="captions"
+        data-composition-src="compositions/captions.html"
+        data-start="0"
+        data-duration="57.6"
+        data-track-index="8"
+        data-track-kind="captions"
+        data-width="1920"
+        data-height="1080"
+        style="z-index: 9"
+      ></div>
+      <!-- sound: the bed (npm run sound -- --for recap), the narration a line a clip, and an
+           effect for each thing that happens on screen, each started early by where its hit is
+           in its file, to land a frame after its picture (npm run recap -- sfx makes the two
+           tracks of ticks) -->
+      <audio
+        id="bed"
+        class="clip"
+        src="assets/music/bed.mp3"
+        data-start="0.000"
+        data-duration="57.60"
+        data-track-index="20"
+        data-volume="0.3"
+        data-fade-out="1.5"
+      ></audio>
+      <audio
+        id="vo-1"
+        class="clip"
+        src="assets/voice/line-01.wav"
+        data-start="0.300"
+        data-duration="2.01"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-2"
+        class="clip"
+        src="assets/voice/line-02.wav"
+        data-start="2.550"
+        data-duration="2.88"
+        data-track-index="22"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-3"
+        class="clip"
+        src="assets/voice/line-03.wav"
+        data-start="5.620"
+        data-duration="2.70"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-4"
+        class="clip"
+        src="assets/voice/line-04.wav"
+        data-start="8.600"
+        data-duration="2.56"
+        data-track-index="22"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-5"
+        class="clip"
+        src="assets/voice/line-05.wav"
+        data-start="11.550"
+        data-duration="2.43"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-6"
+        class="clip"
+        src="assets/voice/line-06.wav"
+        data-start="14.950"
+        data-duration="2.72"
+        data-track-index="22"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-7"
+        class="clip"
+        src="assets/voice/line-07.wav"
+        data-start="18.250"
+        data-duration="3.31"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-13"
+        class="clip"
+        src="assets/voice/line-13.wav"
+        data-start="22.650"
+        data-duration="1.37"
+        data-track-index="22"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-14"
+        class="clip"
+        src="assets/voice/line-14.wav"
+        data-start="27.750"
+        data-duration="2.89"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-8"
+        class="clip"
+        src="assets/voice/line-08.wav"
+        data-start="35.250"
+        data-duration="3.66"
+        data-track-index="22"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-10"
+        class="clip"
+        src="assets/voice/line-10.wav"
+        data-start="39.600"
+        data-duration="3.26"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-11"
+        class="clip"
+        src="assets/voice/line-11.wav"
+        data-start="44.630"
+        data-duration="2.01"
+        data-track-index="22"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="vo-12"
+        class="clip"
+        src="assets/voice/line-12.wav"
+        data-start="47.600"
+        data-duration="3.16"
+        data-track-index="21"
+        data-volume="1"
+      ></audio>
+      <audio
+        id="sfx-stones"
+        class="clip"
+        src="assets/sfx/stones.wav"
+        data-start="0.000"
+        data-duration="5.60"
+        data-track-index="23"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-keystone"
+        class="clip"
+        src="assets/sfx/impact-bass-1.mp3"
+        data-start="6.690"
+        data-duration="2.10"
+        data-track-index="24"
+        data-volume="0.7"
+      ></audio>
+      <audio
+        id="sfx-window"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="7.300"
+        data-duration="0.57"
+        data-track-index="25"
+        data-volume="0.4"
+      ></audio>
+      <audio
+        id="sfx-field"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="11.810"
+        data-duration="0.37"
+        data-track-index="26"
+        data-volume="0.6"
+      ></audio>
+      <audio
+        id="sfx-result"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="13.460"
+        data-duration="0.37"
+        data-track-index="27"
+        data-volume="0.7"
+      ></audio>
+      <audio
+        id="sfx-flight"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="13.600"
+        data-duration="0.57"
+        data-track-index="28"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-tower"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="15.260"
+        data-duration="0.72"
+        data-track-index="29"
+        data-volume="0.35"
+      ></audio>
+      <audio
+        id="sfx-invite"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="17.960"
+        data-duration="0.37"
+        data-track-index="30"
+        data-volume="0.6"
+      ></audio>
+      <audio
+        id="sfx-start"
+        class="clip"
+        src="assets/sfx/click.mp3"
+        data-start="18.660"
+        data-duration="0.37"
+        data-track-index="31"
+        data-volume="0.7"
+      ></audio>
+      <audio
+        id="sfx-pick"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="20.660"
+        data-duration="0.37"
+        data-track-index="32"
+        data-volume="0.7"
+      ></audio>
+      <audio
+        id="sfx-to-history"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="22.430"
+        data-duration="0.57"
+        data-track-index="33"
+        data-volume="0.4"
+      ></audio>
+      <audio
+        id="sfx-history"
+        class="clip"
+        src="assets/sfx/history.wav"
+        data-start="22.555"
+        data-duration="12.50"
+        data-track-index="34"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="sfx-riser"
+        class="clip"
+        src="assets/sfx/riser.mp3"
+        data-start="31.590"
+        data-duration="3.45"
+        data-track-index="35"
+        data-volume="0.25"
+      ></audio>
+      <audio
+        id="sfx-thirteen"
+        class="clip"
+        src="assets/sfx/impact-bass-1.mp3"
+        data-start="35.015"
+        data-duration="2.10"
+        data-track-index="36"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-to-hall"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="39.300"
+        data-duration="0.57"
+        data-track-index="37"
+        data-volume="0.35"
+      ></audio>
+      <audio
+        id="sfx-hall-out"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="41.060"
+        data-duration="0.57"
+        data-track-index="38"
+        data-volume="0.25"
+      ></audio>
+      <audio
+        id="sfx-to-london"
+        class="clip"
+        src="assets/sfx/whoosh-short.mp3"
+        data-start="44.300"
+        data-duration="0.57"
+        data-track-index="39"
+        data-volume="0.35"
+      ></audio>
+      <audio
+        id="sfx-first"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="47.840"
+        data-duration="0.72"
+        data-track-index="40"
+        data-volume="0.3"
+      ></audio>
+      <audio
+        id="sfx-to-end"
+        class="clip"
+        src="assets/sfx/whoosh.mp3"
+        data-start="50.870"
+        data-duration="0.57"
+        data-track-index="41"
+        data-volume="0.35"
+      ></audio>
+      <audio
+        id="sfx-letters"
+        class="clip"
+        src="assets/sfx/letters.wav"
+        data-start="51.000"
+        data-duration="1.60"
+        data-track-index="42"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-address"
+        class="clip"
+        src="assets/sfx/pop.mp3"
+        data-start="52.260"
+        data-duration="0.72"
+        data-track-index="43"
+        data-volume="0.45"
+      ></audio>
+      <audio
+        id="sfx-fund"
+        class="clip"
+        src="assets/sfx/click-soft.mp3"
+        data-start="52.610"
+        data-duration="0.37"
+        data-track-index="44"
+        data-volume="0.5"
+      ></audio>
+      <audio
+        id="sfx-typing"
+        class="clip"
+        src="assets/sfx/typing.mp3"
+        data-start="12.000"
+        data-duration="1.10"
+        data-media-start="0.42"
+        data-track-index="50"
+        data-volume="0.35"
+      ></audio>
+    </div>
+    <script>
+      (() => {
+        const tl = gsap.timeline({ paused: true });
+        const END = 51; // the end card's start
+        // the end card: the sign is stamped down, the wordmark laid a letter at a time, then
+        // the question, the address and the button, each in steps
+        tl.fromTo(
+          "#end-sign",
+          { opacity: 0, scale: 1.05 },
+          { opacity: 1, scale: 1, duration: 0.13, ease: "steps(3)" },
+          END,
+        );
+        for (let i = 0; i < 10; i++)
+          tl.fromTo(
+            "#end-l" + (i + 1),
+            { opacity: 0, y: -70 },
+            { opacity: 1, y: 0, duration: 0.1, ease: "steps(3)" },
+            END + 0.15 + i * 0.08 - 0.1,
+          );
+        tl.fromTo(
+          "#end-line",
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: 0.13, ease: "steps(3)" },
+          END + 1.05,
+        );
+        tl.fromTo(
+          "#end-address",
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: 0.13, ease: "steps(3)" },
+          END + 1.35,
+        );
+        tl.fromTo(
+          "#end-fund",
+          { opacity: 0, y: 24 },
+          { opacity: 1, y: 0, duration: 0.13, ease: "steps(3)" },
+          END + 1.65,
+        );
+        window.__timelines["main"] = tl;
+      })();
+    </script>
+  </body>
+</html>

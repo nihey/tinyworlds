@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   cityAsked,
+  cityHallPeople,
   hallCities,
   hallTotals,
-  hasPeople,
   parseCityHall,
   parseHall,
   type HallData,
@@ -44,6 +44,29 @@ describe("parseHall", () => {
   it("throws without a wall, and goes without the cities when they are missing", () => {
     expect(() => parseHall({ data: { cityMilestones: [] } }, API)).toThrow();
     expect(parseHall({ data: { benefactorWall: [] } }, API)).toEqual({ wall: [], cities: [] });
+  });
+
+  it("ranks the wall by total and keeps achievements with their city", () => {
+    const foundation = { number: 1, firstStone: true, keystone: false };
+    const hall = parseHall(
+      {
+        data: {
+          benefactorWall: [
+            { name: null, amountCents: 100, cities: [lisbon], links: [] },
+            {
+              name: "Ana",
+              amountCents: 500,
+              cities: [porto, { ...lisbon, foundation }],
+              links: [],
+            },
+          ],
+        },
+      },
+      API,
+    );
+
+    expect(hall.wall.map(({ amountCents }) => amountCents)).toEqual([500, 100]);
+    expect(hall.wall[0].cities).toEqual([porto, { ...lisbon, foundation }]);
   });
 });
 
@@ -104,8 +127,31 @@ describe("parseCityHall", () => {
   });
 
   it("knows a hall with nobody in it", () => {
-    expect(hasPeople({ founders: [], benefactors: [] })).toBe(false);
-    expect(hasPeople(parseCityHall({ data: { cityBenefactors: city } }, API)!)).toBe(true);
+    expect(cityHallPeople({ founders: [], benefactors: [] })).toEqual([]);
+    expect(cityHallPeople(parseCityHall({ data: { cityBenefactors: city } }, API)!)).toHaveLength(
+      1,
+    );
+  });
+
+  it("ranks city founders and benefactors together by total, with a fallback for old founders", () => {
+    const hall = parseCityHall(
+      {
+        data: {
+          cityBenefactors: {
+            ...city,
+            founders: [
+              { ...city.founders[0], totalAmountCents: 4200 },
+              { ...city.founders[0], number: 2, name: "Bo", amountCents: 600 },
+            ],
+            benefactors: [{ rank: 1, name: "Cy", amountCents: 2000, links: [] }],
+          },
+        },
+      },
+      API,
+    )!;
+
+    expect(cityHallPeople(hall).map((person) => person.name)).toEqual(["Ana", "Cy", "Bo"]);
+    expect(hall.founders[0].totalAmountCents).toBe(4200);
   });
 });
 

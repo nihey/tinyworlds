@@ -19,10 +19,11 @@ const gift = (
   name: string | null,
   city = LISBON,
 ): WallGift => ({
+  id: String(minute),
   donorId,
   amountCents,
   name,
-  city,
+  city: { ...city, goalCents: 300 },
   at: new Date(Date.UTC(2026, 0, 1, 0, minute++)),
 });
 
@@ -41,7 +42,7 @@ describe('benefactorWall', () => {
         name: 'Ana',
         amountCents: 3200,
         // the city they gave most to first
-        cities: [NYC, LISBON],
+        cities: [expect.objectContaining(NYC), expect.objectContaining(LISBON)],
         lastGiftAt: third.at,
       },
     ]);
@@ -54,9 +55,9 @@ describe('benefactorWall', () => {
       gift(null, 900, null, LISBON),
     ]);
     expect(rows.map((r) => [r.name, r.amountCents, r.cities])).toEqual([
-      [null, 900, [LISBON]],
-      [null, 300, [NYC]],
-      [null, 300, [LISBON]],
+      [null, 900, [expect.objectContaining(LISBON)]],
+      [null, 300, [expect.objectContaining(NYC)]],
+      [null, 300, [expect.objectContaining(LISBON)]],
     ]);
     expect(rows.every((r) => r.donorId === null)).toBe(true);
   });
@@ -88,6 +89,46 @@ describe('benefactorWall', () => {
       gift('c', 500, 'Late'),
     ]);
     expect(rows.map((r) => r.name)).toEqual(['Large', 'Late', 'Early']);
+  });
+
+  it('awards the first stone and keystone to the gifts that complete them', () => {
+    const first = gift('ana', 50, null);
+    const second = gift('ana', 50, 'Ana');
+    const third = gift('bo', 200, 'Bo');
+    const extra = gift('ana', 500, 'Ana');
+    const rows = benefactorWall([extra, third, first, second]);
+
+    expect(
+      rows.map(({ name, amountCents, cities }) => [
+        name,
+        amountCents,
+        cities[0].foundation,
+      ]),
+    ).toEqual([
+      ['Ana', 550, { number: 2, firstStone: true, keystone: false }],
+      ['Bo', 200, { number: 3, firstStone: false, keystone: true }],
+      [null, 50, { number: 1, firstStone: false, keystone: false }],
+    ]);
+  });
+
+  it('keeps achievements with their city and leaves unlisted gifts separate', () => {
+    const first = gift('ana', 100, null, LISBON);
+    const second = gift('ana', 200, 'Ana', LISBON);
+    const third = gift('ana', 400, 'Ana', NYC);
+    const rows = benefactorWall([first, third, second]);
+
+    expect(rows[0].cities).toEqual([
+      { ...NYC, foundation: { number: 1, firstStone: true, keystone: true } },
+      {
+        ...LISBON,
+        foundation: { number: 2, firstStone: false, keystone: true },
+      },
+    ]);
+    expect(rows[1].cities[0].foundation).toEqual({
+      number: 1,
+      firstStone: true,
+      keystone: false,
+    });
   });
 
   it('answers the same whatever order the gifts come in', () => {
