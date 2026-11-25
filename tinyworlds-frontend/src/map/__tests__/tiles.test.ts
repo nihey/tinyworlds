@@ -154,6 +154,20 @@ describe("planTiles", () => {
     expect(none.wanted.every((w) => w.pri !== 2)).toBe(true);
   });
 
+  it("stretches the ring in the direction of a pan", () => {
+    const plain = planTiles(pyramid, view, () => false, () => false, { ring: 1 });
+    const ahead = planTiles(pyramid, view, () => false, () => false, {
+      ring: 1,
+      aheadTx: 2,
+    });
+    const maxTx = (plan: typeof plain) =>
+      Math.max(
+        0,
+        ...plan.wanted.filter((w) => w.pri === 2 && w.z === 0).map((w) => w.tx),
+      );
+    expect(maxTx(ahead)).toBeGreaterThan(maxTx(plain));
+  });
+
   it("can skip native tiles while a pan is in flight", () => {
     const deferred = planTiles(pyramid, view, () => false, () => false, {
       ring: 0,

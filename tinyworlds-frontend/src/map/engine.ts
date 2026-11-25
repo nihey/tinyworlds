@@ -24,7 +24,7 @@ import {
   type SightShape,
 } from "./sights";
 import { WindowLights } from "./window-lights";
-import { addSample, emptyEstimate, initialPolicy, policyFor, type LoadPolicy, type NetworkEstimate } from "./network";
+import { addSample, aheadTiles, emptyEstimate, initialPolicy, policyFor, type LoadPolicy, type NetworkEstimate } from "./network";
 import { levelForScale, planTiles, Pyramid, tileKey, type TileRequest } from "./tiles";
 
 /**
@@ -821,7 +821,11 @@ export class MapEngine {
         const tile = this.tiles.get(key);
         return tile?.state === "ready" && !!tile.bitmap;
       },
-      { deferNative: this.policy.deferNative, ring: this.policy.ring },
+      {
+        deferNative: this.policy.deferNative,
+        ring: this.policy.ring,
+        ...aheadTiles(this.policy.ring, this.vx, this.vy),
+      },
     );
     for (const r of plan.retain) {
       const tile = this.tiles.get(tileKey(r.z, r.tx, r.ty));
