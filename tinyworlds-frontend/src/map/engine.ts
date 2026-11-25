@@ -24,7 +24,13 @@ import {
   type SightShape,
 } from "./sights";
 import { WindowLights } from "./window-lights";
-import { addSample, emptyEstimate, initialPolicy, type LoadPolicy, type NetworkEstimate } from "./network";
+import {
+  addSample,
+  emptyEstimate,
+  initialPolicy,
+  type LoadPolicy,
+  type NetworkEstimate,
+} from "./network";
 import { levelForScale, planTiles, Pyramid, tileKey, type TileRequest } from "./tiles";
 
 /**
@@ -968,7 +974,10 @@ export class MapEngine {
     this.inflight++;
 
     const started = performance.now();
-    fetch(this.tileUrl(z, tx, ty), { signal: abort.signal, priority: pinned ? "high" : "low" } as RequestInit)
+    fetch(this.tileUrl(z, tx, ty), {
+      signal: abort.signal,
+      priority: pinned ? "high" : "low",
+    } as RequestInit)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
