@@ -76,6 +76,8 @@ export interface EngineEvents {
   hood: (name: string | null) => void;
   /** the lit sight changed: hovered, pinned (a click or a tap), or none */
   sight: (shown: { id: string; pinned: boolean } | null) => void;
+  /** how much of the view is sharp, for a quiet loading mark */
+  coverage: (info: { ready: number; total: number; loading: number }) => void;
 }
 
 export interface EngineOptions {
@@ -251,7 +253,9 @@ export class MapEngine {
     settle: new Set(),
     hood: new Set(),
     sight: new Set(),
+    coverage: new Set(),
   };
+  private lastCoverage = "";
   private readonly resizeObserver: ResizeObserver;
 
   constructor(options: EngineOptions) {
@@ -612,6 +616,30 @@ export class MapEngine {
     this.maxTiles = clamp(Math.round(onScreen * 2.5), 48, 200);
   }
 
+  /** How many of the tiles on screen are sharp. */
+  private emitCoverage(): void {
+    const v = this.view;
+    const z = levelForScale(v.scale * Math.min(v.dpr, 2), this.pyramid.maxZ);
+    const range = this.pyramid.range(z, v);
+    let total = 0;
+    let ready = 0;
+    let loading = 0;
+    for (let ty = range.ty0; ty <= range.ty1; ty++) {
+      for (let tx = range.tx0; tx <= range.tx1; tx++) {
+        if (!this.pyramid.has(z, tx, ty)) continue;
+        total++;
+        const tile = this.tiles.get(tileKey(z, tx, ty));
+        if (tile?.state === "ready" && tile.bitmap) ready++;
+        else if (tile?.state === "loading") loading++;
+      }
+    }
+    const key = `${ready}/${total}/${loading}`;
+    if (key === this.lastCoverage) return;
+    this.lastCoverage = key;
+    const info = { ready, total, loading };
+    for (const listener of this.listeners.coverage) listener(info);
+  }
+
   /** Keeps the view on the map and refreshes the visible rectangle. */
   private constrain(): void {
     const v = this.view;
@@ -825,6 +853,7 @@ export class MapEngine {
         }
       }
     }
+    this.emitCoverage();
     return fading;
   }
 
