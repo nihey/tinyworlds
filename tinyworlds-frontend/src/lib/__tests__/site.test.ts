@@ -97,6 +97,12 @@ describe("site", () => {
       "Filadelfia",
       "Colorado Springs",
       "Truckee",
+      "Austin",
+      "San Francisco",
+      "São Francisco",
+      "Milwaukee",
+      "Bethlehem, Pennsylvania",
+      "Bethlehem",
       "Winterfell",
       "Invernalia",
       "King's Landing",
@@ -104,6 +110,11 @@ describe("site", () => {
       "Desembarco del Rey",
       "Westeros",
       "Poniente",
+      "GTA III",
+      "GTA: Vice City",
+      "GTA: San Andreas",
+      "GTA IV",
+      "GTA V",
     ]);
   });
 

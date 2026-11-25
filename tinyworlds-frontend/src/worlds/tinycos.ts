@@ -6,6 +6,8 @@ export const tinycos: World = {
   wordmark: "cos",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  units: "imperial",
   // the map's districts are the parts of town round the points the map data names (Downtown, Old
   // North End, Westside…), the towns beside the city and the Air Force Academy; its outlines,
   // the few neighborhoods the data draws

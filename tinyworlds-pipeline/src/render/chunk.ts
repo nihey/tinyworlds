@@ -745,9 +745,11 @@ export class ChunkRenderer {
       const c = job.cables[n];
       // 0 a main cable, 1 a suspender: bare steel, a pixel across. 2 a truss chord, 3 a lesser
       // truss member: painted steel with some body to it, so a truss does not fade away from afar.
-      const truss = cab.kind[c] >= 2;
-      const main = cab.kind[c] === 0 || cab.kind[c] === 2;
-      const colour = idx(truss ? R.tan : R.steel, main ? S_DEEP : S_SHADE);
+      const kind = cab.kind[c];
+      const truss = kind === 2 || kind === 3;
+      const painted = kind === 4 || kind === 5;
+      const main = kind === 0 || kind === 2 || kind === 4;
+      const colour = idx(truss ? R.tan : painted ? R.roofRed : R.steel, main ? S_DEEP : S_SHADE);
       const across = truss ? 2 : 1;
       const down = (main ? 2 : 1) + (truss ? 1 : 0);
       for (let v = cab.start[c]; v + 1 < cab.start[c + 1]; v++) {

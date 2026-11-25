@@ -35,6 +35,7 @@ const glass = (wall: number) => ({ wall, pattern: Pattern.Curtain });
  */
 export const tinylas: City = {
   id: "tinylas",
+  walk: true,
   title: "Las Vegas",
   // the fountains of the Bellagio
   origin: { lon: -115.17661, lat: 36.11311 },
@@ -81,6 +82,11 @@ export const tinylas: City = {
   // the desert: bare ground and scrub as dry, tussocky steppe
   ground: { landCover: { barren: G.Steppe, shrub: G.Steppe } },
 
+  sights: {
+    placeWords: ["Las Vegas", "Nevada", "Paradise", "The Strip"],
+    areaByDistrict: true,
+    wikipedia: { "w las vegas": "W Las Vegas" },
+  },
   curated: CURATED,
   flights: [
     // landing from the east on the long runway

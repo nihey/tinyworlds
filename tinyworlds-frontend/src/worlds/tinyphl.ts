@@ -6,6 +6,8 @@ export const tinyphl: World = {
   wordmark: "phl",
   homeLocale: "en-US",
   turn: "grid",
+  walk: true,
+  units: "imperial",
   // the map's districts are the parts of town (Center City, University City…) and the towns
   // across the rivers (Camden); its outlines, the neighborhoods
   copy: {

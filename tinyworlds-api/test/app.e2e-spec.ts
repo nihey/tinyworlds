@@ -1422,7 +1422,7 @@ describe('the API over HTTP', () => {
   describe('benefactors', () => {
     const BENEFACTORS = `query ($input: CityBenefactorsInput!) { cityBenefactors(input: $input) {
       slug name status worldId goalCents raisedCents stones benefactorCount
-      founders { number name amountCents stones firstStone keystone }
+      founders { number name amountCents totalAmountCents stones firstStone keystone }
       benefactors { rank name amountCents } } }`;
     const gift = (
       id: string,
@@ -1474,6 +1474,7 @@ describe('the API over HTTP', () => {
           number: 1,
           name: 'Ana',
           amountCents: 1200,
+          totalAmountCents: 4200,
           stones: 12,
           firstStone: true,
           keystone: false,
@@ -1482,6 +1483,7 @@ describe('the API over HTTP', () => {
           number: 2,
           name: null,
           amountCents: 8800,
+          totalAmountCents: 8800,
           stones: 88,
           firstStone: false,
           keystone: true,
@@ -1859,7 +1861,7 @@ describe('the API over HTTP', () => {
       const HIDE_LINKS =
         'mutation ($input: SetLinksHiddenInput!) { setLinksHidden(input: $input) }';
       const WALL = `{ benefactorWall { name amountCents lastGiftAt
-        cities { slug name worldId } links { ${LINK} } } }`;
+        cities { slug name worldId foundation { number firstStone keystone } } links { ${LINK} } } }`;
       const ROWS = `query ($input: CityBenefactorsInput!) { cityBenefactors(input: $input) {
         founders { number name links { ${LINK} } }
         benefactors { rank name links { ${LINK} } } } }`;
@@ -2370,14 +2372,28 @@ describe('the API over HTTP', () => {
             {
               name: null,
               amountCents: 8800,
-              cities: [lisbon],
+              cities: [
+                {
+                  ...lisbon,
+                  foundation: { number: 2, firstStone: false, keystone: true },
+                },
+              ],
               links: [],
               lastGiftAt: expect.any(String) as string,
             },
             {
               name: 'Ana',
               amountCents: 4900,
-              cities: [lisbon, porto],
+              cities: [
+                {
+                  ...lisbon,
+                  foundation: { number: 1, firstStone: true, keystone: false },
+                },
+                {
+                  ...porto,
+                  foundation: { number: 1, firstStone: true, keystone: false },
+                },
+              ],
               links: [
                 {
                   url: SHOP,
@@ -2392,7 +2408,12 @@ describe('the API over HTTP', () => {
             {
               name: null,
               amountCents: 2500,
-              cities: [porto],
+              cities: [
+                {
+                  ...porto,
+                  foundation: { number: 2, firstStone: false, keystone: false },
+                },
+              ],
               links: [],
               lastGiftAt: expect.any(String) as string,
             },

@@ -1,0 +1,52 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #opening-sign {
+      position: absolute;
+      left: 192px;
+      bottom: 143px;
+    }
+    #opening-lockup {
+      position: static;
+      padding: 24px 37px 28px;
+      letter-spacing: normal;
+    }
+    #opening-city {
+      margin: 0 0 6px;
+      color: var(--taxi);
+      font-size: 36px;
+      font-weight: 650;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    #opening-headline {
+      margin: 0;
+      font-size: 120px;
+      font-weight: 790;
+      letter-spacing: -0.054em;
+      line-height: 0.92;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="title"
+    data-width="1920"
+    data-height="1080"
+    data-composition-variables='[{"id":"city","type":"string","label":"City","default":"New York"},{"id":"headline","type":"string","label":"Headline","default":"Street Walk"}]'
+  >
+    <header id="opening-sign" class="clip" data-start="0" data-duration="2.5" data-track-index="0">
+      <div id="opening-lockup" class="sign">
+        <p id="opening-city" data-var-text="city">New York</p>
+        <h1 id="opening-headline" data-var-text="headline">Street Walk</h1>
+      </div>
+    </header>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#opening-lockup", { x: 16 }, { x: 0, ease: "power2.out", duration: 0.25 }, 0);
+    window.__timelines["title"] = tl;
+  </script>
+</template>

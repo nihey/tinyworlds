@@ -13,6 +13,13 @@ export interface WallCity {
   slug: string;
   name: string;
   worldId: string | null;
+  foundation?: WallFoundation;
+}
+
+export interface WallFoundation {
+  number: number;
+  firstStone: boolean;
+  keystone: boolean;
 }
 
 export interface WallEntry {
@@ -35,6 +42,14 @@ export function wallRequest() {
   return { query: WALL };
 }
 
+function parseFoundation(value: unknown): WallFoundation | undefined {
+  if (typeof value !== "object" || value === null) return;
+  const { number, firstStone, keystone } = value as Record<string, unknown>;
+  if (typeof number !== "number" || !Number.isInteger(number) || number < 1) return;
+  if (typeof firstStone !== "boolean" || typeof keystone !== "boolean") return;
+  return { number, firstStone, keystone };
+}
+
 /** The API's answer as the wall's entries, in its order; throws when there is no list in it. */
 export function parseWall(body: unknown, origin: string | null): WallEntry[] {
   const rows = (body as { data?: { benefactorWall?: unknown } } | null)?.data?.benefactorWall;
@@ -47,9 +62,22 @@ export function parseWall(body: unknown, origin: string | null): WallEntry[] {
       return [];
     const where = (Array.isArray(cities) ? cities : []).flatMap((city: unknown): WallCity[] => {
       if (typeof city !== "object" || city === null) return [];
-      const { slug, name: cityName, worldId } = city as Record<string, unknown>;
+      const {
+        slug,
+        name: cityName,
+        worldId,
+        foundation: rawFoundation,
+      } = city as Record<string, unknown>;
       if (typeof slug !== "string" || !slug || typeof cityName !== "string" || !cityName) return [];
-      return [{ slug, name: cityName, worldId: typeof worldId === "string" ? worldId : null }];
+      const foundation = parseFoundation(rawFoundation);
+      return [
+        {
+          slug,
+          name: cityName,
+          worldId: typeof worldId === "string" ? worldId : null,
+          ...(foundation && { foundation }),
+        },
+      ];
     });
     if (where.length === 0) return [];
     return [

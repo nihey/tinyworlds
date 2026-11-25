@@ -1,13 +1,43 @@
 import { describe, expect, it } from "vitest";
 import {
   FADE_MS,
+  filterWorlds,
   lastSeen,
   mayAdvance,
   SLIDE_MS,
   stepSlide,
-  tileSpan,
   type AdvanceState,
 } from "../home";
+import { byVisits, type WorldCounts } from "../visits";
+import { WORLDS } from "@/worlds";
+
+describe("filterWorlds", () => {
+  const worlds = [WORLDS.tinynyc, WORLDS.tinyrao, WORLDS.tinywinterfell, WORLDS.tinyvlc];
+  const counts: WorldCounts = new Map([
+    ["tinywinterfell", { visits: 500, live: 0 }],
+    ["tinyrao", { visits: 200, live: 0 }],
+    ["tinynyc", { visits: 1, live: 50 }],
+  ]);
+  const ranked = byVisits(worlds, counts);
+  const ids = (matches: typeof worlds) => matches.map((world) => world.id);
+
+  it("keeps the total-visit order across real and imagined worlds and within each filter", () => {
+    expect(ids(filterWorlds(ranked, "all", ""))).toEqual([
+      "tinywinterfell",
+      "tinyrao",
+      "tinynyc",
+      "tinyvlc",
+    ]);
+    expect(ids(filterWorlds(ranked, "real", ""))).toEqual(["tinyrao", "tinynyc", "tinyvlc"]);
+    expect(ids(filterWorlds(ranked, "imagined", ""))).toEqual(["tinywinterfell"]);
+  });
+
+  it("matches accented and translated city names and combines search with the chosen filter", () => {
+    expect(ids(filterWorlds(ranked, "all", "ribeirao"))).toEqual(["tinyrao"]);
+    expect(ids(filterWorlds(ranked, "all", "invernalia"))).toEqual(["tinywinterfell"]);
+    expect(filterWorlds(ranked, "real", "invernalia")).toEqual([]);
+  });
+});
 
 describe("stepSlide", () => {
   it("goes round the slides both ways", () => {
@@ -20,18 +50,6 @@ describe("stepSlide", () => {
   it("stays on the first when there is nothing to go round", () => {
     expect(stepSlide(3, 1, 0)).toBe(0);
     expect(stepSlide(0, 1, 1)).toBe(0);
-  });
-});
-
-describe("tileSpan", () => {
-  it("gives the tile what is left of the last row, or a row of its own", () => {
-    expect(tileSpan(7, 3)).toBe(2);
-    expect(tileSpan(7, 2)).toBe(1);
-    expect(tileSpan(8, 3)).toBe(1);
-    expect(tileSpan(9, 3)).toBe(3);
-    expect(tileSpan(9, 2)).toBe(1);
-    expect(tileSpan(4, 1)).toBe(1);
-    expect(tileSpan(0, 3)).toBe(3);
   });
 });
 

@@ -5,7 +5,7 @@ import { ACTION_QUIET } from "@/components/styles";
 import { useI18n } from "@/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 
-/** The tile's "Tell me when new cities are built": on, it says so and pressing it leaves. */
+/** Subscribe to new-city announcements, or leave the list when already subscribed. */
 export function NewCitiesButton({
   on,
   onJoin,
@@ -22,7 +22,6 @@ export function NewCitiesButton({
       type="button"
       onClick={on ? onLeave : onJoin}
       aria-pressed={on}
-      // the label is long: it may wrap, so it never runs out of a narrow tile
       className={cn(
         ACTION_QUIET,
         "h-auto min-h-11 py-2 text-left whitespace-normal",

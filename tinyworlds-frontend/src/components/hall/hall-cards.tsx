@@ -1,31 +1,22 @@
 "use client";
 
 import { ArrowUpRight, ChevronRight } from "lucide-react";
-import { Fragment } from "react";
+import type { ReactNode } from "react";
 import { BenefactorLinks } from "@/components/benefactors/benefactor-link";
 import { BroughtByPlaque } from "@/components/benefactors/brought-by";
-import { PixelBadge } from "@/components/benefactors/pixel-badge";
 import { MovingPicture } from "@/components/home/moving-picture";
 import { useI18n } from "@/hooks/use-i18n";
-import type { BenefactorRow, FounderRow } from "@/lib/benefactors";
 import type { BroughtBy } from "@/lib/brought-by";
-import { formatUsd, progress } from "@/lib/donate";
+import { formatAmount, formatUsd, progress } from "@/lib/donate";
 import type { HallCity, HallTotals } from "@/lib/hall";
+import type { BenefactorLink } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import type { WallEntry } from "@/lib/wall";
-import { hallCityUrl, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { hallCityUrl, worldCardSrcSet, worldCardUrl, worldLoopUrl, worldUrl } from "@/site";
+import { AchievementBadges } from "./achievement-badges";
 
-/**
- * A card of the hall: a plaque with room for a name, what was given, and the links. Cards are
- * as tall as what they hold, so they are set in columns (`CARDS`), each card whole in one.
- */
-const CARD = "sign min-w-0 break-inside-avoid px-4 py-4";
-
-/**
- * The list the cards stand in: one column on a phone, two, then three, each filled from the
- * top, so a card with pictures leaves no hole beside a short one.
- */
-export const CARDS = "gap-4 sm:columns-2 lg:columns-3 [&>li]:mb-4";
+/** Ranked plaques read across each row in the same order as the list. */
+export const LEADERBOARD = "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
 
 /** A name on a card: paper for one that is given, dimmed for "Anonymous". */
 function Name({ name }: { name: string | null }) {
@@ -42,91 +33,66 @@ function Name({ name }: { name: string | null }) {
   );
 }
 
-const SUM = "text-[15px] font-semibold whitespace-nowrap text-taxi tabular-nums";
-/** A place in a ranked list: "01". */
-const RANK = "w-4 shrink-0 text-[13px] font-semibold text-paper-dim tabular-nums";
-const ranked = (n: number) => String(n).padStart(2, "0");
 const LINK =
   "rounded-sm underline decoration-paper-dim/40 underline-offset-2 outline-none hover:text-paper hover:decoration-paper focus-visible:text-taxi";
 
-/**
- * Someone on the overall hall of fame, at their place among everyone (the largest gifts first):
- * a named benefactor with everything they are named for, the cities they gave to (each leads to
- * that city's hall) and their links; or an unnamed gift.
- */
-export function PersonCard({ entry, rank }: { entry: WallEntry; rank: number }) {
-  const { locale } = useI18n();
+/** Keep each achievement beside the city where it was earned. */
+export function PersonCities({ cities }: { cities: WallEntry["cities"] }) {
   return (
-    <li className={CARD}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-2.5">
-          <span className={RANK}>{ranked(rank)}</span>
-          <Name name={entry.name} />
-        </div>
-        <span className={SUM}>{formatUsd(entry.amountCents, locale)}</span>
-      </div>
-      <p className="pt-1 pl-[26px] text-[13px] leading-snug text-paper-dim">
-        {entry.cities.map((city, i) => (
-          <Fragment key={city.slug}>
-            {i > 0 && ", "}
-            <a href={hallCityUrl(city.slug)} className={LINK}>
-              {city.name}
-            </a>
-          </Fragment>
-        ))}
-      </p>
-      <BenefactorLinks links={entry.links} look="card" className="pt-3.5" />
-    </li>
+    <ul
+      role="list"
+      className="flex flex-wrap items-start gap-x-4 gap-y-2 text-[13px] leading-snug text-paper-dim"
+    >
+      {cities.map((city) => (
+        <li key={city.slug} className="flex min-w-0 flex-col items-start gap-1">
+          <a href={hallCityUrl(city.slug)} className={cn(LINK, "break-words")}>
+            {city.name}
+          </a>
+          {city.foundation && <AchievementBadges foundation={city.foundation} />}
+        </li>
+      ))}
+    </ul>
   );
 }
 
-/** A founder in a city's hall: the founding number, the stones laid, the badges, the links. */
-export function FounderCard({ founder }: { founder: FounderRow }) {
-  const { t, locale } = useI18n();
-  const stones = (
-    founder.stones === 1 ? t.benefactors.stones.one : t.benefactors.stones.other
-  ).replace("{n}", String(founder.stones));
+export function PersonCard({
+  rank,
+  name,
+  amountCents,
+  links,
+  children,
+}: {
+  rank: number;
+  name: string | null;
+  amountCents: number;
+  links: BenefactorLink[];
+  children?: ReactNode;
+}) {
+  const { locale } = useI18n();
+  const first = rank === 1;
   return (
     <li
       className={cn(
-        CARD,
-        // the first stone and the keystone are lit
-        (founder.firstStone || founder.keystone) &&
-          "bg-[linear-gradient(135deg,rgb(247_194_27/0.10),transparent_60%)]",
+        "sign min-w-0 px-4 py-3.5",
+        first && "bg-[linear-gradient(135deg,rgb(247_194_27/0.14),transparent_68%)]",
       )}
     >
-      <div className="flex flex-wrap items-center gap-1.5 pb-2.5">
-        <PixelBadge
-          art="founding"
-          label={String(founder.number).padStart(2, "0")}
-          title={t.benefactors.foundingTitle.replace("{n}", String(founder.number))}
-        />
-        {founder.firstStone && <PixelBadge art="firstStone" label={t.benefactors.firstStone} />}
-        {founder.keystone && <PixelBadge art="keystone" label={t.benefactors.keystone} />}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2.5">
+        <span
+          className={cn(
+            "grid min-w-7 place-items-center rounded-sm px-1 py-1 font-pixel text-[11px] leading-none tabular-nums",
+            first ? "bg-taxi text-taxi-ink" : "bg-paper/8 text-paper-dim",
+          )}
+        >
+          {String(rank).padStart(2, "0")}
+        </span>
+        <Name name={name} />
+        <span className="text-[15px] leading-tight font-semibold whitespace-nowrap text-taxi tabular-nums">
+          {formatAmount(amountCents, locale)}
+        </span>
+        {children && <div className="col-span-2 col-start-2 min-w-0 pt-1.5">{children}</div>}
       </div>
-      <div className="flex items-start justify-between gap-3">
-        <Name name={founder.name} />
-        <span className={SUM}>{formatUsd(founder.amountCents, locale)}</span>
-      </div>
-      <p className="pt-1 text-[13px] leading-snug text-paper-dim">{stones}</p>
-      <BenefactorLinks links={founder.links} look="card" className="pt-3.5" />
-    </li>
-  );
-}
-
-/** A benefactor in a city's hall (one who gave once it had its goal): the rank, the sum, the links. */
-export function BenefactorCard({ benefactor }: { benefactor: BenefactorRow }) {
-  const { locale } = useI18n();
-  return (
-    <li className={CARD}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-2.5">
-          <span className={RANK}>{ranked(benefactor.rank)}</span>
-          <Name name={benefactor.name} />
-        </div>
-        <span className={SUM}>{formatUsd(benefactor.amountCents, locale)}</span>
-      </div>
-      <BenefactorLinks links={benefactor.links} look="card" className="pt-3.5" />
+      <BenefactorLinks links={links} look="card" className="pt-3.5" />
     </li>
   );
 }
@@ -175,6 +141,9 @@ export function BuiltCityCard({
         <div aria-hidden className="h-[3px] shrink-0 bg-taxi" />
         <MovingPicture
           still={worldCardUrl(worldId)}
+          srcSet={worldCardSrcSet(worldId)}
+          // the hall's gallery: one, two, then three across
+          sizes="(min-width: 64rem) 26rem, (min-width: 40rem) 45vw, 90vw"
           loop={worldLoopUrl(worldId)}
           alt=""
           className="aspect-[1200/630] w-full"

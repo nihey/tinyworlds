@@ -49,6 +49,7 @@ export interface QuizText {
   lang: string;
   /** the article: two sights with one article are one question */
   url?: string;
+  reference?: true;
 }
 
 /** One question: the sight, the three wrong names, and its text cut into pieces (odd ones blanked). */
@@ -63,6 +64,7 @@ export interface QuizQuestion {
   area?: string;
   parts: string[];
   lang: string;
+  reference?: true;
 }
 
 export interface QuizReport {
@@ -612,9 +614,11 @@ export function buildQuiz(
   for (const sight of sights) {
     const en = texts["en-US"][sight.id];
     if (!en) continue;
-    const article = en.url ?? en.title;
-    if (articles.has(article)) continue;
-    articles.add(article);
+    if (!en.reference) {
+      const article = en.url ?? en.title;
+      if (articles.has(article)) continue;
+      articles.add(article);
+    }
     const kind = kindOf(sight, en.text);
     pool.push({
       ...sight,
@@ -645,14 +649,18 @@ export function buildQuiz(
     // the building's own area is part of its name ("Liberty" of the Statue of Liberty, on Liberty Island)
     const own = new Set(wordsOf(sight.b ?? ""));
     const placesHere = new Set([...places].filter((w) => !own.has(w)));
-    const blanked = new Map<QuizLocale, { parts: string[]; lang: string }>();
+    const blanked = new Map<QuizLocale, { parts: string[]; lang: string; reference?: true }>();
     for (const locale of QUIZ_LOCALES) {
       const text = texts[locale][sight.id];
       if (!text) continue;
       // "181st Street station (IRT Broadway–Seventh Avenue Line)": the line is not its name
       const title = text.title.replace(/\s*\([^)]*\)\s*$/, "");
       const names = [sight.n, title, ...(aliasesOf.get(sight.n.toLowerCase()) ?? [])];
-      blanked.set(locale, { parts: blankName(text.text, names, placesHere), lang: text.lang });
+      blanked.set(locale, {
+        parts: blankName(text.text, names, placesHere),
+        lang: text.lang,
+        reference: text.reference,
+      });
     }
     const visible = [...blanked.values()].map((b) => visibleOf(b.parts));
     const allowed = decoyRule(sight, visible, places);
@@ -671,7 +679,7 @@ export function buildQuiz(
     }
     report.questions++;
     report.levels[level - 1]++;
-    for (const [locale, { parts, lang }] of blanked) {
+    for (const [locale, { parts, lang, reference }] of blanked) {
       const left = parts
         .filter((_, i) => i % 2 === 0)
         .join("")
@@ -688,6 +696,7 @@ export function buildQuiz(
           ...(sight.area ? { area: sight.area } : {}),
           parts,
           lang,
+          ...(reference ? { reference } : {}),
         });
     }
   }

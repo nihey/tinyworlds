@@ -5,6 +5,8 @@ node_modules/
 */assets/plates/
 */batch/
 */assets/takes/
+# copies of the front page's committed loops
+recap/assets/loops/
 
 # renders and HyperFrames' own working state
 out/

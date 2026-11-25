@@ -77,6 +77,25 @@ model Donation {
   @@map("donations")
 }
 
+enum OwnerAlertChannel {
+  EMAIL
+  TELEGRAM
+}
+
+/// A pending owner alert, saved in the same transaction as the donation that triggered it.
+model OwnerAlert {
+  id          String            @id @default(uuid()) @db.Uuid
+  channel     OwnerAlertChannel
+  subject     String
+  text        String
+  /// The retry time, or the expiry of a worker's claim while it sends.
+  availableAt DateTime          @default(now()) @map("available_at")
+  attempts    Int               @default(0)
+
+  @@index([channel, availableAt, id])
+  @@map("owner_alerts")
+}
+
 /// Someone who has given, known by the email Stripe collected. Never exposed in GraphQL.
 model Donor {
   id           String       @id @default(uuid()) @db.Uuid

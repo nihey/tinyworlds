@@ -3,8 +3,7 @@
 @import "shadcn/tailwind.css";
 
 /* Every panel is a black enamel sign in both themes, so shadcn's dark-surface styles always apply.
-   The theme itself (day / dusk) only changes the fog behind the map and the map's own tint: it is
-   the `dusk` class on <html>, set by the script in layout.tsx and kept in sync by useTheme. */
+   The interface follows useTheme; the city canvases have their own lighting. */
 @custom-variant dark (&:where(html *));
 @custom-variant dusk (&:where(.dusk *));
 
@@ -49,7 +48,8 @@
 
 :root {
   /* the fog the map's dithered edges dissolve into */
-  --fog: #e9e6df;
+  --day-fog: #e9e6df;
+  --fog: var(--day-fog);
   /* signs: black enamel, paper-white lettering, taxi yellow for whatever is on */
   --sign: #15171a;
   --sign-raised: #24272c;
@@ -59,8 +59,6 @@
   --taxi: #f7c21b;
   --taxi-ink: #1a1503;
 
-  /* the same city an hour after sunset */
-  --dusk-tint: brightness(0.92) saturate(0.92) contrast(1.03);
   /* a model under studio lights: a touch more colour than the real thing */
   --tilt-lift: saturate(1.2) contrast(1.03);
 
@@ -141,7 +139,38 @@
   --tilt-reach: 26vh;
 }
 
+.map-benefactor-plaque {
+  --tool-clearance: 0px;
+  --minimap-clearance: 9.5rem;
+  margin-right: var(--tool-clearance);
+  max-width: min(
+    16rem,
+    calc(100dvw - var(--edge-l) - var(--edge-r) - var(--minimap-clearance) - var(--tool-clearance))
+  );
+}
+
+@media (max-height: 34rem) {
+  .map-benefactor-plaque {
+    --tool-clearance: 3.5rem;
+  }
+}
+
+@media (max-height: 40rem) {
+  .map-benefactor-carousel {
+    --tool-clearance: 3.5rem;
+  }
+}
+
+/* On short, narrow phones, the carousel needs the width above the minimap. */
+@media (max-width: 383px) and (max-height: 40rem) {
+  .map-benefactor-carousel {
+    --minimap-clearance: 0px;
+    margin-bottom: 4.25rem;
+  }
+}
+
 .map-tiles,
+.map-windows,
 .map-marks {
   position: fixed;
   inset: 0;
@@ -150,6 +179,7 @@
   display: block;
 }
 .map-tiles {
+  background: var(--day-fog);
   z-index: 0;
   touch-action: none;
   cursor: grab;
@@ -159,14 +189,35 @@
   outline: none;
 }
 /* no filter at all unless one is wanted: an identity filter still costs a pass per frame */
-.dusk .map-tiles {
-  filter: var(--dusk-tint);
+.map-root[data-city-light] .map-tiles {
+  filter: url(#city-light);
 }
-.tilt-on .map-tiles {
+.tilt-on:not([data-walk-dragging]) .map-tiles {
   filter: var(--tilt-lift);
 }
-.dusk .tilt-on .map-tiles {
-  filter: var(--dusk-tint) var(--tilt-lift);
+.tilt-on[data-city-light]:not([data-walk-dragging]) .map-tiles {
+  filter: url(#city-light) var(--tilt-lift);
+}
+.map-weather {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+.map-weather[data-weather="fog"] {
+  background:
+    linear-gradient(158deg, rgb(212 227 230 / 0.38), transparent 57%),
+    radial-gradient(ellipse at 95% 90%, rgb(210 225 233 / 0.25), transparent 58%);
+}
+.map-weather[data-weather="cloudy"] {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgb(52 67 86 / 0.17), transparent 55%),
+    radial-gradient(ellipse at 90% 74%, rgb(52 67 86 / 0.14), transparent 48%);
+}
+.map-root[data-city-light] .map-weather {
+  filter: url(#city-light);
 }
 /* over a building that lights up: it can be clicked (a drag still grabs) */
 .map-tiles.over-sight {
@@ -175,24 +226,19 @@
 .map-tiles.dragging {
   cursor: grabbing;
 }
+/* Window lamps sit above the graded city and below the tilt bands and map signs. */
+.map-windows {
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.map-root[data-walk-dragging] > .map-windows,
+.walk-full > .map-windows {
+  visibility: hidden;
+}
 .map-marks {
   z-index: 2;
   pointer-events: none;
-}
-
-/* dusk: a blue hour laid over the model, and a little warmth left at the horizon */
-.dusk-wash {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(to bottom, #56659d 0%, #7a78a8 55%, #b98f8f 100%);
-  mix-blend-mode: multiply;
-  transition: opacity 400ms ease;
-}
-.dusk .dusk-wash {
-  opacity: 0.3;
 }
 
 /* tilt-shift: the top and bottom of the view fall out of focus, like a photo of a model.
@@ -208,6 +254,10 @@
 }
 .tilt-on .tilt-band {
   opacity: 1;
+}
+/* Keep the street preview sharp above the dimmed tiles while placing the walker. */
+.map-root[data-walk-dragging] > :is(.map-marks, .tilt-band) {
+  visibility: hidden;
 }
 .tilt-band[data-edge="top"] {
   top: 0;
@@ -236,6 +286,103 @@
   }
 }
 
+/* ---- the street walk (components/walk) ---------------------------------------------------- */
+
+/* the walk takes the whole screen. The map waits underneath, hidden and still (its engine is
+   paused), for the way back; its other signs are not drawn meanwhile */
+.walk-full > .map-tiles,
+.walk-full > .map-marks,
+.walk-full > .tilt-band {
+  visibility: hidden;
+}
+.walk-area {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+}
+
+/* The minimap's size also reserves room for the touch controls on narrow and short screens. */
+.walk-pane {
+  --walk-mm: 176px;
+}
+@media (max-width: 639.98px), (max-height: 499.98px) {
+  .walk-pane {
+    --walk-mm: clamp(96px, min(33vw, 29dvh), 128px);
+  }
+}
+.walk-minimap {
+  left: var(--edge-l);
+  bottom: var(--edge-b);
+  width: var(--walk-mm);
+  height: var(--walk-mm);
+}
+
+/* the person carried over the map: held by the head, swinging a little */
+@keyframes walk-dangle {
+  0%,
+  100% {
+    rotate: -7deg;
+  }
+  50% {
+    rotate: 7deg;
+  }
+}
+.walk-dangle {
+  transform-origin: 50% 0;
+  animation: walk-dangle 900ms ease-in-out infinite;
+}
+
+/* a hit: the edges of the view redden, and the life bar flashes */
+.walk-hurt {
+  box-shadow: inset 0 0 70px 18px rgb(200 71 60 / 0.75);
+}
+@keyframes walk-flash {
+  50% {
+    opacity: 0.35;
+  }
+}
+.walk-flash {
+  animation: walk-flash 160ms steps(1, end) infinite;
+}
+
+/* the wasted screen's word: Tiny5 in paper white, outlined one of its own pixels wide (an em is
+   eight of them) in the signs' ink, at sizes where its pixels are whole screen pixels */
+.walk-wasted {
+  --px: 0.125em;
+  font-size: 56px;
+  line-height: 1;
+  /* room between the letters' outlines: the word stands on the vignette, not on a band */
+  letter-spacing: 0.22em;
+  margin-right: -0.22em;
+  color: var(--paper);
+  text-shadow:
+    var(--px) 0 0 #15171a,
+    calc(-1 * var(--px)) 0 0 #15171a,
+    0 var(--px) 0 #15171a,
+    0 calc(-1 * var(--px)) 0 #15171a,
+    var(--px) var(--px) 0 #15171a,
+    calc(-1 * var(--px)) var(--px) 0 #15171a,
+    var(--px) calc(-1 * var(--px)) 0 #15171a,
+    calc(-1 * var(--px)) calc(-1 * var(--px)) 0 #15171a;
+}
+@media (min-width: 640px) {
+  .walk-wasted {
+    font-size: 96px;
+  }
+}
+@media (min-width: 1100px) {
+  .walk-wasted {
+    font-size: 136px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-dangle,
+  .walk-flash {
+    animation: none;
+  }
+}
+
 /* ---- signs -------------------------------------------------------------------------------- */
 
 @utility sign {
@@ -247,6 +394,14 @@
     0 0 0 1px rgb(0 0 0 / 0.6),
     0 16px 34px -14px rgb(0 0 0 / 0.65),
     0 2px 6px -1px rgb(0 0 0 / 0.3);
+}
+
+/* a stone of a city's wall (stone-wall.tsx): a page holds hundreds, so one short class */
+@utility stone {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  box-shadow: inset 0 -2px 0 rgb(0 0 0 / 0.25);
 }
 
 /* the part of a funding bar a donation is about to add: the accent in stripes, drifting */
@@ -346,6 +501,33 @@
   animation: hero-in ease both;
 }
 
+/* The homepage's paper and wordmark follow the theme used by the rest of the site. */
+.home-landing {
+  --home-wordmark: #486957;
+}
+body:has(.home-landing) {
+  background: #f6f2e8;
+}
+.dusk .home-landing {
+  --home-wordmark: var(--taxi);
+}
+.dusk body:has(.home-landing) {
+  background: var(--fog);
+}
+
+@keyframes home-arrive {
+  from {
+    opacity: 0.5;
+    transform: translateY(var(--home-rise, 8px));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-arrive {
+    animation: home-arrive 470ms cubic-bezier(0.2, 0.75, 0.25, 1) var(--home-delay, 0ms) backwards;
+  }
+}
+
 /* the first arrival: signs go up one after another */
 @keyframes sign-in {
   from {
@@ -360,6 +542,23 @@
 .sign-in {
   animation: sign-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   animation-delay: var(--sign-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .benefactor-flip {
+    animation: benefactor-flip 260ms ease-out both;
+  }
+}
+
+@keyframes benefactor-flip {
+  from {
+    opacity: 0;
+    transform: perspective(12rem) rotateX(-36deg) translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* the invitation to the other places steps aside while the search box is in use: its results
@@ -393,7 +592,6 @@
   .skyline i {
     animation: none;
   }
-  .dusk-wash,
   .tilt-band {
     transition: none;
   }

@@ -2,11 +2,12 @@
 
 The moving pictures, made with [HyperFrames](https://hyperframes.heygen.com) (HTML rendered to
 video, frame by frame): the loops the front page plays in its hero and its cards, a flyover of
-each city to share, the showcase film, and a tour of tinywesteros for the people who know its
-places. One rule holds everywhere: **a picture of a map is cut from the real tiles or filmed
+each city to share, the showcase film, a tour of tinywesteros for the people who know its
+places, the recap film (what the project has done, and the invitation to fund the next city),
+and the New York Street Walk announcement. One rule holds everywhere: **a picture of a map is cut from the real tiles or filmed
 from the real viewer**. Nothing is redrawn.
 
-Four HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`: each an `index.html`, its
+The HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`, `recap/`, `street-walk/`: each an `index.html`, its
 `compositions/` and `assets/`) and the TypeScript scripts that feed and render them.
 
 ## Commands
@@ -15,6 +16,7 @@ Four HyperFrames projects (`loop/`, `flyover/`, `film/`, `westeros/`: each an `i
 npm run plates [-- tinynyc …]   # cut the map plates and wordmark sheets from the tiles → */assets/plates/, */batch/
 npm run loops [-- tinylax …]    # render the card loops (every one, or the worlds named) → ../tinyworlds-frontend/public/loops/<world>.mp4 (committed)
 npm run flyovers [-- hero [world …]|cities]   # the heroes → …/public/loops/hero.{mp4,jpg}, hero-<world>.{mp4,jpg} (committed); city flyovers → out/flyovers/
+# after new loops or heroes: `npm run stills` in ../tinyworlds-frontend (the front page's smaller copies)
 npm run takes -- main [--until 8.4]   # film the New York map for the film (VIEWER_URL, a dev server of the viewer)
 npm run takes -- page           # capture the front page for the film (HOME_URL, a dev server of the front page)
 ELEVENLABS_API_KEY=… npm run sound [-- --for film|westeros]   # compose a NEW music bed → <film>/assets/music/bed.mp3 (replaces the committed one)
@@ -22,6 +24,14 @@ npm run film [-- draft|looks|delivery]   # render the film → out/film/tinyworl
 npm run westeros -- stills 0 2.9 12.7    # the Westeros tour: look at its picture at those seconds (VIEWER_URL)
 npm run westeros -- take                 # film it from the viewer (NEXT_PUBLIC_WORLD=tinywesteros)
 npm run westeros -- render [draft|looks|delivery]   # → out/westeros/tinywesteros.mp4 (+ a smaller copy to post)
+ELEVENLABS_API_KEY=… npm run recap -- voice [take]   # the recap's narration, a take or all → recap/assets/voice/ (committed)
+npm run recap -- take           # film the Dallas viewer for the recap (VIEWER_URL, a build of tinydal served locally)
+npm run recap -- pages          # capture the live front page, ranking and Hall of Fame (SITE_URL or deploy/.env)
+npm run recap -- plates         # the history's pictures and signs, from the flyover plates (npm run plates first)
+npm run recap -- sfx            # the recap's tracks of ticks (stones, history, letters), from assets/sfx/
+npm run recap -- captions       # its subtitles, from the narration's word times → recap/compositions/captions.html
+npm run recap -- render [draft|looks|delivery]   # → out/recap/tinyworlds-recap.mp4 (+ a smaller copy to post)
+npm exec -- tsx scripts/street-walk.ts [shot …]   # film the New York announcement (VIEWER_URL)
 npm run context                 # a look round each world's card framing (out/context/), to choose a drift
 npm run probe -- name:lon,lat,scale[,rise][@seconds][+chrome]   # stills of the viewer, to choose a take's framings
 npm run lint | lint:fix | typecheck
@@ -52,10 +62,13 @@ scripts/
 ├── worlds.ts        # per world: which way its card loop sets off, its flyover's framing, its hero's
 ├── plates.ts loops.ts flyovers.ts takes.ts sound.ts film.ts context.ts probe.ts
 ├── westeros.ts      # the tour of tinywesteros: its stops, its take, its render
+├── recap.ts         # the recap film: its narration, its Dallas take, its page captures, its render
 loop/                # 1200 × 630, 10 s: a card loop (variables: plate, sign, dir)
 flyover/             # 1920 × 1080, 12 s: a city flyover, and a world's hero (variables: plate, sign, a, b)
 film/                # 1920 × 1080, 31 s: the showcase film (SPEC.md, REVIEW.md)
 westeros/            # 1920 × 1080, 35 s: the tour of tinywesteros (SPEC.md, REVIEW.md)
+recap/               # 1920 × 1080, 57.6 s: the recap film, narrated (STORYLINES.md, SPEC.md, REVIEW.md)
+street-walk/         # 1920 × 1080, 30 s: the New York Street Walk announcement (README.md, SPEC.md, REVIEW.md)
 ```
 
 It imports from the pipeline's source (`../tinyworlds-pipeline/src/`: the cities' card
@@ -153,6 +166,43 @@ made for fan communities: people who know the places.
   a picture of the fan-made map for the fans of its world, with "A fan-made map. Not affiliated
   with George R. R. Martin or HBO." on its end card, an original score that imitates no one's,
   and no claim to be official anywhere. The address is the `address` variable, as in the film.
+
+## The recap
+
+`recap/SPEC.md` is its brief ("Thirty stones": the other two storylines are in
+`recap/STORYLINES.md`). Narrated, with subtitles, unlike the other films.
+
+- **The voice is the clock.** `recap -- voice` asks ElevenLabs for each take of the script
+  (`VOICE_TAKES`: one request per take, so each sounds like one reading), with each character's
+  time, and cuts it into a file per line, numbered on across the takes
+  (`assets/voice/line-NN.wav`, `lines.json`: each word's time inside its line). Name a take to
+  record only it: the film is timed to the others. `PLACES` says where each line is said;
+  `index.html` places the lines' `<audio>` at the same seconds, and `recap -- captions` writes
+  the subtitles (`compositions/captions.html`) from the same word times: Tiny5 on the site's
+  black enamel, the spoken word in taxi yellow, up to five words a group (`BREAKS` where a
+  phrase wants splitting by hand). The takes are committed, like a music bed. The key is never
+  in a file here.
+- **The history of the map** (`compositions/history.html`): the thirteen real cities in the
+  order they went up (`HISTORY`, the viewer's registry order), a beat or two each on the bed's
+  bars. Each is its hero framing, cut from the tiles by `npm run plates` and made lighter by
+  `recap -- plates` (with its flyover sign, the pipeline's own, cut off its sheet); those built
+  by their benefactors carry their real plaque, captured from their card (`recap -- pages`).
+  A new city: add it to `HISTORY`, give it a beat in the composition, and cut its plates.
+- **Only the stone wall is rebuilt** (`compositions/stones.html`, from the site's `StoneWall`):
+  Dallas's thirty stones, laid at the times `STONE_TIMES` in `recap.ts` also gives the ticks.
+  The real walls are the ranking's: London's empty one ends the film.
+- **The take** (`recap -- take`) is the showcase film's way of filming (`lib/film.ts`) on a
+  static build of tinydal (`NEXT_PUBLIC_WORLD=tinydal NEXT_PUBLIC_BASE_PATH=/tinydal
+NEXT_PUBLIC_DATA_BASE=/tinydal/data`, built in a copy of the frontend as `deploy.sh` does,
+  `data` linked in, served with `python3 -m http.server`). Its pointer is a pixel-art arrow
+  drawn into the page (it follows the real mouse), and the page's `Math.random` is seeded so
+  the game's first building is always the same. Its moments are `TAKE_AT`, in film seconds.
+- **The pages are the live site's** (`recap -- pages`): only the site's own host is fetched,
+  and a program's browser is never counted as a visit. Each capture comes with its pictures'
+  places (`*.json`), which the cities' shot uses to play the real loops (copied from the front
+  page's `public/loops/` into `recap/assets/loops/`, not committed) over the cards.
+- **Names on screen** are the site's public ones (the opening's two gifts are the `stones`
+  composition's variables `first` and `second`).
 
 ## Gotchas
 

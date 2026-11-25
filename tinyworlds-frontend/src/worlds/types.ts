@@ -1,3 +1,4 @@
+import type { WeatherCondition } from "@/map/weather";
 import type { Locale } from "@/i18n/locale";
 import type { SearchRules } from "@/map/search-rules";
 
@@ -63,6 +64,8 @@ export interface World {
    * front page lists it apart from the real cities.
    */
   fictional?: boolean;
+  /** Initial sky in an imagined world. Real cities start with a live observation. */
+  weather?: WeatherCondition;
   /**
    * Its data has sights (sights.json): buildings found in the search light up under the pointer,
    * with a line from Wikipedia. Without it the viewer never asks for the file.
@@ -79,6 +82,22 @@ export interface World {
    * from one to the other. Without it the compass only says where north is.
    */
   turn?: "grid";
+  /**
+   * Its data has the street walk (walk/, in its own folder: one walk whichever way the map is
+   * turned): the little person on the map opens a walk at street level, on foot, at the wheel or
+   * on the water. Without it the viewer never asks for the files.
+   */
+  walk?: boolean;
+  /**
+   * Areas of the walk (a centre and a radius in metres) whose street-facing walls carry
+   * billboards: generic animated pixel-art screens, no brands, no words (`walk/render/billboards.ts`).
+   * Absent: none. Only read with `walk`.
+   */
+  billboards?: { lon: number; lat: number; radius: number }[];
+  /**
+   * Speeds in the walk are in miles per hour (the country drives by them). Absent: km/h.
+   */
+  units?: "imperial";
   /** How queries are read. This follows the language of the map's names, not the interface's. */
   search: SearchRules;
 }

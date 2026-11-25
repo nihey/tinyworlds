@@ -294,6 +294,29 @@ describe("buildQuiz", () => {
     expect(files["pt-BR"].questions[0].lang).toBe("pt");
     expect(files["en-US"].questions[0].parts.join("")).toBe(long("Alpha Tower"));
   });
+
+  it("keeps distinct landmark clues sourced to the same reference page", () => {
+    const referenced = (lang: string) =>
+      Object.fromEntries(
+        sights.map((s) => [
+          s.id,
+          { title: s.n, text: long(s.n), lang, url: "https://example.org/history", reference: true as const },
+        ]),
+      );
+    const { files } = buildQuiz(
+      sights,
+      {
+        "en-US": referenced("en"),
+        "pt-BR": referenced("pt"),
+        "es-ES": referenced("es"),
+      },
+      [],
+    );
+    for (const { questions } of Object.values(files)) {
+      expect(questions.map((q) => q.id)).toEqual(["a", "b", "c", "d"]);
+      expect(questions.every((q) => q.reference === true)).toBe(true);
+    }
+  });
 });
 
 describe("questions that must not answer themselves (review)", () => {

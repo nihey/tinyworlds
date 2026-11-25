@@ -13,7 +13,7 @@ import { givingSummary, stoneRanges, type MyCity, type MyGiving } from "@/lib/be
 import { formatUsd } from "@/lib/donate";
 import { cityStones } from "@/lib/stones";
 import { cn } from "@/lib/utils";
-import { SITE_ID, worldCardUrl, worldUrl } from "@/site";
+import { SITE_ID, worldCardSrcSet, worldCardUrl, worldUrl } from "@/site";
 import { BadgesToEarn } from "./badges";
 import { NameEditor } from "./name-editor";
 
@@ -31,6 +31,8 @@ function Thumbnail({ world }: { world: string }) {
     // eslint-disable-next-line @next/next/no-img-element -- a plain file, no optimizer in a static export
     <img
       src={worldCardUrl(world)}
+      srcSet={worldCardSrcSet(world)}
+      sizes="7rem"
       alt=""
       loading="lazy"
       decoding="async"

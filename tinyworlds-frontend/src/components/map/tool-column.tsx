@@ -67,6 +67,8 @@ interface ToolColumnProps {
   onSettingsOpenChange: (open: boolean) => void;
   /** the settings panel's contents */
   settings: ReactNode;
+  /** the street walk's little person, in a world that has the walk */
+  person?: ReactNode;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -86,6 +88,7 @@ export function ToolColumn({
   settingsOpen,
   onSettingsOpenChange,
   settings,
+  person,
   className,
   style,
 }: ToolColumnProps) {
@@ -109,6 +112,12 @@ export function ToolColumn({
       <ToolButton label={t.tools.wholeMap} hint="0" onClick={onWholeMap}>
         <MapIcon {...icon} />
       </ToolButton>
+      {person && (
+        <>
+          <Rule />
+          {person}
+        </>
+      )}
       <Rule />
       <ToolButton label={t.tools.search} hint="/" onClick={onSearch}>
         <Search {...icon} />
@@ -134,7 +143,7 @@ export function ToolColumn({
           align="start"
           sideOffset={12}
           collisionPadding={12}
-          className="sign w-[min(19rem,calc(100vw-5.5rem))] gap-0 overflow-hidden p-0 ring-0"
+          className="sign w-[min(19rem,calc(100vw-5.5rem))] max-h-(--radix-popover-content-available-height) gap-0 overflow-y-auto p-0 ring-0"
         >
           {settings}
         </PopoverContent>
